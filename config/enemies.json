@@ -1,0 +1,256 @@
+{
+  "enemy_groups": [
+    {
+      "key": "low",
+      "name": "低阶妖域",
+      "description": "炼气-筑基期妖兽出没的荒野林地",
+      "level_range": [0, 12],
+      "templates": [
+        {
+          "key": "wolf",
+          "name": "疾风狼",
+          "description": "速度迅捷，利爪如风的低阶妖兽",
+          "elite_prefixes": ["历战的", "强壮的", "变异的", "狂暴的"],
+          "boss_names": ["苍月狼王", "疾风狼王", "啸月狼尊"],
+          "hp_mult": 0.6,
+          "atk_mult": 0.85,
+          "defense": 3,
+          "crit_rate": 10
+        },
+        {
+          "key": "snake",
+          "name": "赤炼蛇",
+          "description": "身蕴火毒，噬人于无形",
+          "elite_prefixes": ["历战的", "强壮的", "变异的", "狂暴的"],
+          "boss_names": ["赤炼蛇王", "噬心蛇尊", "九节毒龙"],
+          "hp_mult": 0.65,
+          "atk_mult": 0.8,
+          "defense": 5,
+          "crit_rate": 8
+        },
+        {
+          "key": "spider",
+          "name": "鬼面蛛",
+          "description": "背生鬼脸，毒丝缠魂",
+          "elite_prefixes": ["历战的", "强壮的", "变异的", "狂暴的"],
+          "boss_names": ["千面蛛后", "幽冥鬼蛛", "噬魂蛛王"],
+          "hp_mult": 0.7,
+          "atk_mult": 0.7,
+          "defense": 10,
+          "crit_rate": 5
+        }
+      ],
+      "elite": {
+        "hp_mult": 0.9,
+        "atk_mult": 1.0,
+        "defense_bonus": 5,
+        "crit_rate_bonus": 5
+      },
+      "boss": {
+        "hp_mult": 1.2,
+        "atk_mult": 1.2,
+        "defense_bonus": 15,
+        "crit_rate_bonus": 10
+      },
+      "drop_tier": "low"
+    },
+    {
+      "key": "mid",
+      "name": "中阶妖域",
+      "description": "金丹-元婴期妖兽盘踞的山脉深谷",
+      "level_range": [13, 18],
+      "templates": [
+        {
+          "key": "tiger",
+          "name": "裂地虎",
+          "description": "虎啸裂地，凶煞逼人",
+          "elite_prefixes": ["强大的", "铁甲的", "血瞳的", "吞噬的"],
+          "boss_names": ["裂地虎尊", "血瞳虎王", "噬天虎妖"],
+          "hp_mult": 0.7,
+          "atk_mult": 1.0,
+          "defense": 10,
+          "crit_rate": 15
+        },
+        {
+          "key": "bear",
+          "name": "撼山熊",
+          "description": "力能撼山，妖躯如铁",
+          "elite_prefixes": ["强大的", "铁甲的", "血瞳的", "吞噬的"],
+          "boss_names": ["撼山熊君", "铁背妖熊", "吞山巨罴"],
+          "hp_mult": 0.9,
+          "atk_mult": 0.85,
+          "defense": 25,
+          "crit_rate": 8
+        },
+        {
+          "key": "eagle",
+          "name": "铁羽鹰",
+          "description": "铁翼横空，喙爪如刃",
+          "elite_prefixes": ["强大的", "铁甲的", "血瞳的", "吞噬的"],
+          "boss_names": ["铁羽鹰皇", "裂空妖鹏", "噬魂鹫王"],
+          "hp_mult": 0.75,
+          "atk_mult": 0.95,
+          "defense": 12,
+          "crit_rate": 12
+        }
+      ],
+      "elite": {
+        "hp_mult": 1.1,
+        "atk_mult": 1.1,
+        "defense_bonus": 8,
+        "crit_rate_bonus": 5
+      },
+      "boss": {
+        "hp_mult": 1.2,
+        "atk_mult": 1.4,
+        "defense_bonus": 20,
+        "crit_rate_bonus": 8
+      },
+      "drop_tier": "mid"
+    },
+    {
+      "key": "high",
+      "name": "高阶妖域",
+      "description": "化神-合体期凶兽蛰伏的远古禁地",
+      "level_range": [19, 27],
+      "templates": [
+        {
+          "key": "jiao",
+          "name": "玄水蛟",
+          "description": "潜渊游雾，龙威初显",
+          "elite_prefixes": ["天灾级的", "上古的", "深渊的", "混沌的"],
+          "boss_names": ["覆海蛟魔", "深渊龙君", "玄冥蛟皇"],
+          "hp_mult": 0.8,
+          "atk_mult": 1.1,
+          "defense": 20,
+          "crit_rate": 15
+        },
+        {
+          "key": "turtle",
+          "name": "镇海玄龟",
+          "description": "背负玄甲，万法不侵",
+          "elite_prefixes": ["天灾级的", "上古的", "深渊的", "混沌的"],
+          "boss_names": ["北海玄龟", "镇海龙龟", "玄武后裔"],
+          "hp_mult": 1.1,
+          "atk_mult": 0.85,
+          "defense": 45,
+          "crit_rate": 5
+        },
+        {
+          "key": "golden_eagle",
+          "name": "裂空金雕",
+          "description": "金翼裂空，喙啄金石",
+          "elite_prefixes": ["天灾级的", "上古的", "深渊的", "混沌的"],
+          "boss_names": ["金翅大鹏", "裂天雕皇", "九霄鹏魔"],
+          "hp_mult": 0.85,
+          "atk_mult": 1.05,
+          "defense": 18,
+          "crit_rate": 20
+        }
+      ],
+      "elite": {
+        "hp_mult": 1.1,
+        "atk_mult": 1.3,
+        "defense_bonus": 12,
+        "crit_rate_bonus": 5
+      },
+      "boss": {
+        "hp_mult": 1.3,
+        "atk_mult": 1.6,
+        "defense_bonus": 30,
+        "crit_rate_bonus": 5
+      },
+      "drop_tier": "high"
+    },
+    {
+      "key": "top",
+      "name": "顶级妖域",
+      "description": "大乘-渡劫期神兽栖息的洪荒秘境",
+      "level_range": [28, 31],
+      "templates": [
+        {
+          "key": "dragon",
+          "name": "苍龙",
+          "description": "龙吟九霄，吐息焚海",
+          "elite_prefixes": ["天灾级的", "太古的", "洪荒的", "混沌的"],
+          "boss_names": ["五爪金龙", "太古苍龙", "混沌龙祖"],
+          "hp_mult": 0.9,
+          "atk_mult": 1.2,
+          "defense": 35,
+          "crit_rate": 20
+        },
+        {
+          "key": "qilin",
+          "name": "墨玉麒麟",
+          "description": "瑞兽后裔，踏火御风",
+          "elite_prefixes": ["天灾级的", "太古的", "洪荒的", "混沌的"],
+          "boss_names": ["麒麟圣皇", "洪荒玉麒麟", "祥瑞古兽"],
+          "hp_mult": 1.2,
+          "atk_mult": 1.0,
+          "defense": 60,
+          "crit_rate": 10
+        },
+        {
+          "key": "phoenix",
+          "name": "火凤",
+          "description": "浴火而生，涅槃不灭",
+          "elite_prefixes": ["天灾级的", "太古的", "洪荒的", "混沌的"],
+          "boss_names": ["九天凤皇", "太古火凤", "不死凤凰"],
+          "hp_mult": 1.0,
+          "atk_mult": 1.1,
+          "defense": 30,
+          "crit_rate": 25
+        }
+      ],
+      "elite": {
+        "hp_mult": 1.1,
+        "atk_mult": 1.5,
+        "defense_bonus": 15,
+        "crit_rate_bonus": 5
+      },
+      "boss": {
+        "hp_mult": 1.3,
+        "atk_mult": 1.8,
+        "defense_bonus": 40,
+        "crit_rate_bonus": 5
+      },
+      "drop_tier": "top"
+    }
+  ],
+  "drop_tables": {
+    "low": [
+      { "name": "妖兽精血", "weight": 40, "min": 1, "max": 2 },
+      { "name": "灵兽毛皮", "weight": 35, "min": 1, "max": 2 },
+      { "name": "灵草", "weight": 25, "min": 1, "max": 3 }
+    ],
+    "mid": [
+      { "name": "灵兽内丹", "weight": 30, "min": 1, "max": 1 },
+      { "name": "妖兽精血", "weight": 30, "min": 1, "max": 2 },
+      { "name": "星辰石", "weight": 25, "min": 1, "max": 2 },
+      { "name": "功法残页", "weight": 15, "min": 1, "max": 1 }
+    ],
+    "high": [
+      { "name": "天材地宝", "weight": 25, "min": 1, "max": 1 },
+      { "name": "混沌精华", "weight": 25, "min": 1, "max": 1 },
+      { "name": "远古秘籍", "weight": 25, "min": 1, "max": 1 },
+      { "name": "仙器碎片", "weight": 25, "min": 1, "max": 1 }
+    ],
+    "top": [
+      { "name": "天材地宝", "weight": 20, "min": 1, "max": 2 },
+      { "name": "混沌精华", "weight": 20, "min": 1, "max": 1 },
+      { "name": "远古秘籍", "weight": 20, "min": 1, "max": 1 },
+      { "name": "仙器碎片", "weight": 20, "min": 1, "max": 1 },
+      { "name": "神兽之骨", "weight": 20, "min": 1, "max": 1 }
+    ]
+  },
+  "difficulty_coefficients": {
+    "normal": 0.85,
+    "elite": 1.0,
+    "boss": 1.2
+  },
+  "naming": {
+    "normal": "{name}",
+    "elite": "{prefix}{name}",
+    "boss": "{boss_name}"
+  }
+}
