@@ -12,6 +12,37 @@ from .database_extended import DatabaseExtended
 # 获取 Player 模型的所有字段名（用于过滤数据库中的多余字段，作为迁移未完成时的兼容）
 PLAYER_FIELDS = {f.name for f in fields(Player)}
 
+# 从 Player dataclass 动态生成 SQL
+_PLAYER_FIELDS = [f.name for f in fields(Player)]
+_PLAYER_FIELDS_SET = set(_PLAYER_FIELDS)
+
+def _build_insert_sql():
+    """构建 INSERT SQL（从 Player dataclass 动态生成）"""
+    cols = ', '.join(_PLAYER_FIELDS)
+    placeholders = ', '.join(['?' for _ in _PLAYER_FIELDS])
+    return f"INSERT INTO players ({cols}) VALUES ({placeholders})"
+
+def _build_update_sql():
+    """构建 UPDATE SQL（从 Player dataclass 动态生成）"""
+    set_clauses = ', '.join([f"{f} = ?" for f in _PLAYER_FIELDS if f != 'user_id'])
+    return f"UPDATE players SET {set_clauses} WHERE user_id = ?"
+
+def _player_to_tuple(player: Player, for_insert: bool = True):
+    """将 Player 对象转换为 SQL 参数元组"""
+    values = []
+    for f in _PLAYER_FIELDS:
+        val = getattr(player, f)
+        # 布尔值转整数
+        if isinstance(val, bool):
+            val = int(val)
+        values.append(val)
+    if not for_insert:
+        # UPDATE: user_id 移到最后
+        values.append(values.pop(0))
+    return tuple(values)
+
+
+
 class DataBase:
     """数据库管理类，提供基础玩家操作"""
 
@@ -55,71 +86,10 @@ class DataBase:
         await self.reconnect()
 
     async def create_player(self, player: Player):
-        """创建新玩家"""
-        await self.conn.execute(
-            """
-            INSERT INTO players (
-                user_id, level_index, spiritual_root,cultivation_type, user_name, lifespan,
-                experience, gold, state, cultivation_start_time, last_check_in_date, level_up_rate,
-                weapon, armor, main_technique, techniques,
-                hp, mp, atk, atkpractice,
-                spiritual_qi, max_spiritual_qi, blood_qi, max_blood_qi,
-                magic_damage, physical_damage, magic_defense, physical_defense, mental_power,
-                sect_id, sect_position, sect_contribution, sect_task, sect_elixir_get,
-                blessed_spot_flag, blessed_spot_name,
-                active_pill_effects, permanent_pill_gains, has_resurrection_pill, has_debuff_shield, pills_inventory,
-                storage_ring, storage_ring_items,
-                daily_pill_usage, last_daily_reset
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                player.user_id,
-                player.level_index,
-                player.spiritual_root,
-                player.cultivation_type,
-                player.user_name,
-                player.lifespan,
-                player.experience,
-                player.gold,
-                player.state,
-                player.cultivation_start_time,
-                player.last_check_in_date,
-                player.level_up_rate,
-                player.weapon,
-                player.armor,
-                player.main_technique,
-                player.techniques,
-                player.hp,
-                player.mp,
-                player.atk,
-                player.atkpractice,
-                player.spiritual_qi,
-                player.max_spiritual_qi,
-                player.blood_qi,
-                player.max_blood_qi,
-                player.magic_damage,
-                player.physical_damage,
-                player.magic_defense,
-                player.physical_defense,
-                player.mental_power,
-                player.sect_id,
-                player.sect_position,
-                player.sect_contribution,
-                player.sect_task,
-                player.sect_elixir_get,
-                player.blessed_spot_flag,
-                player.blessed_spot_name,
-                player.active_pill_effects,
-                player.permanent_pill_gains,
-                player.has_resurrection_pill,
-                int(player.has_debuff_shield),
-                player.pills_inventory,
-                player.storage_ring,
-                player.storage_ring_items,
-                player.daily_pill_usage,
-                player.last_daily_reset
-            )
-        )
+        """创建新玩家（字段从 Player dataclass 动态生成，避免遗漏）"""
+        sql = _build_insert_sql()
+        params = _player_to_tuple(player, for_insert=True)
+        await self.conn.execute(sql, params)
         await self.conn.commit()
 
     async def get_player_by_id(self, user_id: str) -> Player:
@@ -131,7 +101,7 @@ class DataBase:
             row = await cursor.fetchone()
             if row:
                 # 过滤掉 Player 模型中不存在的字段（兼容旧数据库/迁移未完成的情况）
-                filtered_data = {k: v for k, v in dict(row).items() if k in PLAYER_FIELDS}
+                filtered_data = {k: v for k, v in dict(row).items() if k in _PLAYER_FIELDS_SET}
                 return Player(**filtered_data)
             return None
 
@@ -143,109 +113,15 @@ class DataBase:
         ) as cursor:
             row = await cursor.fetchone()
             if row:
-                filtered_data = {k: v for k, v in dict(row).items() if k in PLAYER_FIELDS}
+                filtered_data = {k: v for k, v in dict(row).items() if k in _PLAYER_FIELDS_SET}
                 return Player(**filtered_data)
             return None
 
     async def update_player(self, player: Player):
-        """更新玩家信息"""
-        await self.conn.execute(
-            """
-            UPDATE players SET
-                level_index = ?,
-                spiritual_root = ?,
-                cultivation_type = ?,
-                user_name = ?,
-                lifespan = ?,
-                experience = ?,
-                gold = ?,
-                state = ?,
-                cultivation_start_time = ?,
-                last_check_in_date = ?,
-                level_up_rate = ?,
-                weapon = ?,
-                armor = ?,
-                main_technique = ?,
-                techniques = ?,
-                hp = ?,
-                mp = ?,
-                atk = ?,
-                atkpractice = ?,
-                spiritual_qi = ?,
-                max_spiritual_qi = ?,
-                blood_qi = ?,
-                max_blood_qi = ?,
-                magic_damage = ?,
-                physical_damage = ?,
-                magic_defense = ?,
-                physical_defense = ?,
-                mental_power = ?,
-                sect_id = ?,
-                sect_position = ?,
-                sect_contribution = ?,
-                sect_task = ?,
-                sect_elixir_get = ?,
-                blessed_spot_flag = ?,
-                blessed_spot_name = ?,
-                active_pill_effects = ?,
-                permanent_pill_gains = ?,
-                has_resurrection_pill = ?,
-                has_debuff_shield = ?,
-                pills_inventory = ?,
-                storage_ring = ?,
-                storage_ring_items = ?,
-                daily_pill_usage = ?,
-                last_daily_reset = ?
-            WHERE user_id = ?
-            """,
-            (
-                player.level_index,
-                player.spiritual_root,
-                player.cultivation_type,
-                player.user_name,
-                player.lifespan,
-                player.experience,
-                player.gold,
-                player.state,
-                player.cultivation_start_time,
-                player.last_check_in_date,
-                player.level_up_rate,
-                player.weapon,
-                player.armor,
-                player.main_technique,
-                player.techniques,
-                player.hp,
-                player.mp,
-                player.atk,
-                player.atkpractice,
-                player.spiritual_qi,
-                player.max_spiritual_qi,
-                player.blood_qi,
-                player.max_blood_qi,
-                player.magic_damage,
-                player.physical_damage,
-                player.magic_defense,
-                player.physical_defense,
-                player.mental_power,
-                player.sect_id,
-                player.sect_position,
-                player.sect_contribution,
-                player.sect_task,
-                player.sect_elixir_get,
-                player.blessed_spot_flag,
-                player.blessed_spot_name,
-                player.active_pill_effects,
-                player.permanent_pill_gains,
-                player.has_resurrection_pill,
-                int(player.has_debuff_shield),
-                player.pills_inventory,
-                player.storage_ring,
-                player.storage_ring_items,
-                player.daily_pill_usage,
-                player.last_daily_reset,
-                player.user_id
-            )
-        )
+        """更新玩家信息（字段从 Player dataclass 动态生成，避免遗漏）"""
+        sql = _build_update_sql()
+        params = _player_to_tuple(player, for_insert=False)
+        await self.conn.execute(sql, params)
         await self.conn.commit()
 
     async def delete_player(self, user_id: str):
@@ -292,7 +168,7 @@ class DataBase:
         async with self.conn.execute("SELECT * FROM players") as cursor:
             rows = await cursor.fetchall()
             # 过滤掉 Player 模型中不存在的字段（兼容旧数据库/迁移未完成的情况）
-            return [Player(**{k: v for k, v in dict(row).items() if k in PLAYER_FIELDS}) for row in rows]
+            return [Player(**{k: v for k, v in dict(row).items() if k in _PLAYER_FIELDS_SET}) for row in rows]
 
     # ===== 商店数据操作 =====
 

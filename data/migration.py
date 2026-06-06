@@ -520,6 +520,131 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_trans_user ON bank_transactions(user_id)")
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_trans_time ON bank_transactions(created_at)")
 
+
+    # 创建悬赏任务表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS bounty_tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            bounty_id INTEGER NOT NULL,
+            bounty_name TEXT NOT NULL,
+            target_type TEXT NOT NULL,
+            target_count INTEGER NOT NULL,
+            current_progress INTEGER NOT NULL DEFAULT 0,
+            rewards TEXT NOT NULL DEFAULT '{}',
+            start_time INTEGER NOT NULL,
+            expire_time INTEGER NOT NULL,
+            status INTEGER NOT NULL DEFAULT 1
+        )
+    """)
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bounty_user ON bounty_tasks(user_id)")
+    
+    # 创建洞天福地表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS blessed_lands (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL UNIQUE,
+            land_type INTEGER NOT NULL DEFAULT 1,
+            land_name TEXT NOT NULL DEFAULT '小洞天',
+            level INTEGER NOT NULL DEFAULT 1,
+            exp_bonus REAL NOT NULL DEFAULT 0.05,
+            gold_per_hour INTEGER NOT NULL DEFAULT 100,
+            last_collect_time INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_blessed_lands_user ON blessed_lands(user_id)")
+    
+    # 创建灵田表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS spirit_farms (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL UNIQUE,
+            level INTEGER NOT NULL DEFAULT 1,
+            crops TEXT NOT NULL DEFAULT '[]'
+        )
+    """)
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_spirit_farms_user ON spirit_farms(user_id)")
+    
+    # 创建双修记录表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS dual_cultivation (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL UNIQUE,
+            last_dual_time INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_dual_user ON dual_cultivation(user_id)")
+    
+    # 创建天地灵眼表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS spirit_eyes (
+            eye_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            eye_type INTEGER NOT NULL DEFAULT 1,
+            eye_name TEXT NOT NULL DEFAULT '下品灵眼',
+            exp_per_hour INTEGER NOT NULL DEFAULT 500,
+            spawn_time INTEGER NOT NULL,
+            owner_id TEXT,
+            owner_name TEXT,
+            claim_time INTEGER,
+            last_collect_time INTEGER
+        )
+    """)
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_spirit_eyes_owner ON spirit_eyes(owner_id)")
+    
+    # 创建双修请求表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS dual_cultivation_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            from_id TEXT NOT NULL,
+            from_name TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL
+        )
+    """)
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_dual_req_target ON dual_cultivation_requests(target_id)")
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_dual_req_expires ON dual_cultivation_requests(expires_at)")
+    
+    # 创建战斗冷却表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS combat_cooldowns (
+            user_id TEXT PRIMARY KEY,
+            last_duel_time INTEGER NOT NULL DEFAULT 0,
+            last_spar_time INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    
+    # ===== 插入初始数据 =====
+    
+    # 插入默认秘境数据
+    import json
+    default_rifts = [
+        (1, "青云秘境", 1, 0, json.dumps({"exp": [500, 1500], "gold": [200, 800]})),
+        (2, "落日峡谷", 2, 3, json.dumps({"exp": [1500, 4000], "gold": [500, 2000]})),
+        (3, "万妖洞", 3, 6, json.dumps({"exp": [3000, 8000], "gold": [1000, 5000]})),
+        (4, "玄冰地宫", 4, 10, json.dumps({"exp": [5000, 15000], "gold": [2000, 10000]})),
+        (5, "上古遗迹", 5, 15, json.dumps({"exp": [10000, 30000], "gold": [5000, 20000]})),
+    ]
+    for rift in default_rifts:
+        await conn.execute(
+            "INSERT OR IGNORE INTO rifts (rift_id, rift_name, rift_level, required_level, rewards) VALUES (?, ?, ?, ?, ?)",
+            rift
+        )
+    
+    # 插入初始灵眼数据
+    import time
+    now = int(time.time())
+    initial_eyes = [
+        (1, "下品灵眼", 500, now),
+        (1, "下品灵眼", 500, now),
+        (2, "中品灵眼", 2000, now),
+    ]
+    for eye in initial_eyes:
+        await conn.execute(
+            "INSERT INTO spirit_eyes (eye_type, eye_name, exp_per_hour, spawn_time) VALUES (?, ?, ?, ?)",
+            eye
+        )
+
     logger.info("数据库表已创建完成（v2 - 完整修仙系统）")
 
 

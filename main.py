@@ -279,9 +279,6 @@ class XiuXianPlugin(Star):
         migration_manager = MigrationManager(self.db.conn, self.config_manager)
         await migration_manager.migrate()
         
-        # 确保系统配置表存在
-        await self.db.ext.ensure_system_config_table()
-        
         # 启动定时任务
         self.boss_task = asyncio.create_task(self._schedule_boss_spawn())
         self.loan_check_task = asyncio.create_task(self._schedule_loan_check())
