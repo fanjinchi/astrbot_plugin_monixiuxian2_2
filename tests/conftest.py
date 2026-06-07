@@ -10,10 +10,11 @@ bypassing the package __init__ chain entirely.
 import importlib.util
 import os
 import sys
-from pathlib import Path
 
 # Mock astrbot before any plugin module is imported
 import unittest.mock as _mock
+from pathlib import Path
+
 sys.modules.setdefault("astrbot", _mock.MagicMock())
 sys.modules.setdefault("astrbot.api", _mock.MagicMock())
 sys.modules.setdefault("astrbot.api.logger", _mock.MagicMock())

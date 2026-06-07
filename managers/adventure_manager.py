@@ -7,14 +7,14 @@ import json
 import random
 import time
 from pathlib import Path
-from typing import Tuple, Dict, Optional, List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from astrbot.api import logger
 
 from ..data.data_manager import DataBase
+from ..managers.pve_combat_manager import PVECombatManager
 from ..models import Player
 from ..models_extended import UserStatus
-from ..managers.pve_combat_manager import PVECombatManager
 
 if TYPE_CHECKING:
     from ..core import StorageRingManager
@@ -95,11 +95,11 @@ class AdventureManager:
         self.db = db
         self.storage_ring_manager = storage_ring_manager
         self.pve_combat_mgr = pve_combat_mgr
-        self._route_cooldowns: Dict[str, Dict[str, int]] = {}
-        self.routes: Dict[str, dict] = {}
-        self.route_alias_index: Dict[str, str] = {}
-        self.event_groups: Dict[str, List[dict]] = {}
-        self.drop_tables: Dict[str, List[dict]] = {}
+        self._route_cooldowns: dict[str, dict[str, int]] = {}
+        self.routes: dict[str, dict] = {}
+        self.route_alias_index: dict[str, str] = {}
+        self.event_groups: dict[str, list[dict]] = {}
+        self.drop_tables: dict[str, list[dict]] = {}
         self.default_route_key: str = "scout"
         self.reload_config()
 
@@ -133,7 +133,7 @@ class AdventureManager:
         """加载配置文件并在失败时回退到默认配置"""
         if self.CONFIG_FILE.exists():
             try:
-                with open(self.CONFIG_FILE, "r", encoding="utf-8") as f:
+                with open(self.CONFIG_FILE, encoding="utf-8") as f:
                     data = json.load(f)
                     logger.info("已加载 adventure_config.json")
                     return data
@@ -141,7 +141,7 @@ class AdventureManager:
                 logger.error(f"加载 adventure_config.json 失败，将使用默认配置: {exc}")
         return self.DEFAULT_CONFIG
 
-    def get_route_overview(self) -> List[dict]:
+    def get_route_overview(self) -> list[dict]:
         """暴露给指令层的路线概览"""
         overview = []
         for route in self.routes.values():
@@ -159,7 +159,7 @@ class AdventureManager:
 
     # -------- 核心流程 --------
 
-    async def start_adventure(self, user_id: str, route_token: str = "") -> Tuple[bool, str]:
+    async def start_adventure(self, user_id: str, route_token: str = "") -> tuple[bool, str]:
         """开始指定路线的历练"""
         player = await self.db.get_player_by_id(user_id)
         if not player:
@@ -205,7 +205,7 @@ class AdventureManager:
 
         return True, "\n".join(hint)
 
-    async def finish_adventure(self, user_id: str) -> Tuple[bool, str, Optional[Dict]]:
+    async def finish_adventure(self, user_id: str) -> tuple[bool, str, dict | None]:
         """结算历练"""
         player = await self.db.get_player_by_id(user_id)
         if not player:
@@ -307,7 +307,7 @@ class AdventureManager:
         }
         return True, msg, reward_data
 
-    async def check_adventure_status(self, user_id: str) -> Tuple[bool, str]:
+    async def check_adventure_status(self, user_id: str) -> tuple[bool, str]:
         """查看历练状态"""
         user_cd = await self.db.ext.get_user_cd(user_id)
         if not user_cd or user_cd.type != UserStatus.ADVENTURING:
@@ -371,7 +371,7 @@ class AdventureManager:
         group = self.event_groups.get(group_key) or self.event_groups.get("standard") or self.DEFAULT_CONFIG["event_groups"]["standard"]
         return random.choice(group)
 
-    def _calculate_rewards(self, player: Player, route: dict, duration: int, event: dict) -> Dict[str, int]:
+    def _calculate_rewards(self, player: Player, route: dict, duration: int, event: dict) -> dict[str, int]:
         duration_minutes = max(1, duration // 60)
         base_exp = duration_minutes * route.get("base_exp_per_min", 40)
         base_gold = duration_minutes * route.get("base_gold_per_min", 10)
@@ -387,8 +387,8 @@ class AdventureManager:
         final_gold = max(0, int(gold_total * event.get("gold_mult", 1.0)))
         return {"exp": final_exp, "gold": final_gold}
 
-    async def _handle_drops(self, player: Player, route: dict, event: dict) -> Tuple[List[Tuple[str, int]], str]:
-        dropped_items: List[Tuple[str, int]] = []
+    async def _handle_drops(self, player: Player, route: dict, event: dict) -> tuple[list[tuple[str, int]], str]:
+        dropped_items: list[tuple[str, int]] = []
         if not self.storage_ring_manager:
             return dropped_items, ""
 

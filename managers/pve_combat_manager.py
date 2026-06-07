@@ -339,7 +339,7 @@ class PVECombatManager:
         scene: str,
         difficulty: str,
         base_rewards: dict | None = None,
-    ) -> str | None:
+    ) -> tuple[str, dict] | None:
         """
         触发PVE战斗的主入口
 
@@ -398,4 +398,5 @@ class PVECombatManager:
         rewards = self._calculate_rewards(result, base_rewards, enemy)
 
         # 8. 格式化并返回结果
-        return self._format_combat_result(result, enemy, rewards)
+        msg = self._format_combat_result(result, enemy, rewards)
+        return msg, rewards

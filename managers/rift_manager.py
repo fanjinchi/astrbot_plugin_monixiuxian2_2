@@ -5,13 +5,13 @@
 
 import random
 import time
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING
 
 from ..data.data_manager import DataBase
 from ..managers.enemy_manager import EnemyManager  # noqa: F401
 from ..managers.pve_combat_manager import PVECombatManager
 from ..models import Player
-from ..models_extended import Rift, UserStatus
+from ..models_extended import UserStatus
 
 if TYPE_CHECKING:
     from ..core import StorageRingManager
@@ -117,7 +117,7 @@ class RiftManager:
             return level_names[level_index]
         return f"境界{level_index}"
 
-    async def list_rifts(self) -> Tuple[bool, str]:
+    async def list_rifts(self) -> tuple[bool, str]:
         """
         列出所有秘境
 
@@ -140,7 +140,7 @@ class RiftManager:
 
             msg += f"【{rift.rift_name}】(ID:{rift.rift_id})\n"
             if rift.required_level == 0:
-                msg += f"  等级要求：无限制\n"
+                msg += "  等级要求：无限制\n"
             else:
                 msg += f"  等级要求：{level_name} 及以上\n"
             msg += f"  修为奖励：{exp_range[0]:,}-{exp_range[1]:,}\n"
@@ -150,7 +150,7 @@ class RiftManager:
 
         return True, msg
 
-    async def enter_rift(self, user_id: str, rift_id: int) -> Tuple[bool, str]:
+    async def enter_rift(self, user_id: str, rift_id: int) -> tuple[bool, str]:
         """
         进入秘境
 
@@ -202,7 +202,7 @@ class RiftManager:
 
     async def finish_exploration(
         self, user_id: str
-    ) -> Tuple[bool, str, Optional[Dict]]:
+    ) -> tuple[bool, str, dict | None]:
         """
         完成秘境探索
 
@@ -342,7 +342,7 @@ class RiftManager:
 
         return True, msg, reward_data
 
-    async def exit_rift(self, user_id: str) -> Tuple[bool, str]:
+    async def exit_rift(self, user_id: str) -> tuple[bool, str]:
         """
         退出秘境（放弃探索）
 
@@ -385,7 +385,7 @@ class RiftManager:
 
     async def _roll_rift_drops(
         self, player: Player, rift_level: int, item_chance: int
-    ) -> List[Tuple[str, int]]:
+    ) -> list[tuple[str, int]]:
         """
         根据秘境等级随机掉落物品
 
@@ -436,7 +436,7 @@ class RiftManager:
 
         return dropped_items
 
-    def _roll_pill_drops(self, rift_level: int) -> List[Tuple[str, int]]:
+    def _roll_pill_drops(self, rift_level: int) -> list[tuple[str, int]]:
         """
         根据秘境等级随机掉落稀有丹药
 
