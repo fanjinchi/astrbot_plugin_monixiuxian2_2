@@ -14,6 +14,7 @@ from astrbot.api import logger
 from ..data.data_manager import DataBase
 from ..models import Player
 from ..models_extended import UserStatus
+from ..managers.pve_combat_manager import PVECombatManager
 
 if TYPE_CHECKING:
     from ..core import StorageRingManager
@@ -90,9 +91,10 @@ class AdventureManager:
         }
     }
 
-    def __init__(self, db: DataBase, storage_ring_manager: "StorageRingManager" = None):
+    def __init__(self, db: DataBase, storage_ring_manager: "StorageRingManager" = None, pve_combat_mgr: PVECombatManager = None):
         self.db = db
         self.storage_ring_manager = storage_ring_manager
+        self.pve_combat_mgr = pve_combat_mgr
         self._route_cooldowns: Dict[str, Dict[str, int]] = {}
         self.routes: Dict[str, dict] = {}
         self.route_alias_index: Dict[str, str] = {}
@@ -238,17 +240,38 @@ class AdventureManager:
         effective_duration = min(adventure_duration, scheduled_duration)
         event = self._trigger_route_event(route)
 
-        rewards = self._calculate_rewards(player, route, effective_duration, event)
+        combat_msg = ""
+        combat_result = None
+        base_rewards = self._calculate_rewards(player, route, effective_duration, event)
+        if self.pve_combat_mgr:
+            risk_map = {"低": "low", "中": "mid", "高": "high", "极高": "extreme"}
+            difficulty = risk_map.get(route.get("risk", "低"), "low")
+            combat_result = await self.pve_combat_mgr.trigger_pve_combat(
+                player, "adventure", difficulty, base_rewards
+            )
+            if combat_result:
+                combat_msg = "\n\n" + combat_result[0]
+                rewards = combat_result[1]
+                if rewards.get("hp_penalty"):
+                    player.hp = 1
+            else:
+                rewards = base_rewards
+        else:
+            rewards = base_rewards
+
         dropped_items, item_msg = await self._handle_drops(player, route, event)
 
-        player.experience += rewards["exp"]
-        player.gold += rewards["gold"]
+        player.experience += rewards.get("exp", 0)
+        if rewards.get("bonus_exp", 0) > 0:
+            player.experience += rewards["bonus_exp"]
+        player.gold += rewards.get("gold", 0)
         await self.db.update_player(player)
         await self.db.ext.set_user_free(user_id)
 
         fatigue = route.get("fatigue_cooldown", 0)
         if event.get("injury"):
-            # 受伤时增加额外休整时间
+            fatigue += 600
+        if combat_result and rewards.get("hp_penalty"):
             fatigue += 600
         if fatigue:
             self._route_cooldowns.setdefault(user_id, {})[route["key"]] = int(time.time()) + fatigue
@@ -258,7 +281,8 @@ class AdventureManager:
         msg = (
             f"🚶 历练归来 · {route['name']}\n"
             f"━━━━━━━━━━━━━━━\n"
-            f"{event['desc']}\n\n"
+            f"{event['desc']}"
+            f"{combat_msg}\n\n"
             f"本次历练：{display_minutes} 分钟\n"
             f"获得修为：+{rewards['exp']:,}\n"
             f"获得灵石：+{rewards['gold']:,}"
