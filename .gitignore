@@ -11,3 +11,6 @@ __pycache__
 .conda/
 uv.lock
 .coverage
+
+# OpenCode / LazyCodex workspace
+.omo/
