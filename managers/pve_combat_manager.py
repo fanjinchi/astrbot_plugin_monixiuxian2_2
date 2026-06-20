@@ -365,9 +365,7 @@ class PVECombatManager:
 
         # 4. 生成敌人
         try:
-            enemy = self.enemy_mgr.spawn_enemy(
-                player.level_index, player.experience, category
-            )
+            enemy = self.enemy_mgr.spawn_enemy(player.level_index, category)
         except Exception as e:
             logger.error(f"生成敌人失败: {e}")
             return None

@@ -2,7 +2,7 @@
 Tests for EnemyManager - enemy spawning, group selection, stat calculation, name composition.
 """
 
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -160,6 +160,42 @@ SAMPLE_ENEMIES_CONFIG = {
     },
 }
 
+# Simplified level_config covering level indices 0-31 (mirroring real level_config.json)
+SAMPLE_LEVEL_CONFIG = [
+    {"exp_needed": 0},       # 0 炼气期一层
+    {"exp_needed": 500},     # 1 炼气期二层
+    {"exp_needed": 1200},    # 2 炼气期三层
+    {"exp_needed": 2000},    # 3 炼气期四层
+    {"exp_needed": 3000},    # 4 炼气期五层
+    {"exp_needed": 4500},    # 5 炼气期六层
+    {"exp_needed": 6500},    # 6 炼气期七层
+    {"exp_needed": 9000},    # 7 炼气期八层
+    {"exp_needed": 12000},   # 8 炼气期九层
+    {"exp_needed": 16000},   # 9 炼气期十层
+    {"exp_needed": 16000},   # 10 炼气期十层 (reuse for tests)
+    {"exp_needed": 25000},   # 11 筑基期初期
+    {"exp_needed": 25000},   # 12 筑基期初期
+    {"exp_needed": 45000},   # 13 筑基期中期
+    {"exp_needed": 45000},   # 14 筑基期中期
+    {"exp_needed": 45000},   # 15 筑基期中期
+    {"exp_needed": 45000},   # 16 筑基期中期
+    {"exp_needed": 45000},   # 17 筑基期中期
+    {"exp_needed": 45000},   # 18 筑基期中期
+    {"exp_needed": 150000},  # 19 金丹期初期
+    {"exp_needed": 150000},  # 20 金丹期初期
+    {"exp_needed": 150000},  # 21 金丹期初期
+    {"exp_needed": 150000},  # 22 金丹期初期
+    {"exp_needed": 150000},  # 23 金丹期初期
+    {"exp_needed": 150000},  # 24 金丹期初期
+    {"exp_needed": 150000},  # 25 金丹期初期
+    {"exp_needed": 150000},  # 26 金丹期初期
+    {"exp_needed": 150000},  # 27 金丹期初期
+    {"exp_needed": 600000000},  # 28 大乘期初期
+    {"exp_needed": 600000000},  # 29 大乘期初期
+    {"exp_needed": 600000000},  # 30 大乘期初期
+    {"exp_needed": 600000000},  # 31 大乘期初期
+]
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -168,11 +204,10 @@ SAMPLE_ENEMIES_CONFIG = {
 
 @pytest.fixture
 def enemy_manager():
-    """Create an EnemyManager with mocked file loading."""
-    with patch("builtins.open", mock_open(read_data="{}")):
-        with patch("enemy_manager.json.load") as mock_load:
-            mock_load.return_value = SAMPLE_ENEMIES_CONFIG
-            mgr = EnemyManager("dummy.json")
+    """Create an EnemyManager with mocked config loading."""
+    with patch.object(EnemyManager, "_load_config_file", return_value=SAMPLE_ENEMIES_CONFIG):
+        with patch.object(EnemyManager, "_load_level_config", return_value=SAMPLE_LEVEL_CONFIG):
+            mgr = EnemyManager()
             return mgr
 
 
@@ -216,10 +251,9 @@ class TestGroupSelection:
         """When no groups exist, returns empty dict."""
         config = SAMPLE_ENEMIES_CONFIG.copy()
         config["enemy_groups"] = []
-        with patch("builtins.open", mock_open(read_data="{}")):
-            with patch("enemy_manager.json.load") as mock_load:
-                mock_load.return_value = config
-                mgr = EnemyManager("dummy.json")
+        with patch.object(EnemyManager, "_load_config_file", return_value=config):
+            with patch.object(EnemyManager, "_load_level_config", return_value=SAMPLE_LEVEL_CONFIG):
+                mgr = EnemyManager()
                 group = mgr._get_group_by_level(5)
                 assert group == {}
 
@@ -230,25 +264,24 @@ class TestGroupSelection:
 
 
 class TestStatCalculation:
-    """Verify spawn_enemy stat formulas."""
+    """Verify spawn_enemy stat formulas with level-based base_exp."""
 
     def test_normal_stats(self, enemy_manager):
-        """Normal enemy: base_exp = player_exp * 0.85;
+        """Normal enemy: base_exp = exp_needed(enemy_level);
         HP = (base_exp//2)*hp_mult; ATK = (base_exp//10)*atk_mult."""
-        with patch("random.choice") as mock_choice:
+        with patch("random.choice") as mock_choice, patch(
+            "enemy_manager.random.randint"
+        ) as mock_randint:
             mock_choice.return_value = SAMPLE_ENEMIES_CONFIG["enemy_groups"][0][
                 "templates"
             ][0]  # "wolf" template
+            mock_randint.return_value = 10  # fixed enemy level
 
-            enemy = enemy_manager.spawn_enemy(
-                player_level=10, player_exp=10000, category="normal"
-            )
+            enemy = enemy_manager.spawn_enemy(player_level=10, category="normal")
 
-            # difficulty_coefficients["normal"] = 0.85
-            base_exp = int(10000 * 0.85)
+            base_exp = SAMPLE_LEVEL_CONFIG[10]["exp_needed"]  # 16000
             assert enemy.exp == base_exp
 
-            # wolf: hp_mult=0.6, atk_mult=0.85, defense=3, crit_rate=10
             expected_hp = int((base_exp // 2) * 0.6)
             expected_atk = int((base_exp // 10) * 0.85)
             assert enemy.hp == expected_hp
@@ -261,22 +294,20 @@ class TestStatCalculation:
 
     def test_elite_stats(self, enemy_manager):
         """Elite enemy applies elite multiplier bonuses on top of base template."""
-        with patch("random.choice") as mock_choice:
+        with patch("random.choice") as mock_choice, patch(
+            "enemy_manager.random.randint"
+        ) as mock_randint:
             mock_choice.side_effect = [
                 SAMPLE_ENEMIES_CONFIG["enemy_groups"][0]["templates"][0],
                 "历战的",
             ]
+            mock_randint.return_value = 10
 
-            enemy = enemy_manager.spawn_enemy(
-                player_level=10, player_exp=10000, category="elite"
-            )
+            enemy = enemy_manager.spawn_enemy(player_level=10, category="elite")
 
-            # difficulty_coefficients["elite"] = 1.0
-            base_exp = int(10000 * 1.0)
+            base_exp = SAMPLE_LEVEL_CONFIG[10]["exp_needed"]  # 16000
             assert enemy.exp == base_exp
 
-            # wolf: hp_mult=0.6, atk_mult=0.85
-            # elite: hp_mult *= 0.9, atk_mult *= 1.0, defense_bonus=5, crit_rate_bonus=5
             expected_hp = int((base_exp // 2) * 0.6 * 0.9)
             expected_atk = int((base_exp // 10) * 0.85 * 1.0)
             assert enemy.hp == expected_hp
@@ -286,22 +317,20 @@ class TestStatCalculation:
 
     def test_boss_stats(self, enemy_manager):
         """Boss enemy applies boss multiplier bonuses on top of base template."""
-        with patch("random.choice") as mock_choice:
+        with patch("random.choice") as mock_choice, patch(
+            "enemy_manager.random.randint"
+        ) as mock_randint:
             mock_choice.side_effect = [
                 SAMPLE_ENEMIES_CONFIG["enemy_groups"][0]["templates"][0],
                 "苍月狼王",
             ]
+            mock_randint.return_value = 10
 
-            enemy = enemy_manager.spawn_enemy(
-                player_level=10, player_exp=10000, category="boss"
-            )
+            enemy = enemy_manager.spawn_enemy(player_level=10, category="boss")
 
-            # difficulty_coefficients["boss"] = 1.2
-            base_exp = int(10000 * 1.2)
+            base_exp = SAMPLE_LEVEL_CONFIG[10]["exp_needed"]  # 16000
             assert enemy.exp == base_exp
 
-            # wolf: hp_mult=0.6, atk_mult=0.85
-            # boss: hp_mult *= 1.2, atk_mult *= 1.2, defense_bonus=15, crit_rate_bonus=10
             expected_hp = int((base_exp // 2) * 0.6 * 1.2)
             expected_atk = int((base_exp // 10) * 0.85 * 1.2)
             assert enemy.hp == expected_hp
@@ -309,36 +338,35 @@ class TestStatCalculation:
             assert enemy.defense == 3 + 15
             assert enemy.crit_rate == 10 + 10
 
-    def test_different_levels_and_exp(self, enemy_manager):
+    def test_different_levels_and_groups(self, enemy_manager):
         """Stat calculation works across level groups."""
         cases = [
-            (1, 500, "low"),
-            (15, 50_000, "mid"),
-            (25, 200_000, "high"),
-            (30, 500_000, "top"),
+            (1, "low"),
+            (15, "mid"),
+            (25, "high"),
+            (30, "top"),
         ]
-        for level, exp, _group_key in cases:
-            with patch("random.choice") as mock_choice:
+        for level, _group_key in cases:
+            with patch("random.choice") as mock_choice, patch(
+                "enemy_manager.random.randint"
+            ) as mock_randint:
                 mock_choice.side_effect = lambda lst: lst[0]
-                enemy = enemy_manager.spawn_enemy(
-                    player_level=level, player_exp=exp, category="normal"
-                )
+                mock_randint.return_value = level
+                enemy = enemy_manager.spawn_enemy(player_level=level, category="normal")
                 assert enemy.exp > 0
                 assert enemy.hp > 0
                 assert enemy.atk > 0
                 assert enemy.mp > 0
                 assert enemy.user_id.startswith("enemy_")
 
-    def test_minimal_exp(self, enemy_manager):
-        """With very low exp, enemy still has valid stats (at least 0 or 1)."""
-        with patch("random.choice") as mock_choice:
+    def test_minimal_level(self, enemy_manager):
+        """With level 0 (exp_needed=0), enemy has 0 stats."""
+        with patch("random.choice") as mock_choice, patch(
+            "enemy_manager.random.randint"
+        ) as mock_randint:
             mock_choice.side_effect = lambda lst: lst[0]
-            enemy = enemy_manager.spawn_enemy(
-                player_level=1, player_exp=1, category="normal"
-            )
-            # base_exp = int(1 * 0.85) = 0
-            # hp = int((0 // 2) * mult) = 0
-            # atk = int((0 // 10) * mult) = 0
+            mock_randint.return_value = 0
+            enemy = enemy_manager.spawn_enemy(player_level=1, category="normal")
             assert enemy.exp == 0
             assert enemy.hp == 0
             assert enemy.atk == 0
@@ -354,40 +382,50 @@ class TestNameComposition:
 
     def test_normal_name(self, enemy_manager):
         """Normal enemy uses template name directly via {name} format."""
-        with patch("random.choice") as mock_choice:
+        with patch("random.choice") as mock_choice, patch(
+            "enemy_manager.random.randint"
+        ) as mock_randint:
             mock_choice.side_effect = lambda lst: lst[0]
-            enemy = enemy_manager.spawn_enemy(10, 10000, "normal")
+            mock_randint.return_value = 10
+            enemy = enemy_manager.spawn_enemy(10, "normal")
             assert enemy.name == "疾风狼"
 
     def test_elite_name(self, enemy_manager):
         """Elite enemy = prefix + name via {prefix}{name} format."""
-        with patch("random.choice") as mock_choice:
+        with patch("random.choice") as mock_choice, patch(
+            "enemy_manager.random.randint"
+        ) as mock_randint:
             mock_choice.side_effect = [
                 SAMPLE_ENEMIES_CONFIG["enemy_groups"][0]["templates"][0],
                 "强壮的",
             ]
-            enemy = enemy_manager.spawn_enemy(10, 10000, "elite")
+            mock_randint.return_value = 10
+            enemy = enemy_manager.spawn_enemy(10, "elite")
             assert enemy.name == "强壮的疾风狼"
 
     def test_boss_name(self, enemy_manager):
         """Boss enemy uses boss_name from template via {boss_name} format."""
-        with patch("random.choice") as mock_choice:
+        with patch("random.choice") as mock_choice, patch(
+            "enemy_manager.random.randint"
+        ) as mock_randint:
             mock_choice.side_effect = [
                 SAMPLE_ENEMIES_CONFIG["enemy_groups"][0]["templates"][0],
                 "啸月狼尊",
             ]
-            enemy = enemy_manager.spawn_enemy(10, 10000, "boss")
+            mock_randint.return_value = 10
+            enemy = enemy_manager.spawn_enemy(10, "boss")
             assert enemy.name == "啸月狼尊"
 
     def test_invalid_category_falls_to_template_name(self, enemy_manager):
         """Invalid category returns the template name as-is."""
-        with patch("random.choice") as mock_choice:
+        with patch("random.choice") as mock_choice, patch(
+            "enemy_manager.random.randint"
+        ) as mock_randint:
             mock_choice.side_effect = lambda lst: lst[0]
-            enemy = enemy_manager.spawn_enemy(
-                10, 10000, category="invalid_category"
-            )
+            mock_randint.return_value = 10
+            enemy = enemy_manager.spawn_enemy(10, category="invalid_category")
             assert enemy.name == "疾风狼"
-            assert enemy.exp == int(10000 * 0.85)
+            assert enemy.exp == SAMPLE_LEVEL_CONFIG[10]["exp_needed"]
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -412,44 +450,65 @@ class TestErrorHandling:
             }
         ]
         with pytest.raises(ValueError, match="未找到敌人模板配置"):
-            enemy_manager.spawn_enemy(
-                player_level=5, player_exp=1000, category="normal"
-            )
+            enemy_manager.spawn_enemy(player_level=5, category="normal")
         enemy_manager.enemy_groups = original_groups
-
-    def test_missing_difficulty_coefficient(self, enemy_manager):
-        """Unknown category uses default coefficient of 0.85."""
-        enemy_manager.difficulty_coefficients = {}
-        with patch("random.choice") as mock_choice:
-            mock_choice.side_effect = lambda lst: lst[0]
-            enemy = enemy_manager.spawn_enemy(
-                player_level=10, player_exp=10000, category="normal"
-            )
-            assert enemy.exp == int(10000 * 0.85)
 
     def test_missing_naming_config(self, enemy_manager):
         """Missing naming config uses default format strings."""
         enemy_manager.naming = {}
-        with patch("random.choice") as mock_choice:
+        with patch("random.choice") as mock_choice, patch(
+            "enemy_manager.random.randint"
+        ) as mock_randint:
             mock_choice.side_effect = lambda lst: lst[0]
-            enemy = enemy_manager.spawn_enemy(
-                player_level=10, player_exp=10000, category="normal"
-            )
+            mock_randint.return_value = 10
+            enemy = enemy_manager.spawn_enemy(player_level=10, category="normal")
             assert enemy.name == "疾风狼"
 
     def test_template_missing_name_field(self, enemy_manager):
         """Template without 'name' uses '未知妖兽'."""
-        with patch("random.choice") as mock_choice:
+        with patch("random.choice") as mock_choice, patch(
+            "enemy_manager.random.randint"
+        ) as mock_randint:
             mock_choice.side_effect = lambda lst: {
                 "key": "mystery",
                 "hp_mult": 0.5,
                 "atk_mult": 0.5,
             }
-            enemy = enemy_manager.spawn_enemy(
-                player_level=10, player_exp=10000, category="normal"
-            )
+            mock_randint.return_value = 10
+            enemy = enemy_manager.spawn_enemy(player_level=10, category="normal")
             assert enemy.name == "未知妖兽"
             assert enemy.user_id == "enemy_mystery"
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Level-based spawning tests
+# ──────────────────────────────────────────────────────────────────────
+
+
+class TestLevelBasedSpawning:
+    """Enemy level is randomly chosen within the group's level_range."""
+
+    def test_random_level_in_range(self, enemy_manager):
+        """Enemy level is randomly chosen from the group's level_range."""
+        with patch("random.choice") as mock_choice, patch(
+            "enemy_manager.random.randint"
+        ) as mock_randint:
+            mock_choice.side_effect = lambda lst: lst[0]
+            mock_randint.return_value = 5
+            enemy = enemy_manager.spawn_enemy(player_level=10, category="normal")
+            assert enemy.exp == SAMPLE_LEVEL_CONFIG[5]["exp_needed"]
+            mock_randint.assert_called_once_with(0, 12)
+
+    def test_fallback_group_uses_last_range(self, enemy_manager):
+        """When player level exceeds all ranges, fallback to last group's range."""
+        with patch("random.choice") as mock_choice, patch(
+            "enemy_manager.random.randint"
+        ) as mock_randint:
+            mock_choice.side_effect = lambda lst: lst[0]
+            mock_randint.return_value = 30
+            enemy = enemy_manager.spawn_enemy(player_level=99, category="normal")
+            assert enemy.exp == SAMPLE_LEVEL_CONFIG[30]["exp_needed"]
+            mock_randint.assert_called_once_with(28, 31)
 
 
 # ──────────────────────────────────────────────────────────────────────
