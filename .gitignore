@@ -3,6 +3,7 @@
 .dolt/
 *.db
 .beads-credential-key
+.beads/
 
 # Python related
 __pycache__
@@ -18,3 +19,7 @@ uv.lock
 # AI coding assistants / indexing
 .codegraph/
 .serena/
+
+# Claude / Cursor settings
+.claude/
+.cursor/
