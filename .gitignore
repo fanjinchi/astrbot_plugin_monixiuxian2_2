@@ -14,3 +14,7 @@ uv.lock
 
 # OpenCode / LazyCodex workspace
 .omo/
+
+# AI coding assistants / indexing
+.codegraph/
+.serena/
