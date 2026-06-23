@@ -297,7 +297,7 @@ class RiftManager:
             )
             if combat_result:
                 msg_text, combat_rewards = combat_result
-                combat_msg = f"\n\n{msg_text}"
+                combat_msg = msg_text
                 exp_reward = combat_rewards.get("exp", exp_reward)
                 gold_reward = combat_rewards.get("gold", gold_reward)
                 bonus_exp = combat_rewards.get("bonus_exp", 0)

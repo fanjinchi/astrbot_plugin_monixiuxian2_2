@@ -321,8 +321,10 @@ class EnemyManager:
             name = template.get("name", "未知妖兽")
 
         EnemyManager._spawn_counter += 1
+        suffix = EnemyManager._spawn_counter
+        random_token = f"{random.getrandbits(16):04x}"
         return Enemy(
-            user_id=f"enemy_{template.get('key', 'unknown')}_{EnemyManager._spawn_counter}",
+            user_id=f"enemy_{template.get('key', 'unknown')}_{suffix}_{random_token}",
             name=name,
             hp=hp,
             max_hp=hp,

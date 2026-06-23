@@ -290,7 +290,7 @@ class AdventureManager:
                 player, "adventure", difficulty, base_rewards
             )
             if combat_result:
-                combat_msg = "\n\n" + combat_result[0]
+                combat_msg = combat_result[0]
                 rewards = combat_result[1]
                 if rewards.get("hp_penalty"):
                     player.hp = 1
