@@ -33,7 +33,12 @@ class EnemyManager:
     """敌人管理器 - 根据玩家等级生成对应难度的敌人"""
 
     CONFIG_FILE = Path(__file__).resolve().parents[1] / "config" / "enemies.json"
-    LEVEL_CONFIG_FILE = Path(__file__).resolve().parents[1] / "config" / "level_config.json"
+    LEVEL_CONFIG_FILE = (
+        Path(__file__).resolve().parents[1] / "config" / "level_config.json"
+    )
+
+    # 类级计数器，用于为每个生成的敌人分配唯一 user_id
+    _spawn_counter = 0
 
     DEFAULT_CONFIG = {
         "enemy_groups": [
@@ -121,7 +126,9 @@ class EnemyManager:
     def reload_config(self, level_config: list = None):
         """重新加载配置文件"""
         config = self._load_config_file()
-        self.enemy_groups = config.get("enemy_groups", self.DEFAULT_CONFIG["enemy_groups"])
+        self.enemy_groups = config.get(
+            "enemy_groups", self.DEFAULT_CONFIG["enemy_groups"]
+        )
         self.difficulty_coefficients = config.get(
             "difficulty_coefficients", self.DEFAULT_CONFIG["difficulty_coefficients"]
         )
@@ -181,6 +188,69 @@ class EnemyManager:
             return self.level_config[level_index].get("exp_needed", 0)
         return 0
 
+    def _extract_realm_prefix(self, level_name: str) -> str:
+        """从境界名称提取境界前缀（如'炼气期一层' -> '炼气期'）。"""
+        if "期" in level_name:
+            return level_name[: level_name.index("期") + 1]
+        return level_name
+
+    def _get_realm_range(self, player_level: int) -> list[int, int]:
+        """根据玩家等级计算其所属境界在 level_config 中的连续索引范围。"""
+        if not self.level_config:
+            return [0, 0]
+        max_index = len(self.level_config) - 1
+        safe_level = max(0, min(player_level, max_index))
+        level_name = self.level_config[safe_level].get("level_name", "")
+        prefix = self._extract_realm_prefix(level_name)
+        if not prefix:
+            return [safe_level, safe_level]
+
+        start = safe_level
+        while (
+            start > 0
+            and self._extract_realm_prefix(
+                self.level_config[start - 1].get("level_name", "")
+            )
+            == prefix
+        ):
+            start -= 1
+
+        end = safe_level
+        while (
+            end < max_index
+            and self._extract_realm_prefix(
+                self.level_config[end + 1].get("level_name", "")
+            )
+            == prefix
+        ):
+            end += 1
+
+        return [start, end]
+
+    @staticmethod
+    def _intersect_ranges(*ranges: list[int, int]) -> list[int, int] | None:
+        """计算多个闭区间的交集，无交集时返回 None。"""
+        low = max(r[0] for r in ranges)
+        high = min(r[1] for r in ranges)
+        if low > high:
+            return None
+        return [low, high]
+
+    def _choose_enemy_level(
+        self, player_level: int, group_range: list[int, int]
+    ) -> int:
+        """在分组、境界、玩家等级范围内选取敌人等级。"""
+        realm_range = self._get_realm_range(player_level)
+        player_range = [max(0, player_level - 2), player_level + 1]
+
+        final_range = self._intersect_ranges(group_range, realm_range, player_range)
+        if final_range is None:
+            final_range = self._intersect_ranges(group_range, player_range)
+        if final_range is None:
+            final_range = group_range
+
+        return random.randint(final_range[0], final_range[1])
+
     def spawn_enemy(self, player_level: int, category: str) -> Enemy:
         """
         生成一个敌人
@@ -226,7 +296,7 @@ class EnemyManager:
             crit_rate += boss_config.get("crit_rate_bonus", 0)
 
         level_range = group.get("level_range", [0, 0])
-        enemy_level = random.randint(level_range[0], level_range[1])
+        enemy_level = self._choose_enemy_level(player_level, level_range)
         base_exp = self._get_exp_for_level(enemy_level)
 
         # 计算最终属性
@@ -250,8 +320,9 @@ class EnemyManager:
         else:
             name = template.get("name", "未知妖兽")
 
+        EnemyManager._spawn_counter += 1
         return Enemy(
-            user_id=f"enemy_{template.get('key', 'unknown')}",
+            user_id=f"enemy_{template.get('key', 'unknown')}_{EnemyManager._spawn_counter}",
             name=name,
             hp=hp,
             max_hp=hp,
