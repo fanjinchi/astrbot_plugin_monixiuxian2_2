@@ -3,15 +3,41 @@
 秘境系统管理器 - 处理秘境探索、奖励等逻辑
 """
 
+import importlib.util
+import os
 import random
+import sys
 import time
 from typing import TYPE_CHECKING
 
-from ..data.data_manager import DataBase
-from ..managers.enemy_manager import EnemyManager  # noqa: F401
-from ..managers.pve_combat_manager import PVECombatManager, RIFT_LEVEL_DIFFICULTY_MAP
-from ..models import Player
-from ..models_extended import UserStatus
+try:
+    from ..data.data_manager import DataBase
+    from ..managers.enemy_manager import EnemyManager  # noqa: F401
+    from ..managers.pve_combat_manager import (
+        PVECombatManager,
+        RIFT_LEVEL_DIFFICULTY_MAP,
+    )
+    from ..models import Player
+    from ..models_extended import UserStatus
+except ImportError:
+    # 独立运行（测试）时降级加载依赖
+    def _load_module(name, rel_path):
+        plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        path = os.path.join(plugin_root, rel_path)
+        spec = importlib.util.spec_from_file_location(name, path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
+    DataBase = object
+    _pve = _load_module("pve_combat_manager", "managers/pve_combat_manager.py")
+    PVECombatManager = _pve.PVECombatManager
+    RIFT_LEVEL_DIFFICULTY_MAP = _pve.RIFT_LEVEL_DIFFICULTY_MAP
+    _md = _load_module("models", "models.py")
+    Player = _md.Player
+    _mde = _load_module("models_extended", "models_extended.py")
+    UserStatus = _mde.UserStatus
 
 if TYPE_CHECKING:
     from ..core import StorageRingManager
@@ -262,6 +288,7 @@ class RiftManager:
         event = random.choice(events)
 
         combat_msg = ""
+        combat_rewards = {}
         if self.pve_combat_mgr:
             difficulty = RIFT_LEVEL_DIFFICULTY_MAP.get(rift_level, "low")
             base_rewards = {"exp": exp_reward, "gold": gold_reward}
@@ -282,9 +309,10 @@ class RiftManager:
         # 6. 物品掉落（根据秘境等级）
         dropped_items = []
         item_msg = ""
-        dropped_items = await self._roll_rift_drops(
-            player, rift_level, event["item_chance"]
-        )
+        if not combat_rewards.get("hp_penalty"):
+            dropped_items = await self._roll_rift_drops(
+                player, rift_level, event["item_chance"]
+            )
         if dropped_items:
             item_lines = []
             for item_name, count in dropped_items:

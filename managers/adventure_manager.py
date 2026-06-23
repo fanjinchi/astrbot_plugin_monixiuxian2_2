@@ -3,18 +3,40 @@
 历练系统管理器 - 可配置路线、风险与奖励
 """
 
+import importlib.util
 import json
+import os
 import random
+import sys
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from astrbot.api import logger
 
-from ..data.data_manager import DataBase
-from ..managers.pve_combat_manager import PVECombatManager
-from ..models import Player
-from ..models_extended import UserStatus
+try:
+    from ..data.data_manager import DataBase
+    from ..managers.pve_combat_manager import PVECombatManager
+    from ..models import Player
+    from ..models_extended import UserStatus
+except ImportError:
+    # 独立运行（测试）时降级加载依赖
+    def _load_module(name, rel_path):
+        plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        path = os.path.join(plugin_root, rel_path)
+        spec = importlib.util.spec_from_file_location(name, path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
+    DataBase = object
+    _pve = _load_module("pve_combat_manager", "managers/pve_combat_manager.py")
+    PVECombatManager = _pve.PVECombatManager
+    _md = _load_module("models", "models.py")
+    Player = _md.Player
+    _mde = _load_module("models_extended", "models_extended.py")
+    UserStatus = _mde.UserStatus
 
 if TYPE_CHECKING:
     from ..core import StorageRingManager
@@ -23,7 +45,9 @@ if TYPE_CHECKING:
 class AdventureManager:
     """历练系统管理器"""
 
-    CONFIG_FILE = Path(__file__).resolve().parents[1] / "config" / "adventure_config.json"
+    CONFIG_FILE = (
+        Path(__file__).resolve().parents[1] / "config" / "adventure_config.json"
+    )
     DEFAULT_CONFIG = {
         "routes": [
             {
@@ -43,7 +67,7 @@ class AdventureManager:
                 "event_weights": {"safe": 60, "standard": 30, "risky": 10},
                 "drop_tier": "low",
                 "bounty_tag": "adventure_scout",
-                "bounty_progress": 1
+                "bounty_progress": 1,
             }
         ],
         "event_groups": {
@@ -55,7 +79,7 @@ class AdventureManager:
                     "exp_mult": 1.1,
                     "gold_mult": 1.1,
                     "item_chance": 60,
-                    "bonus_progress": 0
+                    "bonus_progress": 0,
                 }
             ],
             "standard": [
@@ -66,7 +90,7 @@ class AdventureManager:
                     "exp_mult": 1.2,
                     "gold_mult": 1.2,
                     "item_chance": 50,
-                    "bonus_progress": 1
+                    "bonus_progress": 1,
                 }
             ],
             "risky": [
@@ -78,20 +102,25 @@ class AdventureManager:
                     "gold_mult": 0.7,
                     "item_chance": 15,
                     "bonus_progress": 0,
-                    "injury": True
+                    "injury": True,
                 }
-            ]
+            ],
         },
         "drop_tables": {
             "low": [
                 {"name": "灵草", "weight": 50, "min": 1, "max": 3},
                 {"name": "精铁", "weight": 30, "min": 1, "max": 2},
-                {"name": "灵石碎片", "weight": 20, "min": 2, "max": 5}
+                {"name": "灵石碎片", "weight": 20, "min": 2, "max": 5},
             ]
-        }
+        },
     }
 
-    def __init__(self, db: DataBase, storage_ring_manager: "StorageRingManager" = None, pve_combat_mgr: PVECombatManager = None):
+    def __init__(
+        self,
+        db: DataBase,
+        storage_ring_manager: "StorageRingManager" = None,
+        pve_combat_mgr: PVECombatManager = None,
+    ):
         self.db = db
         self.storage_ring_manager = storage_ring_manager
         self.pve_combat_mgr = pve_combat_mgr
@@ -126,7 +155,9 @@ class AdventureManager:
             for alias in aliases:
                 self.route_alias_index[alias.lower()] = key
 
-        self.event_groups = config.get("event_groups", self.DEFAULT_CONFIG["event_groups"])
+        self.event_groups = config.get(
+            "event_groups", self.DEFAULT_CONFIG["event_groups"]
+        )
         self.drop_tables = config.get("drop_tables", self.DEFAULT_CONFIG["drop_tables"])
 
     def _load_config_file(self) -> dict:
@@ -152,14 +183,16 @@ class AdventureManager:
                     "risk": route.get("risk", "未知"),
                     "duration": route.get("duration", 0),
                     "min_level": route.get("min_level", 0),
-                    "description": route.get("description", "")
+                    "description": route.get("description", ""),
                 }
             )
         return overview
 
     # -------- 核心流程 --------
 
-    async def start_adventure(self, user_id: str, route_token: str = "") -> tuple[bool, str]:
+    async def start_adventure(
+        self, user_id: str, route_token: str = ""
+    ) -> tuple[bool, str]:
         """开始指定路线的历练"""
         player = await self.db.get_player_by_id(user_id)
         if not player:
@@ -171,7 +204,10 @@ class AdventureManager:
             user_cd = await self.db.ext.get_user_cd(user_id)
 
         if user_cd.type != UserStatus.IDLE:
-            return False, f"❌ 你当前正{UserStatus.get_name(user_cd.type)}，无法开始历练！"
+            return (
+                False,
+                f"❌ 你当前正{UserStatus.get_name(user_cd.type)}，无法开始历练！",
+            )
 
         route_key = self._resolve_route(route_token)
         route = self.routes.get(route_key)
@@ -191,12 +227,14 @@ class AdventureManager:
         duration = route.get("duration", 3600)
         scheduled_time = now + duration
         extra = {"route_key": route_key}
-        await self.db.ext.set_user_busy(user_id, UserStatus.ADVENTURING, scheduled_time, extra_data=extra)
+        await self.db.ext.set_user_busy(
+            user_id, UserStatus.ADVENTURING, scheduled_time, extra_data=extra
+        )
 
         fatigue = route.get("fatigue_cooldown", 0)
         hint = [
             f"✨ 你选择了「{route['name']}」——{route.get('description', '未知冒险')}",
-            f"路线风险：{route.get('risk', '未知')} | 历练时长：{duration // 60} 分钟"
+            f"路线风险：{route.get('risk', '未知')} | 历练时长：{duration // 60} 分钟",
         ]
         if route.get("min_level", 0):
             hint.append(f"建议境界：{route['min_level']} 阶以上")
@@ -231,7 +269,9 @@ class AdventureManager:
             except Exception:
                 extra = {}
 
-        route = self.routes.get(extra.get("route_key", self.default_route_key)) or self.routes.get(self.default_route_key)
+        route = self.routes.get(
+            extra.get("route_key", self.default_route_key)
+        ) or self.routes.get(self.default_route_key)
         if not route:
             return False, "❌ 未找到历练路线配置，请联系管理员。", None
 
@@ -259,7 +299,10 @@ class AdventureManager:
         else:
             rewards = base_rewards
 
-        dropped_items, item_msg = await self._handle_drops(player, route, event)
+        if not rewards.get("hp_penalty"):
+            dropped_items, item_msg = await self._handle_drops(player, route, event)
+        else:
+            dropped_items, item_msg = [], ""
 
         player.experience += rewards.get("exp", 0)
         if rewards.get("bonus_exp", 0) > 0:
@@ -274,7 +317,9 @@ class AdventureManager:
         if combat_result and rewards.get("hp_penalty"):
             fatigue += 600
         if fatigue:
-            self._route_cooldowns.setdefault(user_id, {})[route["key"]] = int(time.time()) + fatigue
+            self._route_cooldowns.setdefault(user_id, {})[route["key"]] = (
+                int(time.time()) + fatigue
+            )
 
         fatigue_hint = f"\n⏳ 该路线休整：{fatigue // 60} 分钟" if fatigue else ""
         display_minutes = effective_duration // 60
@@ -303,7 +348,9 @@ class AdventureManager:
             "items": dropped_items,
             "duration": effective_duration,
             "bounty_tag": route.get("bounty_tag", "adventure"),
-            "bounty_progress": max(1, route.get("bounty_progress", 1) + event.get("bonus_progress", 0))
+            "bounty_progress": max(
+                1, route.get("bounty_progress", 1) + event.get("bonus_progress", 0)
+            ),
         }
         return True, msg, reward_data
 
@@ -368,10 +415,16 @@ class AdventureManager:
                     group_key = key
                     break
 
-        group = self.event_groups.get(group_key) or self.event_groups.get("standard") or self.DEFAULT_CONFIG["event_groups"]["standard"]
+        group = (
+            self.event_groups.get(group_key)
+            or self.event_groups.get("standard")
+            or self.DEFAULT_CONFIG["event_groups"]["standard"]
+        )
         return random.choice(group)
 
-    def _calculate_rewards(self, player: Player, route: dict, duration: int, event: dict) -> dict[str, int]:
+    def _calculate_rewards(
+        self, player: Player, route: dict, duration: int, event: dict
+    ) -> dict[str, int]:
         duration_minutes = max(1, duration // 60)
         base_exp = duration_minutes * route.get("base_exp_per_min", 40)
         base_gold = duration_minutes * route.get("base_gold_per_min", 10)
@@ -387,7 +440,9 @@ class AdventureManager:
         final_gold = max(0, int(gold_total * event.get("gold_mult", 1.0)))
         return {"exp": final_exp, "gold": final_gold}
 
-    async def _handle_drops(self, player: Player, route: dict, event: dict) -> tuple[list[tuple[str, int]], str]:
+    async def _handle_drops(
+        self, player: Player, route: dict, event: dict
+    ) -> tuple[list[tuple[str, int]], str]:
         dropped_items: list[tuple[str, int]] = []
         if not self.storage_ring_manager:
             return dropped_items, ""
@@ -397,7 +452,9 @@ class AdventureManager:
             return dropped_items, ""
 
         tier = event.get("drop_tier") or route.get("drop_tier") or "low"
-        drop_table = self.drop_tables.get(tier, self.DEFAULT_CONFIG["drop_tables"]["low"])
+        drop_table = self.drop_tables.get(
+            tier, self.DEFAULT_CONFIG["drop_tables"]["low"]
+        )
         total_weight = sum(item["weight"] for item in drop_table)
         roll = random.randint(1, total_weight)
         upto = 0
@@ -413,7 +470,9 @@ class AdventureManager:
 
         item_lines = []
         for item_name, qty in dropped_items:
-            success, _ = await self.storage_ring_manager.store_item(player, item_name, qty, silent=True)
+            success, _ = await self.storage_ring_manager.store_item(
+                player, item_name, qty, silent=True
+            )
             if success:
                 item_lines.append(f"  · {item_name} x{qty}")
             else:
