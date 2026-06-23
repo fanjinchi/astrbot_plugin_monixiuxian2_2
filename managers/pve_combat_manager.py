@@ -327,9 +327,11 @@ class PVECombatManager:
             # 平局：奖励不变
             pass
         elif is_enemy_winner:
-            # 战败
             rewards["exp"] = int(rewards["exp"] * 0.3)
             rewards["gold"] = 0
+            consolation_reward = result.get("reward")
+            if consolation_reward is not None:
+                rewards["gold"] += consolation_reward
             rewards["hp_penalty"] = True
         else:
             # 胜利

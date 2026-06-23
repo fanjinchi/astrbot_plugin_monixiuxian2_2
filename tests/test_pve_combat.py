@@ -268,6 +268,26 @@ class TestRewardCalculation:
         assert rewards["hp_penalty"]
         assert rewards["bonus_exp"] == 0
 
+    def test_loss_with_consolation_reward(self, pve_manager):
+        """Loss with result['reward'] adds the consolation value to gold."""
+        result = {"winner": "enemy_wolf", "reward": 25}
+        base = {"exp": 100, "gold": 50}
+        rewards = pve_manager._calculate_rewards(result, base, self.make_enemy())
+        assert rewards["exp"] == int(100 * 0.3)
+        assert rewards["gold"] == 25
+        assert rewards["hp_penalty"]
+        assert rewards["bonus_exp"] == 0
+
+    def test_victory_ignores_result_reward(self, pve_manager):
+        """Victory does not apply result['reward']; base gold is kept."""
+        result = {"winner": "player_001", "reward": 999}
+        base = {"exp": 100, "gold": 50}
+        rewards = pve_manager._calculate_rewards(result, base, self.make_enemy())
+        assert rewards["exp"] == int(100 * 1.2)
+        assert rewards["gold"] == 50
+        assert not rewards["hp_penalty"]
+        assert rewards["bonus_exp"] == 8500
+
     def test_draw(self, pve_manager):
         """Draw: no changes to rewards."""
         result = {"winner": "平局"}
