@@ -162,38 +162,38 @@ SAMPLE_ENEMIES_CONFIG = {
 
 # Simplified level_config covering level indices 0-31 (mirroring real level_config.json)
 SAMPLE_LEVEL_CONFIG = [
-    {"exp_needed": 0},       # 0 炼气期一层
-    {"exp_needed": 500},     # 1 炼气期二层
-    {"exp_needed": 1200},    # 2 炼气期三层
-    {"exp_needed": 2000},    # 3 炼气期四层
-    {"exp_needed": 3000},    # 4 炼气期五层
-    {"exp_needed": 4500},    # 5 炼气期六层
-    {"exp_needed": 6500},    # 6 炼气期七层
-    {"exp_needed": 9000},    # 7 炼气期八层
-    {"exp_needed": 12000},   # 8 炼气期九层
-    {"exp_needed": 16000},   # 9 炼气期十层
-    {"exp_needed": 16000},   # 10 炼气期十层 (reuse for tests)
-    {"exp_needed": 25000},   # 11 筑基期初期
-    {"exp_needed": 25000},   # 12 筑基期初期
-    {"exp_needed": 45000},   # 13 筑基期中期
-    {"exp_needed": 45000},   # 14 筑基期中期
-    {"exp_needed": 45000},   # 15 筑基期中期
-    {"exp_needed": 45000},   # 16 筑基期中期
-    {"exp_needed": 45000},   # 17 筑基期中期
-    {"exp_needed": 45000},   # 18 筑基期中期
-    {"exp_needed": 150000},  # 19 金丹期初期
-    {"exp_needed": 150000},  # 20 金丹期初期
-    {"exp_needed": 150000},  # 21 金丹期初期
-    {"exp_needed": 150000},  # 22 金丹期初期
-    {"exp_needed": 150000},  # 23 金丹期初期
-    {"exp_needed": 150000},  # 24 金丹期初期
-    {"exp_needed": 150000},  # 25 金丹期初期
-    {"exp_needed": 150000},  # 26 金丹期初期
-    {"exp_needed": 150000},  # 27 金丹期初期
-    {"exp_needed": 600000000},  # 28 大乘期初期
-    {"exp_needed": 600000000},  # 29 大乘期初期
-    {"exp_needed": 600000000},  # 30 大乘期初期
-    {"exp_needed": 600000000},  # 31 大乘期初期
+    {"level_name": "炼气期一层", "exp_needed": 0},  # 0
+    {"level_name": "炼气期二层", "exp_needed": 500},  # 1
+    {"level_name": "炼气期三层", "exp_needed": 1200},  # 2
+    {"level_name": "炼气期四层", "exp_needed": 2000},  # 3
+    {"level_name": "炼气期五层", "exp_needed": 3000},  # 4
+    {"level_name": "炼气期六层", "exp_needed": 4500},  # 5
+    {"level_name": "炼气期七层", "exp_needed": 6500},  # 6
+    {"level_name": "炼气期八层", "exp_needed": 9000},  # 7
+    {"level_name": "炼气期九层", "exp_needed": 12000},  # 8
+    {"level_name": "炼气期十层", "exp_needed": 16000},  # 9
+    {"level_name": "炼气期十层", "exp_needed": 16000},  # 10
+    {"level_name": "筑基期初期", "exp_needed": 25000},  # 11
+    {"level_name": "筑基期初期", "exp_needed": 25000},  # 12
+    {"level_name": "筑基期中期", "exp_needed": 45000},  # 13
+    {"level_name": "筑基期中期", "exp_needed": 45000},  # 14
+    {"level_name": "筑基期中期", "exp_needed": 45000},  # 15
+    {"level_name": "筑基期中期", "exp_needed": 45000},  # 16
+    {"level_name": "筑基期中期", "exp_needed": 45000},  # 17
+    {"level_name": "筑基期中期", "exp_needed": 45000},  # 18
+    {"level_name": "金丹期初期", "exp_needed": 150000},  # 19
+    {"level_name": "金丹期初期", "exp_needed": 150000},  # 20
+    {"level_name": "金丹期初期", "exp_needed": 150000},  # 21
+    {"level_name": "金丹期初期", "exp_needed": 150000},  # 22
+    {"level_name": "金丹期初期", "exp_needed": 150000},  # 23
+    {"level_name": "金丹期初期", "exp_needed": 150000},  # 24
+    {"level_name": "金丹期初期", "exp_needed": 150000},  # 25
+    {"level_name": "金丹期初期", "exp_needed": 150000},  # 26
+    {"level_name": "金丹期初期", "exp_needed": 150000},  # 27
+    {"level_name": "大乘期初期", "exp_needed": 600000000},  # 28
+    {"level_name": "大乘期初期", "exp_needed": 600000000},  # 29
+    {"level_name": "大乘期初期", "exp_needed": 600000000},  # 30
+    {"level_name": "大乘期初期", "exp_needed": 600000000},  # 31
 ]
 
 
@@ -205,8 +205,13 @@ SAMPLE_LEVEL_CONFIG = [
 @pytest.fixture
 def enemy_manager():
     """Create an EnemyManager with mocked config loading."""
-    with patch.object(EnemyManager, "_load_config_file", return_value=SAMPLE_ENEMIES_CONFIG):
-        with patch.object(EnemyManager, "_load_level_config", return_value=SAMPLE_LEVEL_CONFIG):
+    EnemyManager._spawn_counter = 0
+    with patch.object(
+        EnemyManager, "_load_config_file", return_value=SAMPLE_ENEMIES_CONFIG
+    ):
+        with patch.object(
+            EnemyManager, "_load_level_config", return_value=SAMPLE_LEVEL_CONFIG
+        ):
             mgr = EnemyManager()
             return mgr
 
@@ -252,7 +257,9 @@ class TestGroupSelection:
         config = SAMPLE_ENEMIES_CONFIG.copy()
         config["enemy_groups"] = []
         with patch.object(EnemyManager, "_load_config_file", return_value=config):
-            with patch.object(EnemyManager, "_load_level_config", return_value=SAMPLE_LEVEL_CONFIG):
+            with patch.object(
+                EnemyManager, "_load_level_config", return_value=SAMPLE_LEVEL_CONFIG
+            ):
                 mgr = EnemyManager()
                 group = mgr._get_group_by_level(5)
                 assert group == {}
@@ -269,9 +276,10 @@ class TestStatCalculation:
     def test_normal_stats(self, enemy_manager):
         """Normal enemy: base_exp = exp_needed(enemy_level);
         HP = (base_exp//2)*hp_mult; ATK = (base_exp//10)*atk_mult."""
-        with patch("random.choice") as mock_choice, patch(
-            "enemy_manager.random.randint"
-        ) as mock_randint:
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
             mock_choice.return_value = SAMPLE_ENEMIES_CONFIG["enemy_groups"][0][
                 "templates"
             ][0]  # "wolf" template
@@ -294,9 +302,10 @@ class TestStatCalculation:
 
     def test_elite_stats(self, enemy_manager):
         """Elite enemy applies elite multiplier bonuses on top of base template."""
-        with patch("random.choice") as mock_choice, patch(
-            "enemy_manager.random.randint"
-        ) as mock_randint:
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
             mock_choice.side_effect = [
                 SAMPLE_ENEMIES_CONFIG["enemy_groups"][0]["templates"][0],
                 "历战的",
@@ -317,9 +326,10 @@ class TestStatCalculation:
 
     def test_boss_stats(self, enemy_manager):
         """Boss enemy applies boss multiplier bonuses on top of base template."""
-        with patch("random.choice") as mock_choice, patch(
-            "enemy_manager.random.randint"
-        ) as mock_randint:
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
             mock_choice.side_effect = [
                 SAMPLE_ENEMIES_CONFIG["enemy_groups"][0]["templates"][0],
                 "苍月狼王",
@@ -347,9 +357,10 @@ class TestStatCalculation:
             (30, "top"),
         ]
         for level, _group_key in cases:
-            with patch("random.choice") as mock_choice, patch(
-                "enemy_manager.random.randint"
-            ) as mock_randint:
+            with (
+                patch("random.choice") as mock_choice,
+                patch("enemy_manager.random.randint") as mock_randint,
+            ):
                 mock_choice.side_effect = lambda lst: lst[0]
                 mock_randint.return_value = level
                 enemy = enemy_manager.spawn_enemy(player_level=level, category="normal")
@@ -361,9 +372,10 @@ class TestStatCalculation:
 
     def test_minimal_level(self, enemy_manager):
         """With level 0 (exp_needed=0), enemy has 0 stats."""
-        with patch("random.choice") as mock_choice, patch(
-            "enemy_manager.random.randint"
-        ) as mock_randint:
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
             mock_choice.side_effect = lambda lst: lst[0]
             mock_randint.return_value = 0
             enemy = enemy_manager.spawn_enemy(player_level=1, category="normal")
@@ -382,9 +394,10 @@ class TestNameComposition:
 
     def test_normal_name(self, enemy_manager):
         """Normal enemy uses template name directly via {name} format."""
-        with patch("random.choice") as mock_choice, patch(
-            "enemy_manager.random.randint"
-        ) as mock_randint:
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
             mock_choice.side_effect = lambda lst: lst[0]
             mock_randint.return_value = 10
             enemy = enemy_manager.spawn_enemy(10, "normal")
@@ -392,9 +405,10 @@ class TestNameComposition:
 
     def test_elite_name(self, enemy_manager):
         """Elite enemy = prefix + name via {prefix}{name} format."""
-        with patch("random.choice") as mock_choice, patch(
-            "enemy_manager.random.randint"
-        ) as mock_randint:
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
             mock_choice.side_effect = [
                 SAMPLE_ENEMIES_CONFIG["enemy_groups"][0]["templates"][0],
                 "强壮的",
@@ -405,9 +419,10 @@ class TestNameComposition:
 
     def test_boss_name(self, enemy_manager):
         """Boss enemy uses boss_name from template via {boss_name} format."""
-        with patch("random.choice") as mock_choice, patch(
-            "enemy_manager.random.randint"
-        ) as mock_randint:
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
             mock_choice.side_effect = [
                 SAMPLE_ENEMIES_CONFIG["enemy_groups"][0]["templates"][0],
                 "啸月狼尊",
@@ -418,9 +433,10 @@ class TestNameComposition:
 
     def test_invalid_category_falls_to_template_name(self, enemy_manager):
         """Invalid category returns the template name as-is."""
-        with patch("random.choice") as mock_choice, patch(
-            "enemy_manager.random.randint"
-        ) as mock_randint:
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
             mock_choice.side_effect = lambda lst: lst[0]
             mock_randint.return_value = 10
             enemy = enemy_manager.spawn_enemy(10, category="invalid_category")
@@ -456,9 +472,10 @@ class TestErrorHandling:
     def test_missing_naming_config(self, enemy_manager):
         """Missing naming config uses default format strings."""
         enemy_manager.naming = {}
-        with patch("random.choice") as mock_choice, patch(
-            "enemy_manager.random.randint"
-        ) as mock_randint:
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
             mock_choice.side_effect = lambda lst: lst[0]
             mock_randint.return_value = 10
             enemy = enemy_manager.spawn_enemy(player_level=10, category="normal")
@@ -466,9 +483,10 @@ class TestErrorHandling:
 
     def test_template_missing_name_field(self, enemy_manager):
         """Template without 'name' uses '未知妖兽'."""
-        with patch("random.choice") as mock_choice, patch(
-            "enemy_manager.random.randint"
-        ) as mock_randint:
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
             mock_choice.side_effect = lambda lst: {
                 "key": "mystery",
                 "hp_mult": 0.5,
@@ -477,7 +495,7 @@ class TestErrorHandling:
             mock_randint.return_value = 10
             enemy = enemy_manager.spawn_enemy(player_level=10, category="normal")
             assert enemy.name == "未知妖兽"
-            assert enemy.user_id == "enemy_mystery"
+            assert enemy.user_id.startswith("enemy_mystery_")
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -489,26 +507,106 @@ class TestLevelBasedSpawning:
     """Enemy level is randomly chosen within the group's level_range."""
 
     def test_random_level_in_range(self, enemy_manager):
-        """Enemy level is randomly chosen from the group's level_range."""
-        with patch("random.choice") as mock_choice, patch(
-            "enemy_manager.random.randint"
-        ) as mock_randint:
+        """Enemy level is clamped by group range, player realm, and player level ±2."""
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
             mock_choice.side_effect = lambda lst: lst[0]
-            mock_randint.return_value = 5
+            mock_randint.return_value = 9
             enemy = enemy_manager.spawn_enemy(player_level=10, category="normal")
-            assert enemy.exp == SAMPLE_LEVEL_CONFIG[5]["exp_needed"]
-            mock_randint.assert_called_once_with(0, 12)
+            assert enemy.exp == SAMPLE_LEVEL_CONFIG[9]["exp_needed"]
+            # group [0,12] ∩ 炼气期 realm [0,10] ∩ [8,11] = [8,10]
+            mock_randint.assert_called_once_with(8, 10)
 
     def test_fallback_group_uses_last_range(self, enemy_manager):
         """When player level exceeds all ranges, fallback to last group's range."""
-        with patch("random.choice") as mock_choice, patch(
-            "enemy_manager.random.randint"
-        ) as mock_randint:
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
             mock_choice.side_effect = lambda lst: lst[0]
             mock_randint.return_value = 30
             enemy = enemy_manager.spawn_enemy(player_level=99, category="normal")
             assert enemy.exp == SAMPLE_LEVEL_CONFIG[30]["exp_needed"]
             mock_randint.assert_called_once_with(28, 31)
+
+    def test_realm_isolation_lianqi_player(self, enemy_manager):
+        """炼气期玩家生成的敌人境界必须停留在炼气期。"""
+        lianqi_indices = [
+            i
+            for i, cfg in enumerate(SAMPLE_LEVEL_CONFIG)
+            if cfg["level_name"].startswith("炼气期")
+        ]
+        for level in [1, 4, 9]:
+            for _ in range(20):
+                enemy = enemy_manager.spawn_enemy(player_level=level, category="normal")
+                enemy_level = next(
+                    i
+                    for i, cfg in enumerate(SAMPLE_LEVEL_CONFIG)
+                    if cfg["exp_needed"] == enemy.exp
+                )
+                assert enemy_level in lianqi_indices, (
+                    f"Player level {level} spawned enemy at level {enemy_level}, "
+                    f"outside 炼气期 realm {lianqi_indices}"
+                )
+
+    def test_realm_isolation_zhuji_player(self, enemy_manager):
+        """筑基期玩家生成的敌人境界必须停留在筑基期。"""
+        zhuji_indices = [
+            i
+            for i, cfg in enumerate(SAMPLE_LEVEL_CONFIG)
+            if cfg["level_name"].startswith("筑基期")
+        ]
+        for level in [11, 13, 18]:
+            for _ in range(20):
+                enemy = enemy_manager.spawn_enemy(player_level=level, category="normal")
+                enemy_level = next(
+                    i
+                    for i, cfg in enumerate(SAMPLE_LEVEL_CONFIG)
+                    if cfg["exp_needed"] == enemy.exp
+                )
+                assert enemy_level in zhuji_indices, (
+                    f"Player level {level} spawned enemy at level {enemy_level}, "
+                    f"outside 筑基期 realm {zhuji_indices}"
+                )
+
+    def test_enemy_level_clamped_to_player_level_window(self, enemy_manager):
+        """敌人等级同时被限制在 [player_level-2, player_level+1] 内。"""
+        player_level = 10
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
+            mock_choice.side_effect = lambda lst: lst[0]
+            mock_randint.return_value = 9
+            enemy_manager.spawn_enemy(player_level=player_level, category="normal")
+            # group [0,12] ∩ 炼气期 realm [0,10] ∩ [8,11] = [8,10]
+            mock_randint.assert_called_once_with(8, 10)
+
+    def test_unique_user_id_per_spawn(self, enemy_manager):
+        """同一模板多次生成的敌人 user_id 不重复。"""
+        user_ids = set()
+        for _ in range(50):
+            enemy = enemy_manager.spawn_enemy(player_level=5, category="normal")
+            assert enemy.user_id not in user_ids, (
+                f"Duplicate user_id generated: {enemy.user_id}"
+            )
+            user_ids.add(enemy.user_id)
+
+    def test_fallback_when_realm_and_player_window_disjoint(self, enemy_manager):
+        """当境界范围与玩家窗口无交集时回退到 group ∩ player_window。"""
+        # 大乘期玩家（等级 28）进入顶级妖域 [28,31]，玩家窗口 [26,29]，
+        # 与大乘期 realm [28,31] 交集为 [28,29]，仍在范围内。
+        player_level = 28
+        with (
+            patch("random.choice") as mock_choice,
+            patch("enemy_manager.random.randint") as mock_randint,
+        ):
+            mock_choice.side_effect = lambda lst: lst[0]
+            mock_randint.return_value = 28
+            enemy_manager.spawn_enemy(player_level=player_level, category="normal")
+            mock_randint.assert_called_once_with(28, 29)
 
 
 # ──────────────────────────────────────────────────────────────────────
