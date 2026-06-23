@@ -14,6 +14,7 @@ _pve_mod = load_module("pve_combat_manager", "managers/pve_combat_manager.py")
 PVECombatManager = _pve_mod.PVECombatManager
 calculate_equipment_defense = _pve_mod.calculate_equipment_defense
 calculate_equipment_atk_bonus = _pve_mod.calculate_equipment_atk_bonus
+RIFT_LEVEL_DIFFICULTY_MAP = _pve_mod.RIFT_LEVEL_DIFFICULTY_MAP
 
 # Load supporting types (they don't trigger the problematic __init__.py chain)
 _cm_mod = load_module("combat_manager", "managers/combat_manager.py")
@@ -122,6 +123,7 @@ class TestEncounterProbability:
             ("rift", "low", 0.50),
             ("rift", "mid", 0.70),
             ("rift", "high", 0.90),
+            ("rift", "extreme", 0.95),
         ],
     )
     def test_encounter_rate(self, pve_manager, scene, difficulty, expected):
@@ -162,6 +164,7 @@ class TestEnemyCategoryDistribution:
             ("rift", "low", (0.80, 0.20, 0.00)),
             ("rift", "mid", (0.50, 0.35, 0.15)),
             ("rift", "high", (0.30, 0.40, 0.30)),
+            ("rift", "extreme", (0.20, 0.40, 0.40)),
         ],
     )
     def test_category_distribution(self, pve_manager, scene, difficulty, expected):
@@ -197,6 +200,30 @@ class TestEnemyCategoryDistribution:
     def test_unknown_defaults_to_normal(self, pve_manager):
         """Unknown scene/difficulty returns 'normal'."""
         assert pve_manager._select_enemy_category("unknown", "mid") == "normal"
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Rift difficulty mapping
+# ──────────────────────────────────────────────────────────────────────
+
+
+class TestRiftDifficultyMap:
+    """RIFT_LEVEL_DIFFICULTY_MAP covers levels 1-5 and falls back to low."""
+
+    def test_levels_1_to_3_unchanged(self):
+        """Existing rift levels keep their original difficulties."""
+        assert RIFT_LEVEL_DIFFICULTY_MAP[1] == "low"
+        assert RIFT_LEVEL_DIFFICULTY_MAP[2] == "mid"
+        assert RIFT_LEVEL_DIFFICULTY_MAP[3] == "high"
+
+    def test_levels_4_and_5_are_extreme(self):
+        """Rift levels 4 and 5 map to extreme difficulty."""
+        assert RIFT_LEVEL_DIFFICULTY_MAP[4] == "extreme"
+        assert RIFT_LEVEL_DIFFICULTY_MAP[5] == "extreme"
+
+    def test_unknown_level_defaults_to_low(self):
+        """Unmapped levels fall back to 'low' when using .get()."""
+        assert RIFT_LEVEL_DIFFICULTY_MAP.get(99, "low") == "low"
 
 
 # ──────────────────────────────────────────────────────────────────────

@@ -38,6 +38,16 @@ except ImportError:
     Player = _md.Player
 
 
+# 秘境层数 -> PVE 难度映射（4/5 层为 extreme，未知层数回退到 low）
+RIFT_LEVEL_DIFFICULTY_MAP = {
+    1: "low",
+    2: "mid",
+    3: "high",
+    4: "extreme",
+    5: "extreme",
+}
+
+
 def calculate_equipment_atk_bonus(player: Player, config_manager) -> int:
     """
     计算装备提供的攻击力加成
@@ -138,6 +148,7 @@ class PVECombatManager:
                 "low": 0.50,
                 "mid": 0.70,
                 "high": 0.90,
+                "extreme": 0.95,
             },
         }
 
@@ -200,6 +211,13 @@ class PVECombatManager:
                 if rand < 0.30:
                     return "normal"
                 elif rand < 0.70:
+                    return "elite"
+                else:
+                    return "boss"
+            elif difficulty == "extreme":
+                if rand < 0.20:
+                    return "normal"
+                elif rand < 0.60:
                     return "elite"
                 else:
                     return "boss"
