@@ -112,13 +112,13 @@ class TestEncounterProbability:
     @pytest.mark.parametrize(
         "scene,difficulty,expected",
         [
-            ("adventure", "low", 0.10),
-            ("adventure", "mid", 0.25),
-            ("adventure", "high", 0.45),
-            ("adventure", "extreme", 0.55),
-            ("rift", "low", 0.30),
-            ("rift", "mid", 0.50),
-            ("rift", "high", 0.70),
+            ("adventure", "low", 0.30),
+            ("adventure", "mid", 0.45),
+            ("adventure", "high", 0.65),
+            ("adventure", "extreme", 0.75),
+            ("rift", "low", 0.50),
+            ("rift", "mid", 0.70),
+            ("rift", "high", 0.90),
         ],
     )
     def test_encounter_rate(self, pve_manager, scene, difficulty, expected):
@@ -396,9 +396,7 @@ class TestTriggerPVECombat:
 
         with (
             patch.object(pve_manager, "_should_trigger_combat", return_value=True),
-            patch.object(
-                pve_manager, "_select_enemy_category", return_value="normal"
-            ),
+            patch.object(pve_manager, "_select_enemy_category", return_value="normal"),
             patch.object(
                 pve_manager,
                 "_build_player_combat_stats",
@@ -420,9 +418,7 @@ class TestTriggerPVECombat:
         assert rewards["bonus_exp"] == 8500
 
     @pytest.mark.asyncio
-    async def test_full_flow_loss(
-        self, pve_manager, mock_player, mock_combat_manager
-    ):
+    async def test_full_flow_loss(self, pve_manager, mock_player, mock_combat_manager):
         """Loss flow marks hp_penalty."""
         enemy = Enemy(
             user_id="enemy_wolf",
@@ -461,9 +457,7 @@ class TestTriggerPVECombat:
 
         with (
             patch.object(pve_manager, "_should_trigger_combat", return_value=True),
-            patch.object(
-                pve_manager, "_select_enemy_category", return_value="elite"
-            ),
+            patch.object(pve_manager, "_select_enemy_category", return_value="elite"),
             patch.object(
                 pve_manager,
                 "_build_player_combat_stats",
@@ -511,9 +505,7 @@ class TestTriggerPVECombat:
 
         with (
             patch.object(pve_manager, "_should_trigger_combat", return_value=True),
-            patch.object(
-                pve_manager, "_select_enemy_category", return_value="normal"
-            ),
+            patch.object(pve_manager, "_select_enemy_category", return_value="normal"),
             patch.object(
                 pve_manager,
                 "_build_player_combat_stats",
@@ -532,9 +524,7 @@ class TestTriggerPVECombat:
     @pytest.mark.asyncio
     async def test_spawn_enemy_failure_returns_none(self, pve_manager, mock_player):
         """When spawn_enemy raises, trigger_pve_combat returns None."""
-        pve_manager.enemy_mgr.spawn_enemy.side_effect = ValueError(
-            "未找到敌人模板配置"
-        )
+        pve_manager.enemy_mgr.spawn_enemy.side_effect = ValueError("未找到敌人模板配置")
 
         combat_stats = CombatStats(
             user_id="player_001",
@@ -551,9 +541,7 @@ class TestTriggerPVECombat:
 
         with (
             patch.object(pve_manager, "_should_trigger_combat", return_value=True),
-            patch.object(
-                pve_manager, "_select_enemy_category", return_value="normal"
-            ),
+            patch.object(pve_manager, "_select_enemy_category", return_value="normal"),
             patch.object(
                 pve_manager,
                 "_build_player_combat_stats",

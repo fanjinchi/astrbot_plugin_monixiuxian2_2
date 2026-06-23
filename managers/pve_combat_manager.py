@@ -106,15 +106,15 @@ class PVECombatManager:
         # 战斗触发概率配置
         encounter_rates = {
             "adventure": {
-                "low": 0.10,
-                "mid": 0.25,
-                "high": 0.45,
-                "extreme": 0.55,
+                "low": 0.30,
+                "mid": 0.45,
+                "high": 0.65,
+                "extreme": 0.75,
             },
             "rift": {
-                "low": 0.30,
-                "mid": 0.50,
-                "high": 0.70,
+                "low": 0.50,
+                "mid": 0.70,
+                "high": 0.90,
             },
         }
 
