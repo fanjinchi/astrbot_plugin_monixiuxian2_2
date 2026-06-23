@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from ..data.data_manager import DataBase
 from ..managers.enemy_manager import EnemyManager  # noqa: F401
-from ..managers.pve_combat_manager import PVECombatManager
+from ..managers.pve_combat_manager import PVECombatManager, RIFT_LEVEL_DIFFICULTY_MAP
 from ..models import Player
 from ..models_extended import UserStatus
 
@@ -200,9 +200,7 @@ class RiftManager:
             f"✨ 你进入了『{rift.rift_name}』！探索需要 {self.explore_duration // 60} 分钟。\n使用 /完成探索 领取奖励",
         )
 
-    async def finish_exploration(
-        self, user_id: str
-    ) -> tuple[bool, str, dict | None]:
+    async def finish_exploration(self, user_id: str) -> tuple[bool, str, dict | None]:
         """
         完成秘境探索
 
@@ -265,8 +263,7 @@ class RiftManager:
 
         combat_msg = ""
         if self.pve_combat_mgr:
-            difficulty_map = {1: "low", 2: "mid", 3: "high"}
-            difficulty = difficulty_map.get(rift_level, "low")
+            difficulty = RIFT_LEVEL_DIFFICULTY_MAP.get(rift_level, "low")
             base_rewards = {"exp": exp_reward, "gold": gold_reward}
             combat_result = await self.pve_combat_mgr.trigger_pve_combat(
                 player, "rift", difficulty, base_rewards
