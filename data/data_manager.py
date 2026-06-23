@@ -16,16 +16,19 @@ PLAYER_FIELDS = {f.name for f in fields(Player)}
 _PLAYER_FIELDS = [f.name for f in fields(Player)]
 _PLAYER_FIELDS_SET = set(_PLAYER_FIELDS)
 
+
 def _build_insert_sql():
     """构建 INSERT SQL（从 Player dataclass 动态生成）"""
-    cols = ', '.join(_PLAYER_FIELDS)
-    placeholders = ', '.join(['?' for _ in _PLAYER_FIELDS])
+    cols = ", ".join(_PLAYER_FIELDS)
+    placeholders = ", ".join(["?" for _ in _PLAYER_FIELDS])
     return f"INSERT INTO players ({cols}) VALUES ({placeholders})"
+
 
 def _build_update_sql():
     """构建 UPDATE SQL（从 Player dataclass 动态生成）"""
-    set_clauses = ', '.join([f"{f} = ?" for f in _PLAYER_FIELDS if f != 'user_id'])
+    set_clauses = ", ".join([f"{f} = ?" for f in _PLAYER_FIELDS if f != "user_id"])
     return f"UPDATE players SET {set_clauses} WHERE user_id = ?"
+
 
 def _player_to_tuple(player: Player, for_insert: bool = True):
     """将 Player 对象转换为 SQL 参数元组"""
@@ -40,7 +43,6 @@ def _player_to_tuple(player: Player, for_insert: bool = True):
         # UPDATE: user_id 移到最后
         values.append(values.pop(0))
     return tuple(values)
-
 
 
 class DataBase:
@@ -95,25 +97,27 @@ class DataBase:
     async def get_player_by_id(self, user_id: str) -> Player:
         """根据用户ID获取玩家信息"""
         async with self.conn.execute(
-            "SELECT * FROM players WHERE user_id = ?",
-            (user_id,)
+            "SELECT * FROM players WHERE user_id = ?", (user_id,)
         ) as cursor:
             row = await cursor.fetchone()
             if row:
                 # 过滤掉 Player 模型中不存在的字段（兼容旧数据库/迁移未完成的情况）
-                filtered_data = {k: v for k, v in dict(row).items() if k in _PLAYER_FIELDS_SET}
+                filtered_data = {
+                    k: v for k, v in dict(row).items() if k in _PLAYER_FIELDS_SET
+                }
                 return Player(**filtered_data)
             return None
 
     async def get_player_by_name(self, user_name: str) -> Player:
         """根据道号获取玩家信息"""
         async with self.conn.execute(
-            "SELECT * FROM players WHERE user_name = ?",
-            (user_name,)
+            "SELECT * FROM players WHERE user_name = ?", (user_name,)
         ) as cursor:
             row = await cursor.fetchone()
             if row:
-                filtered_data = {k: v for k, v in dict(row).items() if k in _PLAYER_FIELDS_SET}
+                filtered_data = {
+                    k: v for k, v in dict(row).items() if k in _PLAYER_FIELDS_SET
+                }
                 return Player(**filtered_data)
             return None
 
@@ -126,14 +130,12 @@ class DataBase:
 
     async def delete_player(self, user_id: str):
         """删除玩家"""
-        await self.conn.execute(
-            "DELETE FROM players WHERE user_id = ?",
-            (user_id,)
-        )
+        await self.conn.execute("DELETE FROM players WHERE user_id = ?", (user_id,))
         await self.conn.commit()
 
     async def delete_player_cascade(self, user_id: str):
         """级联删除玩家及所有关联数据"""
+
         async def safe_execute(sql: str, params: tuple):
             try:
                 await self.conn.execute(sql, params)
@@ -142,19 +144,31 @@ class DataBase:
                 logger.warning(f"[delete_player_cascade] 忽略执行 {sql_preview}: {e}")
 
         statements = [
-            ("UPDATE spirit_eyes SET owner_id = NULL, owner_name = NULL, claim_time = NULL WHERE owner_id = ?", (user_id,)),
+            (
+                "UPDATE spirit_eyes SET owner_id = NULL, owner_name = NULL, claim_time = NULL WHERE owner_id = ?",
+                (user_id,),
+            ),
             ("DELETE FROM blessed_lands WHERE user_id = ?", (user_id,)),
             ("DELETE FROM spirit_farms WHERE user_id = ?", (user_id,)),
             ("DELETE FROM bank_accounts WHERE user_id = ?", (user_id,)),
-            ("UPDATE bank_loans SET status = 'bad_debt' WHERE user_id = ? AND status = 'active'", (user_id,)),
+            (
+                "UPDATE bank_loans SET status = 'bad_debt' WHERE user_id = ? AND status = 'active'",
+                (user_id,),
+            ),
             ("DELETE FROM bounty_tasks WHERE user_id = ?", (user_id,)),
             ("DELETE FROM dual_cultivation WHERE user_id = ?", (user_id,)),
-            ("DELETE FROM dual_cultivation_requests WHERE from_id = ? OR target_id = ?", (user_id, user_id)),
+            (
+                "DELETE FROM dual_cultivation_requests WHERE from_id = ? OR target_id = ?",
+                (user_id, user_id),
+            ),
             ("DELETE FROM user_cd WHERE user_id = ?", (user_id,)),
             ("DELETE FROM buff_info WHERE user_id = ?", (user_id,)),
             ("DELETE FROM impart_info WHERE user_id = ?", (user_id,)),
-            ("DELETE FROM combat_cooldowns WHERE attacker_id = ? OR defender_id = ?", (user_id, user_id)),
-            ("DELETE FROM pending_gifts WHERE sender_id = ? OR receiver_id = ?", (user_id, user_id)),
+            ("DELETE FROM combat_cooldowns WHERE user_id = ?", (user_id,)),
+            (
+                "DELETE FROM pending_gifts WHERE sender_id = ? OR receiver_id = ?",
+                (user_id, user_id),
+            ),
         ]
 
         for sql, params in statements:
@@ -168,7 +182,12 @@ class DataBase:
         async with self.conn.execute("SELECT * FROM players") as cursor:
             rows = await cursor.fetchall()
             # 过滤掉 Player 模型中不存在的字段（兼容旧数据库/迁移未完成的情况）
-            return [Player(**{k: v for k, v in dict(row).items() if k in _PLAYER_FIELDS_SET}) for row in rows]
+            return [
+                Player(
+                    **{k: v for k, v in dict(row).items() if k in _PLAYER_FIELDS_SET}
+                )
+                for row in rows
+            ]
 
     # ===== 商店数据操作 =====
 
@@ -183,7 +202,7 @@ class DataBase:
         """
         async with self.conn.execute(
             "SELECT last_refresh_time, current_items FROM shop WHERE shop_id = ?",
-            (shop_id,)
+            (shop_id,),
         ) as cursor:
             row = await cursor.fetchone()
             if row:
@@ -195,7 +214,9 @@ class DataBase:
                 return last_refresh_time, current_items
             return 0, []
 
-    async def update_shop_data(self, shop_id: str, last_refresh_time: int, current_items: List[dict]):
+    async def update_shop_data(
+        self, shop_id: str, last_refresh_time: int, current_items: List[dict]
+    ):
         """更新商店数据
 
         Args:
@@ -209,11 +230,17 @@ class DataBase:
             INSERT OR REPLACE INTO shop (shop_id, last_refresh_time, current_items)
             VALUES (?, ?, ?)
             """,
-            (shop_id, last_refresh_time, items_json)
+            (shop_id, last_refresh_time, items_json),
         )
         await self.conn.commit()
 
-    async def decrement_shop_item_stock(self, shop_id: str, item_name: str, quantity: int = 1, external_transaction: bool = False) -> tuple[bool, int, int]:
+    async def decrement_shop_item_stock(
+        self,
+        shop_id: str,
+        item_name: str,
+        quantity: int = 1,
+        external_transaction: bool = False,
+    ) -> tuple[bool, int, int]:
         """尝试扣减指定商店物品的库存（原子操作，可批量）
 
         Args:
@@ -231,7 +258,7 @@ class DataBase:
         try:
             async with self.conn.execute(
                 "SELECT last_refresh_time, current_items FROM shop WHERE shop_id = ?",
-                (shop_id,)
+                (shop_id,),
             ) as cursor:
                 row = await cursor.fetchone()
 
@@ -248,7 +275,7 @@ class DataBase:
 
             target_index = -1
             for idx, item in enumerate(current_items):
-                if item.get('name') == item_name:
+                if item.get("name") == item_name:
                     target_index = idx
                     break
 
@@ -257,7 +284,7 @@ class DataBase:
                     await self.conn.rollback()
                 return False, last_refresh_time, 0
 
-            stock = current_items[target_index].get('stock', 0)
+            stock = current_items[target_index].get("stock", 0)
             if stock is None or stock <= 0:
                 if not external_transaction:
                     await self.conn.rollback()
@@ -269,12 +296,12 @@ class DataBase:
                 return False, last_refresh_time, stock
 
             new_stock = stock - quantity
-            current_items[target_index]['stock'] = new_stock
+            current_items[target_index]["stock"] = new_stock
 
             items_json = json.dumps(current_items, ensure_ascii=False)
             await self.conn.execute(
                 "UPDATE shop SET current_items = ?, last_refresh_time = ? WHERE shop_id = ?",
-                (items_json, last_refresh_time, shop_id)
+                (items_json, last_refresh_time, shop_id),
             )
             if not external_transaction:
                 await self.conn.commit()
@@ -284,14 +311,16 @@ class DataBase:
                 await self.conn.rollback()
             raise
 
-    async def increment_shop_item_stock(self, shop_id: str, item_name: str, quantity: int = 1):
+    async def increment_shop_item_stock(
+        self, shop_id: str, item_name: str, quantity: int = 1
+    ):
         """回滚库存（在购买失败时恢复库存），支持批量"""
         quantity = max(1, int(quantity))
         await self.conn.execute("BEGIN IMMEDIATE")
         try:
             async with self.conn.execute(
                 "SELECT last_refresh_time, current_items FROM shop WHERE shop_id = ?",
-                (shop_id,)
+                (shop_id,),
             ) as cursor:
                 row = await cursor.fetchone()
 
@@ -306,15 +335,15 @@ class DataBase:
                 current_items = []
 
             for item in current_items:
-                if item.get('name') == item_name:
-                    current_stock = item.get('stock', 0) or 0
-                    item['stock'] = current_stock + quantity
+                if item.get("name") == item_name:
+                    current_stock = item.get("stock", 0) or 0
+                    item["stock"] = current_stock + quantity
                     break
 
             items_json = json.dumps(current_items, ensure_ascii=False)
             await self.conn.execute(
                 "UPDATE shop SET current_items = ?, last_refresh_time = ? WHERE shop_id = ?",
-                (items_json, last_refresh_time, shop_id)
+                (items_json, last_refresh_time, shop_id),
             )
             await self.conn.commit()
         except Exception:
