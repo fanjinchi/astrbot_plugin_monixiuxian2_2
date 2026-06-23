@@ -5,16 +5,24 @@ from typing import Dict, Callable, Awaitable
 from astrbot.api import logger
 from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 20  # v20: 用户CD表添加额外数据字段
+LATEST_DB_VERSION = 21  # v21: 添加系统配置表，补齐全新安装时缺失的表和字段
 
-MIGRATION_TASKS: Dict[int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]] = {}
+MIGRATION_TASKS: Dict[
+    int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]
+] = {}
+
 
 def migration(version: int):
     """注册数据库迁移任务的装饰器"""
-    def decorator(func: Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]):
+
+    def decorator(
+        func: Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]],
+    ):
         MIGRATION_TASKS[version] = func
         return func
+
     return decorator
+
 
 class MigrationManager:
     """数据库迁移管理器"""
@@ -25,13 +33,17 @@ class MigrationManager:
 
     async def migrate(self):
         await self.conn.execute("PRAGMA foreign_keys = ON")
-        async with self.conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='db_info'") as cursor:
+        async with self.conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='db_info'"
+        ) as cursor:
             if await cursor.fetchone() is None:
                 logger.info("未检测到数据库版本，将进行全新安装...")
                 await self.conn.execute("BEGIN")
                 # 使用最新的建表函数
-                await _create_all_tables_v2(self.conn)
-                await self.conn.execute("INSERT INTO db_info (version) VALUES (?)", (LATEST_DB_VERSION,))
+                await _create_all_tables_v21(self.conn)
+                await self.conn.execute(
+                    "INSERT INTO db_info (version) VALUES (?)", (LATEST_DB_VERSION,)
+                )
                 await self.conn.commit()
                 logger.info(f"数据库已初始化到最新版本: v{LATEST_DB_VERSION}")
                 return
@@ -40,16 +52,22 @@ class MigrationManager:
             row = await cursor.fetchone()
             current_version = row[0] if row else 0
 
-        logger.info(f"当前数据库版本: v{current_version}, 最新版本: v{LATEST_DB_VERSION}")
+        logger.info(
+            f"当前数据库版本: v{current_version}, 最新版本: v{LATEST_DB_VERSION}"
+        )
         if current_version < LATEST_DB_VERSION:
             logger.info("检测到数据库需要升级...")
             for version in sorted(MIGRATION_TASKS.keys()):
                 if current_version < version:
-                    logger.info(f"正在执行数据库升级: v{current_version} -> v{version} ...")
+                    logger.info(
+                        f"正在执行数据库升级: v{current_version} -> v{version} ..."
+                    )
                     await self.conn.execute("BEGIN")
                     try:
                         await MIGRATION_TASKS[version](self.conn, self.config_manager)
-                        await self.conn.execute("UPDATE db_info SET version = ?", (version,))
+                        await self.conn.execute(
+                            "UPDATE db_info SET version = ?", (version,)
+                        )
                         await self.conn.commit()
                         current_version = version
                         logger.info(f"数据库升级成功: v{version}")
@@ -60,6 +78,7 @@ class MigrationManager:
             logger.info(f"数据库已升级到最新版本: v{LATEST_DB_VERSION}")
         else:
             logger.info("数据库已是最新版本，无需升级。")
+
 
 async def _create_all_tables_v1(conn: aiosqlite.Connection):
     """创建所有表 - v1，只保留玩家基础信息"""
@@ -90,9 +109,12 @@ async def _create_all_tables_v1(conn: aiosqlite.Connection):
     """)
 
     # 创建索引
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_player_level ON players(level_index)")
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_player_level ON players(level_index)"
+    )
 
     logger.info("数据库表已创建完成（v1）")
+
 
 @migration(2)
 async def _migrate_to_v2(conn: aiosqlite.Connection, config_manager: ConfigManager):
@@ -105,15 +127,19 @@ async def _migrate_to_v2(conn: aiosqlite.Connection, config_manager: ConfigManag
 
     logger.info("v2迁移完成：新属性系统")
 
+
 @migration(3)
 async def _migrate_to_v3(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v3 - 添加闭关系统"""
     logger.info("开始迁移到v3：添加闭关系统")
 
     # 添加 cultivation_start_time 字段
-    await conn.execute("ALTER TABLE players ADD COLUMN cultivation_start_time INTEGER NOT NULL DEFAULT 0")
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN cultivation_start_time INTEGER NOT NULL DEFAULT 0"
+    )
 
     logger.info("v3迁移完成：闭关系统")
+
 
 @migration(4)
 async def _migrate_to_v4(conn: aiosqlite.Connection, config_manager: ConfigManager):
@@ -121,9 +147,12 @@ async def _migrate_to_v4(conn: aiosqlite.Connection, config_manager: ConfigManag
     logger.info("开始迁移到v4：添加签到系统")
 
     # 添加 last_check_in_date 字段
-    await conn.execute("ALTER TABLE players ADD COLUMN last_check_in_date TEXT NOT NULL DEFAULT ''")
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN last_check_in_date TEXT NOT NULL DEFAULT ''"
+    )
 
     logger.info("v4迁移完成：签到系统")
+
 
 @migration(5)
 async def _migrate_to_v5(conn: aiosqlite.Connection, config_manager: ConfigManager):
@@ -133,13 +162,20 @@ async def _migrate_to_v5(conn: aiosqlite.Connection, config_manager: ConfigManag
     # 添加装备栏字段
     await conn.execute("ALTER TABLE players ADD COLUMN weapon TEXT NOT NULL DEFAULT ''")
     await conn.execute("ALTER TABLE players ADD COLUMN armor TEXT NOT NULL DEFAULT ''")
-    await conn.execute("ALTER TABLE players ADD COLUMN main_technique TEXT NOT NULL DEFAULT ''")
-    await conn.execute("ALTER TABLE players ADD COLUMN techniques TEXT NOT NULL DEFAULT '[]'")
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN main_technique TEXT NOT NULL DEFAULT ''"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN techniques TEXT NOT NULL DEFAULT '[]'"
+    )
 
     # 添加灵气容量字段
-    await conn.execute("ALTER TABLE players ADD COLUMN max_spiritual_qi INTEGER NOT NULL DEFAULT 1000")
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN max_spiritual_qi INTEGER NOT NULL DEFAULT 1000"
+    )
 
     logger.info("v5迁移完成：装备系统")
+
 
 @migration(6)
 async def _migrate_to_v6(conn: aiosqlite.Connection, config_manager: ConfigManager):
@@ -147,21 +183,33 @@ async def _migrate_to_v6(conn: aiosqlite.Connection, config_manager: ConfigManag
     logger.info("开始迁移到v6：添加丹药系统")
 
     # 添加丹药系统相关字段
-    await conn.execute("ALTER TABLE players ADD COLUMN active_pill_effects TEXT NOT NULL DEFAULT '[]'")
-    await conn.execute("ALTER TABLE players ADD COLUMN permanent_pill_gains TEXT NOT NULL DEFAULT '{}'")
-    await conn.execute("ALTER TABLE players ADD COLUMN has_resurrection_pill INTEGER NOT NULL DEFAULT 0")
-    await conn.execute("ALTER TABLE players ADD COLUMN pills_inventory TEXT NOT NULL DEFAULT '{}'")
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN active_pill_effects TEXT NOT NULL DEFAULT '[]'"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN permanent_pill_gains TEXT NOT NULL DEFAULT '{}'"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN has_resurrection_pill INTEGER NOT NULL DEFAULT 0"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN pills_inventory TEXT NOT NULL DEFAULT '{}'"
+    )
 
     logger.info("v6迁移完成：丹药系统")
+
 
 @migration(7)
 async def _migrate_to_v7(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v7 - 丹药系统扩展字段"""
     logger.info("开始迁移到v7：丹药系统扩展字段")
 
-    await conn.execute("ALTER TABLE players ADD COLUMN has_debuff_shield INTEGER NOT NULL DEFAULT 0")
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN has_debuff_shield INTEGER NOT NULL DEFAULT 0"
+    )
 
     logger.info("v7迁移完成：新增定魂丹护盾字段")
+
 
 @migration(8)
 async def _migrate_to_v8(conn: aiosqlite.Connection, config_manager: ConfigManager):
@@ -185,16 +233,22 @@ async def _migrate_to_v8(conn: aiosqlite.Connection, config_manager: ConfigManag
 
     logger.info("v8迁移完成：商店系统")
 
+
 @migration(9)
 async def _migrate_to_v9(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v9 - 添加体修气血系统"""
     logger.info("开始迁移到v9：添加体修气血系统")
 
     # 添加气血字段
-    await conn.execute("ALTER TABLE players ADD COLUMN blood_qi INTEGER NOT NULL DEFAULT 0")
-    await conn.execute("ALTER TABLE players ADD COLUMN max_blood_qi INTEGER NOT NULL DEFAULT 0")
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN blood_qi INTEGER NOT NULL DEFAULT 0"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN max_blood_qi INTEGER NOT NULL DEFAULT 0"
+    )
 
     logger.info("v9迁移完成：体修气血系统")
+
 
 @migration(10)
 async def _migrate_to_v10(conn: aiosqlite.Connection, config_manager: ConfigManager):
@@ -207,12 +261,34 @@ async def _migrate_to_v10(conn: aiosqlite.Connection, config_manager: ConfigMana
 
     # 定义需要保留的字段（与 Player 模型一致）
     valid_columns = {
-        'user_id', 'level_index', 'spiritual_root', 'cultivation_type', 'lifespan',
-        'experience', 'gold', 'state', 'cultivation_start_time', 'last_check_in_date',
-        'spiritual_qi', 'max_spiritual_qi', 'blood_qi', 'max_blood_qi',
-        'magic_damage', 'physical_damage', 'magic_defense', 'physical_defense', 'mental_power',
-        'weapon', 'armor', 'main_technique', 'techniques',
-        'active_pill_effects', 'permanent_pill_gains', 'has_resurrection_pill', 'has_debuff_shield', 'pills_inventory'
+        "user_id",
+        "level_index",
+        "spiritual_root",
+        "cultivation_type",
+        "lifespan",
+        "experience",
+        "gold",
+        "state",
+        "cultivation_start_time",
+        "last_check_in_date",
+        "spiritual_qi",
+        "max_spiritual_qi",
+        "blood_qi",
+        "max_blood_qi",
+        "magic_damage",
+        "physical_damage",
+        "magic_defense",
+        "physical_defense",
+        "mental_power",
+        "weapon",
+        "armor",
+        "main_technique",
+        "techniques",
+        "active_pill_effects",
+        "permanent_pill_gains",
+        "has_resurrection_pill",
+        "has_debuff_shield",
+        "pills_inventory",
     }
 
     # 找出需要删除的废弃字段
@@ -222,7 +298,7 @@ async def _migrate_to_v10(conn: aiosqlite.Connection, config_manager: ConfigMana
 
         # 使用正确的表重建方式（保留约束）
         columns_to_keep = columns & valid_columns
-        columns_str = ', '.join(columns_to_keep)
+        columns_str = ", ".join(columns_to_keep)
 
         # 1. 创建新表（带完整约束）
         await conn.execute("""
@@ -273,7 +349,9 @@ async def _migrate_to_v10(conn: aiosqlite.Connection, config_manager: ConfigMana
         await conn.execute("ALTER TABLE players_new RENAME TO players")
 
         # 5. 重建索引
-        await conn.execute("CREATE INDEX IF NOT EXISTS idx_player_level ON players(level_index)")
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_player_level ON players(level_index)"
+        )
 
         logger.info(f"已清理废弃字段: {deprecated_columns}")
     else:
@@ -288,8 +366,12 @@ async def _migrate_to_v11(conn: aiosqlite.Connection, config_manager: ConfigMana
     logger.info("开始迁移到v11：添加储物戒系统")
 
     # 添加储物戒字段
-    await conn.execute("ALTER TABLE players ADD COLUMN storage_ring TEXT NOT NULL DEFAULT '基础储物戒'")
-    await conn.execute("ALTER TABLE players ADD COLUMN storage_ring_items TEXT NOT NULL DEFAULT '{}'")
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN storage_ring TEXT NOT NULL DEFAULT '基础储物戒'"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN storage_ring_items TEXT NOT NULL DEFAULT '{}'"
+    )
 
     logger.info("v11迁移完成：储物戒系统 - 所有玩家已配备基础储物戒")
 
@@ -360,7 +442,9 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
     """)
 
     # 创建索引
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_player_level ON players(level_index)")
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_player_level ON players(level_index)"
+    )
 
     # 创建商店表
     await conn.execute("""
@@ -375,7 +459,7 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
         INSERT OR IGNORE INTO shop (shop_id, last_refresh_time, current_items)
         VALUES ('global', 0, '[]')
     """)
-    
+
     # 创建宗门表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS sects (
@@ -392,8 +476,10 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
         )
     """)
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_sect_owner ON sects(sect_owner)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_sect_scale ON sects(sect_scale DESC)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sect_scale ON sects(sect_scale DESC)"
+    )
+
     # 创建Buff信息表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS buff_info (
@@ -410,7 +496,7 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
         )
     """)
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_buff_user ON buff_info(user_id)")
-    
+
     # 创建Boss表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS boss (
@@ -426,8 +512,10 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             status INTEGER NOT NULL DEFAULT 1
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_boss_status ON boss(status, create_time DESC)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_boss_status ON boss(status, create_time DESC)"
+    )
+
     # 创建秘境表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS rifts (
@@ -438,7 +526,7 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             rewards TEXT NOT NULL DEFAULT '{}'
         )
     """)
-    
+
     # 创建传承信息表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS impart_info (
@@ -451,8 +539,10 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             impart_burst_per REAL NOT NULL DEFAULT 0.0
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_impart_user ON impart_info(user_id)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_impart_user ON impart_info(user_id)"
+    )
+
     # 创建用户CD表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS user_cd (
@@ -462,7 +552,7 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             scheduled_time INTEGER NOT NULL DEFAULT 0
         )
     """)
-    
+
     # 创建赠予请求表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS pending_gifts (
@@ -476,9 +566,13 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             expires_at INTEGER NOT NULL
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_gifts_receiver ON pending_gifts(receiver_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_gifts_expires ON pending_gifts(expires_at)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pending_gifts_receiver ON pending_gifts(receiver_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pending_gifts_expires ON pending_gifts(expires_at)"
+    )
+
     # 创建银行账户表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS bank_accounts (
@@ -487,7 +581,7 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             last_interest_time INTEGER NOT NULL DEFAULT 0
         )
     """)
-    
+
     # 创建银行贷款表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS bank_loans (
@@ -502,9 +596,13 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             UNIQUE(user_id, status)
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_loans_user ON bank_loans(user_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_loans_status ON bank_loans(status)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_loans_user ON bank_loans(user_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_loans_status ON bank_loans(status)"
+    )
+
     # 创建银行交易流水表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS bank_transactions (
@@ -517,9 +615,12 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             created_at INTEGER NOT NULL
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_trans_user ON bank_transactions(user_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_trans_time ON bank_transactions(created_at)")
-
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_trans_user ON bank_transactions(user_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_trans_time ON bank_transactions(created_at)"
+    )
 
     # 创建悬赏任务表
     await conn.execute("""
@@ -537,8 +638,10 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             status INTEGER NOT NULL DEFAULT 1
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bounty_user ON bounty_tasks(user_id)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bounty_user ON bounty_tasks(user_id)"
+    )
+
     # 创建洞天福地表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS blessed_lands (
@@ -552,8 +655,10 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             last_collect_time INTEGER NOT NULL DEFAULT 0
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_blessed_lands_user ON blessed_lands(user_id)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_blessed_lands_user ON blessed_lands(user_id)"
+    )
+
     # 创建灵田表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS spirit_farms (
@@ -563,8 +668,10 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             crops TEXT NOT NULL DEFAULT '[]'
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_spirit_farms_user ON spirit_farms(user_id)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spirit_farms_user ON spirit_farms(user_id)"
+    )
+
     # 创建双修记录表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS dual_cultivation (
@@ -573,8 +680,10 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             last_dual_time INTEGER NOT NULL DEFAULT 0
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_dual_user ON dual_cultivation(user_id)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dual_user ON dual_cultivation(user_id)"
+    )
+
     # 创建天地灵眼表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS spirit_eyes (
@@ -589,8 +698,10 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             last_collect_time INTEGER
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_spirit_eyes_owner ON spirit_eyes(owner_id)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spirit_eyes_owner ON spirit_eyes(owner_id)"
+    )
+
     # 创建双修请求表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS dual_cultivation_requests (
@@ -602,9 +713,13 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             expires_at INTEGER NOT NULL
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_dual_req_target ON dual_cultivation_requests(target_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_dual_req_expires ON dual_cultivation_requests(expires_at)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dual_req_target ON dual_cultivation_requests(target_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dual_req_expires ON dual_cultivation_requests(expires_at)"
+    )
+
     # 创建战斗冷却表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS combat_cooldowns (
@@ -613,26 +728,40 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             last_spar_time INTEGER NOT NULL DEFAULT 0
         )
     """)
-    
+
     # ===== 插入初始数据 =====
-    
+
     # 插入默认秘境数据
     import json
+
     default_rifts = [
         (1, "青云秘境", 1, 0, json.dumps({"exp": [500, 1500], "gold": [200, 800]})),
         (2, "落日峡谷", 2, 3, json.dumps({"exp": [1500, 4000], "gold": [500, 2000]})),
         (3, "万妖洞", 3, 6, json.dumps({"exp": [3000, 8000], "gold": [1000, 5000]})),
-        (4, "玄冰地宫", 4, 10, json.dumps({"exp": [5000, 15000], "gold": [2000, 10000]})),
-        (5, "上古遗迹", 5, 15, json.dumps({"exp": [10000, 30000], "gold": [5000, 20000]})),
+        (
+            4,
+            "玄冰地宫",
+            4,
+            10,
+            json.dumps({"exp": [5000, 15000], "gold": [2000, 10000]}),
+        ),
+        (
+            5,
+            "上古遗迹",
+            5,
+            15,
+            json.dumps({"exp": [10000, 30000], "gold": [5000, 20000]}),
+        ),
     ]
     for rift in default_rifts:
         await conn.execute(
             "INSERT OR IGNORE INTO rifts (rift_id, rift_name, rift_level, required_level, rewards) VALUES (?, ?, ?, ?, ?)",
-            rift
+            rift,
         )
-    
+
     # 插入初始灵眼数据
     import time
+
     now = int(time.time())
     initial_eyes = [
         (1, "下品灵眼", 500, now),
@@ -642,37 +771,112 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
     for eye in initial_eyes:
         await conn.execute(
             "INSERT INTO spirit_eyes (eye_type, eye_name, exp_per_hour, spawn_time) VALUES (?, ?, ?, ?)",
-            eye
+            eye,
         )
 
     logger.info("数据库表已创建完成（v2 - 完整修仙系统）")
+
+
+async def _create_all_tables_v21(conn: aiosqlite.Connection):
+    """创建v21最新完整schema，全新安装时直接得到全部表和字段。"""
+
+    await _create_all_tables_v2(conn)
+
+    async with conn.execute("PRAGMA table_info(user_cd)") as cursor:
+        user_cd_columns = {row[1] for row in await cursor.fetchall()}
+    if "extra_data" not in user_cd_columns:
+        await conn.execute(
+            "ALTER TABLE user_cd ADD COLUMN extra_data TEXT NOT NULL DEFAULT '{}'"
+        )
+
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS system_config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    await conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_system_config_updated
+        ON system_config(updated_at)
+    """)
+
+    logger.info("数据库表已创建完成（v21 - 完整修仙系统）")
+
+
+@migration(21)
+async def _migrate_to_v21(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """迁移到v21 - 创建系统配置表并补齐user_cd.extra_data字段"""
+    logger.info("开始迁移到v21：创建系统配置表")
+
+    async with conn.execute("PRAGMA table_info(user_cd)") as cursor:
+        user_cd_columns = {row[1] for row in await cursor.fetchall()}
+    if "extra_data" not in user_cd_columns:
+        await conn.execute(
+            "ALTER TABLE user_cd ADD COLUMN extra_data TEXT NOT NULL DEFAULT '{}'"
+        )
+
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS system_config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    await conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_system_config_updated
+        ON system_config(updated_at)
+    """)
+
+    await conn.commit()
+    logger.info("v21迁移完成：系统配置表已创建")
 
 
 @migration(12)
 async def _migrate_to_v12(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v12 - 添加完整修仙系统（宗门、Boss、秘境、战斗系统等）"""
     logger.info("开始迁移到v12：添加完整修仙系统")
-    
+
     # 1. 添加Player新字段（战斗属性和宗门）
     logger.info("添加战斗属性字段...")
-    await conn.execute("ALTER TABLE players ADD COLUMN user_name TEXT NOT NULL DEFAULT ''")
-    await conn.execute("ALTER TABLE players ADD COLUMN level_up_rate INTEGER NOT NULL DEFAULT 0")
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN user_name TEXT NOT NULL DEFAULT ''"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN level_up_rate INTEGER NOT NULL DEFAULT 0"
+    )
     await conn.execute("ALTER TABLE players ADD COLUMN hp INTEGER NOT NULL DEFAULT 0")
     await conn.execute("ALTER TABLE players ADD COLUMN mp INTEGER NOT NULL DEFAULT 0")
     await conn.execute("ALTER TABLE players ADD COLUMN atk INTEGER NOT NULL DEFAULT 0")
-    await conn.execute("ALTER TABLE players ADD COLUMN atkpractice INTEGER NOT NULL DEFAULT 0")
-    
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN atkpractice INTEGER NOT NULL DEFAULT 0"
+    )
+
     logger.info("添加宗门相关字段...")
-    await conn.execute("ALTER TABLE players ADD COLUMN sect_id INTEGER NOT NULL DEFAULT 0")
-    await conn.execute("ALTER TABLE players ADD COLUMN sect_position INTEGER NOT NULL DEFAULT 4")
-    await conn.execute("ALTER TABLE players ADD COLUMN sect_contribution INTEGER NOT NULL DEFAULT 0")
-    await conn.execute("ALTER TABLE players ADD COLUMN sect_task INTEGER NOT NULL DEFAULT 0")
-    await conn.execute("ALTER TABLE players ADD COLUMN sect_elixir_get INTEGER NOT NULL DEFAULT 0")
-    
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN sect_id INTEGER NOT NULL DEFAULT 0"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN sect_position INTEGER NOT NULL DEFAULT 4"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN sect_contribution INTEGER NOT NULL DEFAULT 0"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN sect_task INTEGER NOT NULL DEFAULT 0"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN sect_elixir_get INTEGER NOT NULL DEFAULT 0"
+    )
+
     logger.info("添加洞天福地字段...")
-    await conn.execute("ALTER TABLE players ADD COLUMN blessed_spot_flag INTEGER NOT NULL DEFAULT 0")
-    await conn.execute("ALTER TABLE players ADD COLUMN blessed_spot_name TEXT NOT NULL DEFAULT ''")
-    
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN blessed_spot_flag INTEGER NOT NULL DEFAULT 0"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN blessed_spot_name TEXT NOT NULL DEFAULT ''"
+    )
+
     # 2. 创建新表
     logger.info("创建宗门表...")
     await conn.execute("""
@@ -690,8 +894,10 @@ async def _migrate_to_v12(conn: aiosqlite.Connection, config_manager: ConfigMana
         )
     """)
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_sect_owner ON sects(sect_owner)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_sect_scale ON sects(sect_scale DESC)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sect_scale ON sects(sect_scale DESC)"
+    )
+
     logger.info("创建Buff信息表...")
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS buff_info (
@@ -708,7 +914,7 @@ async def _migrate_to_v12(conn: aiosqlite.Connection, config_manager: ConfigMana
         )
     """)
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_buff_user ON buff_info(user_id)")
-    
+
     logger.info("创建Boss表...")
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS boss (
@@ -724,8 +930,10 @@ async def _migrate_to_v12(conn: aiosqlite.Connection, config_manager: ConfigMana
             status INTEGER NOT NULL DEFAULT 1
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_boss_status ON boss(status, create_time DESC)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_boss_status ON boss(status, create_time DESC)"
+    )
+
     logger.info("创建秘境表...")
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS rifts (
@@ -736,7 +944,7 @@ async def _migrate_to_v12(conn: aiosqlite.Connection, config_manager: ConfigMana
             rewards TEXT NOT NULL DEFAULT '{}'
         )
     """)
-    
+
     logger.info("创建传承信息表...")
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS impart_info (
@@ -749,8 +957,10 @@ async def _migrate_to_v12(conn: aiosqlite.Connection, config_manager: ConfigMana
             impart_burst_per REAL NOT NULL DEFAULT 0.0
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_impart_user ON impart_info(user_id)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_impart_user ON impart_info(user_id)"
+    )
+
     logger.info("创建用户CD表...")
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS user_cd (
@@ -760,7 +970,7 @@ async def _migrate_to_v12(conn: aiosqlite.Connection, config_manager: ConfigMana
             scheduled_time INTEGER NOT NULL DEFAULT 0
         )
     """)
-    
+
     # 3. 初始化现有用户的扩展数据
     logger.info("为现有用户初始化扩展数据...")
     async with conn.execute("SELECT user_id FROM players") as cursor:
@@ -768,18 +978,27 @@ async def _migrate_to_v12(conn: aiosqlite.Connection, config_manager: ConfigMana
         for user in users:
             user_id = user[0]
             # 初始化BuffInfo
-            await conn.execute("""
+            await conn.execute(
+                """
                 INSERT OR IGNORE INTO buff_info (user_id) VALUES (?)
-            """, (user_id,))
+            """,
+                (user_id,),
+            )
             # 初始化UserCd
-            await conn.execute("""
+            await conn.execute(
+                """
                 INSERT OR IGNORE INTO user_cd (user_id) VALUES (?)
-            """, (user_id,))
+            """,
+                (user_id,),
+            )
             # 初始化ImpartInfo
-            await conn.execute("""
+            await conn.execute(
+                """
                 INSERT OR IGNORE INTO impart_info (user_id) VALUES (?)
-            """, (user_id,))
-    
+            """,
+                (user_id,),
+            )
+
     logger.info(f"v12迁移完成：完整修仙系统 - 已为 {len(users)} 个用户初始化扩展数据")
 
 
@@ -787,18 +1006,22 @@ async def _migrate_to_v12(conn: aiosqlite.Connection, config_manager: ConfigMana
 async def _migrate_to_v13(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v13 - Phase 1: 道号系统、每日限制、物品绑定"""
     logger.info("开始迁移到v13：Phase 1 功能增强")
-    
+
     # 1. 添加每日限制字段
     logger.info("添加每日限制字段...")
     try:
-        await conn.execute("ALTER TABLE players ADD COLUMN daily_pill_usage TEXT NOT NULL DEFAULT '{}'")
+        await conn.execute(
+            "ALTER TABLE players ADD COLUMN daily_pill_usage TEXT NOT NULL DEFAULT '{}'"
+        )
     except:
         pass  # 字段可能已存在
     try:
-        await conn.execute("ALTER TABLE players ADD COLUMN last_daily_reset TEXT NOT NULL DEFAULT ''")
+        await conn.execute(
+            "ALTER TABLE players ADD COLUMN last_daily_reset TEXT NOT NULL DEFAULT ''"
+        )
     except:
         pass
-    
+
     logger.info("v13迁移完成：Phase 1 功能增强")
 
 
@@ -806,7 +1029,7 @@ async def _migrate_to_v13(conn: aiosqlite.Connection, config_manager: ConfigMana
 async def _migrate_to_v14(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v14 - Phase 2: 灵石银行、悬赏令系统"""
     logger.info("开始迁移到v14：Phase 2 经济与任务系统")
-    
+
     # 1. 创建银行账户表
     logger.info("创建银行账户表...")
     await conn.execute("""
@@ -816,7 +1039,7 @@ async def _migrate_to_v14(conn: aiosqlite.Connection, config_manager: ConfigMana
             last_interest_time INTEGER NOT NULL DEFAULT 0
         )
     """)
-    
+
     # 2. 创建悬赏任务表
     logger.info("创建悬赏任务表...")
     await conn.execute("""
@@ -834,8 +1057,10 @@ async def _migrate_to_v14(conn: aiosqlite.Connection, config_manager: ConfigMana
             status INTEGER NOT NULL DEFAULT 1
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bounty_user ON bounty_tasks(user_id)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bounty_user ON bounty_tasks(user_id)"
+    )
+
     logger.info("v14迁移完成：Phase 2 经济与任务系统")
 
 
@@ -843,26 +1068,39 @@ async def _migrate_to_v14(conn: aiosqlite.Connection, config_manager: ConfigMana
 async def _migrate_to_v15(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v15 - 添加默认秘境数据"""
     logger.info("开始迁移到v15：添加默认秘境数据")
-    
+
     # 插入默认秘境数据
     import json
+
     default_rifts = [
         (1, "青云秘境", 1, 0, json.dumps({"exp": [500, 1500], "gold": [200, 800]})),
         (2, "落日峡谷", 2, 3, json.dumps({"exp": [1500, 4000], "gold": [500, 2000]})),
         (3, "万妖洞", 3, 6, json.dumps({"exp": [3000, 8000], "gold": [1000, 5000]})),
-        (4, "玄冰地宫", 4, 10, json.dumps({"exp": [5000, 15000], "gold": [2000, 10000]})),
-        (5, "上古遗迹", 5, 15, json.dumps({"exp": [10000, 30000], "gold": [5000, 20000]})),
+        (
+            4,
+            "玄冰地宫",
+            4,
+            10,
+            json.dumps({"exp": [5000, 15000], "gold": [2000, 10000]}),
+        ),
+        (
+            5,
+            "上古遗迹",
+            5,
+            15,
+            json.dumps({"exp": [10000, 30000], "gold": [5000, 20000]}),
+        ),
     ]
-    
+
     for rift in default_rifts:
         try:
             await conn.execute(
                 "INSERT OR IGNORE INTO rifts (rift_id, rift_name, rift_level, required_level, rewards) VALUES (?, ?, ?, ?, ?)",
-                rift
+                rift,
             )
         except:
             pass
-    
+
     await conn.commit()
     logger.info("v15迁移完成：已添加5个默认秘境")
 
@@ -871,7 +1109,7 @@ async def _migrate_to_v15(conn: aiosqlite.Connection, config_manager: ConfigMana
 async def _migrate_to_v16(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v16 - Phase 4 扩展功能"""
     logger.info("开始迁移到v16：Phase 4 扩展功能")
-    
+
     # 洞天福地表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS blessed_lands (
@@ -885,8 +1123,10 @@ async def _migrate_to_v16(conn: aiosqlite.Connection, config_manager: ConfigMana
             last_collect_time INTEGER NOT NULL DEFAULT 0
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_blessed_lands_user ON blessed_lands(user_id)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_blessed_lands_user ON blessed_lands(user_id)"
+    )
+
     # 灵田表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS spirit_farms (
@@ -896,8 +1136,10 @@ async def _migrate_to_v16(conn: aiosqlite.Connection, config_manager: ConfigMana
             crops TEXT NOT NULL DEFAULT '[]'
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_spirit_farms_user ON spirit_farms(user_id)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spirit_farms_user ON spirit_farms(user_id)"
+    )
+
     # 双修记录表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS dual_cultivation (
@@ -906,8 +1148,10 @@ async def _migrate_to_v16(conn: aiosqlite.Connection, config_manager: ConfigMana
             last_dual_time INTEGER NOT NULL DEFAULT 0
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_dual_user ON dual_cultivation(user_id)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dual_user ON dual_cultivation(user_id)"
+    )
+
     # 天地灵眼表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS spirit_eyes (
@@ -921,10 +1165,13 @@ async def _migrate_to_v16(conn: aiosqlite.Connection, config_manager: ConfigMana
             claim_time INTEGER
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_spirit_eyes_owner ON spirit_eyes(owner_id)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spirit_eyes_owner ON spirit_eyes(owner_id)"
+    )
+
     # 插入初始灵眼
     import time
+
     now = int(time.time())
     initial_eyes = [
         (1, "下品灵眼", 500, now),
@@ -934,9 +1181,9 @@ async def _migrate_to_v16(conn: aiosqlite.Connection, config_manager: ConfigMana
     for eye in initial_eyes:
         await conn.execute(
             "INSERT INTO spirit_eyes (eye_type, eye_name, exp_per_hour, spawn_time) VALUES (?, ?, ?, ?)",
-            eye
+            eye,
         )
-    
+
     await conn.commit()
     logger.info("v16迁移完成：Phase 4 扩展功能（洞天福地、灵田、双修、灵眼）")
 
@@ -945,7 +1192,7 @@ async def _migrate_to_v16(conn: aiosqlite.Connection, config_manager: ConfigMana
 async def _migrate_to_v17(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v17 - 赠予请求持久化"""
     logger.info("开始迁移到v17：赠予请求持久化")
-    
+
     # 创建赠予请求表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS pending_gifts (
@@ -959,9 +1206,13 @@ async def _migrate_to_v17(conn: aiosqlite.Connection, config_manager: ConfigMana
             expires_at INTEGER NOT NULL
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_gifts_receiver ON pending_gifts(receiver_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_gifts_expires ON pending_gifts(expires_at)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pending_gifts_receiver ON pending_gifts(receiver_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pending_gifts_expires ON pending_gifts(expires_at)"
+    )
+
     await conn.commit()
     logger.info("v17迁移完成：赠予请求持久化")
 
@@ -970,7 +1221,7 @@ async def _migrate_to_v17(conn: aiosqlite.Connection, config_manager: ConfigMana
 async def _migrate_to_v18(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v18 - 银行贷款与交易流水系统"""
     logger.info("开始迁移到v18：银行贷款与交易流水系统")
-    
+
     # 0. 确保 bank_accounts 表存在（v14可能未正确创建）
     logger.info("确保银行账户表存在...")
     await conn.execute("""
@@ -980,7 +1231,7 @@ async def _migrate_to_v18(conn: aiosqlite.Connection, config_manager: ConfigMana
             last_interest_time INTEGER NOT NULL DEFAULT 0
         )
     """)
-    
+
     # 1. 创建银行贷款表
     logger.info("创建银行贷款表...")
     await conn.execute("""
@@ -996,9 +1247,13 @@ async def _migrate_to_v18(conn: aiosqlite.Connection, config_manager: ConfigMana
             UNIQUE(user_id, status)
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_loans_user ON bank_loans(user_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_loans_status ON bank_loans(status)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_loans_user ON bank_loans(user_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_loans_status ON bank_loans(status)"
+    )
+
     # 2. 创建银行交易流水表
     logger.info("创建银行交易流水表...")
     await conn.execute("""
@@ -1012,9 +1267,13 @@ async def _migrate_to_v18(conn: aiosqlite.Connection, config_manager: ConfigMana
             created_at INTEGER NOT NULL
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_trans_user ON bank_transactions(user_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_trans_time ON bank_transactions(created_at)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_trans_user ON bank_transactions(user_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_trans_time ON bank_transactions(created_at)"
+    )
+
     await conn.commit()
     logger.info("v18迁移完成：银行贷款与交易流水系统")
 
@@ -1023,7 +1282,7 @@ async def _migrate_to_v18(conn: aiosqlite.Connection, config_manager: ConfigMana
 async def _migrate_to_v19(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v19 - 银行系统表完整性修复"""
     logger.info("开始迁移到v19：银行系统表完整性修复")
-    
+
     # 确保 bank_accounts 表存在（修复v14迁移可能跳过的情况）
     logger.info("确保银行账户表存在...")
     await conn.execute("""
@@ -1033,7 +1292,7 @@ async def _migrate_to_v19(conn: aiosqlite.Connection, config_manager: ConfigMana
             last_interest_time INTEGER NOT NULL DEFAULT 0
         )
     """)
-    
+
     # 确保 bank_loans 表存在
     logger.info("确保银行贷款表存在...")
     await conn.execute("""
@@ -1048,9 +1307,13 @@ async def _migrate_to_v19(conn: aiosqlite.Connection, config_manager: ConfigMana
             loan_type TEXT NOT NULL DEFAULT 'normal'
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_loans_user ON bank_loans(user_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_loans_status ON bank_loans(status)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_loans_user ON bank_loans(user_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_loans_status ON bank_loans(status)"
+    )
+
     # 确保 bank_transactions 表存在
     logger.info("确保银行交易流水表存在...")
     await conn.execute("""
@@ -1064,9 +1327,13 @@ async def _migrate_to_v19(conn: aiosqlite.Connection, config_manager: ConfigMana
             created_at INTEGER NOT NULL
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_trans_user ON bank_transactions(user_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_bank_trans_time ON bank_transactions(created_at)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_trans_user ON bank_transactions(user_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_trans_time ON bank_transactions(created_at)"
+    )
+
     await conn.commit()
     logger.info("v19迁移完成：银行系统表完整性修复")
 
@@ -1075,19 +1342,23 @@ async def _migrate_to_v19(conn: aiosqlite.Connection, config_manager: ConfigMana
 async def _migrate_to_v20(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v20 - 用户CD表添加额外数据字段"""
     logger.info("开始迁移到v20：用户CD表添加额外数据字段")
-    
+
     # 添加extra_data字段用于存储额外信息（如秘境ID、战斗冷却等）
     try:
-        await conn.execute("ALTER TABLE user_cd ADD COLUMN extra_data TEXT NOT NULL DEFAULT '{}'")
+        await conn.execute(
+            "ALTER TABLE user_cd ADD COLUMN extra_data TEXT NOT NULL DEFAULT '{}'"
+        )
     except Exception as e:
         logger.warning(f"添加extra_data字段失败（可能已存在）: {e}")
-    
+
     # 添加last_collect_time字段到spirit_eyes表（修复灵眼收取时间计算）
     try:
-        await conn.execute("ALTER TABLE spirit_eyes ADD COLUMN last_collect_time INTEGER")
+        await conn.execute(
+            "ALTER TABLE spirit_eyes ADD COLUMN last_collect_time INTEGER"
+        )
     except Exception as e:
         logger.warning(f"添加last_collect_time字段失败（可能已存在）: {e}")
-    
+
     # 添加双修请求持久化表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS dual_cultivation_requests (
@@ -1099,9 +1370,13 @@ async def _migrate_to_v20(conn: aiosqlite.Connection, config_manager: ConfigMana
             expires_at INTEGER NOT NULL
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_dual_req_target ON dual_cultivation_requests(target_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_dual_req_expires ON dual_cultivation_requests(expires_at)")
-    
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dual_req_target ON dual_cultivation_requests(target_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dual_req_expires ON dual_cultivation_requests(expires_at)"
+    )
+
     # 添加战斗冷却表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS combat_cooldowns (
@@ -1110,6 +1385,6 @@ async def _migrate_to_v20(conn: aiosqlite.Connection, config_manager: ConfigMana
             last_spar_time INTEGER NOT NULL DEFAULT 0
         )
     """)
-    
+
     await conn.commit()
     logger.info("v20迁移完成：用户CD表添加额外数据字段")
