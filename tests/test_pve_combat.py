@@ -3,7 +3,7 @@ Tests for PVECombatManager - encounter probability, enemy category distribution,
 reward calculation, equipment defense, and the full trigger_pve_combat flow.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -13,6 +13,7 @@ from tests.helpers import load_module
 _pve_mod = load_module("pve_combat_manager", "managers/pve_combat_manager.py")
 PVECombatManager = _pve_mod.PVECombatManager
 calculate_equipment_defense = _pve_mod.calculate_equipment_defense
+calculate_equipment_atk_bonus = _pve_mod.calculate_equipment_atk_bonus
 
 # Load supporting types (they don't trigger the problematic __init__.py chain)
 _cm_mod = load_module("combat_manager", "managers/combat_manager.py")
@@ -68,6 +69,8 @@ def mock_player():
     player.level_index = 10
     player.experience = 10000
     player.atkpractice = 5
+    player.hp = 100
+    player.mp = 200
     player.weapon = ""
     player.armor = ""
     return player
@@ -287,14 +290,14 @@ class TestCalculateEquipmentDefense:
         mock_player.armor = ""
         assert calculate_equipment_defense(mock_player, mock_config_manager) == 0
 
-    def test_weapon_defense(self, mock_player, mock_config_manager):
-        """Weapon with physical_defense contributes to total."""
+    def test_weapon_defense_not_counted(self, mock_player, mock_config_manager):
+        """Weapon physical/magic defense is not counted (aligned with _prepare_combat_stats)."""
         mock_player.weapon = "玄铁剑"
         mock_player.armor = ""
         mock_config_manager.weapons_data = {
             "玄铁剑": {"physical_defense": 15, "magic_defense": 5}
         }
-        assert calculate_equipment_defense(mock_player, mock_config_manager) == 20
+        assert calculate_equipment_defense(mock_player, mock_config_manager) == 0
 
     def test_armor_defense(self, mock_player, mock_config_manager):
         """Armor with defenses contributes to total."""
@@ -306,7 +309,7 @@ class TestCalculateEquipmentDefense:
         assert calculate_equipment_defense(mock_player, mock_config_manager) == 40
 
     def test_weapon_and_armor(self, mock_player, mock_config_manager):
-        """Both weapon and armor defenses are summed."""
+        """Only armor defenses are summed; weapon defenses are ignored."""
         mock_player.weapon = "玄铁剑"
         mock_player.armor = "金蚕丝甲"
         mock_config_manager.weapons_data = {
@@ -315,7 +318,7 @@ class TestCalculateEquipmentDefense:
         mock_config_manager.items_data = {
             "金蚕丝甲": {"physical_defense": 30, "magic_defense": 10}
         }
-        assert calculate_equipment_defense(mock_player, mock_config_manager) == 60
+        assert calculate_equipment_defense(mock_player, mock_config_manager) == 40
 
     def test_missing_weapon_in_data(self, mock_player, mock_config_manager):
         """When weapon name not in data, it is skipped without error."""
@@ -338,12 +341,245 @@ class TestCalculateEquipmentDefense:
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Equipment attack bonus helper
+# ──────────────────────────────────────────────────────────────────────
+
+
+class TestCalculateEquipmentAtkBonus:
+    """calculate_equipment_atk_bonus standalone function."""
+
+    def test_no_config_manager(self, mock_player):
+        """Returns 0 when config_manager is None."""
+        assert calculate_equipment_atk_bonus(mock_player, None) == 0
+
+    def test_no_weapon(self, mock_player, mock_config_manager):
+        """Returns 0 when player has no weapon."""
+        mock_player.weapon = ""
+        assert calculate_equipment_atk_bonus(mock_player, mock_config_manager) == 0
+
+    def test_weapon_atk_bonus(self, mock_player, mock_config_manager):
+        """Weapon atk contributes to attack bonus."""
+        mock_player.weapon = "玄铁剑"
+        mock_config_manager.weapons_data = {"玄铁剑": {"atk": 25}}
+        assert calculate_equipment_atk_bonus(mock_player, mock_config_manager) == 25
+
+    def test_weapon_physical_damage_bonus(self, mock_player, mock_config_manager):
+        """Weapon physical_damage contributes to attack bonus."""
+        mock_player.weapon = "玄铁剑"
+        mock_config_manager.weapons_data = {"玄铁剑": {"physical_damage": 10}}
+        assert calculate_equipment_atk_bonus(mock_player, mock_config_manager) == 10
+
+    def test_weapon_magic_damage_bonus(self, mock_player, mock_config_manager):
+        """Weapon magic_damage contributes to attack bonus."""
+        mock_player.weapon = "玄铁剑"
+        mock_config_manager.weapons_data = {"玄铁剑": {"magic_damage": 12}}
+        assert calculate_equipment_atk_bonus(mock_player, mock_config_manager) == 12
+
+    def test_weapon_all_atk_fields_summed(self, mock_player, mock_config_manager):
+        """Weapon atk + physical_damage + magic_damage are summed."""
+        mock_player.weapon = "玄铁剑"
+        mock_config_manager.weapons_data = {
+            "玄铁剑": {"atk": 20, "physical_damage": 8, "magic_damage": 7}
+        }
+        assert calculate_equipment_atk_bonus(mock_player, mock_config_manager) == 35
+
+    def test_missing_weapon_in_data(self, mock_player, mock_config_manager):
+        """When weapon name not in data, it is skipped without error."""
+        mock_player.weapon = "不存在之剑"
+        assert calculate_equipment_atk_bonus(mock_player, mock_config_manager) == 0
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Build player combat stats
+# ──────────────────────────────────────────────────────────────────────
+
+
+class TestBuildPlayerCombatStats:
+    """_build_player_combat_stats formula alignment with _prepare_combat_stats."""
+
+    @pytest.mark.asyncio
+    async def test_uses_current_hp_mp(self, pve_manager_with_config, mock_player):
+        """CombatStats.hp/mp are initialized from player.hp/mp, not recalculated."""
+        mock_player.hp = 123
+        mock_player.mp = 456
+        stats = await pve_manager_with_config._build_player_combat_stats(mock_player)
+        assert stats.hp == 123
+        assert stats.mp == 456
+
+    @pytest.mark.asyncio
+    async def test_max_hp_mp_from_experience(
+        self, pve_manager_with_config, mock_player, mock_combat_manager
+    ):
+        """CombatStats.max_hp/max_mp come from calculate_hp_mp(player.experience, ...)."""
+        mock_combat_manager.calculate_hp_mp.return_value = (500, 1000)
+        stats = await pve_manager_with_config._build_player_combat_stats(mock_player)
+        assert stats.max_hp == 500
+        assert stats.max_mp == 1000
+        mock_combat_manager.calculate_hp_mp.assert_called_once_with(
+            mock_player.experience, 0.0, 0.0
+        )
+
+    @pytest.mark.asyncio
+    async def test_atk_includes_base_and_equipment(
+        self,
+        pve_manager_with_config,
+        mock_player,
+        mock_combat_manager,
+        mock_config_manager,
+    ):
+        """ATK = calculate_atk(...) + weapon atk + physical_damage + magic_damage."""
+        mock_combat_manager.calculate_atk.return_value = 100
+        mock_player.weapon = "玄铁剑"
+        mock_config_manager.weapons_data = {
+            "玄铁剑": {"atk": 10, "physical_damage": 5, "magic_damage": 3}
+        }
+        stats = await pve_manager_with_config._build_player_combat_stats(mock_player)
+        assert stats.atk == 118
+        mock_combat_manager.calculate_atk.assert_called_once_with(
+            mock_player.experience, mock_player.atkpractice, 0.0
+        )
+
+    @pytest.mark.asyncio
+    async def test_defense_is_equipment_defense_only(
+        self, pve_manager_with_config, mock_player, mock_config_manager
+    ):
+        """DEF equals calculate_equipment_defense (armor only), ignoring base player defense."""
+        mock_player.armor = "金蚕丝甲"
+        mock_config_manager.items_data = {
+            "金蚕丝甲": {"physical_defense": 30, "magic_defense": 10}
+        }
+        stats = await pve_manager_with_config._build_player_combat_stats(mock_player)
+        assert stats.defense == 40
+
+    @pytest.mark.asyncio
+    async def test_no_equipment_bonus_when_no_config(
+        self, pve_manager, mock_player, mock_combat_manager
+    ):
+        """Without config_manager, ATK is base only and DEF is 0."""
+        mock_combat_manager.calculate_atk.return_value = 80
+        stats = await pve_manager._build_player_combat_stats(mock_player)
+        assert stats.atk == 80
+        assert stats.defense == 0
+
+
+# ──────────────────────────────────────────────────────────────────────
+# CombatManager crit-rate bounds and conversion
+# ──────────────────────────────────────────────────────────────────────
+
+
+class TestCombatManagerCritRate:
+    """calculate_turn_attack crit-roll behaviour for boundary crit rates."""
+
+    TRIALS = 1000
+
+    def test_crit_rate_zero_never_crits(self):
+        """crit_rate=0 must produce zero crits across many trials."""
+        crits = sum(
+            CombatManager.calculate_turn_attack(100, crit_rate=0)[0]
+            for _ in range(self.TRIALS)
+        )
+        assert crits == 0
+
+    def test_crit_rate_hundred_always_crits(self):
+        """crit_rate=100 must produce a crit on every trial."""
+        crits = sum(
+            CombatManager.calculate_turn_attack(100, crit_rate=100)[0]
+            for _ in range(self.TRIALS)
+        )
+        assert crits == self.TRIALS
+
+
+class TestBuildPlayerCombatStatsCritConversion:
+    """Fractional impart_know_per is converted to integer percentage crit_rate."""
+
+    @pytest.mark.asyncio
+    async def test_fractional_crit_rate_buff_converted_to_percent(
+        self, mock_combat_manager, mock_enemy_manager, mock_player
+    ):
+        """impart_know_per=0.1 means +10% crit rate."""
+        config_manager = MagicMock()
+        config_manager.db.ext.get_impart_info = AsyncMock(
+            return_value=MagicMock(
+                impart_hp_per=0.0,
+                impart_mp_per=0.0,
+                impart_atk_per=0.0,
+                impart_know_per=0.1,
+            )
+        )
+
+        manager = PVECombatManager(
+            mock_combat_manager, mock_enemy_manager, config_manager
+        )
+        stats = await manager._build_player_combat_stats(mock_player)
+
+        assert stats.crit_rate == 10
+
+
+# ──────────────────────────────────────────────────────────────────────
 # trigger_pve_combat integration flow
 # ──────────────────────────────────────────────────────────────────────
 
 
 class TestTriggerPVECombat:
     """End-to-end flow of trigger_pve_combat with mocked internals."""
+
+    @pytest.mark.asyncio
+    async def test_writes_back_hp_mp_after_combat(
+        self,
+        pve_manager_with_config,
+        mock_player,
+        mock_combat_manager,
+        mock_config_manager,
+    ):
+        """After combat, player.hp/mp are updated from combat_stats.hp/mp."""
+        mock_player.hp = 500
+        mock_player.mp = 1000
+        mock_combat_manager.calculate_hp_mp.return_value = (600, 1200)
+        mock_combat_manager.calculate_atk.return_value = 100
+
+        enemy = Enemy(
+            user_id="enemy_wolf",
+            name="疾风狼",
+            hp=200,
+            max_hp=200,
+            mp=400,
+            max_mp=400,
+            atk=30,
+            defense=5,
+            crit_rate=10,
+            exp=8500,
+        )
+        pve_manager_with_config.enemy_mgr.spawn_enemy.return_value = enemy
+
+        def mutate_and_return(player_stats, _enemy_stats):
+            player_stats.hp = 250
+            player_stats.mp = 800
+            return {
+                "winner": "player_001",
+                "combat_log": [],
+                "player_final_hp": 250,
+                "player_final_mp": 800,
+            }
+
+        mock_combat_manager.player_vs_boss.side_effect = mutate_and_return
+
+        with (
+            patch.object(
+                pve_manager_with_config, "_should_trigger_combat", return_value=True
+            ),
+            patch.object(
+                pve_manager_with_config, "_select_enemy_category", return_value="normal"
+            ),
+        ):
+            await pve_manager_with_config.trigger_pve_combat(
+                mock_player,
+                scene="adventure",
+                difficulty="mid",
+                base_rewards={"exp": 100, "gold": 50},
+            )
+
+        assert mock_player.hp == 250
+        assert mock_player.mp == 800
 
     @pytest.mark.asyncio
     async def test_no_encounter_returns_none(self, pve_manager, mock_player):
@@ -396,9 +632,7 @@ class TestTriggerPVECombat:
 
         with (
             patch.object(pve_manager, "_should_trigger_combat", return_value=True),
-            patch.object(
-                pve_manager, "_select_enemy_category", return_value="normal"
-            ),
+            patch.object(pve_manager, "_select_enemy_category", return_value="normal"),
             patch.object(
                 pve_manager,
                 "_build_player_combat_stats",
@@ -420,9 +654,7 @@ class TestTriggerPVECombat:
         assert rewards["bonus_exp"] == 8500
 
     @pytest.mark.asyncio
-    async def test_full_flow_loss(
-        self, pve_manager, mock_player, mock_combat_manager
-    ):
+    async def test_full_flow_loss(self, pve_manager, mock_player, mock_combat_manager):
         """Loss flow marks hp_penalty."""
         enemy = Enemy(
             user_id="enemy_wolf",
@@ -461,9 +693,7 @@ class TestTriggerPVECombat:
 
         with (
             patch.object(pve_manager, "_should_trigger_combat", return_value=True),
-            patch.object(
-                pve_manager, "_select_enemy_category", return_value="elite"
-            ),
+            patch.object(pve_manager, "_select_enemy_category", return_value="elite"),
             patch.object(
                 pve_manager,
                 "_build_player_combat_stats",
@@ -511,9 +741,7 @@ class TestTriggerPVECombat:
 
         with (
             patch.object(pve_manager, "_should_trigger_combat", return_value=True),
-            patch.object(
-                pve_manager, "_select_enemy_category", return_value="normal"
-            ),
+            patch.object(pve_manager, "_select_enemy_category", return_value="normal"),
             patch.object(
                 pve_manager,
                 "_build_player_combat_stats",
@@ -532,9 +760,7 @@ class TestTriggerPVECombat:
     @pytest.mark.asyncio
     async def test_spawn_enemy_failure_returns_none(self, pve_manager, mock_player):
         """When spawn_enemy raises, trigger_pve_combat returns None."""
-        pve_manager.enemy_mgr.spawn_enemy.side_effect = ValueError(
-            "未找到敌人模板配置"
-        )
+        pve_manager.enemy_mgr.spawn_enemy.side_effect = ValueError("未找到敌人模板配置")
 
         combat_stats = CombatStats(
             user_id="player_001",
@@ -551,9 +777,7 @@ class TestTriggerPVECombat:
 
         with (
             patch.object(pve_manager, "_should_trigger_combat", return_value=True),
-            patch.object(
-                pve_manager, "_select_enemy_category", return_value="normal"
-            ),
+            patch.object(pve_manager, "_select_enemy_category", return_value="normal"),
             patch.object(
                 pve_manager,
                 "_build_player_combat_stats",
