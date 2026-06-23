@@ -26,15 +26,16 @@ try:
     from ..models import Player
 except ImportError:
     # Standalone execution (for testing)
-    _cm = _load_module("combat_manager", "managers/combat_manager.py")
+    # Use prefixed module names to avoid colliding with real package imports.
+    _cm = _load_module("pve_combat_manager_combat", "managers/combat_manager.py")
     CombatManager = _cm.CombatManager
     CombatStats = _cm.CombatStats
 
-    _em = _load_module("enemy_manager", "managers/enemy_manager.py")
+    _em = _load_module("pve_combat_manager_enemy", "managers/enemy_manager.py")
     EnemyManager = _em.EnemyManager
     Enemy = _em.Enemy
 
-    _md = _load_module("models", "models.py")
+    _md = _load_module("pve_combat_manager_models", "models.py")
     Player = _md.Player
 
 
@@ -411,20 +412,20 @@ class PVECombatManager:
         if not self._should_trigger_combat(scene, difficulty):
             return None
 
-        # 3. 选择敌人类别
+        # 2. 选择敌人类别
         category = self._select_enemy_category(scene, difficulty)
 
-        # 4. 生成敌人
+        # 3. 生成敌人
         try:
             enemy = self.enemy_mgr.spawn_enemy(player.level_index, category)
         except Exception as e:
             logger.error(f"生成敌人失败: {e}")
             return None
 
-        # 5. 构建玩家战斗属性
+        # 4. 构建玩家战斗属性
         player_stats = await self._build_player_combat_stats(player)
 
-        # 将敌人转换为CombatStats
+        # 5. 将敌人转换为 CombatStats
         enemy_stats = CombatStats(
             user_id=enemy.user_id,
             name=enemy.name,
