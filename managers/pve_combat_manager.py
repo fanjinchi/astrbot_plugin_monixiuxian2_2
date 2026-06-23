@@ -38,16 +38,45 @@ except ImportError:
     Player = _md.Player
 
 
+def calculate_equipment_atk_bonus(player: Player, config_manager) -> int:
+    """
+    计算装备提供的攻击力加成
+
+    与 handlers/combat_handlers.py:_calculate_equipment_bonus 对齐，
+    仅统计武器的 atk、physical_damage、magic_damage。
+
+    Args:
+        player: 玩家对象
+        config_manager: 配置管理器，包含武器数据
+
+    Returns:
+        装备提供的总攻击力加成，无配置或装备时返回0
+    """
+    if not config_manager:
+        return 0
+
+    total_atk = 0
+
+    # 武器
+    if player.weapon and player.weapon in config_manager.weapons_data:
+        data = config_manager.weapons_data[player.weapon]
+        total_atk += data.get("atk", 0)
+        total_atk += data.get("physical_damage", 0)
+        total_atk += data.get("magic_damage", 0)
+
+    return total_atk
+
+
 def calculate_equipment_defense(player: Player, config_manager) -> int:
     """
     计算装备提供的防御力
 
-    从玩家装备的武器和防具中读取物理防御和法术防御，
-    返回防御力总和。
+    与 handlers/combat_handlers.py:_calculate_equipment_bonus 对齐，
+    仅统计防具的 physical_defense 和 magic_defense。
 
     Args:
         player: 玩家对象
-        config_manager: 配置管理器，包含武器和物品数据
+        config_manager: 配置管理器，包含物品数据
 
     Returns:
         装备提供的总防御力，无配置或装备时返回0
@@ -56,12 +85,6 @@ def calculate_equipment_defense(player: Player, config_manager) -> int:
         return 0
 
     total_defense = 0
-
-    # 武器
-    if player.weapon and player.weapon in config_manager.weapons_data:
-        data = config_manager.weapons_data[player.weapon]
-        total_defense += data.get("physical_defense", 0)
-        total_defense += data.get("magic_defense", 0)
 
     # 防具
     if player.armor and player.armor in config_manager.items_data:
@@ -217,29 +240,37 @@ class PVECombatManager:
                     hp_buff = getattr(impart_info, "impart_hp_per", 0.0) or 0.0
                     mp_buff = getattr(impart_info, "impart_mp_per", 0.0) or 0.0
                     atk_buff = getattr(impart_info, "impart_atk_per", 0.0) or 0.0
-                    crit_rate = getattr(impart_info, "impart_know_per", 0) or 0
+                    # impart_know_per 以小数存储（0.1 = 10%），乘以 100 并四舍五入转为整数百分比
+                    raw_crit = getattr(impart_info, "impart_know_per", 0.0) or 0.0
+                    crit_rate = int(round(raw_crit * 100))
             except Exception as e:
                 logger.warning(f"获取传承信息失败: {e}")
 
-        # 计算HP/MP
-        hp, mp = self.combat_mgr.calculate_hp_mp(player.experience, hp_buff, mp_buff)
+        # 计算最大HP/MP（按修为计算）
+        max_hp, max_mp = self.combat_mgr.calculate_hp_mp(
+            player.experience, hp_buff, mp_buff
+        )
 
-        # 计算攻击力
+        # 计算基础攻击力
         base_atk = self.combat_mgr.calculate_atk(
             player.experience, player.atkpractice, atk_buff
         )
 
-        # 计算装备防御
+        # 计算装备攻击加成（与 _prepare_combat_stats 对齐）
+        equipment_atk_bonus = calculate_equipment_atk_bonus(player, self.config_manager)
+        final_atk = base_atk + equipment_atk_bonus
+
+        # 计算装备防御（仅防具，与 _prepare_combat_stats 对齐）
         equipment_defense = calculate_equipment_defense(player, self.config_manager)
 
         return CombatStats(
             user_id=player.user_id,
             name=player.user_name if player.user_name else f"道友{player.user_id}",
-            hp=hp,
-            max_hp=hp,
-            mp=mp,
-            max_mp=mp,
-            atk=base_atk,
+            hp=player.hp,
+            max_hp=max_hp,
+            mp=player.mp,
+            max_mp=max_mp,
+            atk=final_atk,
             defense=equipment_defense,
             crit_rate=crit_rate,
             exp=player.experience,
@@ -390,11 +421,15 @@ class PVECombatManager:
         # 6. 执行战斗
         result = self.combat_mgr.player_vs_boss(player_stats, enemy_stats)
 
-        # 7. 计算奖励
+        # 7. 将战斗后的当前 HP/MP 写回玩家对象
+        player.hp = player_stats.hp
+        player.mp = player_stats.mp
+
+        # 8. 计算奖励
         if base_rewards is None:
             base_rewards = {"exp": 100, "gold": 50}
         rewards = self._calculate_rewards(result, base_rewards, enemy)
 
-        # 8. 格式化并返回结果
+        # 9. 格式化并返回结果
         msg = self._format_combat_result(result, enemy, rewards)
         return msg, rewards
