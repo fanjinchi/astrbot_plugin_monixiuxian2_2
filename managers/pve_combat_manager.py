@@ -110,7 +110,11 @@ class PVECombatManager:
     """PVE战斗管理器 - 处理战斗触发、敌人选择、奖励计算和结果格式化"""
 
     def __init__(
-        self, combat_mgr: CombatManager, enemy_mgr: EnemyManager, config_manager=None
+        self,
+        combat_mgr: CombatManager,
+        enemy_mgr: EnemyManager,
+        config_manager=None,
+        impart_manager=None,
     ):
         """
         初始化PVE战斗管理器
@@ -119,10 +123,12 @@ class PVECombatManager:
             combat_mgr: 战斗系统管理器，用于执行战斗计算
             enemy_mgr: 敌人管理器，用于生成敌人
             config_manager: 配置管理器，可选，用于读取装备数据
+            impart_manager: 传承管理器，可选，用于获取传承加成
         """
         self.combat_mgr = combat_mgr
         self.enemy_mgr = enemy_mgr
         self.config_manager = config_manager
+        self.impart_manager = impart_manager
 
     def _should_trigger_combat(self, scene: str, difficulty: str) -> bool:
         """
@@ -249,10 +255,10 @@ class PVECombatManager:
         atk_buff = 0.0
         crit_rate = 0
 
-        # 尝试从config_manager获取传承信息（如果支持）
-        if self.config_manager and hasattr(self.config_manager, "db"):
+        # 尝试从传承管理器获取传承加成
+        if self.impart_manager:
             try:
-                impart_info = await self.config_manager.db.ext.get_impart_info(
+                _success, _msg, impart_info = await self.impart_manager.get_impart_info(
                     player.user_id
                 )
                 if impart_info:

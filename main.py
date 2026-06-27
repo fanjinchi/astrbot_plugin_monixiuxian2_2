@@ -232,7 +232,7 @@ class XiuXianPlugin(Star):
         self.combat_mgr = CombatManager()
         self.enemy_mgr = EnemyManager()
         self.pve_combat_mgr = PVECombatManager(
-            self.combat_mgr, self.enemy_mgr, self.config_manager
+            self.combat_mgr, self.enemy_mgr, self.config_manager, self.impart_mgr
         )
         self.sect_mgr = SectManager(self.db, self.config_manager)
         self.boss_mgr = BossManager(

@@ -30,7 +30,9 @@ class PillHandler:
             if name:
                 names.append(name)
         if 0 <= level_index < len(self.config_manager.body_level_data):
-            name = self.config_manager.body_level_data[level_index].get("level_name", "")
+            name = self.config_manager.body_level_data[level_index].get(
+                "level_name", ""
+            )
             if name and name not in names:
                 names.append(name)
         if not names:
@@ -38,7 +40,9 @@ class PillHandler:
         return " / ".join(names)
 
     @player_required
-    async def handle_use_pill(self, player: Player, event: AstrMessageEvent, pill_name: str = ""):
+    async def handle_use_pill(
+        self, player: Player, event: AstrMessageEvent, pill_name: str = ""
+    ):
         """处理服用丹药指令
 
         Args:
@@ -91,6 +95,7 @@ class PillHandler:
             for effect in active_effects:
                 pill_name = effect.get("pill_name", "未知丹药")
                 import time
+
                 remaining_seconds = effect.get("expiry_time", 0) - int(time.time())
                 if remaining_seconds > 0:
                     remaining_minutes = remaining_seconds // 60
@@ -119,7 +124,9 @@ class PillHandler:
         yield event.plain_result(full_message)
 
     @player_required
-    async def handle_pill_info(self, player: Player, event: AstrMessageEvent, pill_name: str = ""):
+    async def handle_pill_info(
+        self, player: Player, event: AstrMessageEvent, pill_name: str = ""
+    ):
         """处理查看丹药信息指令
 
         Args:
@@ -148,27 +155,27 @@ class PillHandler:
             f"--- 丹药信息 ---",
             f"名称：{pill_data.get('name', '未知')}",
             f"品级：{pill_data.get('rank', '未知')}",
-            f"类型：{self._get_subtype_display(pill_data.get('subtype', ''))}"
+            f"类型：{self._get_subtype_display(pill_data.get('subtype', ''))}",
         ]
 
         # 描述
-        description = pill_data.get('description', '')
+        description = pill_data.get("description", "")
         if description:
             info_lines.append(f"描述：{description}")
 
         # 需求境界
-        required_level = pill_data.get('required_level_index', 0)
+        required_level = pill_data.get("required_level_index", 0)
         if required_level > 0:
             level_name = self._format_required_level(required_level)
             info_lines.append(f"需求境界：{level_name}")
 
         # 价格
-        price = pill_data.get('price', 0)
+        price = pill_data.get("price", 0)
         if price > 0:
             info_lines.append(f"价格：{price} 灵石")
 
         # 效果描述
-        effect_type = pill_data.get('effect_type', '')
+        effect_type = pill_data.get("effect_type", "")
         if effect_type:
             info_lines.append(f"\n【效果】")
             info_lines.append(self._get_effect_description(pill_data))
@@ -196,71 +203,71 @@ class PillHandler:
 
     def _get_effect_description(self, pill_data: dict) -> str:
         """获取丹药效果描述"""
-        effect_type = pill_data.get('effect_type', '')
-        subtype = pill_data.get('subtype', '')
+        effect_type = pill_data.get("effect_type", "")
+        subtype = pill_data.get("subtype", "")
         lines = []
 
         if subtype == "exp":
-            exp_gain = pill_data.get('exp_gain', 0)
+            exp_gain = pill_data.get("exp_gain", 0)
             lines.append(f"  增加修为：{exp_gain}")
 
         elif subtype == "resurrection":
             lines.append("  抵消一次死亡，复活后属性减半")
 
         elif effect_type == "temporary":
-            duration = pill_data.get('duration_minutes', 0)
+            duration = pill_data.get("duration_minutes", 0)
             lines.append(f"  持续时间：{duration}分钟")
 
-            if 'cultivation_multiplier' in pill_data:
-                mult = pill_data['cultivation_multiplier']
+            if "cultivation_multiplier" in pill_data:
+                mult = pill_data["cultivation_multiplier"]
                 lines.append(f"  修炼速度：{mult:+.0%}")
 
-            if 'physical_damage_multiplier' in pill_data:
-                mult = pill_data['physical_damage_multiplier']
+            if "physical_damage_multiplier" in pill_data:
+                mult = pill_data["physical_damage_multiplier"]
                 lines.append(f"  物伤：{mult:+.0%}")
 
-            if 'magic_damage_multiplier' in pill_data:
-                mult = pill_data['magic_damage_multiplier']
+            if "magic_damage_multiplier" in pill_data:
+                mult = pill_data["magic_damage_multiplier"]
                 lines.append(f"  法伤：{mult:+.0%}")
 
-            if 'physical_defense_multiplier' in pill_data:
-                mult = pill_data['physical_defense_multiplier']
+            if "physical_defense_multiplier" in pill_data:
+                mult = pill_data["physical_defense_multiplier"]
                 lines.append(f"  物防：{mult:+.0%}")
 
-            if 'magic_defense_multiplier' in pill_data:
-                mult = pill_data['magic_defense_multiplier']
+            if "magic_defense_multiplier" in pill_data:
+                mult = pill_data["magic_defense_multiplier"]
                 lines.append(f"  法防：{mult:+.0%}")
 
         elif effect_type == "permanent":
             lines.append("  永久效果（受30%上限限制）：")
 
-            if 'physical_damage_gain' in pill_data:
-                gain = pill_data['physical_damage_gain']
+            if "physical_damage_gain" in pill_data:
+                gain = pill_data["physical_damage_gain"]
                 lines.append(f"  物伤：{gain:+d}")
 
-            if 'magic_damage_gain' in pill_data:
-                gain = pill_data['magic_damage_gain']
+            if "magic_damage_gain" in pill_data:
+                gain = pill_data["magic_damage_gain"]
                 lines.append(f"  法伤：{gain:+d}")
 
-            if 'physical_defense_gain' in pill_data:
-                gain = pill_data['physical_defense_gain']
+            if "physical_defense_gain" in pill_data:
+                gain = pill_data["physical_defense_gain"]
                 lines.append(f"  物防：{gain:+d}")
 
-            if 'magic_defense_gain' in pill_data:
-                gain = pill_data['magic_defense_gain']
+            if "magic_defense_gain" in pill_data:
+                gain = pill_data["magic_defense_gain"]
                 lines.append(f"  法防：{gain:+d}")
 
-            if 'mental_power_gain' in pill_data:
-                gain = pill_data['mental_power_gain']
+            if "mental_power_gain" in pill_data:
+                gain = pill_data["mental_power_gain"]
                 lines.append(f"  精神力：{gain:+d}")
 
-            if 'lifespan_gain' in pill_data:
-                gain = pill_data['lifespan_gain']
+            if "lifespan_gain" in pill_data:
+                gain = pill_data["lifespan_gain"]
                 lines.append(f"  寿命：{gain:+d}")
 
         elif effect_type == "instant":
-            if 'spiritual_qi_restore' in pill_data:
-                restore = pill_data['spiritual_qi_restore']
+            if "spiritual_qi_restore" in pill_data:
+                restore = pill_data["spiritual_qi_restore"]
                 if restore == -1:
                     lines.append("  瞬间恢复灵气至满")
                 else:

@@ -3,6 +3,7 @@ from astrbot.api.event import AstrMessageEvent
 from ..managers.adventure_manager import AdventureManager
 from ..data.data_manager import DataBase
 
+
 class AdventureHandlers:
     def __init__(self, db: DataBase, adv_mgr: AdventureManager):
         self.db = db
@@ -40,7 +41,7 @@ class AdventureHandlers:
         user_id = event.get_sender_id()
         success, msg, _ = await self.adv_mgr.finish_adventure(user_id)
         yield event.plain_result(msg)
-    
+
     async def handle_adventure_status(self, event: AstrMessageEvent):
         """历练状态"""
         user_id = event.get_sender_id()

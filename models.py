@@ -7,6 +7,7 @@ import json
 if TYPE_CHECKING:
     from .config_manager import ConfigManager
 
+
 @dataclass
 class Item:
     """装备物品模型"""
@@ -54,6 +55,7 @@ class Item:
             attrs.append(f"气血+{self.blood_qi}")
         return "、".join(attrs) if attrs else "无属性加成"
 
+
 @dataclass
 class Player:
     """玩家数据模型 - 完整修仙系统（参照NoneBot2）"""
@@ -70,7 +72,9 @@ class Player:
     gold: int = 0  # 灵石
     state: str = "空闲"
     cultivation_start_time: int = 0  # 闭关开始时间（Unix时间戳，0表示未闭关）
-    last_check_in_date: str = ""  # 最后签到日期（格式：YYYY-MM-DD，空字符串表示从未签到）
+    last_check_in_date: str = (
+        ""  # 最后签到日期（格式：YYYY-MM-DD，空字符串表示从未签到）
+    )
     level_up_rate: int = 0  # 突破成功率加成
 
     # 装备栏
@@ -116,10 +120,14 @@ class Player:
 
     # 储物戒系统字段
     storage_ring: str = "基础储物戒"  # 当前装备的储物戒名称
-    storage_ring_items: str = "{}"  # 储物戒中的物品（JSON字符串，格式：{item_name: {count, bound}}）
+    storage_ring_items: str = (
+        "{}"  # 储物戒中的物品（JSON字符串，格式：{item_name: {count, bound}}）
+    )
 
     # Phase 1: 每日限制系统
-    daily_pill_usage: str = "{}"  # 每日丹药使用次数（JSON字符串，格式：{pill_id: count}）
+    daily_pill_usage: str = (
+        "{}"  # 每日丹药使用次数（JSON字符串，格式：{pill_id: count}）
+    )
     last_daily_reset: str = ""  # 上次每日重置日期（格式：YYYY-MM-DD）
 
     def get_level(self, config_manager: "ConfigManager") -> str:
@@ -191,7 +199,9 @@ class Player:
         """设置储物戒物品"""
         self.storage_ring_items = json.dumps(items, ensure_ascii=False)
 
-    def get_total_attributes(self, equipped_items: List[Item], pill_multipliers: Optional[dict] = None) -> dict:
+    def get_total_attributes(
+        self, equipped_items: List[Item], pill_multipliers: Optional[dict] = None
+    ) -> dict:
         """计算包含装备加成和丹药效果的总属性
 
         Args:
@@ -231,9 +241,18 @@ class Player:
 
         # 应用丹药倍率效果
         if pill_multipliers:
-            total["physical_damage"] = int(total["physical_damage"] * pill_multipliers.get("physical_damage", 1.0))
-            total["magic_damage"] = int(total["magic_damage"] * pill_multipliers.get("magic_damage", 1.0))
-            total["physical_defense"] = int(total["physical_defense"] * pill_multipliers.get("physical_defense", 1.0))
-            total["magic_defense"] = int(total["magic_defense"] * pill_multipliers.get("magic_defense", 1.0))
+            total["physical_damage"] = int(
+                total["physical_damage"] * pill_multipliers.get("physical_damage", 1.0)
+            )
+            total["magic_damage"] = int(
+                total["magic_damage"] * pill_multipliers.get("magic_damage", 1.0)
+            )
+            total["physical_defense"] = int(
+                total["physical_defense"]
+                * pill_multipliers.get("physical_defense", 1.0)
+            )
+            total["magic_defense"] = int(
+                total["magic_defense"] * pill_multipliers.get("magic_defense", 1.0)
+            )
 
         return total

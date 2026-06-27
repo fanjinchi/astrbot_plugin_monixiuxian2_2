@@ -56,17 +56,23 @@ class BreakthroughHandler:
         # 查找适用的破境丹
         available_pills = []
         for pill_name, pill_data in self.config_manager.pills_data.items():
-            if (pill_data.get("subtype") == "breakthrough" and
-                pill_data.get("target_level_index") == player.level_index + 1):
+            if (
+                pill_data.get("subtype") == "breakthrough"
+                and pill_data.get("target_level_index") == player.level_index + 1
+            ):
                 max_rate = pill_data.get("max_success_rate", 1.0)
                 breakthrough_bonus = pill_data.get("breakthrough_bonus", 0)
-                final_rate = min(base_success_rate + temp_bonus + breakthrough_bonus, max_rate)
-                available_pills.append({
-                    "name": pill_name,
-                    "rank": pill_data.get("rank", ""),
-                    "final_rate": final_rate,
-                    "max_rate": max_rate
-                })
+                final_rate = min(
+                    base_success_rate + temp_bonus + breakthrough_bonus, max_rate
+                )
+                available_pills.append(
+                    {
+                        "name": pill_name,
+                        "rank": pill_data.get("rank", ""),
+                        "final_rate": final_rate,
+                        "max_rate": max_rate,
+                    }
+                )
 
         # 构建信息显示
         info_lines = [
@@ -101,30 +107,36 @@ class BreakthroughHandler:
 
         # 根据修炼类型显示不同的突破说明
         if player.cultivation_type == "体修":
-            info_lines.extend([
-                f"━━━━━━━━━━━━━━━\n",
-                f"【突破说明】\n",
-                f"• 使用命令：{CMD_BREAKTHROUGH} 或 {CMD_BREAKTHROUGH} [破境丹名称]\n",
-                f"• 突破成功：境界提升，肉身更强\n",
-                f"• 突破失败：损失10%修为，有概率死亡\n",
-                f"• 死亡后：所有数据清除，需重新入仙途\n",
-                f"=" * 28
-            ])
+            info_lines.extend(
+                [
+                    f"━━━━━━━━━━━━━━━\n",
+                    f"【突破说明】\n",
+                    f"• 使用命令：{CMD_BREAKTHROUGH} 或 {CMD_BREAKTHROUGH} [破境丹名称]\n",
+                    f"• 突破成功：境界提升，肉身更强\n",
+                    f"• 突破失败：损失10%修为，有概率死亡\n",
+                    f"• 死亡后：所有数据清除，需重新入仙途\n",
+                    f"=" * 28,
+                ]
+            )
         else:
-            info_lines.extend([
-                f"━━━━━━━━━━━━━━━\n",
-                f"【突破说明】\n",
-                f"• 使用命令：{CMD_BREAKTHROUGH} 或 {CMD_BREAKTHROUGH} [破境丹名称]\n",
-                f"• 突破成功：境界提升，实力大增\n",
-                f"• 突破失败：损失10%修为，有概率死亡\n",
-                f"• 死亡后：所有数据清除，需重新入仙途\n",
-                f"=" * 28
-            ])
+            info_lines.extend(
+                [
+                    f"━━━━━━━━━━━━━━━\n",
+                    f"【突破说明】\n",
+                    f"• 使用命令：{CMD_BREAKTHROUGH} 或 {CMD_BREAKTHROUGH} [破境丹名称]\n",
+                    f"• 突破成功：境界提升，实力大增\n",
+                    f"• 突破失败：损失10%修为，有概率死亡\n",
+                    f"• 死亡后：所有数据清除，需重新入仙途\n",
+                    f"=" * 28,
+                ]
+            )
 
         yield event.plain_result("".join(info_lines))
 
     @player_required
-    async def handle_breakthrough(self, player: Player, event: AstrMessageEvent, pill_name: str = None):
+    async def handle_breakthrough(
+        self, player: Player, event: AstrMessageEvent, pill_name: str = None
+    ):
         """执行突破"""
         display_name = event.get_sender_name()
 
@@ -172,7 +184,7 @@ class BreakthroughHandler:
             player,
             pill_name,
             modifiers["temp_bonus"],
-            modifiers["permanent_death_multiplier"]
+            modifiers["permanent_death_multiplier"],
         )
 
         if modifiers["has_temp_effects"]:

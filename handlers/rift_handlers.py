@@ -3,6 +3,7 @@ from astrbot.api.event import AstrMessageEvent
 from ..managers.rift_manager import RiftManager
 from ..data.data_manager import DataBase
 
+
 class RiftHandlers:
     def __init__(self, db: DataBase, rift_mgr: RiftManager):
         self.db = db
@@ -21,13 +22,13 @@ class RiftHandlers:
             return
         success, msg = await self.rift_mgr.enter_rift(user_id, int(rift_id))
         yield event.plain_result(msg)
-        
+
     async def handle_rift_complete(self, event: AstrMessageEvent):
         """完成探索"""
         user_id = event.get_sender_id()
         success, msg, _ = await self.rift_mgr.finish_exploration(user_id)
         yield event.plain_result(msg)
-    
+
     async def handle_rift_exit(self, event: AstrMessageEvent):
         """退出秘境"""
         user_id = event.get_sender_id()

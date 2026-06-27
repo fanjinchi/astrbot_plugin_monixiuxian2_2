@@ -72,9 +72,16 @@ class StorageRingManager:
 
         return True, ""
 
-    async def store_item(self, player: Player, item_name: str, count: int = 1, silent: bool = False, external_transaction: bool = False) -> Tuple[bool, str]:
+    async def store_item(
+        self,
+        player: Player,
+        item_name: str,
+        count: int = 1,
+        silent: bool = False,
+        external_transaction: bool = False,
+    ) -> Tuple[bool, str]:
         """将物品存入储物戒（带事务保护）
-        
+
         Args:
             external_transaction: 如果为True，表示外部已有事务，跳过内部事务管理
         """
@@ -124,7 +131,9 @@ class StorageRingManager:
                 await self.db.conn.rollback()
             raise
 
-    async def retrieve_item(self, player: Player, item_name: str, count: int = 1) -> Tuple[bool, str]:
+    async def retrieve_item(
+        self, player: Player, item_name: str, count: int = 1
+    ) -> Tuple[bool, str]:
         """从储物戒取出物品（带事务保护）"""
         await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
@@ -138,7 +147,10 @@ class StorageRingManager:
             current_count = items[item_name]
             if count > current_count:
                 await self.db.conn.rollback()
-                return False, f"储物戒中【{item_name}】数量不足（当前：{current_count}个）"
+                return (
+                    False,
+                    f"储物戒中【{item_name}】数量不足（当前：{current_count}个）",
+                )
 
             if count >= current_count:
                 del items[item_name]
@@ -156,7 +168,9 @@ class StorageRingManager:
             await self.db.conn.rollback()
             raise
 
-    async def discard_item(self, player: Player, item_name: str, count: int = 1) -> Tuple[bool, str]:
+    async def discard_item(
+        self, player: Player, item_name: str, count: int = 1
+    ) -> Tuple[bool, str]:
         """丢弃储物戒中的物品（带事务保护）"""
         await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
@@ -170,7 +184,10 @@ class StorageRingManager:
             current_count = items[item_name]
             if count > current_count:
                 await self.db.conn.rollback()
-                return False, f"储物戒中【{item_name}】数量不足（当前：{current_count}个）"
+                return (
+                    False,
+                    f"储物戒中【{item_name}】数量不足（当前：{current_count}个）",
+                )
 
             if count >= current_count:
                 del items[item_name]
@@ -190,7 +207,9 @@ class StorageRingManager:
             await self.db.conn.rollback()
             raise
 
-    def check_upgrade_requirement(self, player: Player, new_ring_name: str) -> Tuple[bool, str]:
+    def check_upgrade_requirement(
+        self, player: Player, new_ring_name: str
+    ) -> Tuple[bool, str]:
         """检查玩家是否满足储物戒升级要求"""
         # 检查是否为储物戒类型
         ring_config = self.get_storage_ring_config(new_ring_name)
@@ -204,13 +223,19 @@ class StorageRingManager:
         required_level = ring_config.get("required_level_index", 0)
         if player.level_index < required_level:
             level_name = self._format_required_level(required_level)
-            return False, f"境界不足！【{new_ring_name}】（{ring_config.get('rank', '')}）需要达到【{level_name}】以上"
+            return (
+                False,
+                f"境界不足！【{new_ring_name}】（{ring_config.get('rank', '')}）需要达到【{level_name}】以上",
+            )
 
         # 检查是否为升级（容量必须更大）
         current_capacity = self.get_ring_capacity(player.storage_ring)
         new_capacity = ring_config.get("capacity", 20)
         if new_capacity <= current_capacity:
-            return False, f"【{new_ring_name}】容量（{new_capacity}格）不高于当前储物戒（{current_capacity}格），无法替换"
+            return (
+                False,
+                f"【{new_ring_name}】容量（{new_capacity}格）不高于当前储物戒（{current_capacity}格），无法替换",
+            )
 
         return True, ""
 
@@ -222,7 +247,9 @@ class StorageRingManager:
             if name:
                 names.append(name)
         if 0 <= level_index < len(self.config_manager.body_level_data):
-            name = self.config_manager.body_level_data[level_index].get("level_name", "")
+            name = self.config_manager.body_level_data[level_index].get(
+                "level_name", ""
+            )
             if name and name not in names:
                 names.append(name)
 
@@ -230,7 +257,9 @@ class StorageRingManager:
             return f"境界{level_index}"
         return " / ".join(names)
 
-    async def upgrade_ring(self, player: Player, new_ring_name: str) -> Tuple[bool, str]:
+    async def upgrade_ring(
+        self, player: Player, new_ring_name: str
+    ) -> Tuple[bool, str]:
         """升级/替换储物戒"""
         can_upgrade, error_msg = self.check_upgrade_requirement(player, new_ring_name)
         if not can_upgrade:
@@ -240,7 +269,7 @@ class StorageRingManager:
         old_ring = player.storage_ring
         old_capacity = self.get_ring_capacity(old_ring)
         new_capacity = ring_config.get("capacity", 20)
-        
+
         # 检查价格并扣除灵石
         price = ring_config.get("price", 0)
         if price > 0:
@@ -276,21 +305,23 @@ class StorageRingManager:
             "capacity": capacity,
             "used": used,
             "available": capacity - used,
-            "items": items
+            "items": items,
         }
 
     def get_all_storage_rings(self) -> List[dict]:
         """获取所有可用的储物戒列表"""
         rings = []
         for name, config in self.config_manager.storage_rings_data.items():
-            rings.append({
-                "name": name,
-                "rank": config.get("rank", ""),
-                "capacity": config.get("capacity", 20),
-                "required_level_index": config.get("required_level_index", 0),
-                "price": config.get("price", 0),
-                "description": config.get("description", "")
-            })
+            rings.append(
+                {
+                    "name": name,
+                    "rank": config.get("rank", ""),
+                    "capacity": config.get("capacity", 20),
+                    "required_level_index": config.get("required_level_index", 0),
+                    "price": config.get("price", 0),
+                    "description": config.get("description", ""),
+                }
+            )
         rings.sort(key=lambda x: x["capacity"])
         return rings
 

@@ -3,6 +3,7 @@ from astrbot.api.event import AstrMessageEvent
 from ..managers.impart_manager import ImpartManager
 from ..data.data_manager import DataBase
 
+
 class ImpartHandlers:
     def __init__(self, db: DataBase, impart_mgr: ImpartManager):
         self.db = db

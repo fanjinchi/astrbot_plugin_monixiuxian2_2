@@ -553,18 +553,25 @@ class TestBuildPlayerCombatStatsCritConversion:
         self, mock_combat_manager, mock_enemy_manager, mock_player
     ):
         """impart_know_per=0.1 means +10% crit rate."""
-        config_manager = MagicMock()
-        config_manager.db.ext.get_impart_info = AsyncMock(
-            return_value=MagicMock(
-                impart_hp_per=0.0,
-                impart_mp_per=0.0,
-                impart_atk_per=0.0,
-                impart_know_per=0.1,
+        impart_manager = MagicMock()
+        impart_manager.get_impart_info = AsyncMock(
+            return_value=(
+                True,
+                "",
+                MagicMock(
+                    impart_hp_per=0.0,
+                    impart_mp_per=0.0,
+                    impart_atk_per=0.0,
+                    impart_know_per=0.1,
+                ),
             )
         )
 
         manager = PVECombatManager(
-            mock_combat_manager, mock_enemy_manager, config_manager
+            mock_combat_manager,
+            mock_enemy_manager,
+            config_manager=None,
+            impart_manager=impart_manager,
         )
         stats = await manager._build_player_combat_stats(mock_player)
 

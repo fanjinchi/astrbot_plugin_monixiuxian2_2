@@ -11,12 +11,13 @@ if TYPE_CHECKING:
 
 class UserStatus(IntEnum):
     """用户状态枚举"""
-    IDLE = 0           # 空闲
-    CULTIVATING = 1    # 闭关中
-    ADVENTURING = 2    # 历练中
-    EXPLORING = 3      # 探索秘境中
-    SECT_TASK = 4      # 宗门任务中
-    
+
+    IDLE = 0  # 空闲
+    CULTIVATING = 1  # 闭关中
+    ADVENTURING = 2  # 历练中
+    EXPLORING = 3  # 探索秘境中
+    SECT_TASK = 4  # 宗门任务中
+
     @classmethod
     def get_name(cls, status: int) -> str:
         """获取状态名称"""
@@ -29,10 +30,11 @@ class UserStatus(IntEnum):
         }
         return names.get(status, "忙碌中")
 
+
 @dataclass
 class Sect:
     """宗门数据模型"""
-    
+
     sect_id: int  # 宗门ID（主键）
     sect_name: str  # 宗门名称
     sect_owner: str  # 宗主用户ID
@@ -43,29 +45,37 @@ class Sect:
     mainbuff: str = "0"  # 主修功法buff ID列表（JSON字符串）
     secbuff: str = "0"  # 辅修功法buff ID列表（JSON字符串）
     elixir_room_level: int = 0  # 丹房等级
-    
+
     def get_mainbuff_list(self) -> List[int]:
         """获取主修功法ID列表"""
         try:
             if self.mainbuff == "0" or not self.mainbuff:
                 return []
-            return json.loads(self.mainbuff) if isinstance(self.mainbuff, str) else [self.mainbuff]
+            return (
+                json.loads(self.mainbuff)
+                if isinstance(self.mainbuff, str)
+                else [self.mainbuff]
+            )
         except:
             return []
-    
+
     def set_mainbuff_list(self, buff_list: List[int]):
         """设置主修功法ID列表"""
         self.mainbuff = json.dumps(buff_list, ensure_ascii=False) if buff_list else "0"
-    
+
     def get_secbuff_list(self) -> List[int]:
         """获取辅修功法ID列表"""
         try:
             if self.secbuff == "0" or not self.secbuff:
                 return []
-            return json.loads(self.secbuff) if isinstance(self.secbuff, str) else [self.secbuff]
+            return (
+                json.loads(self.secbuff)
+                if isinstance(self.secbuff, str)
+                else [self.secbuff]
+            )
         except:
             return []
-    
+
     def set_secbuff_list(self, buff_list: List[int]):
         """设置辅修功法ID列表"""
         self.secbuff = json.dumps(buff_list, ensure_ascii=False) if buff_list else "0"
@@ -74,7 +84,7 @@ class Sect:
 @dataclass
 class BuffInfo:
     """Buff信息数据模型（用户装备的功法、法器等）"""
-    
+
     id: int  # 主键
     user_id: str  # 用户ID
     main_buff: int = 0  # 主修功法ID
@@ -90,7 +100,7 @@ class BuffInfo:
 @dataclass
 class Boss:
     """Boss数据模型"""
-    
+
     boss_id: int  # Boss ID（主键）
     boss_name: str  # Boss名称
     boss_level: str  # Boss境界
@@ -101,25 +111,25 @@ class Boss:
     stone_reward: int = 0  # 灵石奖励
     create_time: int = 0  # 生成时间
     status: int = 1  # 状态（0已击败，1存活）
-    
+
 
 @dataclass
 class Rift:
     """秘境数据模型"""
-    
+
     rift_id: int  # 秘境ID（主键）
     rift_name: str  # 秘境名称
     rift_level: int  # 秘境等级
-    required_level: int # 需求境界
+    required_level: int  # 需求境界
     rewards: str = "{}"  # 奖励配置（JSON字符串）
-    
+
     def get_rewards(self) -> dict:
         """获取奖励字典"""
         try:
             return json.loads(self.rewards)
         except:
             return {}
-    
+
     def set_rewards(self, rewards_dict: dict):
         """设置奖励字典"""
         self.rewards = json.dumps(rewards_dict, ensure_ascii=False)
@@ -128,7 +138,7 @@ class Rift:
 @dataclass
 class ImpartInfo:
     """传承信息数据模型"""
-    
+
     id: int  # 主键
     user_id: str  # 用户ID
     impart_hp_per: float = 0.0  # HP加成百分比
@@ -141,20 +151,20 @@ class ImpartInfo:
 @dataclass
 class UserCd:
     """用户CD信息数据模型"""
-    
+
     user_id: str  # 用户ID（主键）
     type: int = UserStatus.IDLE  # CD类型，参见 UserStatus 枚举
     create_time: int = 0  # 创建时间
     scheduled_time: int = 0  # 计划完成时间
     extra_data: str = "{}"  # 额外数据（JSON字符串，如秘境ID等）
-    
+
     def get_extra_data(self) -> dict:
         """获取额外数据字典"""
         try:
             return json.loads(self.extra_data)
         except:
             return {}
-    
+
     def set_extra_data(self, data: dict):
         """设置额外数据"""
         self.extra_data = json.dumps(data, ensure_ascii=False)

@@ -5,6 +5,7 @@ from ..managers.sect_manager import SectManager
 from ..data.data_manager import DataBase
 from ..models_extended import UserStatus
 
+
 class SectHandlers:
     def __init__(self, db: DataBase, sect_mgr: SectManager):
         self.db = db
@@ -31,7 +32,7 @@ class SectHandlers:
             return
         success, msg = await self.sect_mgr.join_sect(user_id, name)
         yield event.plain_result(msg)
-    
+
     async def handle_leave_sect(self, event: AstrMessageEvent):
         """退出宗门"""
         user_id = event.get_sender_id()
@@ -48,12 +49,12 @@ class SectHandlers:
         user_id = event.get_sender_id()
         success, msg, _ = await self.sect_mgr.get_sect_info(user_id)
         yield event.plain_result(msg)
-    
+
     async def handle_sect_list(self, event: AstrMessageEvent):
         """宗门列表"""
         success, msg = await self.sect_mgr.list_all_sects()
         yield event.plain_result(msg)
-    
+
     async def handle_donate(self, event: AstrMessageEvent, amount: int):
         """宗门捐献"""
         user_id = event.get_sender_id()
@@ -64,30 +65,32 @@ class SectHandlers:
             return
         success, msg = await self.sect_mgr.donate_to_sect(user_id, amount)
         yield event.plain_result(msg)
-        
-    async def handle_kick_member(self, event: AstrMessageEvent, target: str): # target 可能是 at 或者是 id
+
+    async def handle_kick_member(
+        self, event: AstrMessageEvent, target: str
+    ):  # target 可能是 at 或者是 id
         """踢出宗门成员"""
         user_id = event.get_sender_id()
         # 处理可能的 At 对象，获取目标 user_id
         # 这里简单假设传入的是纯数字字符串或者包含在 At 中
         # AstrBot 的 At 解析通常在 filter 或者 message chain 中
         # 这里简化处理，假设用户输入的是 user_id 或者是通过 At 获取到的
-        
+
         # 实际 AstrBot 开发中，如果是指令参数带 At，通常需要解析 metadata 或者 message chain
         # 暂时只支持纯 ID 或依靠 AstrBot 的参数解析
-        
+
         # 尝试从 message chain 中获取 at
         target_id = None
         for component in event.message_obj.message:
             if isinstance(component, At):
-                target_id = str(component.qq) # 假设是 QQ 适配器
+                target_id = str(component.qq)  # 假设是 QQ 适配器
                 break
-        
+
         if not target_id:
             # 尝试直接解析 text 参数
             if target.isdigit():
                 target_id = target
-        
+
         if not target_id:
             yield event.plain_result("❌ 请指定要踢出的成员（At或输入ID）")
             return
@@ -103,10 +106,10 @@ class SectHandlers:
             if isinstance(component, At):
                 target_id = str(component.qq)
                 break
-        
+
         if not target_id and target.isdigit():
-             target_id = target
-             
+            target_id = target
+
         if not target_id:
             yield event.plain_result("❌ 请指定传位目标（At或输入ID）")
             return
@@ -114,7 +117,9 @@ class SectHandlers:
         success, msg = await self.sect_mgr.transfer_ownership(user_id, target_id)
         yield event.plain_result(msg)
 
-    async def handle_position_change(self, event: AstrMessageEvent, target: str, position: int):
+    async def handle_position_change(
+        self, event: AstrMessageEvent, target: str, position: int
+    ):
         """职位变更"""
         user_id = event.get_sender_id()
         target_id = None
@@ -122,10 +127,10 @@ class SectHandlers:
             if isinstance(component, At):
                 target_id = str(component.qq)
                 break
-        
+
         if not target_id and target.isdigit():
-             target_id = target
-             
+            target_id = target
+
         if not target_id:
             yield event.plain_result("❌ 请指定目标（At或输入ID）")
             return

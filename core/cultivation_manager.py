@@ -6,6 +6,7 @@ from astrbot.api import AstrBotConfig, logger
 from ..config_manager import ConfigManager
 from ..models import Player
 
+
 class CultivationManager:
     """修炼管理器，包含角色生成和闭关修炼功能"""
 
@@ -17,14 +18,12 @@ class CultivationManager:
         self.root_to_config_key = {
             # 废柴系列
             "伪": "PSEUDO_ROOT_SPEED",
-
             # 多灵根系列
             "金木水火": "QUAD_ROOT_SPEED",
             "金木水土": "QUAD_ROOT_SPEED",
             "金木火土": "QUAD_ROOT_SPEED",
             "金水火土": "QUAD_ROOT_SPEED",
             "木水火土": "QUAD_ROOT_SPEED",
-
             "金木水": "TRI_ROOT_SPEED",
             "金木火": "TRI_ROOT_SPEED",
             "金木土": "TRI_ROOT_SPEED",
@@ -35,7 +34,6 @@ class CultivationManager:
             "木水土": "TRI_ROOT_SPEED",
             "木火土": "TRI_ROOT_SPEED",
             "水火土": "TRI_ROOT_SPEED",
-
             "金木": "DUAL_ROOT_SPEED",
             "金水": "DUAL_ROOT_SPEED",
             "金火": "DUAL_ROOT_SPEED",
@@ -46,21 +44,18 @@ class CultivationManager:
             "水火": "DUAL_ROOT_SPEED",
             "水土": "DUAL_ROOT_SPEED",
             "火土": "DUAL_ROOT_SPEED",
-
             # 五行单灵根
             "金": "WUXING_ROOT_SPEED",
             "木": "WUXING_ROOT_SPEED",
             "水": "WUXING_ROOT_SPEED",
             "火": "WUXING_ROOT_SPEED",
             "土": "WUXING_ROOT_SPEED",
-
             # 变异灵根
             "雷": "THUNDER_ROOT_SPEED",
             "冰": "ICE_ROOT_SPEED",
             "风": "WIND_ROOT_SPEED",
             "暗": "DARK_ROOT_SPEED",
             "光": "LIGHT_ROOT_SPEED",
-
             # 天灵根（单属性极致）
             "天金": "HEAVENLY_ROOT_SPEED",
             "天木": "HEAVENLY_ROOT_SPEED",
@@ -68,34 +63,55 @@ class CultivationManager:
             "天火": "HEAVENLY_ROOT_SPEED",
             "天土": "HEAVENLY_ROOT_SPEED",
             "天雷": "HEAVENLY_ROOT_SPEED",
-
             # 传说级
             "阴阳": "YIN_YANG_ROOT_SPEED",
             "融合": "FUSION_ROOT_SPEED",
-
             # 神话级
             "混沌": "CHAOS_ROOT_SPEED",
-
             # 禁忌级体质
             "先天道体": "INNATE_BODY_SPEED",
-            "神圣体质": "DIVINE_BODY_SPEED"
+            "神圣体质": "DIVINE_BODY_SPEED",
         }
 
         # 灵根池定义（按权重类别）
         self.root_pools = {
             "PSEUDO": ["伪"],
             "QUAD": ["金木水火", "金木水土", "金木火土", "金水火土", "木水火土"],
-            "TRI": ["金木水", "金木火", "金木土", "金水火", "金水土", "金火土", "木水火", "木水土", "木火土", "水火土"],
-            "DUAL": ["金木", "金水", "金火", "金土", "木水", "木火", "木土", "水火", "水土", "火土"],
+            "TRI": [
+                "金木水",
+                "金木火",
+                "金木土",
+                "金水火",
+                "金水土",
+                "金火土",
+                "木水火",
+                "木水土",
+                "木火土",
+                "水火土",
+            ],
+            "DUAL": [
+                "金木",
+                "金水",
+                "金火",
+                "金土",
+                "木水",
+                "木火",
+                "木土",
+                "水火",
+                "水土",
+                "火土",
+            ],
             "WUXING": ["金", "木", "水", "火", "土"],
             "VARIANT": ["雷", "冰", "风", "暗", "光"],
             "HEAVENLY": ["天金", "天木", "天水", "天火", "天土", "天雷"],
             "LEGENDARY": ["阴阳", "融合"],
             "MYTHIC": ["混沌"],
-            "DIVINE_BODY": ["先天道体", "神圣体质"]
+            "DIVINE_BODY": ["先天道体", "神圣体质"],
         }
 
-    def _calculate_base_stats(self, level_index: int, cultivation_type: str = "灵修") -> Dict[str, int]:
+    def _calculate_base_stats(
+        self, level_index: int, cultivation_type: str = "灵修"
+    ) -> Dict[str, int]:
         """从境界配置中读取基础属性
 
         Args:
@@ -109,13 +125,27 @@ class CultivationManager:
         if 0 <= level_index < len(level_data):
             level_config = level_data[level_index]
             base_lifespan = level_config.get("base_lifespan", 100 + level_index * 50)
-            base_max_spiritual_qi = level_config.get("base_max_spiritual_qi", 50 + level_index * 20)
-            base_max_blood_qi = level_config.get("base_max_blood_qi", 50 + level_index * 20)
-            base_mental_power = level_config.get("base_mental_power", 50 + level_index * 20)
-            base_physical_damage = level_config.get("base_physical_damage", 10 + level_index * 8)
-            base_magic_damage = level_config.get("base_magic_damage", 10 + level_index * 8)
-            base_physical_defense = level_config.get("base_physical_defense", 5 + level_index * 4)
-            base_magic_defense = level_config.get("base_magic_defense", 5 + level_index * 4)
+            base_max_spiritual_qi = level_config.get(
+                "base_max_spiritual_qi", 50 + level_index * 20
+            )
+            base_max_blood_qi = level_config.get(
+                "base_max_blood_qi", 50 + level_index * 20
+            )
+            base_mental_power = level_config.get(
+                "base_mental_power", 50 + level_index * 20
+            )
+            base_physical_damage = level_config.get(
+                "base_physical_damage", 10 + level_index * 8
+            )
+            base_magic_damage = level_config.get(
+                "base_magic_damage", 10 + level_index * 8
+            )
+            base_physical_defense = level_config.get(
+                "base_physical_defense", 5 + level_index * 4
+            )
+            base_magic_defense = level_config.get(
+                "base_magic_defense", 5 + level_index * 4
+            )
 
             return {
                 "lifespan": base_lifespan,
@@ -125,7 +155,7 @@ class CultivationManager:
                 "physical_damage": base_physical_damage,
                 "magic_damage": base_magic_damage,
                 "physical_defense": base_physical_defense,
-                "magic_defense": base_magic_defense
+                "magic_defense": base_magic_defense,
             }
         else:
             # 回退逻辑，使用默认计算
@@ -137,7 +167,7 @@ class CultivationManager:
                 "physical_damage": 10 + level_index * 8,
                 "magic_damage": 10 + level_index * 8,
                 "physical_defense": 5 + level_index * 4,
-                "magic_defense": 5 + level_index * 4
+                "magic_defense": 5 + level_index * 4,
             }
 
     def _get_random_spiritual_root(self) -> str:
@@ -149,43 +179,66 @@ class CultivationManager:
 
         # 伪灵根
         pseudo_weight = weights_config.get("PSEUDO_ROOT_WEIGHT", 1)
-        weight_pool.extend([("PSEUDO", root) for root in self.root_pools["PSEUDO"]] * pseudo_weight)
+        weight_pool.extend(
+            [("PSEUDO", root) for root in self.root_pools["PSEUDO"]] * pseudo_weight
+        )
 
         # 四灵根
         quad_weight = weights_config.get("QUAD_ROOT_WEIGHT", 10)
-        weight_pool.extend([("QUAD", root) for root in self.root_pools["QUAD"]] * quad_weight)
+        weight_pool.extend(
+            [("QUAD", root) for root in self.root_pools["QUAD"]] * quad_weight
+        )
 
         # 三灵根
         tri_weight = weights_config.get("TRI_ROOT_WEIGHT", 30)
-        weight_pool.extend([("TRI", root) for root in self.root_pools["TRI"]] * tri_weight)
+        weight_pool.extend(
+            [("TRI", root) for root in self.root_pools["TRI"]] * tri_weight
+        )
 
         # 双灵根
         dual_weight = weights_config.get("DUAL_ROOT_WEIGHT", 100)
-        weight_pool.extend([("DUAL", root) for root in self.root_pools["DUAL"]] * dual_weight)
+        weight_pool.extend(
+            [("DUAL", root) for root in self.root_pools["DUAL"]] * dual_weight
+        )
 
         # 五行单灵根
         wuxing_weight = weights_config.get("WUXING_ROOT_WEIGHT", 200)
-        weight_pool.extend([("WUXING", root) for root in self.root_pools["WUXING"]] * wuxing_weight)
+        weight_pool.extend(
+            [("WUXING", root) for root in self.root_pools["WUXING"]] * wuxing_weight
+        )
 
         # 变异灵根
         variant_weight = weights_config.get("VARIANT_ROOT_WEIGHT", 20)
-        weight_pool.extend([("VARIANT", root) for root in self.root_pools["VARIANT"]] * variant_weight)
+        weight_pool.extend(
+            [("VARIANT", root) for root in self.root_pools["VARIANT"]] * variant_weight
+        )
 
         # 天灵根
         heavenly_weight = weights_config.get("HEAVENLY_ROOT_WEIGHT", 5)
-        weight_pool.extend([("HEAVENLY", root) for root in self.root_pools["HEAVENLY"]] * heavenly_weight)
+        weight_pool.extend(
+            [("HEAVENLY", root) for root in self.root_pools["HEAVENLY"]]
+            * heavenly_weight
+        )
 
         # 传说级
         legendary_weight = weights_config.get("LEGENDARY_ROOT_WEIGHT", 2)
-        weight_pool.extend([("LEGENDARY", root) for root in self.root_pools["LEGENDARY"]] * legendary_weight)
+        weight_pool.extend(
+            [("LEGENDARY", root) for root in self.root_pools["LEGENDARY"]]
+            * legendary_weight
+        )
 
         # 神话级
         mythic_weight = weights_config.get("MYTHIC_ROOT_WEIGHT", 1)
-        weight_pool.extend([("MYTHIC", root) for root in self.root_pools["MYTHIC"]] * mythic_weight)
+        weight_pool.extend(
+            [("MYTHIC", root) for root in self.root_pools["MYTHIC"]] * mythic_weight
+        )
 
         # 禁忌级体质
         divine_weight = weights_config.get("DIVINE_BODY_WEIGHT", 1)
-        weight_pool.extend([("DIVINE_BODY", root) for root in self.root_pools["DIVINE_BODY"]] * divine_weight)
+        weight_pool.extend(
+            [("DIVINE_BODY", root) for root in self.root_pools["DIVINE_BODY"]]
+            * divine_weight
+        )
 
         if not weight_pool:
             # 兜底方案：默认返回金灵根
@@ -200,14 +253,12 @@ class CultivationManager:
         """获取灵根描述"""
         descriptions = {
             "伪": "【废柴】资质低劣，修炼如龟速",
-
             # 四灵根
             "金木水火": "【凡品】四灵根杂乱，资质平庸",
             "金木水土": "【凡品】四灵根杂乱，资质平庸",
             "金木火土": "【凡品】四灵根杂乱，资质平庸",
             "金水火土": "【凡品】四灵根杂乱，资质平庸",
             "木水火土": "【凡品】四灵根杂乱，资质平庸",
-
             # 三灵根
             "金木水": "【凡品】三灵根较杂，资质一般",
             "金木火": "【凡品】三灵根较杂，资质一般",
@@ -219,7 +270,6 @@ class CultivationManager:
             "木水土": "【凡品】三灵根较杂，资质一般",
             "木火土": "【凡品】三灵根较杂，资质一般",
             "水火土": "【凡品】三灵根较杂，资质一般",
-
             # 双灵根
             "金木": "【良品】双灵根，较为常见",
             "金水": "【良品】双灵根，较为常见",
@@ -231,21 +281,18 @@ class CultivationManager:
             "水火": "【良品】双灵根，较为常见",
             "水土": "【良品】双灵根，较为常见",
             "火土": "【良品】双灵根，较为常见",
-
             # 五行单灵根
             "金": "【上品】金之精华，锋锐无双",
             "木": "【上品】木之生机，生生不息",
             "水": "【上品】水之灵韵，柔中带刚",
             "火": "【上品】火之烈焰，霸道无匹",
             "土": "【上品】土之厚重，稳如磐石",
-
             # 变异灵根
             "雷": "【稀有】天地雷霆，毁灭之力",
             "冰": "【稀有】极寒冰封，万物凝固",
             "风": "【稀有】疾风骤雨，来去无踪",
             "暗": "【稀有】幽暗深邃，诡异莫测",
             "光": "【稀有】神圣光明，普照万物",
-
             # 天灵根
             "天金": "【极品】天选之子，金之极致",
             "天木": "【极品】天选之子，木之极致",
@@ -253,21 +300,20 @@ class CultivationManager:
             "天火": "【极品】天选之子，火之极致",
             "天土": "【极品】天选之子，土之极致",
             "天雷": "【极品】天选之子，雷之极致",
-
             # 传说级
             "阴阳": "【传说】阴阳调和，造化玄机",
             "融合": "【传说】五行融合，万法归一",
-
             # 神话级
             "混沌": "【神话】混沌初开，包罗万象",
-
             # 禁忌级
             "先天道体": "【禁忌】天生道体，与天地同寿",
-            "神圣体质": "【禁忌】神之后裔，天赋异禀"
+            "神圣体质": "【禁忌】神之后裔，天赋异禀",
         }
         return descriptions.get(root_name, "【未知】神秘的灵根")
 
-    def generate_new_player_stats(self, user_id: str, cultivation_type: str = "灵修") -> Player:
+    def generate_new_player_stats(
+        self, user_id: str, cultivation_type: str = "灵修"
+    ) -> Player:
         """生成新玩家的初始数据
 
         Args:
@@ -296,7 +342,7 @@ class CultivationManager:
                 physical_damage=5,
                 magic_defense=0,
                 physical_defense=5,
-                mental_power=random.randint(100, 500)
+                mental_power=random.randint(100, 500),
             )
         else:  # 体修
             # 体修初始数据：寿命50-100，修为0，气血100-500，法伤0，物伤100-500，法防50-200，物防100-500，精神力100-500
@@ -316,7 +362,7 @@ class CultivationManager:
                 physical_damage=random.randint(100, 500),
                 magic_defense=random.randint(50, 200),
                 physical_defense=random.randint(100, 500),
-                mental_power=random.randint(100, 500)
+                mental_power=random.randint(100, 500),
             )
 
     def get_spiritual_root_speed(self, player: Player) -> float:
@@ -347,7 +393,7 @@ class CultivationManager:
         player: Player,
         minutes: int,
         technique_bonus: float = 0.0,
-        pill_multipliers: Optional[Dict[str, float]] = None
+        pill_multipliers: Optional[Dict[str, float]] = None,
     ) -> int:
         """计算闭关修炼获得的修为
 
@@ -383,4 +429,3 @@ class CultivationManager:
             f"获得修为 {total_exp}"
         )
         return total_exp
-

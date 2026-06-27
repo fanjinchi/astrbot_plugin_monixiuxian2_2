@@ -4,6 +4,7 @@ from ..managers.alchemy_manager import AlchemyManager
 from ..data.data_manager import DataBase
 from ..models_extended import UserStatus
 
+
 class AlchemyHandlers:
     def __init__(self, db: DataBase, alchemy_mgr: AlchemyManager):
         self.db = db
@@ -18,20 +19,20 @@ class AlchemyHandlers:
     async def handle_craft(self, event: AstrMessageEvent, pill_id: int):
         """炼丹"""
         user_id = event.get_sender_id()
-        
+
         # 检查玩家是否存在
         player = await self.db.get_player_by_id(user_id)
         if not player:
             yield event.plain_result("❌ 你还未踏入修仙之路！")
             return
-        
+
         # 检查玩家状态
         user_cd = await self.db.ext.get_user_cd(user_id)
         if user_cd and user_cd.type != UserStatus.IDLE:
             current_status = UserStatus.get_name(user_cd.type)
             yield event.plain_result(f"❌ 你当前正{current_status}，无法炼丹！")
             return
-        
+
         if not pill_id:
             yield event.plain_result("❌ 请输入丹药配方ID")
             return

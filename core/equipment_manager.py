@@ -8,15 +8,23 @@ if TYPE_CHECKING:
     from ..config_manager import ConfigManager
     from .storage_ring_manager import StorageRingManager
 
+
 class EquipmentManager:
     """装备管理器 - 处理装备的穿戴、卸下和属性计算"""
 
-    def __init__(self, db: DataBase, config_manager: "ConfigManager" = None, storage_ring_manager: "StorageRingManager" = None):
+    def __init__(
+        self,
+        db: DataBase,
+        config_manager: "ConfigManager" = None,
+        storage_ring_manager: "StorageRingManager" = None,
+    ):
         self.db = db
         self.config_manager = config_manager
         self.storage_ring_manager = storage_ring_manager
 
-    def parse_item_from_name(self, item_name: str, items_data: dict, weapons_data: dict = None) -> Optional[Item]:
+    def parse_item_from_name(
+        self, item_name: str, items_data: dict, weapons_data: dict = None
+    ) -> Optional[Item]:
         """从物品名称解析为Item对象
 
         Args:
@@ -90,10 +98,12 @@ class EquipmentManager:
             mental_power=mental_power,
             exp_multiplier=item_config.get("exp_multiplier", 0.0),
             spiritual_qi=item_config.get("spiritual_qi", 0),
-            blood_qi=item_config.get("blood_qi", 0)
+            blood_qi=item_config.get("blood_qi", 0),
         )
 
-    def get_equipped_items(self, player: Player, items_data: dict, weapons_data: dict = None) -> List[Item]:
+    def get_equipped_items(
+        self, player: Player, items_data: dict, weapons_data: dict = None
+    ) -> List[Item]:
         """获取玩家所有已装备的物品
 
         Args:
@@ -120,7 +130,9 @@ class EquipmentManager:
 
         # 主修心法
         if player.main_technique:
-            item = self.parse_item_from_name(player.main_technique, items_data, weapons_data)
+            item = self.parse_item_from_name(
+                player.main_technique, items_data, weapons_data
+            )
             if item:
                 equipped.append(item)
 
@@ -133,7 +145,9 @@ class EquipmentManager:
 
         return equipped
 
-    def check_equipment_level_requirement(self, player: Player, item: Item) -> tuple[bool, str]:
+    def check_equipment_level_requirement(
+        self, player: Player, item: Item
+    ) -> tuple[bool, str]:
         """检查玩家是否满足装备的境界要求
 
         Args:
@@ -146,7 +160,10 @@ class EquipmentManager:
         if player.level_index < item.required_level_index:
             # 获取需求境界名称
             required_level_name = self._format_required_level(item.required_level_index)
-            return False, f"境界不足！装备【{item.name}】（{item.rank}）需要达到【{required_level_name}】以上"
+            return (
+                False,
+                f"境界不足！装备【{item.name}】（{item.rank}）需要达到【{required_level_name}】以上",
+            )
         return True, ""
 
     def _format_required_level(self, level_index: int) -> str:
@@ -162,7 +179,9 @@ class EquipmentManager:
                 names.append(name)
         # 体修境界名称
         if 0 <= level_index < len(self.config_manager.body_level_data):
-            name = self.config_manager.body_level_data[level_index].get("level_name", "")
+            name = self.config_manager.body_level_data[level_index].get(
+                "level_name", ""
+            )
             if name and name not in names:
                 names.append(name)
 
@@ -193,7 +212,10 @@ class EquipmentManager:
             if old_item:
                 # 尝试将旧装备存入储物戒
                 storage_msg = await self._store_old_equipment(player, old_item)
-                return True, f"已将【{old_item}】替换为【{item.name}】（{item.rank}）{storage_msg}"
+                return (
+                    True,
+                    f"已将【{old_item}】替换为【{item.name}】（{item.rank}）{storage_msg}",
+                )
             else:
                 return True, f"已装备武器【{item.name}】（{item.rank}）"
 
@@ -204,7 +226,10 @@ class EquipmentManager:
             if old_item:
                 # 尝试将旧装备存入储物戒
                 storage_msg = await self._store_old_equipment(player, old_item)
-                return True, f"已将【{old_item}】替换为【{item.name}】（{item.rank}）{storage_msg}"
+                return (
+                    True,
+                    f"已将【{old_item}】替换为【{item.name}】（{item.rank}）{storage_msg}",
+                )
             else:
                 return True, f"已装备防具【{item.name}】（{item.rank}）"
 
@@ -215,7 +240,10 @@ class EquipmentManager:
             if old_item:
                 # 尝试将旧心法存入储物戒
                 storage_msg = await self._store_old_equipment(player, old_item)
-                return True, f"已将主修心法【{old_item}】替换为【{item.name}】（{item.rank}）{storage_msg}"
+                return (
+                    True,
+                    f"已将主修心法【{old_item}】替换为【{item.name}】（{item.rank}）{storage_msg}",
+                )
             else:
                 return True, f"已装备主修心法【{item.name}】（{item.rank}）"
 
@@ -234,7 +262,10 @@ class EquipmentManager:
             techniques_list.append(item.name)
             player.set_techniques_list(techniques_list)
             await self.db.update_player(player)
-            return True, f"已装备功法【{item.name}】（{item.rank}）（{len(techniques_list)}/3）"
+            return (
+                True,
+                f"已装备功法【{item.name}】（{item.rank}）（{len(techniques_list)}/3）",
+            )
 
         else:
             return False, f"未知的装备类型：{item.item_type}"
@@ -297,7 +328,9 @@ class EquipmentManager:
         if not self.storage_ring_manager:
             return ""
 
-        success, msg = await self.storage_ring_manager.store_item(player, item_name, 1, silent=True)
+        success, msg = await self.storage_ring_manager.store_item(
+            player, item_name, 1, silent=True
+        )
         if success:
             return f"\n旧装备【{item_name}】已存入储物戒"
         else:
