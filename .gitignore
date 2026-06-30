@@ -13,6 +13,12 @@ uv.lock
 .codegraph/
 .serena/
 
+# Subagent / tooling output
+.opencode/
+.pi/prompts/
+subagent-*.md
+worker_*_summary.md
+
 # Claude / Cursor settings
 .claude/
 .cursor/
