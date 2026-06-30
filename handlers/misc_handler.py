@@ -1,5 +1,6 @@
 # handlers/misc_handler.py
 from astrbot.api.event import AstrMessageEvent
+
 from ..data import DataBase
 
 __all__ = ["MiscHandler"]
@@ -14,7 +15,7 @@ class MiscHandler:
     async def handle_help(self, event: AstrMessageEvent):
         """显示帮助信息"""
         help_text = (
-            "📖 修仙指令大全 v3.1.3\n"
+            "📖 修仙指令大全 v3.2.0\n"
             "━━━━━━━━━━━━━━━\n"
             "\n"
             "📖【入门 & 基础】\n"
@@ -148,6 +149,9 @@ class MiscHandler:
             "  抢占灵眼 <ID> → 占据无主灵眼\n"
             "  灵眼收取 → 收取灵眼修为产出\n"
             "  释放灵眼 → 释放已占据的灵眼\n"
+            "\n"
+            "🔧【GM 管理】(仅管理员可用)\n"
+            "  修仙GM帮助 → 查看 GM 命令说明\n"
             "\n"
             "━━━━━━━━━━━━━━━\n"
             "💡 提示: 指令前加 / 使用，如 /我要修仙"

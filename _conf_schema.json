@@ -20,6 +20,12 @@
         "type": "list",
         "default": [],
         "hint": "可以手动生成Boss的用户ID（字符串）。为空则不允许任何人手动生成Boss。"
+      },
+      "GM_ADMINS": {
+        "description": "GM管理员名单",
+        "type": "list",
+        "default": [],
+        "hint": "可以使用修仙GM命令的管理员用户ID（字符串）。为空则不允许任何人使用GM命令。"
       }
     }
   },

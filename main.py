@@ -5,6 +5,7 @@ from pathlib import Path
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, StarTools
+from astrbot.core.star.filter.command import GreedyStr
 
 from .config_manager import ConfigManager
 from .data import DataBase, MigrationManager
@@ -19,6 +20,7 @@ from .handlers import (
     CombatHandlers,
     DualCultivationHandlers,
     EquipmentHandler,
+    GMHandler,
     ImpartHandlers,
     ImpartPkHandlers,
     MiscHandler,
@@ -197,6 +199,10 @@ CMD_SPIRIT_EYE_RELEASE = "释放灵眼"
 
 CMD_REBIRTH = "弃道重修"
 
+# GM 系统指令
+CMD_GM = "修仙GM"
+CMD_GM_HELP = "修仙GM帮助"
+
 
 class XiuXianPlugin(Star):
     """修仙插件 - 文字修仙游戏"""
@@ -225,9 +231,16 @@ class XiuXianPlugin(Star):
         self.storage_ring_handler = StorageRingHandler(self.db, self.config_manager)
 
         # 初始化核心管理器
-        from .core import StorageRingManager
+        from .core import EquipmentManager, GMManager, StorageRingManager
 
         self.storage_ring_mgr = StorageRingManager(self.db, self.config_manager)
+        self.equipment_mgr = EquipmentManager(
+            self.db, self.config_manager, self.storage_ring_mgr
+        )
+
+        # Phase 2: 灵石银行和悬赏令（GMManager 依赖 bounty_mgr，需提前初始化）
+        self.bank_mgr = BankManager(self.db, self.config)
+        self.bounty_mgr = BountyManager(self.db, self.storage_ring_mgr)
 
         self.combat_mgr = CombatManager()
         self.enemy_mgr = EnemyManager()
@@ -250,6 +263,20 @@ class XiuXianPlugin(Star):
         )
         self.impart_mgr = ImpartManager(self.db)
 
+        # 初始化 GM 管理器（依赖前面创建的管理器）
+        self.gm_manager = GMManager(
+            self.db,
+            self.config_manager,
+            self.storage_ring_mgr,
+            self.equipment_mgr,
+            self.adventure_mgr,
+            self.rift_mgr,
+            self.boss_mgr,
+            bounty_manager=self.bounty_mgr,
+            plugin_data_path=plugin_data_path,
+            broadcast_callback=self._broadcast_boss_spawn,
+        )
+
         # 初始化新功能处理器
         self.sect_handlers = SectHandlers(self.db, self.sect_mgr)
         self.boss_handlers = BossHandlers(self.db, self.boss_mgr)
@@ -262,10 +289,8 @@ class XiuXianPlugin(Star):
         self.alchemy_handlers = AlchemyHandlers(self.db, self.alchemy_mgr)
         self.impart_handlers = ImpartHandlers(self.db, self.impart_mgr)
         self.nickname_handler = NicknameHandler(self.db)  # Phase 1
+        self.gm_handler = GMHandler(self.db, self.gm_manager)
 
-        # Phase 2: 灵石银行和悬赏令
-        self.bank_mgr = BankManager(self.db, self.config)
-        self.bounty_mgr = BountyManager(self.db, self.storage_ring_mgr)
         self.bank_handlers = BankHandlers(self.db, self.bank_mgr)
         self.bounty_handlers = BountyHandlers(self.db, self.bounty_mgr)
 
@@ -295,6 +320,7 @@ class XiuXianPlugin(Star):
         self.boss_admins = [
             str(a) for a in access_control_config.get("BOSS_ADMINS", [])
         ]
+        self.gm_admins = [str(a) for a in access_control_config.get("GM_ADMINS", [])]
 
         logger.info(f"【修仙插件】XiuXianPlugin 初始化完成，数据库路径: {db_path}")
 
@@ -324,11 +350,18 @@ class XiuXianPlugin(Star):
         sender_id = str(event.get_sender_id())
         return sender_id in self.boss_admins
 
+    def _check_gm_admin(self, event: AstrMessageEvent) -> bool:
+        """检查是否为GM管理员"""
+        if not self.gm_admins:
+            return False
+        sender_id = str(event.get_sender_id())
+        return sender_id in self.gm_admins
+
     async def _send_access_denied_message(self, event: AstrMessageEvent):
         """发送访问被拒绝的提示消息"""
         try:
             await event.send("抱歉，此群聊未在修仙插件的白名单中，无法使用相关功能。")
-        except:
+        except Exception:
             # 如果发送失败，静默处理
             pass
 
@@ -1339,4 +1372,23 @@ class XiuXianPlugin(Star):
     @require_whitelist
     async def handle_spirit_eye_release(self, event: AstrMessageEvent):
         async for r in self.spirit_eye_handlers.handle_release(event):
+            yield r
+
+    # ===== GM 系统指令 =====
+    @filter.command(CMD_GM, "GM 管理命令")
+    @require_whitelist
+    async def handle_gm(self, event: AstrMessageEvent, args: GreedyStr):
+        if not self._check_gm_admin(event):
+            yield event.plain_result("❌ 你没有权限使用修仙GM命令！")
+            return
+        async for r in self.gm_handler.handle_gm(event, args):
+            yield r
+
+    @filter.command(CMD_GM_HELP, "GM 帮助命令")
+    @require_whitelist
+    async def handle_gm_help(self, event: AstrMessageEvent):
+        if not self._check_gm_admin(event):
+            yield event.plain_result("❌ 你没有权限使用修仙GM帮助命令！")
+            return
+        async for r in self.gm_handler.handle_gm_help(event):
             yield r
