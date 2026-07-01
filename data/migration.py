@@ -1,13 +1,20 @@
 # data/migration.py
 
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING
+
 import aiosqlite
-from typing import Dict, Callable, Awaitable
+
 from astrbot.api import logger
-from ..config_manager import ConfigManager
+
+if TYPE_CHECKING:
+    from ..config_manager import ConfigManager
 
 LATEST_DB_VERSION = 21  # v21: 添加系统配置表，补齐全新安装时缺失的表和字段
 
-MIGRATION_TASKS: Dict[
+MIGRATION_TASKS: dict[
     int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]
 ] = {}
 
@@ -407,7 +414,7 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             blessed_spot_flag INTEGER NOT NULL DEFAULT 0,
             blessed_spot_name TEXT NOT NULL DEFAULT '',
             level_up_rate INTEGER NOT NULL DEFAULT 0,
-            
+
             spiritual_root TEXT NOT NULL DEFAULT '未知',
             lifespan INTEGER NOT NULL DEFAULT 100,
             state TEXT NOT NULL DEFAULT '空闲',
@@ -422,12 +429,12 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             magic_defense INTEGER NOT NULL DEFAULT 5,
             physical_defense INTEGER NOT NULL DEFAULT 5,
             mental_power INTEGER NOT NULL DEFAULT 100,
-            
+
             weapon TEXT NOT NULL DEFAULT '',
             armor TEXT NOT NULL DEFAULT '',
             main_technique TEXT NOT NULL DEFAULT '',
             techniques TEXT NOT NULL DEFAULT '[]',
-            
+
             active_pill_effects TEXT NOT NULL DEFAULT '[]',
             permanent_pill_gains TEXT NOT NULL DEFAULT '{}',
             has_resurrection_pill INTEGER NOT NULL DEFAULT 0,
@@ -435,7 +442,7 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             pills_inventory TEXT NOT NULL DEFAULT '{}',
             storage_ring TEXT NOT NULL DEFAULT '基础储物戒',
             storage_ring_items TEXT NOT NULL DEFAULT '{}',
-            
+
             daily_pill_usage TEXT NOT NULL DEFAULT '{}',
             last_daily_reset TEXT NOT NULL DEFAULT ''
         )
@@ -1013,13 +1020,13 @@ async def _migrate_to_v13(conn: aiosqlite.Connection, config_manager: ConfigMana
         await conn.execute(
             "ALTER TABLE players ADD COLUMN daily_pill_usage TEXT NOT NULL DEFAULT '{}'"
         )
-    except:
+    except Exception:
         pass  # 字段可能已存在
     try:
         await conn.execute(
             "ALTER TABLE players ADD COLUMN last_daily_reset TEXT NOT NULL DEFAULT ''"
         )
-    except:
+    except Exception:
         pass
 
     logger.info("v13迁移完成：Phase 1 功能增强")
@@ -1098,7 +1105,7 @@ async def _migrate_to_v15(conn: aiosqlite.Connection, config_manager: ConfigMana
                 "INSERT OR IGNORE INTO rifts (rift_id, rift_name, rift_level, required_level, rewards) VALUES (?, ?, ?, ?, ?)",
                 rift,
             )
-        except:
+        except Exception:
             pass
 
     await conn.commit()

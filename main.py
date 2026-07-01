@@ -244,6 +244,7 @@ class XiuXianPlugin(Star):
 
         self.combat_mgr = CombatManager()
         self.enemy_mgr = EnemyManager()
+        self.impart_mgr = ImpartManager(self.db)
         self.pve_combat_mgr = PVECombatManager(
             self.combat_mgr, self.enemy_mgr, self.config_manager, self.impart_mgr
         )
@@ -261,7 +262,6 @@ class XiuXianPlugin(Star):
         self.alchemy_mgr = AlchemyManager(
             self.db, self.config_manager, self.storage_ring_mgr
         )
-        self.impart_mgr = ImpartManager(self.db)
 
         # 初始化 GM 管理器（依赖前面创建的管理器）
         self.gm_manager = GMManager(
