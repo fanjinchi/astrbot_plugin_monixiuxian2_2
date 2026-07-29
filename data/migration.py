@@ -12,7 +12,7 @@ from astrbot.api import logger
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 23  # v23: 新增战报合并条数偏好字段
+LATEST_DB_VERSION = 24  # v24: 补齐 players.spiritual_root 字段
 
 MIGRATION_TASKS: dict[
     int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]
@@ -800,6 +800,7 @@ async def _create_all_tables_v22(conn: aiosqlite.Connection):
             user_id TEXT PRIMARY KEY,
             user_name TEXT NOT NULL DEFAULT '',
             level_index INTEGER NOT NULL DEFAULT 0,
+            spiritual_root TEXT NOT NULL DEFAULT '未知',
             cultivation_type TEXT NOT NULL DEFAULT '灵修',
             lifespan INTEGER NOT NULL DEFAULT 100,
             experience INTEGER NOT NULL DEFAULT 0,
@@ -1223,6 +1224,7 @@ async def _migrate_to_v22(conn: aiosqlite.Connection, config_manager: ConfigMana
             user_id TEXT PRIMARY KEY,
             user_name TEXT NOT NULL DEFAULT '',
             level_index INTEGER NOT NULL DEFAULT 0,
+            spiritual_root TEXT NOT NULL DEFAULT '未知',
             cultivation_type TEXT NOT NULL DEFAULT '灵修',
             lifespan INTEGER NOT NULL DEFAULT 100,
             experience INTEGER NOT NULL DEFAULT 0,
@@ -1313,6 +1315,26 @@ async def _migrate_to_v23(conn: aiosqlite.Connection, config_manager: ConfigMana
 
     await conn.commit()
     logger.info("v23迁移完成：战报合并条数偏好")
+
+
+@migration(24)
+async def _migrate_to_v24(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """迁移到v24 - 补齐 players.spiritual_root 字段"""
+    logger.info("开始迁移到v24：补齐 spiritual_root 字段")
+
+    async with conn.execute("PRAGMA table_info(players)") as cursor:
+        columns = {row[1] for row in await cursor.fetchall()}
+
+    if "spiritual_root" not in columns:
+        await conn.execute(
+            "ALTER TABLE players ADD COLUMN spiritual_root TEXT NOT NULL DEFAULT '未知'"
+        )
+        logger.info("已添加 spiritual_root 字段")
+    else:
+        logger.info("spiritual_root 字段已存在，跳过")
+
+    await conn.commit()
+    logger.info("v24迁移完成：spiritual_root 字段已补齐")
 
 
 @migration(21)

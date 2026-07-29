@@ -1,5 +1,4 @@
-"""
-Test helpers: module loader that bypasses the plugin's __init__.py chain.
+"""Test helpers: module loader that bypasses the plugin's __init__.py chain.
 
 The plugin's managers/__init__.py triggers relative imports that fail when
 pytest discovers tests from the AstrBot project root. This loader uses
@@ -9,6 +8,7 @@ importlib.util so each module is loaded without its package __init__.
 import importlib.util
 import os
 import sys
+import types
 from pathlib import Path
 
 # Determine the plugin root directory (two levels up from this file)
@@ -33,5 +33,44 @@ def load_module(mod_name: str, rel_path: str):
         raise ImportError(f"Cannot find spec for {mod_name} at {path}")
     mod = importlib.util.module_from_spec(spec)
     sys.modules[mod_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _ensure_package(full_name: str, package_path: Path) -> None:
+    """Create an empty package module in sys.modules if absent."""
+    if full_name in sys.modules:
+        return
+    pkg = types.ModuleType(full_name)
+    pkg.__path__ = [os.fspath(package_path)]
+    sys.modules[full_name] = pkg
+
+
+def load_package_module(rel_path: str, full_name: str):
+    """Load a module under a synthetic package tree so relative imports resolve.
+
+    This is needed for modules such as ``data/data_manager.py`` that import
+    sibling/parent modules with relative imports (e.g. ``from ..models import Player``).
+
+    Args:
+        rel_path: Path relative to the plugin root (e.g. ``"data/data_manager.py"``).
+        full_name: Dotted module name (e.g. ``"astrbot_plugin_monixiuxian2_2.data.data_manager"``).
+
+    Returns:
+        The loaded module object.
+    """
+    parts = full_name.split(".")
+    _ensure_package(parts[0], PLUGIN_ROOT)
+    for i in range(2, len(parts)):
+        package_name = ".".join(parts[:i])
+        package_path = PLUGIN_ROOT / Path(*parts[1:i])
+        _ensure_package(package_name, package_path)
+
+    file_path = PLUGIN_ROOT / rel_path
+    spec = importlib.util.spec_from_file_location(full_name, file_path)
+    if spec is None:
+        raise ImportError(f"Cannot find spec for {full_name} at {file_path}")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[full_name] = mod
     spec.loader.exec_module(mod)
     return mod
