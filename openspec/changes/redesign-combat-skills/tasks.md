@@ -45,8 +45,8 @@
 
 ## 7. 测试与收尾
 
-- [ ] 7.1 战斗引擎单测：出手权分布、伤害公式边界（下限 1/护甲减伤）、判定链顺序、大招限次、行动上限平局
-- [ ] 7.2 技能系统单测：领悟池系数加权、通用池渠道隔离（闭关不触及）、无心法 3% 独立判定、修习目标入池、升星与槽位校验
-- [ ] 7.3 迁移脚本测试：含旧数据的库执行迁移后新 schema 正确、旧字段废弃
-- [ ] 7.4 质量门禁：`uv run ruff format . && uv run ruff check .` 全过；`uv run python -m pytest tests/ -v` 全绿
-- [ ] 7.5 版本 checklist：`metadata.yaml` 版本号、`README.md` 更新日志、`handlers/misc_handler.py` 修仙帮助文本同步更新
+- [x] 7.1 战斗引擎单测：出手权分布、伤害公式边界（下限 1/护甲减伤）、判定链顺序、大招限次、行动上限平局
+- [x] 7.2 技能系统单测：领悟池系数加权、通用池渠道隔离（闭关不触及）、无心法 3% 独立判定、修习目标入池、升星与槽位校验
+- [x] 7.3 迁移脚本测试：含旧数据的库执行迁移后新 schema 正确、旧字段废弃
+- [x] 7.4 质量门禁：`uv run ruff format . && uv run ruff check .` 全过；`uv run python -m pytest tests/ -v` 全绿
+- [x] 7.5 版本 checklist：`metadata.yaml` 版本号、`README.md` 更新日志、`handlers/misc_handler.py` 修仙帮助文本同步更新

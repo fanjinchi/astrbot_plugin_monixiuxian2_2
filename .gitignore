@@ -1,3 +1,7 @@
+# AstrBot runtime artifacts (auto-generated in plugin data directory)
+data/cmd_config.json
+data/t2i_templates/
+
 # Python related
 __pycache__
 .mypy_cache
