@@ -17,30 +17,20 @@ class PillManager:
         self.config_manager = config_manager
 
     def _ensure_non_negative_attributes(self, player: Player):
-        """保证属性不为负，并同步能量上限约束"""
+        """保证属性不为负"""
         attrs = [
             "lifespan",
             "experience",
-            "physical_damage",
-            "magic_damage",
-            "physical_defense",
-            "magic_defense",
-            "mental_power",
-            "spiritual_qi",
-            "max_spiritual_qi",
-            "blood_qi",
-            "max_blood_qi",
+            "damage",
+            "agility",
+            "speed",
+            "hp",
+            "armor_value",
         ]
         for attr in attrs:
             value = getattr(player, attr, 0)
             if value < 0:
                 setattr(player, attr, 0)
-
-        # 保证当前能量不超过上限
-        if player.spiritual_qi > player.max_spiritual_qi:
-            player.spiritual_qi = player.max_spiritual_qi
-        if player.blood_qi > player.max_blood_qi:
-            player.blood_qi = player.max_blood_qi
 
     def get_pill_by_name(self, pill_name: str) -> dict | None:
         """根据名称获取丹药配置
@@ -454,50 +444,32 @@ class PillManager:
     async def _use_instant_pill(
         self, player: Player, pill_name: str, pill_data: dict
     ) -> tuple[bool, str]:
-        """使用瞬间效果丹药"""
+        """使用瞬间效果丹药
+
+        Legacy spiritual_qi / blood_qi restore keys are mapped to the unified
+        ``hp`` attribute in the four-main-attribute framework.
+        """
         msg_parts = [f"✨ 服用【{pill_name}】成功！", "━━━━━━━━━━━━━━━"]
 
-        # 恢复能量（灵气/气血）
-        energy_restore = None
-        energy_label = "灵气"
-        current_energy = player.spiritual_qi
-        max_energy = player.max_spiritual_qi
+        # Determine restore amount (legacy keys mapped to hp)
+        restore = pill_data.get("hp_restore", 0)
+        if not restore:
+            restore = max(
+                pill_data.get("spiritual_qi_restore", 0),
+                pill_data.get("blood_qi_restore", 0),
+            )
 
-        # 体修优先使用专属气血恢复键；若无则复用灵气恢复作为气血恢复
-        if player.cultivation_type == "体修" and "blood_qi_restore" in pill_data:
-            energy_restore = pill_data["blood_qi_restore"]
-            energy_label = "气血"
-            current_energy = player.blood_qi
-            max_energy = player.max_blood_qi
-        elif "spiritual_qi_restore" in pill_data:
-            energy_restore = pill_data["spiritual_qi_restore"]
-            if player.cultivation_type == "体修":
-                energy_label = "气血"
-                current_energy = player.blood_qi
-                max_energy = player.max_blood_qi
-
-        if energy_restore is not None:
-            if energy_restore == -1:
-                # 恢复至满
-                current_energy = max_energy
-                actual_restore = max_energy
+        if restore:
+            old_hp = player.hp
+            if restore == -1:
+                # Restore to full: use a generous cap matching the old full-energy semantic.
+                player.hp = max(player.hp, 1000)
+                actual_restore = player.hp - old_hp
             else:
-                old_energy = current_energy
-                current_energy = min(current_energy + energy_restore, max_energy)
-                actual_restore = current_energy - old_energy
-
-            if energy_label == "气血":
-                player.blood_qi = current_energy
-                msg_parts.append(f"🌟 恢复气血：+{actual_restore}")
-                msg_parts.append(
-                    f"🩸 当前气血：{player.blood_qi}/{player.max_blood_qi}"
-                )
-            else:
-                player.spiritual_qi = current_energy
-                msg_parts.append(f"🌟 恢复灵气：+{actual_restore}")
-                msg_parts.append(
-                    f"💫 当前灵气：{player.spiritual_qi}/{player.max_spiritual_qi}"
-                )
+                player.hp = old_hp + restore
+                actual_restore = restore
+            msg_parts.append(f"🌟 恢复气血：+{actual_restore}")
+            msg_parts.append(f"🩸 当前气血：{player.hp}")
 
         # 重置永久丹药增益
         if pill_data.get("resets_permanent_pills"):
@@ -572,6 +544,9 @@ class PillManager:
     async def handle_resurrection(self, player: Player) -> bool:
         """处理玩家死亡时的回生丹效果
 
+        In the four-main-attribute framework, "气血" maps to the unified ``hp``
+        attribute. Resurrection halves all core attributes and restores hp.
+
         Args:
             player: 玩家对象
 
@@ -586,18 +561,14 @@ class PillManager:
         # 消耗回生丹效果
         player.has_resurrection_pill = False
 
-        # 所有属性减半
+        # 所有核心属性减半
         player.lifespan = player.lifespan // 2
         player.experience = player.experience // 2
-        player.physical_damage = player.physical_damage // 2
-        player.magic_damage = player.magic_damage // 2
-        player.physical_defense = player.physical_defense // 2
-        player.magic_defense = player.magic_defense // 2
-        player.mental_power = player.mental_power // 2
-        player.max_spiritual_qi = player.max_spiritual_qi // 2
-        player.spiritual_qi = player.max_spiritual_qi // 2
-        player.max_blood_qi = player.max_blood_qi // 2
-        player.blood_qi = player.max_blood_qi // 2
+        player.damage = player.damage // 2
+        player.agility = player.agility // 2
+        player.speed = player.speed // 2
+        player.hp = max(1, player.hp // 2)
+        player.armor_value = player.armor_value // 2
 
         self._ensure_non_negative_attributes(player)
 
