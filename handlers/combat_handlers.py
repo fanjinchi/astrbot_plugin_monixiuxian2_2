@@ -6,7 +6,8 @@ from astrbot.api.all import *
 from astrbot.api.event import AstrMessageEvent
 
 from ..data.data_manager import DataBase
-from ..managers.combat_manager import CombatManager, CombatStats
+from ..managers.combat_manager import CombatManager
+from ..models import Player
 from ..models_extended import UserStatus
 
 # 战斗冷却配置（秒）
@@ -92,68 +93,11 @@ class CombatHandlers:
             return match.group(1)
         return None
 
-    def _calculate_equipment_bonus(self, player) -> dict:
-        """计算装备提供的属性加成"""
-        bonus = {"atk": 0, "defense": 0}
-        if not self.config_manager:
-            return bonus
-
-        # 武器
-        if player.weapon and player.weapon in self.config_manager.weapons_data:
-            data = self.config_manager.weapons_data[player.weapon]
-            bonus["atk"] += data.get("atk", 0)
-            bonus["atk"] += data.get("physical_damage", 0)
-            bonus["atk"] += data.get("magic_damage", 0)
-
-        # 防具
-        if player.armor and player.armor in self.config_manager.items_data:
-            data = self.config_manager.items_data[player.armor]
-            bonus["defense"] += data.get("physical_defense", 0)
-            bonus["defense"] += data.get("magic_defense", 0)
-
-        return bonus
-
-    async def _prepare_combat_stats(self, user_id: str) -> CombatStats:
+    async def _fetch_player(self, user_id: str) -> Player | None:
+        """Load player by ID; returns None if not found."""
         player = await self.db.get_player_by_id(user_id)
-        if not player:
-            return None
+        return player
 
-        # 获取基础属性
-        # 注意：这里我们重新计算属性以确保即时性，特别是Buff
-        impart_info = await self.db.ext.get_impart_info(user_id)
-        hp_buff = impart_info.impart_hp_per if impart_info else 0.0
-        mp_buff = impart_info.impart_mp_per if impart_info else 0.0
-        atk_buff = impart_info.impart_atk_per if impart_info else 0.0
-
-        # 计算属性
-        hp, mp = self.combat_mgr.calculate_hp_mp(player.experience, hp_buff, mp_buff)
-        base_atk = self.combat_mgr.calculate_atk(
-            player.experience, player.atkpractice, atk_buff
-        )
-
-        # 加上装备加成
-        equip_bonus = self._calculate_equipment_bonus(player)
-        final_atk = base_atk + equip_bonus["atk"]
-
-        # 更新Player对象（可选，为了持久化）
-        player.hp = hp
-        player.mp = mp
-        player.atk = final_atk
-        await self.db.update_player(player)
-
-        return CombatStats(
-            user_id=user_id,
-            name=player.user_name if player.user_name else f"道友{user_id}",
-            hp=hp,
-            max_hp=hp,
-            mp=mp,
-            max_mp=mp,
-            atk=final_atk,
-            defense=equip_bonus["defense"],
-            exp=player.experience,
-        )
-
-    async def handle_duel(self, event: AstrMessageEvent, target: str):
         """决斗 (消耗气血)"""
         user_id = event.get_sender_id()
         target_id = await self._get_target_id(event, target)
@@ -192,28 +136,26 @@ class CombatHandlers:
             return
 
         # 获取双方数据
-        p1_stats = await self._prepare_combat_stats(user_id)
-        p2_stats = await self._prepare_combat_stats(target_id)
+        p1 = await self._fetch_player(user_id)
+        p2 = await self._fetch_player(target_id)
 
-        if not p1_stats:
+        if not p1:
             yield event.plain_result("❌ 你还未踏入修仙之路")
             return
-        if not p2_stats:
+        if not p2:
             yield event.plain_result("❌ 对方还未踏入修仙之路")
             return
 
-        # 战斗
-        result = self.combat_mgr.player_vs_player(
-            p1_stats, p2_stats, combat_type=2
-        )  # 2=决斗
+        # TODO: impart buff mapping to new attribute system (design pending)
 
-        # 结算（更新HP）
-        await self.db.ext.update_player_hp_mp(
-            user_id, result["player1_final_hp"], result["player1_final_mp"]
-        )
-        await self.db.ext.update_player_hp_mp(
-            target_id, result["player2_final_hp"], result["player2_final_mp"]
-        )
+        # 战斗
+        result = self.combat_mgr.player_vs_player(p1, p2, combat_type=2)  # 2=决斗
+
+        # 结算（写入最终气血）
+        p1.hp = result["player1_final_hp"]
+        p2.hp = result["player2_final_hp"]
+        await self.db.update_player(p1)
+        await self.db.update_player(p2)
 
         # 更新冷却
         await self._update_combat_cooldown(user_id, "duel")
@@ -258,16 +200,22 @@ class CombatHandlers:
             yield event.plain_result(f"❌ 切磋冷却中，还需 {remaining} 秒")
             return
 
-        p1_stats = await self._prepare_combat_stats(user_id)
-        p2_stats = await self._prepare_combat_stats(target_id)
+        p1 = await self._fetch_player(user_id)
+        p2 = await self._fetch_player(target_id)
 
-        if not p1_stats or not p2_stats:
+        if not p1 or not p2:
             yield event.plain_result("❌ 双方都需要踏入修仙之路")
             return
 
-        result = self.combat_mgr.player_vs_player(
-            p1_stats, p2_stats, combat_type=1
-        )  # 1=切磋
+        # TODO: impart buff mapping to new attribute system (design pending)
+
+        result = self.combat_mgr.player_vs_player(p1, p2, combat_type=1)  # 1=切磋
+
+        # 写入最终气血（切磋原本不消耗，但统一引擎可能修正数值）
+        p1.hp = result["player1_final_hp"]
+        p2.hp = result["player2_final_hp"]
+        await self.db.update_player(p1)
+        await self.db.update_player(p2)
 
         # 更新冷却
         await self._update_combat_cooldown(user_id, "spar")

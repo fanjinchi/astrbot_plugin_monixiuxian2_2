@@ -140,7 +140,7 @@ class DatabaseExtended:
         """宗门捐献（增加灵石和建设度）"""
         await self.conn.execute(
             """
-            UPDATE sects SET 
+            UPDATE sects SET
                 sect_used_stone = sect_used_stone + ?,
                 sect_scale = sect_scale + ?
             WHERE sect_id = ?
@@ -446,9 +446,9 @@ class DatabaseExtended:
     # ===== Player扩展字段更新方法 =====
 
     async def update_player_hp_mp(self, user_id: str, hp: int, mp: int):
-        """更新玩家HP和MP"""
+        """更新玩家HP（MP字段已废弃，保留参数仅作兼容）。"""
         await self.conn.execute(
-            "UPDATE players SET hp = ?, mp = ? WHERE user_id = ?", (hp, mp, user_id)
+            "UPDATE players SET hp = ? WHERE user_id = ?", (hp, user_id)
         )
         await self.conn.commit()
 
@@ -527,7 +527,7 @@ class DatabaseExtended:
             """
             INSERT INTO bank_accounts (user_id, balance, last_interest_time)
             VALUES (?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET 
+            ON CONFLICT(user_id) DO UPDATE SET
                 balance = excluded.balance,
                 last_interest_time = excluded.last_interest_time
             """,
@@ -563,8 +563,8 @@ class DatabaseExtended:
         await self.conn.execute(
             """
             INSERT INTO bounty_tasks (
-                user_id, bounty_id, bounty_name, target_type, 
-                target_count, current_progress, rewards, 
+                user_id, bounty_id, bounty_name, target_type,
+                target_count, current_progress, rewards,
                 start_time, expire_time, status
             ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 1)
             """,
@@ -684,9 +684,9 @@ class DatabaseExtended:
         async with self.conn.execute(
             """
             SELECT id, receiver_id, sender_id, sender_name, item_name, count, created_at, expires_at
-            FROM pending_gifts 
+            FROM pending_gifts
             WHERE receiver_id = ? AND expires_at > ?
-            ORDER BY created_at DESC 
+            ORDER BY created_at DESC
             LIMIT 1
             """,
             (receiver_id, now),
@@ -714,7 +714,7 @@ class DatabaseExtended:
         async with self.conn.execute(
             """
             SELECT id, receiver_id, sender_id, sender_name, item_name, count, created_at, expires_at
-            FROM pending_gifts 
+            FROM pending_gifts
             WHERE receiver_id = ? AND expires_at > ?
             ORDER BY created_at DESC
             """,
