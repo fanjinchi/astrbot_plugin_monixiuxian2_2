@@ -56,7 +56,10 @@ class EquipmentHandler:
 
         # 功法列表
         techniques_list = player.get_techniques_list()
-        equipment_lines.append(f"【功法】({len(techniques_list)}/3)\n")
+        max_slots = 4
+        if self.skill_manager is not None:
+            max_slots = self.skill_manager._skill_cfg.get("max_technique_slots", 4)
+        equipment_lines.append(f"【功法】({len(techniques_list)}/{max_slots})\n")
         if techniques_list:
             for i, tech in enumerate(techniques_list, 1):
                 equipment_lines.append(f"  {i}. {tech}\n")
@@ -133,15 +136,34 @@ class EquipmentHandler:
             yield event.plain_result(f"【{item_name}】不是可装备的物品类型")
             return
 
-        # 功法类物品需要额外校验领悟状态和栏位
+        # 功法类物品改为设为修习目标（不消耗物品，不直接装备）
         if item_type == "technique" and self.skill_manager is not None:
-            owned_skill_ids = self._collect_owned_skill_ids(player, item_name)
-            can_equip, err_msg = self.skill_manager.can_equip_technique(
-                player, item_name, owned_skill_ids
-            )
-            if not can_equip:
-                yield event.plain_result(f"❌ {err_msg}")
+            skill_id = self.skill_manager._find_skill_id_by_name(item_name)
+            if not skill_id:
+                yield event.plain_result(f"未找到功法：{item_name}")
                 return
+
+            if not self.storage_ring_manager.has_item(player, item_name, 1):
+                yield event.plain_result(
+                    f"❌ 储物戒中没有【{item_name}】\n请先通过购买或获得该功法"
+                )
+                return
+
+            if await self.skill_manager._is_skill_learned(player, skill_id):
+                yield event.plain_result(
+                    f"❌ 功法【{item_name}】已领悟，请使用「激活功法」进行激活"
+                )
+                return
+
+            ok, msg = await self.skill_manager.set_study_target(
+                player, skill_id, [skill_id]
+            )
+            if ok:
+                await self.db.update_player(player)
+                yield event.plain_result(f"✅ {msg}")
+            else:
+                yield event.plain_result(f"❌ {msg}")
+            return
 
         # 检查储物戒中是否有该物品
         if not self.storage_ring_manager.has_item(player, item_name, 1):
@@ -249,10 +271,10 @@ class EquipmentHandler:
     def _collect_owned_skill_ids(
         self, player: Player, current_item_name: str
     ) -> list[str]:
-        """Collect skill IDs the player currently owns.
+        """Collect skill IDs the player currently owns from the storage ring.
 
-        Includes storage-ring items, learned skills, equipped techniques and
-        the item currently being equipped.
+        The old learned_skills field is no longer used; player_skills is queried
+        directly by SkillManager when needed.
         """
         owned_names = set(player.get_storage_ring_items().keys())
         owned_names.update(player.get_techniques_list())
@@ -264,11 +286,6 @@ class EquipmentHandler:
 
         for name in owned_names:
             skill_id = self.skill_manager._find_skill_id_by_name(name)
-            if skill_id:
-                owned_ids.add(skill_id)
-
-        for entry in player.get_learned_skills():
-            skill_id = entry.get("skill_id")
             if skill_id:
                 owned_ids.add(skill_id)
 

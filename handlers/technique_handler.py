@@ -16,6 +16,9 @@ CMD_SET_STUDY_TARGET = "修习目标"
 CMD_SHOW_STUDY_TARGET = "我的修习"
 CMD_CLEAR_STUDY_TARGET = "取消修习"
 CMD_SET_BATTLE_REPORT_COUNT = "战报条数"
+CMD_ACTIVATE_TECHNIQUE = "激活功法"
+CMD_DEACTIVATE_TECHNIQUE = "卸下功法"
+CMD_MY_SKILLS = "我的技能"
 
 __all__ = ["TechniqueHandler"]
 
@@ -92,7 +95,9 @@ class TechniqueHandler:
             )
             return
 
-        ok, msg = self.skill_manager.set_study_target(player, skill_id, owned_ids)
+        ok, msg = await self.skill_manager.set_study_target(
+            player, skill_id, owned_ids
+        )
         if ok:
             await self.db.update_player(player)
             yield event.plain_result(f"✅ {msg}")
@@ -143,3 +148,106 @@ class TechniqueHandler:
         player.battle_report_merge_count = value
         await self.db.update_player(player)
         yield event.plain_result(f"✅ 战报合并条数已设置为 {value}")
+
+    @player_required
+    async def handle_activate_technique(
+        self, player: Player, event: AstrMessageEvent, skill_name: str = ""
+    ):
+        """Activate a learned technique into the active technique slots."""
+        if not skill_name or not skill_name.strip():
+            yield event.plain_result(
+                f"请指定要激活的功法名称\n用法：{CMD_ACTIVATE_TECHNIQUE} 功法名"
+            )
+            return
+
+        skill_name = skill_name.strip()
+        skill_id = self.skill_manager._find_skill_id_by_name(skill_name)
+        if not skill_id:
+            yield event.plain_result(f"未找到功法【{skill_name}】")
+            return
+
+        if not await self.skill_manager._is_skill_learned(player, skill_id):
+            yield event.plain_result(
+                f"❌ 功法【{skill_name}】尚未领悟，无法激活\n"
+                f"💡 可先将功法物品设为修习目标进行领悟"
+            )
+            return
+
+        techniques = player.get_techniques_list()
+        if skill_name in techniques:
+            yield event.plain_result(f"❌ 功法【{skill_name}】已处于激活状态")
+            return
+
+        max_slots = self.skill_manager._skill_cfg.get("max_technique_slots", 4)
+        if len(techniques) >= max_slots:
+            yield event.plain_result(
+                f"❌ 功法激活栏已满（最多{max_slots}个），请先卸下其他功法"
+            )
+            return
+
+        techniques.append(skill_name)
+        player.set_techniques_list(techniques)
+        await self.db.update_player(player)
+        yield event.plain_result(
+            f"✅ 已激活功法【{skill_name}】（{len(techniques)}/{max_slots}）"
+        )
+
+    @player_required
+    async def handle_deactivate_technique(
+        self, player: Player, event: AstrMessageEvent, skill_name: str = ""
+    ):
+        """Remove a technique from the active technique slots."""
+        if not skill_name or not skill_name.strip():
+            yield event.plain_result(
+                f"请指定要卸下的功法名称\n用法：{CMD_DEACTIVATE_TECHNIQUE} 功法名"
+            )
+            return
+
+        skill_name = skill_name.strip()
+        techniques = player.get_techniques_list()
+        if skill_name not in techniques:
+            yield event.plain_result(f"❌ 功法【{skill_name}】未在激活列表中")
+            return
+
+        techniques.remove(skill_name)
+        player.set_techniques_list(techniques)
+        await self.db.update_player(player)
+        yield event.plain_result(f"✅ 已卸下功法【{skill_name}】")
+
+    @player_required
+    async def handle_my_skills(self, player: Player, event: AstrMessageEvent):
+        """Display the player's learned skills and active techniques."""
+        max_slots = self.skill_manager._skill_cfg.get("max_technique_slots", 4)
+        active = player.get_techniques_list()
+        learned = await self.db.ext.get_learned_skills(player.user_id)
+        study_info = self.skill_manager.get_study_target_info(player)
+
+        lines = ["📜 我的功法", "━━━━━━━━━━━━━━━"]
+        lines.append(f"【已激活】{len(active)}/{max_slots}")
+        if active:
+            for name in active:
+                lines.append(f"  • {name}")
+        else:
+            lines.append("  暂无激活功法")
+
+        lines.append("")
+        lines.append(f"【已领悟】{len(learned)}个")
+        if learned:
+            for entry in learned:
+                skill_id = entry.get("skill_id", "")
+                star = entry.get("star_level", 1)
+                source = entry.get("source", "")
+                name = self.skill_manager._get_skill_name(skill_id)
+                source_display = source if source else "未知"
+                lines.append(f"  • {name} | 星级：{star} | 来源：{source_display}")
+        else:
+            lines.append("  暂无已领悟功法")
+
+        lines.append("")
+        if study_info.get("has_target"):
+            lines.append(f"【修习目标】{study_info.get('name', '未知')}")
+        else:
+            lines.append("【修习目标】无")
+
+        lines.append("━━━━━━━━━━━━━━━")
+        yield event.plain_result("\n".join(lines))

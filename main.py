@@ -107,6 +107,9 @@ CMD_SET_STUDY_TARGET = "修习目标"
 CMD_SHOW_STUDY_TARGET = "我的修习"
 CMD_CLEAR_STUDY_TARGET = "取消修习"
 CMD_SET_BATTLE_REPORT_COUNT = "战报条数"
+CMD_ACTIVATE_TECHNIQUE = "激活功法"
+CMD_DEACTIVATE_TECHNIQUE = "卸下功法"
+CMD_MY_SKILLS = "我的技能"
 
 # 宗门系统指令
 CMD_CREATE_SECT = "创建宗门"
@@ -848,6 +851,32 @@ class XiuXianPlugin(Star):
         async for r in self.technique_handler.handle_set_battle_report_count(
             event, count
         ):
+            yield r
+
+    @filter.command(CMD_ACTIVATE_TECHNIQUE, "激活已领悟的功法")
+    @require_whitelist
+    async def handle_activate_technique(
+        self, event: AstrMessageEvent, skill_name: str = ""
+    ):
+        async for r in self.technique_handler.handle_activate_technique(
+            event, skill_name
+        ):
+            yield r
+
+    @filter.command(CMD_DEACTIVATE_TECHNIQUE, "卸下已激活的功法")
+    @require_whitelist
+    async def handle_deactivate_technique(
+        self, event: AstrMessageEvent, skill_name: str = ""
+    ):
+        async for r in self.technique_handler.handle_deactivate_technique(
+            event, skill_name
+        ):
+            yield r
+
+    @filter.command(CMD_MY_SKILLS, "查看我的功法")
+    @require_whitelist
+    async def handle_my_skills(self, event: AstrMessageEvent):
+        async for r in self.technique_handler.handle_my_skills(event):
             yield r
 
     @filter.command(CMD_USE_PILL, "服用丹药")
