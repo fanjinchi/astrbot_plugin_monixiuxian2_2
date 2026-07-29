@@ -2,12 +2,10 @@
 
 import random
 import time
-import json
-from typing import List, Dict, Optional, Tuple
 
 from astrbot.api import AstrBotConfig, logger
+
 from ..config_manager import ConfigManager
-from ..models import Item
 
 
 class ShopManager:
@@ -34,7 +32,7 @@ class ShopManager:
             return "未知境界"
         return " / ".join(names)
 
-    def _get_all_shop_items(self) -> List[Dict]:
+    def _get_all_shop_items(self) -> list[dict]:
         """获取所有可以在商店出售的物品"""
         all_items = []
 
@@ -115,7 +113,7 @@ class ShopManager:
 
         return all_items
 
-    def _weighted_random_choice(self, items: List[Dict], count: int) -> List[Dict]:
+    def _weighted_random_choice(self, items: list[dict], count: int) -> list[dict]:
         """基于权重的随机选择（不重复）"""
         if len(items) <= count:
             return items.copy()
@@ -168,7 +166,7 @@ class ShopManager:
 
         return stock
 
-    def ensure_items_have_stock(self, shop_items: List[Dict]) -> bool:
+    def ensure_items_have_stock(self, shop_items: list[dict]) -> bool:
         """确保已有商店物品列表包含库存字段（用于兼容旧数据）
 
         Args:
@@ -192,7 +190,7 @@ class ShopManager:
                 updated = True
         return updated
 
-    def generate_shop_items(self, count: int) -> List[Dict]:
+    def generate_shop_items(self, count: int) -> list[dict]:
         """生成商店物品列表
 
         Args:
@@ -249,7 +247,7 @@ class ShopManager:
             return False
         return (int(time.time()) - last_refresh_time) >= (refresh_hours * 3600)
 
-    def generate_pavilion_items(self, item_getter, count: int) -> List[Dict]:
+    def generate_pavilion_items(self, item_getter, count: int) -> list[dict]:
         """生成阁楼物品列表（带库存和折扣）"""
         base_items = item_getter(count * 2)  # 获取更多以便随机选择
         selected = self._weighted_random_choice(
@@ -279,7 +277,7 @@ class ShopManager:
             )
         return result
 
-    def get_pills_for_display(self, count: int) -> List[Dict]:
+    def get_pills_for_display(self, count: int) -> list[dict]:
         """获取丹药列表用于丹阁展示"""
         all_pills = []
         for pill in self.config_manager.pills_data.values():
@@ -317,7 +315,7 @@ class ShopManager:
                 )
         return all_pills
 
-    def get_weapons_for_display(self, count: int) -> List[Dict]:
+    def get_weapons_for_display(self, count: int) -> list[dict]:
         """获取武器列表用于器阁展示"""
         all_weapons = []
         for weapon in self.config_manager.weapons_data.values():
@@ -333,7 +331,7 @@ class ShopManager:
                 )
         return all_weapons
 
-    def get_all_items_for_display(self, count: int) -> List[Dict]:
+    def get_all_items_for_display(self, count: int) -> list[dict]:
         """获取所有物品用于百宝阁展示"""
         all_items = []
         for weapon in self.config_manager.weapons_data.values():
@@ -433,7 +431,7 @@ class ShopManager:
         # 其他类型保持不变
         return original_type
 
-    def find_item_by_name(self, name: str) -> Optional[Dict]:
+    def find_item_by_name(self, name: str) -> dict | None:
         """根据名称查找物品"""
         for weapon in self.config_manager.weapons_data.values():
             if weapon["name"] == name and weapon.get("price", 0) > 0:
@@ -487,7 +485,7 @@ class ShopManager:
     def format_pavilion_display(
         self,
         pavilion_name: str,
-        items: List[Dict],
+        items: list[dict],
         refresh_hours: int = 6,
         last_refresh: int = 0,
     ) -> str:
@@ -535,10 +533,10 @@ class ShopManager:
                 lines.append(
                     f"\n下次刷新: {remaining // 3600}小时{(remaining % 3600) // 60}分钟后"
                 )
-        lines.append(f"\n提示: 使用 '购买 [物品名]' 购买物品")
+        lines.append("\n提示: 使用 '购买 [物品名]' 购买物品")
         return "".join(lines)
 
-    def _get_item_effect_short(self, item: Dict) -> str:
+    def _get_item_effect_short(self, item: dict) -> str:
         """获取物品效果的简短描述"""
         data = item.get("data", {})
         item_type = item.get("type", "")
@@ -604,7 +602,7 @@ class ShopManager:
 
         return ", ".join(effects[:3]) if effects else ""
 
-    def get_item_details(self, item_data: Dict) -> str:
+    def get_item_details(self, item_data: dict) -> str:
         """获取物品详细信息
 
         Args:

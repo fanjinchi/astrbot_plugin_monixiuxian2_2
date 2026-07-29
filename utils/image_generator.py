@@ -1,7 +1,6 @@
 import asyncio
 from io import BytesIO
 from pathlib import Path
-from typing import Optional, Dict
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -37,8 +36,8 @@ class ImageGenerator:
         return ImageFont.truetype(str(FONT_PATH), size)
 
     async def generate_user_info_card(
-        self, user_id: str, detail_map: Dict
-    ) -> Optional[BytesIO]:
+        self, user_id: str, detail_map: dict
+    ) -> BytesIO | None:
         """
         生成用户信息卡片
 
@@ -65,7 +64,7 @@ class ImageGenerator:
             logger.error(f"生成图片失败: {e}")
             return None
 
-    def _draw_info_card_sync(self, user_id: str, detail_map: Dict) -> BytesIO:
+    def _draw_info_card_sync(self, user_id: str, detail_map: dict) -> BytesIO:
         # 画布基础尺寸
         width = 1100
         height = 2250

@@ -1,8 +1,8 @@
 # core/cultivation_manager.py
 import random
-from typing import Dict, Optional
 
 from astrbot.api import AstrBotConfig, logger
+
 from ..config_manager import ConfigManager
 from ..models import Player
 
@@ -111,7 +111,7 @@ class CultivationManager:
 
     def _calculate_base_stats(
         self, level_index: int, cultivation_type: str = "灵修"
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """从境界配置中读取基础属性
 
         Args:
@@ -393,7 +393,7 @@ class CultivationManager:
         player: Player,
         minutes: int,
         technique_bonus: float = 0.0,
-        pill_multipliers: Optional[Dict[str, float]] = None,
+        pill_multipliers: dict[str, float] | None = None,
     ) -> int:
         """计算闭关修炼获得的修为
 

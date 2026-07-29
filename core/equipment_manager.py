@@ -1,8 +1,9 @@
 # core/equipment_manager.py
 
-from typing import Optional, List, Dict, TYPE_CHECKING
-from ..models import Player, Item
+from typing import TYPE_CHECKING
+
 from ..data import DataBase
+from ..models import Item, Player
 
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
@@ -24,7 +25,7 @@ class EquipmentManager:
 
     def parse_item_from_name(
         self, item_name: str, items_data: dict, weapons_data: dict = None
-    ) -> Optional[Item]:
+    ) -> Item | None:
         """从物品名称解析为Item对象
 
         Args:
@@ -103,7 +104,7 @@ class EquipmentManager:
 
     def get_equipped_items(
         self, player: Player, items_data: dict, weapons_data: dict = None
-    ) -> List[Item]:
+    ) -> list[Item]:
         """获取玩家所有已装备的物品
 
         Args:
@@ -256,7 +257,7 @@ class EquipmentManager:
 
             # 检查功法栏是否已满（最多3个）
             if len(techniques_list) >= 3:
-                return False, f"功法栏已满（最多3个），请先卸下其他功法"
+                return False, "功法栏已满（最多3个），请先卸下其他功法"
 
             # 添加功法
             techniques_list.append(item.name)

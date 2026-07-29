@@ -1,12 +1,12 @@
 # core/breakthrough_manager.py
 
 import random
-from typing import Optional, Tuple
+
 from astrbot.api import logger
 
-from ..models import Player
-from ..data import DataBase
 from ..config_manager import ConfigManager
+from ..data import DataBase
+from ..models import Player
 
 
 class BreakthroughManager:
@@ -17,7 +17,7 @@ class BreakthroughManager:
         self.config_manager = config_manager
         self.config = config
 
-    def check_breakthrough_requirements(self, player: Player) -> Tuple[bool, str]:
+    def check_breakthrough_requirements(self, player: Player) -> tuple[bool, str]:
         """检查玩家是否满足突破条件
 
         Args:
@@ -52,8 +52,8 @@ class BreakthroughManager:
         return True, ""
 
     def calculate_breakthrough_success_rate(
-        self, player: Player, pill_name: Optional[str] = None, temp_bonus: float = 0.0
-    ) -> Tuple[float, str]:
+        self, player: Player, pill_name: str | None = None, temp_bonus: float = 0.0
+    ) -> tuple[float, str]:
         """计算突破成功率
 
         Args:
@@ -105,10 +105,10 @@ class BreakthroughManager:
     async def execute_breakthrough(
         self,
         player: Player,
-        pill_name: Optional[str] = None,
+        pill_name: str | None = None,
         temp_bonus: float = 0.0,
         death_rate_multiplier: float = 1.0,
-    ) -> Tuple[bool, str, bool]:
+    ) -> tuple[bool, str, bool]:
         """执行突破
 
         Args:

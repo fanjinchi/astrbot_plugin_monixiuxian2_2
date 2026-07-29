@@ -1,12 +1,12 @@
 # core/pill_manager.py
 
 import time
-from typing import Dict, List, Optional, Tuple
+
 from astrbot.api import logger
 
-from ..models import Player
-from ..data import DataBase
 from ..config_manager import ConfigManager
+from ..data import DataBase
+from ..models import Player
 
 
 class PillManager:
@@ -42,7 +42,7 @@ class PillManager:
         if player.blood_qi > player.max_blood_qi:
             player.blood_qi = player.max_blood_qi
 
-    def get_pill_by_name(self, pill_name: str) -> Optional[dict]:
+    def get_pill_by_name(self, pill_name: str) -> dict | None:
         """根据名称获取丹药配置
 
         Args:
@@ -96,7 +96,7 @@ class PillManager:
             player.set_active_pill_effects(updated_effects)
             await self.db.update_player(player)
 
-    async def use_pill(self, player: Player, pill_name: str) -> Tuple[bool, str]:
+    async def use_pill(self, player: Player, pill_name: str) -> tuple[bool, str]:
         """使用丹药
 
         Args:
@@ -150,7 +150,7 @@ class PillManager:
 
     async def _use_exp_pill(
         self, player: Player, pill_name: str, pill_data: dict
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """使用修为丹"""
         exp_gain = pill_data.get("exp_gain", 0)
         player.experience += exp_gain
@@ -174,7 +174,7 @@ class PillManager:
 
     async def _use_resurrection_pill(
         self, player: Player, pill_name: str, pill_data: dict
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """使用回生丹"""
         if player.has_resurrection_pill:
             return False, "你已经拥有回生丹效果，无需重复使用！"
@@ -201,7 +201,7 @@ class PillManager:
 
     async def _use_temporary_pill(
         self, player: Player, pill_name: str, pill_data: dict
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """使用临时效果丹药"""
         duration_minutes = pill_data.get("duration_minutes", 60)
         current_time = int(time.time())
@@ -326,7 +326,7 @@ class PillManager:
 
     async def _use_permanent_pill(
         self, player: Player, pill_name: str, pill_data: dict
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """使用永久属性丹药"""
         # 检查境界限制（30%上限）
         permanent_gains = player.get_permanent_pill_gains()
@@ -453,7 +453,7 @@ class PillManager:
 
     async def _use_instant_pill(
         self, player: Player, pill_name: str, pill_data: dict
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """使用瞬间效果丹药"""
         msg_parts = [f"✨ 服用【{pill_name}】成功！", "━━━━━━━━━━━━━━━"]
 

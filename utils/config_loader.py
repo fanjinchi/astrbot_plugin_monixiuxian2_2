@@ -1,7 +1,7 @@
 # utils/config_loader.py
 import json
 import os
-from typing import Dict, Any
+from typing import Any
 
 
 class ConfigLoader:
@@ -13,8 +13,8 @@ class ConfigLoader:
             os.makedirs(config_dir)
 
     def load_config(
-        self, filename: str, default_config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, filename: str, default_config: dict[str, Any]
+    ) -> dict[str, Any]:
         """加载配置，所谓文件不存在则创建默认配置"""
         file_path = os.path.join(self.config_dir, filename)
 
@@ -24,7 +24,7 @@ class ConfigLoader:
             return default_config
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             print(f"Error loading config {filename}: {e}")

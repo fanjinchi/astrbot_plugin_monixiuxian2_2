@@ -1,11 +1,12 @@
 # core/storage_ring_manager.py
 
-from typing import TYPE_CHECKING, Optional, Tuple, List, Dict
+from typing import TYPE_CHECKING
+
 from ..models import Player
 
 if TYPE_CHECKING:
-    from ..data import DataBase
     from ..config_manager import ConfigManager
+    from ..data import DataBase
 
 
 class StorageRingManager:
@@ -18,7 +19,7 @@ class StorageRingManager:
         self.db = db
         self.config_manager = config_manager
 
-    def get_storage_ring_config(self, ring_name: str) -> Optional[dict]:
+    def get_storage_ring_config(self, ring_name: str) -> dict | None:
         """获取储物戒配置"""
         return self.config_manager.storage_rings_data.get(ring_name)
 
@@ -40,7 +41,7 @@ class StorageRingManager:
         used = self.get_used_slots(player)
         return capacity - used
 
-    def get_space_warning(self, player: Player) -> Optional[str]:
+    def get_space_warning(self, player: Player) -> str | None:
         """获取储物戒空间警告（已满或剩余2格以下）
 
         Returns:
@@ -60,7 +61,7 @@ class StorageRingManager:
         """检查物品是否为丹药类型"""
         return self.config_manager.is_pill(item_name)
 
-    def can_store_item(self, item_name: str) -> Tuple[bool, str]:
+    def can_store_item(self, item_name: str) -> tuple[bool, str]:
         """检查物品是否可以存入储物戒"""
         # 丹药不能存入储物戒
         if self.is_pill(item_name):
@@ -79,7 +80,7 @@ class StorageRingManager:
         count: int = 1,
         silent: bool = False,
         external_transaction: bool = False,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """将物品存入储物戒（带事务保护）
 
         Args:
@@ -133,7 +134,7 @@ class StorageRingManager:
 
     async def retrieve_item(
         self, player: Player, item_name: str, count: int = 1
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """从储物戒取出物品（带事务保护）"""
         await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
@@ -170,7 +171,7 @@ class StorageRingManager:
 
     async def discard_item(
         self, player: Player, item_name: str, count: int = 1
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """丢弃储物戒中的物品（带事务保护）"""
         await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
@@ -209,7 +210,7 @@ class StorageRingManager:
 
     def check_upgrade_requirement(
         self, player: Player, new_ring_name: str
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """检查玩家是否满足储物戒升级要求"""
         # 检查是否为储物戒类型
         ring_config = self.get_storage_ring_config(new_ring_name)
@@ -259,7 +260,7 @@ class StorageRingManager:
 
     async def upgrade_ring(
         self, player: Player, new_ring_name: str
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """升级/替换储物戒"""
         can_upgrade, error_msg = self.check_upgrade_requirement(player, new_ring_name)
         if not can_upgrade:
@@ -308,7 +309,7 @@ class StorageRingManager:
             "items": items,
         }
 
-    def get_all_storage_rings(self) -> List[dict]:
+    def get_all_storage_rings(self) -> list[dict]:
         """获取所有可用的储物戒列表"""
         rings = []
         for name, config in self.config_manager.storage_rings_data.items():
