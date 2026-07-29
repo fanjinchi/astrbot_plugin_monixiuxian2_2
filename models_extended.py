@@ -56,7 +56,7 @@ class Sect:
                 if isinstance(self.mainbuff, str)
                 else [self.mainbuff]
             )
-        except:
+        except Exception:
             return []
 
     def set_mainbuff_list(self, buff_list: list[int]):
@@ -73,7 +73,7 @@ class Sect:
                 if isinstance(self.secbuff, str)
                 else [self.secbuff]
             )
-        except:
+        except Exception:
             return []
 
     def set_secbuff_list(self, buff_list: list[int]):
@@ -127,7 +127,7 @@ class Rift:
         """获取奖励字典"""
         try:
             return json.loads(self.rewards)
-        except:
+        except Exception:
             return {}
 
     def set_rewards(self, rewards_dict: dict):
@@ -162,7 +162,7 @@ class UserCd:
         """获取额外数据字典"""
         try:
             return json.loads(self.extra_data)
-        except:
+        except Exception:
             return {}
 
     def set_extra_data(self, data: dict):

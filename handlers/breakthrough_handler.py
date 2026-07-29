@@ -147,7 +147,7 @@ class BreakthroughHandler:
         self, player: Player, event: AstrMessageEvent, pill_name: str = None
     ):
         """执行突破"""
-        display_name = event.get_sender_name()
+        event.get_sender_name()
 
         await self.pill_manager.update_temporary_effects(player)
         modifiers = self.pill_manager.get_breakthrough_modifiers(player)

@@ -100,7 +100,7 @@ class BlessedLandManager:
         # 创建洞天
         await self.db.conn.execute(
             """
-            INSERT INTO blessed_lands (user_id, land_type, land_name, level, exp_bonus, 
+            INSERT INTO blessed_lands (user_id, land_type, land_name, level, exp_bonus,
                                        gold_per_hour, last_collect_time)
             VALUES (?, ?, ?, 1, ?, ?, ?)
             """,

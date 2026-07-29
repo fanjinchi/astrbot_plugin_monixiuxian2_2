@@ -81,7 +81,7 @@ class ImageGenerator:
         font_40 = self._get_font(40)
         color_text = (242, 250, 242)
 
-        draw = ImageDraw.Draw(img)
+        ImageDraw.Draw(img)
 
         # 简单绘制逻辑 (复刻原版布局)
 
@@ -150,7 +150,7 @@ class ImageGenerator:
                 # Pillow 9.2+ using textbbox or textlength, older using textsize
                 # simple centered logic
                 d.text((70, 15), text, fill=color, font=font)
-            except:
+            except Exception:
                 d.text((70, 15), text, fill=color, font=font)
             img.paste(line, (x, y), line)
         else:

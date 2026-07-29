@@ -214,7 +214,11 @@ class EnemyManager:
         return random.randint(low, high)
 
     def _get_level_base(self, level_index: int, key: str) -> int:
-        """从等级配置中读取指定基础属性，缺失时返回合理默认值。"""
+        """从等级配置数组中按索引读取基础属性。
+
+        ``level_index`` 是 ``level_config`` 数组下标，与 ``level`` 字段解耦，
+        避免 ``level`` 字段从 1 开始计数时产生的 1 位偏移。
+        """
         if 0 <= level_index < len(self.level_config):
             return self.level_config[level_index].get(key, 0)
         return 0
