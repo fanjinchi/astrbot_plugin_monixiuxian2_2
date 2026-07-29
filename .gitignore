@@ -16,6 +16,7 @@ uv.lock
 # Subagent / tooling output
 .opencode/
 .pi/prompts/
+.pi-subagents/
 subagent-*.md
 worker_*_summary.md
 
