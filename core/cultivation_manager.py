@@ -121,67 +121,6 @@ class CultivationManager:
             "DIVINE_BODY": ["先天道体", "神圣体质"],
         }
 
-    def _calculate_base_stats(
-        self, level_index: int, cultivation_type: str = "灵修"
-    ) -> dict[str, int]:
-        """从境界配置中读取基础属性
-
-        Args:
-            level_index: 境界索引
-            cultivation_type: 修炼类型，"灵修"或"体修"
-
-        Returns:
-            基础属性字典
-        """
-        level_data = self.config_manager.get_level_data(cultivation_type)
-        if 0 <= level_index < len(level_data):
-            level_config = level_data[level_index]
-            base_lifespan = level_config.get("base_lifespan", 100 + level_index * 50)
-            base_max_spiritual_qi = level_config.get(
-                "base_max_spiritual_qi", 50 + level_index * 20
-            )
-            base_max_blood_qi = level_config.get(
-                "base_max_blood_qi", 50 + level_index * 20
-            )
-            base_mental_power = level_config.get(
-                "base_mental_power", 50 + level_index * 20
-            )
-            base_physical_damage = level_config.get(
-                "base_physical_damage", 10 + level_index * 8
-            )
-            base_magic_damage = level_config.get(
-                "base_magic_damage", 10 + level_index * 8
-            )
-            base_physical_defense = level_config.get(
-                "base_physical_defense", 5 + level_index * 4
-            )
-            base_magic_defense = level_config.get(
-                "base_magic_defense", 5 + level_index * 4
-            )
-
-            return {
-                "lifespan": base_lifespan,
-                "max_spiritual_qi": base_max_spiritual_qi,
-                "max_blood_qi": base_max_blood_qi,
-                "mental_power": base_mental_power,
-                "physical_damage": base_physical_damage,
-                "magic_damage": base_magic_damage,
-                "physical_defense": base_physical_defense,
-                "magic_defense": base_magic_defense,
-            }
-        else:
-            # 回退逻辑，使用默认计算
-            return {
-                "lifespan": 100 + level_index * 50,
-                "max_spiritual_qi": 50 + level_index * 20,
-                "max_blood_qi": 50 + level_index * 20,
-                "mental_power": 50 + level_index * 20,
-                "physical_damage": 10 + level_index * 8,
-                "magic_damage": 10 + level_index * 8,
-                "physical_defense": 5 + level_index * 4,
-                "magic_defense": 5 + level_index * 4,
-            }
-
     def _get_random_spiritual_root(self) -> str:
         """基于权重随机抽取灵根"""
         weights_config = self.config.get("SPIRIT_ROOT_WEIGHTS", {})

@@ -536,6 +536,52 @@ class ShopManager:
         lines.append("\n提示: 使用 '购买 [物品名]' 购买物品")
         return "".join(lines)
 
+    def _normalize_equipment_attributes(self, data: dict) -> dict[str, int]:
+        """Normalize equipment config fields to the new four-main-attribute framework.
+
+        Reads new fields first; falls back to legacy five-dimension fields and
+        legacy ``equip_effects`` (attack/defense) for backward compatibility.
+
+        Args:
+            data: Item configuration dictionary.
+
+        Returns:
+            Dict with damage, agility, speed, hp and armor_value.
+        """
+        damage = data.get("damage", 0)
+        agility = data.get("agility", 0)
+        speed = data.get("speed", 0)
+        hp = data.get("hp", 0)
+        armor_value = data.get("armor_value", 0)
+
+        # Legacy five-dimension fallback
+        physical_damage = data.get("physical_damage", 0)
+        magic_damage = data.get("magic_damage", 0)
+        physical_defense = data.get("physical_defense", 0)
+        magic_defense = data.get("magic_defense", 0)
+        if physical_damage or magic_damage:
+            damage = max(damage, physical_damage + magic_damage)
+        if physical_defense or magic_defense:
+            armor_value = max(armor_value, physical_defense + magic_defense)
+
+        # Legacy equip_effects fallback (items.json 法器)
+        equip_effects = data.get("equip_effects", {})
+        if isinstance(equip_effects, dict):
+            attack = equip_effects.get("attack", 0)
+            defense = equip_effects.get("defense", 0)
+            if attack:
+                damage = max(damage, attack)
+            if defense:
+                armor_value = max(armor_value, defense)
+
+        return {
+            "damage": damage,
+            "agility": agility,
+            "speed": speed,
+            "hp": hp,
+            "armor_value": armor_value,
+        }
+
     def _get_item_effect_short(self, item: dict) -> str:
         """获取物品效果的简短描述"""
         data = item.get("data", {})
@@ -544,25 +590,34 @@ class ShopManager:
 
         # 武器/装备属性
         if item_type in ["weapon", "armor", "accessory"]:
-            if data.get("physical_damage", 0) > 0:
-                effects.append(f"物伤+{data['physical_damage']}")
-            if data.get("magic_damage", 0) > 0:
-                effects.append(f"法伤+{data['magic_damage']}")
-            if data.get("physical_defense", 0) > 0:
-                effects.append(f"物防+{data['physical_defense']}")
-            if data.get("magic_defense", 0) > 0:
-                effects.append(f"法防+{data['magic_defense']}")
-            if data.get("mental_power", 0) > 0:
-                effects.append(f"精神力+{data['mental_power']}")
+            attrs = self._normalize_equipment_attributes(data)
+            if attrs["damage"] > 0:
+                effects.append(f"伤害+{attrs['damage']}")
+            if attrs["agility"] > 0:
+                effects.append(f"身法+{attrs['agility']}")
+            if attrs["speed"] > 0:
+                effects.append(f"迅捷+{attrs['speed']}")
+            if attrs["hp"] > 0:
+                effects.append(f"气血+{attrs['hp']}")
+            if attrs["armor_value"] > 0:
+                effects.append(f"护甲+{attrs['armor_value']}")
+            if item_type == "weapon":
+                if data.get("weapon_coefficient_k", 1.0) != 1.0:
+                    effects.append(f"武器系数K×{data['weapon_coefficient_k']}")
+                if data.get("base_damage", 0) > 0:
+                    effects.append(f"基础伤害+{data['base_damage']}")
+            trigger_skills = data.get("trigger_skills", [])
+            if trigger_skills:
+                names = [
+                    ts["name"] if isinstance(ts, dict) else str(ts)
+                    for ts in trigger_skills
+                ]
+                effects.append(f"触发技:{','.join(names)}")
 
         # 功法属性
         elif item_type in ["main_technique", "technique", "功法"]:
             if data.get("exp_multiplier", 0) > 0:
                 effects.append(f"修炼效率+{int(data['exp_multiplier'] * 100)}%")
-            if data.get("physical_damage", 0) > 0:
-                effects.append(f"物伤+{data['physical_damage']}")
-            if data.get("magic_damage", 0) > 0:
-                effects.append(f"法伤+{data['magic_damage']}")
 
         # 丹药效果
         elif item_type in ["pill", "exp_pill", "utility_pill", "legacy_pill"]:
@@ -576,9 +631,9 @@ class ShopManager:
                 if effect_data.get("add_max_hp", 0) > 0:
                     effects.append(f"气血上限+{effect_data['add_max_hp']}")
                 if effect_data.get("add_attack", 0) > 0:
-                    effects.append(f"攻击+{effect_data['add_attack']}")
+                    effects.append(f"伤害+{effect_data['add_attack']}")
                 if effect_data.get("add_defense", 0) > 0:
-                    effects.append(f"防御+{effect_data['add_defense']}")
+                    effects.append(f"护甲+{effect_data['add_defense']}")
 
             # 破境丹特殊处理
             if data.get("subtype") == "breakthrough":
@@ -625,16 +680,29 @@ class ShopManager:
         # 武器/防具/饰品属性
         if item_type in ["weapon", "armor", "accessory"]:
             attrs = []
-            if data.get("magic_damage", 0) > 0:
-                attrs.append(f"法伤+{data['magic_damage']}")
-            if data.get("physical_damage", 0) > 0:
-                attrs.append(f"物伤+{data['physical_damage']}")
-            if data.get("magic_defense", 0) > 0:
-                attrs.append(f"法防+{data['magic_defense']}")
-            if data.get("physical_defense", 0) > 0:
-                attrs.append(f"物防+{data['physical_defense']}")
-            if data.get("mental_power", 0) > 0:
-                attrs.append(f"精神力+{data['mental_power']}")
+            eq_attrs = self._normalize_equipment_attributes(data)
+            if eq_attrs["damage"] > 0:
+                attrs.append(f"伤害+{eq_attrs['damage']}")
+            if eq_attrs["agility"] > 0:
+                attrs.append(f"身法+{eq_attrs['agility']}")
+            if eq_attrs["speed"] > 0:
+                attrs.append(f"迅捷+{eq_attrs['speed']}")
+            if eq_attrs["hp"] > 0:
+                attrs.append(f"气血+{eq_attrs['hp']}")
+            if eq_attrs["armor_value"] > 0:
+                attrs.append(f"护甲+{eq_attrs['armor_value']}")
+            if item_type == "weapon":
+                if data.get("weapon_coefficient_k", 1.0) != 1.0:
+                    attrs.append(f"武器系数K×{data['weapon_coefficient_k']}")
+                if data.get("base_damage", 0) > 0:
+                    attrs.append(f"基础伤害+{data['base_damage']}")
+            trigger_skills = data.get("trigger_skills", [])
+            if trigger_skills:
+                names = [
+                    ts["name"] if isinstance(ts, dict) else str(ts)
+                    for ts in trigger_skills
+                ]
+                attrs.append(f"触发技:{','.join(names)}")
             if attrs:
                 details.append(f"属性: {', '.join(attrs)}")
             if "required_level_index" in data:
@@ -646,18 +714,6 @@ class ShopManager:
             attrs = []
             if data.get("exp_multiplier", 0) > 0:
                 attrs.append(f"修炼效率+{data['exp_multiplier']:.1%}")
-            if data.get("spiritual_qi", 0) > 0:
-                attrs.append(f"灵气+{data['spiritual_qi']}")
-            if data.get("magic_damage", 0) > 0:
-                attrs.append(f"法伤+{data['magic_damage']}")
-            if data.get("physical_damage", 0) > 0:
-                attrs.append(f"物伤+{data['physical_damage']}")
-            if data.get("magic_defense", 0) > 0:
-                attrs.append(f"法防+{data['magic_defense']}")
-            if data.get("physical_defense", 0) > 0:
-                attrs.append(f"物防+{data['physical_defense']}")
-            if data.get("mental_power", 0) > 0:
-                attrs.append(f"精神力+{data['mental_power']}")
             if attrs:
                 details.append(f"效果: {', '.join(attrs)}")
             if "required_level_index" in data:
@@ -701,16 +757,16 @@ class ShopManager:
                         )
                     if data.get("physical_damage_multiplier"):
                         effect_desc.append(
-                            f"物伤倍率+{data['physical_damage_multiplier']:.0%}"
+                            f"伤害倍率+{data['physical_damage_multiplier']:.0%}"
                         )
                 elif effect_type == "permanent":
                     gains = []
                     for attr_key, label in [
-                        ("physical_damage_gain", "物伤"),
-                        ("magic_damage_gain", "法伤"),
-                        ("physical_defense_gain", "物防"),
-                        ("magic_defense_gain", "法防"),
-                        ("mental_power_gain", "精神力"),
+                        ("physical_damage_gain", "伤害"),
+                        ("magic_damage_gain", "伤害"),
+                        ("physical_defense_gain", "护甲"),
+                        ("magic_defense_gain", "护甲"),
+                        ("mental_power_gain", "身法"),
                     ]:
                         value = data.get(attr_key)
                         if value:
@@ -733,10 +789,10 @@ class ShopManager:
                     ("add_hp", "恢复气血"),
                     ("add_experience", "增加修为"),
                     ("add_max_hp", "提升上限"),
-                    ("add_attack", "物伤变化"),
-                    ("add_defense", "物防变化"),
-                    ("add_spiritual_power", "法伤变化"),
-                    ("add_mental_power", "精神力变化"),
+                    ("add_attack", "伤害变化"),
+                    ("add_defense", "护甲变化"),
+                    ("add_spiritual_power", "伤害变化"),
+                    ("add_mental_power", "身法变化"),
                     ("add_gold", "灵石变化"),
                 ]:
                     value = effect_data.get(key)
