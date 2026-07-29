@@ -12,7 +12,7 @@ from astrbot.api import logger
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 22  # v22: 四主属性重构，废弃旧五维/精神力/MP
+LATEST_DB_VERSION = 23  # v23: 新增战报合并条数偏好字段
 
 MIGRATION_TASKS: dict[
     int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]
@@ -822,6 +822,7 @@ async def _create_all_tables_v22(conn: aiosqlite.Connection):
 
             learned_skills TEXT NOT NULL DEFAULT '[]',
             study_target TEXT NOT NULL DEFAULT '',
+            battle_report_merge_count INTEGER NOT NULL DEFAULT 0,
 
             sect_id INTEGER NOT NULL DEFAULT 0,
             sect_position INTEGER NOT NULL DEFAULT 4,

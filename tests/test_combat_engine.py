@@ -230,6 +230,86 @@ class TestResolutionChain:
         rate = engine._calc_dodge_rate(f1, f2, cap=0.5)
         assert rate <= 0.5
 
+    def test_block_reduces_damage(self):
+        """Block should halve the incoming damage."""
+        engine = make_engine()
+        f1 = make_fighter("A", 100, 100, 5, 10, base_dmg=100)
+        f2_no_block = make_fighter("B", 1000, 10, 5, 10, armor=0)
+        f2_block = make_fighter("B", 1000, 10, 5, 10, armor=0)
+
+        import random as _random
+
+        original_random = _random.random
+        original_uniform = _random.uniform
+
+        # Force no dodge, no block, no crit, flat damage roll
+        _random.random = lambda: 0.9
+        _random.uniform = lambda a, b: 1.0
+        try:
+            engine._resolve_attack(
+                f1, f2_no_block, dodge_cap=0.5, crit_multiplier=1.5, log=[]
+            )
+        finally:
+            _random.random = original_random
+            _random.uniform = original_uniform
+
+        # Force no dodge, block, no crit, flat damage roll
+        _random.random = (v for v in [0.9, 0.0, 0.9]).__next__
+        _random.uniform = lambda a, b: 1.0
+        try:
+            engine._resolve_attack(
+                f1, f2_block, dodge_cap=0.5, crit_multiplier=1.5, log=[]
+            )
+        finally:
+            _random.random = original_random
+            _random.uniform = original_uniform
+
+        # Raw damage is 200; blocked halves it to 100
+        assert f2_no_block.hp == 800
+        assert f2_block.hp == 900
+
+    def test_chain_order_crit_trigger_ultimate(self):
+        """Crit phase runs before on_crit triggers and ultimate."""
+        engine = make_engine()
+        f1 = make_fighter("A", 100, 100, 5, 10, base_dmg=50)
+        f1.trigger_skills = [
+            {
+                "name": "乘胜追击",
+                "trigger_timing": "on_crit",
+                "trigger_rate": 1.0,
+                "effect_type": "damage_bonus",
+                "effect_value": 0.5,
+            }
+        ]
+        f1.ultimates = [
+            {"id": "ult_chain", "name": "终结技", "trigger_rate": 1.0, "effect_value": 1.0}
+        ]
+        f2 = make_fighter("B", 1000, 10, 5, 10, armor=0)
+
+        import random as _random
+
+        original_random = _random.random
+        original_uniform = _random.uniform
+
+        # Sequence: dodge fail, block fail, crit success, trigger success, ultimate success
+        _random.random = (v for v in [0.9, 0.9, 0.0, 0.0, 0.0]).__next__
+        _random.uniform = lambda a, b: b
+        log: list[str] = []
+        try:
+            engine._resolve_attack(f1, f2, dodge_cap=0.5, crit_multiplier=1.5, log=log)
+        finally:
+            _random.random = original_random
+            _random.uniform = original_uniform
+
+        log_text = "\n".join(log)
+        assert "暴击" in log_text
+        assert "乘胜追击" in log_text
+        assert "终结技" in log_text
+        crit_idx = log_text.index("暴击")
+        trigger_idx = log_text.index("乘胜追击")
+        ultimate_idx = log_text.index("终结技")
+        assert trigger_idx < ultimate_idx < crit_idx
+
     def test_ultimate_once_per_battle(self):
         """Each ultimate can only trigger once per battle."""
         engine = make_engine()
