@@ -125,7 +125,6 @@ class Player:
     armor_value: int = 0
 
     # Skill system
-    learned_skills: str = "[]"  # Learned skills (JSON list)
     study_target: str = ""  # Current study target skill ID
 
     # Battle report preference (0 = use game_config default)
@@ -183,17 +182,6 @@ class Player:
     def set_techniques_list(self, techniques_list: list[str]):
         """Set technique list"""
         self.techniques = json.dumps(techniques_list, ensure_ascii=False)
-
-    def get_learned_skills(self) -> list[dict]:
-        """Get learned skills list with star levels"""
-        try:
-            return json.loads(self.learned_skills)
-        except json.JSONDecodeError:
-            return []
-
-    def set_learned_skills(self, skills: list[dict]):
-        """Set learned skills"""
-        self.learned_skills = json.dumps(skills, ensure_ascii=False)
 
     def get_active_pill_effects(self) -> list[dict]:
         """Get active temporary pill effects"""

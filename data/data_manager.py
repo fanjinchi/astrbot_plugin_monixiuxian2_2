@@ -150,6 +150,7 @@ class DataBase:
                 "UPDATE spirit_eyes SET owner_id = NULL, owner_name = NULL, claim_time = NULL WHERE owner_id = ?",
                 (user_id,),
             ),
+            ("DELETE FROM player_skills WHERE user_id = ?", (user_id,)),
             ("DELETE FROM blessed_lands WHERE user_id = ?", (user_id,)),
             ("DELETE FROM spirit_farms WHERE user_id = ?", (user_id,)),
             ("DELETE FROM bank_accounts WHERE user_id = ?", (user_id,)),

@@ -443,6 +443,100 @@ class DatabaseExtended:
         """设置用户为空闲状态"""
         await self.set_user_busy(user_id, 0, 0)
 
+    # ===== 功法领悟系统 CRUD =====
+
+    async def get_learned_skills(self, user_id: str) -> list[dict]:
+        """Get the player's learned skills with star levels and source.
+
+        Args:
+            user_id: Player user ID.
+
+        Returns:
+            List of dicts with keys skill_id, star_level, source, learned_at.
+        """
+        skills = []
+        async with self.conn.execute(
+            "SELECT skill_id, star_level, source, learned_at FROM player_skills WHERE user_id = ?",
+            (user_id,),
+        ) as cursor:
+            async for row in cursor:
+                skills.append(
+                    {
+                        "skill_id": row[0],
+                        "star_level": row[1],
+                        "source": row[2],
+                        "learned_at": row[3],
+                    }
+                )
+        return skills
+
+    async def is_skill_learned(self, user_id: str, skill_id: str) -> bool:
+        """Check whether the player has learned a skill."""
+        async with self.conn.execute(
+            "SELECT 1 FROM player_skills WHERE user_id = ? AND skill_id = ?",
+            (user_id, skill_id),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row is not None
+
+    async def get_star_level(self, user_id: str, skill_id: str) -> int:
+        """Get the star level of a learned skill (defaults to 1)."""
+        async with self.conn.execute(
+            "SELECT star_level FROM player_skills WHERE user_id = ? AND skill_id = ?",
+            (user_id, skill_id),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else 1
+
+    async def learn_or_star_up(
+        self, user_id: str, skill_id: str, source: str = ""
+    ) -> tuple[bool, int]:
+        """Learn a new skill or increment the star level if already learned.
+
+        Args:
+            user_id: Player user ID.
+            skill_id: Skill ID to learn or star up.
+            source: Comprehension source (e.g. breakthrough_success).
+
+        Returns:
+            (is_new_learn, new_star_level).
+        """
+        import time
+
+        now = int(time.time())
+        await self.conn.execute("BEGIN IMMEDIATE")
+        try:
+            async with self.conn.execute(
+                "SELECT star_level FROM player_skills WHERE user_id = ? AND skill_id = ?",
+                (user_id, skill_id),
+            ) as cursor:
+                row = await cursor.fetchone()
+
+            if row is None:
+                await self.conn.execute(
+                    """
+                    INSERT INTO player_skills (user_id, skill_id, star_level, source, learned_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (user_id, skill_id, 1, source, now),
+                )
+                await self.conn.commit()
+                return True, 1
+
+            new_star = row[0] + 1
+            await self.conn.execute(
+                """
+                UPDATE player_skills SET star_level = ?, source = ?, learned_at = ?
+                WHERE user_id = ? AND skill_id = ?
+                """,
+                (new_star, source, now, user_id, skill_id),
+            )
+            await self.conn.commit()
+            return False, new_star
+        except Exception:
+            await self.conn.rollback()
+            raise
+
     # ===== Player扩展字段更新方法 =====
 
     async def update_player_hp_mp(self, user_id: str, hp: int, mp: int):
