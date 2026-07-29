@@ -5,7 +5,7 @@ import json
 import random
 import time
 from pathlib import Path
-from typing import Tuple, List, Optional, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from astrbot.api import logger
 
@@ -66,12 +66,12 @@ class BountyManager:
     ):
         self.db = db
         self.storage_ring_manager = storage_ring_manager
-        self._bounty_cache: Dict[str, Dict] = {}
-        self.difficulties: Dict[str, dict] = {}
-        self.templates_by_id: Dict[int, dict] = {}
-        self.templates_by_diff: Dict[str, List[dict]] = {}
-        self.item_tables: Dict[str, List[dict]] = {}
-        self.adventure_tag_meta: Dict[str, Dict[str, int]] = {}
+        self._bounty_cache: dict[str, dict] = {}
+        self.difficulties: dict[str, dict] = {}
+        self.templates_by_id: dict[int, dict] = {}
+        self.templates_by_diff: dict[str, list[dict]] = {}
+        self.item_tables: dict[str, list[dict]] = {}
+        self.adventure_tag_meta: dict[str, dict[str, int]] = {}
         self.reload_config()
 
     # -------- 配置 --------
@@ -99,7 +99,7 @@ class BountyManager:
     def _load_config_file(self) -> dict:
         if self.CONFIG_FILE.exists():
             try:
-                with open(self.CONFIG_FILE, "r", encoding="utf-8") as f:
+                with open(self.CONFIG_FILE, encoding="utf-8") as f:
                     return json.load(f)
             except Exception as exc:
                 logger.error(f"加载 bounty_templates.json 失败，将使用默认配置: {exc}")
@@ -110,7 +110,7 @@ class BountyManager:
         if not self.ADVENTURE_CONFIG_FILE.exists():
             return
         try:
-            with open(self.ADVENTURE_CONFIG_FILE, "r", encoding="utf-8") as f:
+            with open(self.ADVENTURE_CONFIG_FILE, encoding="utf-8") as f:
                 data = json.load(f)
             for route in data.get("routes", []):
                 tag = str(route.get("bounty_tag", "")).lower()
@@ -126,26 +126,26 @@ class BountyManager:
 
     # -------- 列表 & 缓存 --------
 
-    def _get_cached_bounties(self, user_id: str) -> Optional[List[dict]]:
+    def _get_cached_bounties(self, user_id: str) -> list[dict] | None:
         cache = self._bounty_cache.get(user_id)
         if cache and cache["expire_time"] > int(time.time()):
             return cache["bounties"]
         return None
 
-    def _set_cached_bounties(self, user_id: str, bounties: List[dict]):
+    def _set_cached_bounties(self, user_id: str, bounties: list[dict]):
         self._bounty_cache[user_id] = {
             "bounties": bounties,
             "expire_time": int(time.time()) + self.BOUNTY_CACHE_DURATION,
         }
 
-    async def get_bounty_list(self, player: Player) -> List[dict]:
+    async def get_bounty_list(self, player: Player) -> list[dict]:
         """获取悬赏列表"""
         cached = self._get_cached_bounties(player.user_id)
         if cached:
             return cached
 
         plan = self._get_difficulty_plan(player.level_index)
-        bounties: List[dict] = []
+        bounties: list[dict] = []
         for diff in plan:
             entry = self._build_bounty_entry(diff, player)
             if entry:
@@ -154,7 +154,7 @@ class BountyManager:
         self._set_cached_bounties(player.user_id, bounties)
         return bounties
 
-    def _get_difficulty_plan(self, level_index: int) -> List[str]:
+    def _get_difficulty_plan(self, level_index: int) -> list[str]:
         plan = ["easy", "normal"]
         if level_index >= 7:
             plan.append("hard")
@@ -162,7 +162,7 @@ class BountyManager:
             plan.append("elite")
         return [diff for diff in plan if diff in self.difficulties]
 
-    def _pick_template(self, difficulty: str) -> Optional[dict]:
+    def _pick_template(self, difficulty: str) -> dict | None:
         templates = self.templates_by_diff.get(difficulty)
         if not templates:
             return None
@@ -175,7 +175,7 @@ class BountyManager:
                 return tpl
         return templates[0]
 
-    def _build_bounty_entry(self, difficulty: str, player: Player) -> Optional[dict]:
+    def _build_bounty_entry(self, difficulty: str, player: Player) -> dict | None:
         template = self._pick_template(difficulty)
         if not template:
             return None
@@ -202,7 +202,7 @@ class BountyManager:
 
     def _calculate_reward(
         self, template: dict, diff_cfg: dict, player: Player, target: int
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         base_reward = template.get("reward", {"stone": 200, "exp": 2000})
         stone = base_reward.get("stone", 0)
         exp = base_reward.get("exp", 0)
@@ -225,7 +225,7 @@ class BountyManager:
         buffer = max(600, unit // 2)
         return max(base_limit, expected + buffer)
 
-    def _get_adventure_unit_time(self, template: dict) -> Optional[int]:
+    def _get_adventure_unit_time(self, template: dict) -> int | None:
         durations = []
         for tag in template.get("progress_tags", []):
             meta = self.adventure_tag_meta.get(tag.lower())
@@ -238,7 +238,7 @@ class BountyManager:
 
     # -------- 接取与状态 --------
 
-    async def accept_bounty(self, player: Player, bounty_id: int) -> Tuple[bool, str]:
+    async def accept_bounty(self, player: Player, bounty_id: int) -> tuple[bool, str]:
         if bounty_id <= 0:
             return False, "无效的悬赏编号。"
 
@@ -326,7 +326,7 @@ class BountyManager:
             f"时限：{time_limit // 60} 分钟"
         )
 
-    async def check_bounty_status(self, player: Player) -> Tuple[bool, str]:
+    async def check_bounty_status(self, player: Player) -> tuple[bool, str]:
         active = await self.db.ext.get_active_bounty(player.user_id)
         if not active:
             return (
@@ -354,7 +354,7 @@ class BountyManager:
             f"💡 完成后使用 /完成悬赏 领取奖励"
         )
 
-    async def complete_bounty(self, player: Player) -> Tuple[bool, str]:
+    async def complete_bounty(self, player: Player) -> tuple[bool, str]:
         await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
             active = await self.db.ext.get_active_bounty(player.user_id)
@@ -438,7 +438,7 @@ class BountyManager:
             f"获得修为：+{rewards.get('exp', 0):,}{item_msg}"
         )
 
-    async def abandon_bounty(self, player: Player) -> Tuple[bool, str]:
+    async def abandon_bounty(self, player: Player) -> tuple[bool, str]:
         active = await self.db.ext.get_active_bounty(player.user_id)
         if not active:
             return False, "你当前没有进行中的悬赏任务。"
@@ -454,8 +454,8 @@ class BountyManager:
 
     async def _roll_bounty_items(
         self, player: Player, table_name: str
-    ) -> List[Tuple[str, int]]:
-        dropped_items: List[Tuple[str, int]] = []
+    ) -> list[tuple[str, int]]:
+        dropped_items: list[tuple[str, int]] = []
         drop_table = self.item_tables.get(
             table_name, self.item_tables.get("gather", [])
         )
@@ -478,7 +478,7 @@ class BountyManager:
 
     async def add_bounty_progress(
         self, player: Player, activity_tag: str, count: int = 1
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """根据活动标签推进悬赏"""
         if not isinstance(count, int) or count <= 0:
             return False, ""

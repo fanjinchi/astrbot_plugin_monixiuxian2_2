@@ -1,8 +1,9 @@
 # handlers/sect_handlers.py
-from astrbot.api.event import AstrMessageEvent
 from astrbot.api.all import *
-from ..managers.sect_manager import SectManager
+from astrbot.api.event import AstrMessageEvent
+
 from ..data.data_manager import DataBase
+from ..managers.sect_manager import SectManager
 from ..models_extended import UserStatus
 
 

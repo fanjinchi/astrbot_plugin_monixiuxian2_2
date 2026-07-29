@@ -1,7 +1,8 @@
 # handlers/rift_handlers.py
 from astrbot.api.event import AstrMessageEvent
-from ..managers.rift_manager import RiftManager
+
 from ..data.data_manager import DataBase
+from ..managers.rift_manager import RiftManager
 
 
 class RiftHandlers:

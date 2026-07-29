@@ -88,7 +88,7 @@ def gm_manager(mock_db, mock_config_manager, mock_managers, plugin_data_dir):
 
 
 def make_player(user_id="12345", user_name="测试道友", cultivation_type="灵修"):
-    """Build a minimal Player-like object."""
+    """Build a minimal Player-like object with new four-main-attribute framework."""
     from tests.helpers import load_module
 
     _models = load_module("models_for_gm", "models.py")
@@ -99,10 +99,11 @@ def make_player(user_id="12345", user_name="测试道友", cultivation_type="灵
         level_index=0,
         experience=0,
         gold=100,
+        damage=10,
+        agility=5,
+        speed=5,
         hp=100,
-        mp=50,
-        atk=10,
-        mental_power=100,
+        armor_value=0,
         weapon="青锋剑",
         armor="",
         main_technique="",

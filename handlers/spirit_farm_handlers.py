@@ -2,6 +2,7 @@
 """灵田处理器"""
 
 from astrbot.api.event import AstrMessageEvent
+
 from ..data import DataBase
 from ..managers.spirit_farm_manager import SpiritFarmManager
 from ..models import Player

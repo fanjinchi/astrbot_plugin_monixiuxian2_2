@@ -1,9 +1,10 @@
 # handlers/breakthrough_handler.py
 
 from astrbot.api.event import AstrMessageEvent
-from ..data import DataBase
-from ..core import BreakthroughManager, PillManager
+
 from ..config_manager import ConfigManager
+from ..core import BreakthroughManager, PillManager
+from ..data import DataBase
 from ..models import Player
 from .utils import player_required
 
@@ -79,13 +80,13 @@ class BreakthroughHandler:
             f"=== {display_name} 的突破信息 ===\n",
             f"当前境界：{current_level_name}\n",
             f"下一境界：{next_level_name}\n",
-            f"━━━━━━━━━━━━━━━\n",
-            f"【突破条件】\n",
+            "━━━━━━━━━━━━━━━\n",
+            "【突破条件】\n",
             f"所需修为：{required_exp}\n",
             f"当前修为：{player.experience}\n",
             f"修为状态：{exp_status}\n",
-            f"━━━━━━━━━━━━━━━\n",
-            f"【突破成功率】\n",
+            "━━━━━━━━━━━━━━━\n",
+            "【突破成功率】\n",
             f"基础成功率：{base_success_rate:.1%}\n",
         ]
 
@@ -96,38 +97,38 @@ class BreakthroughHandler:
             info_lines.append(f"突破死亡概率降低：{death_reduce:.1%}\n")
 
         if available_pills:
-            info_lines.append(f"\n【可用破境丹】\n")
+            info_lines.append("\n【可用破境丹】\n")
             for pill in available_pills:
                 info_lines.append(
                     f"• {pill['name']}（{pill['rank']}）\n"
                     f"  使用后成功率：{pill['final_rate']:.1%}（最高{pill['max_rate']:.1%}）\n"
                 )
         else:
-            info_lines.append(f"\n暂无适用的破境丹\n")
+            info_lines.append("\n暂无适用的破境丹\n")
 
         # 根据修炼类型显示不同的突破说明
         if player.cultivation_type == "体修":
             info_lines.extend(
                 [
-                    f"━━━━━━━━━━━━━━━\n",
-                    f"【突破说明】\n",
+                    "━━━━━━━━━━━━━━━\n",
+                    "【突破说明】\n",
                     f"• 使用命令：{CMD_BREAKTHROUGH} 或 {CMD_BREAKTHROUGH} [破境丹名称]\n",
-                    f"• 突破成功：境界提升，肉身更强\n",
-                    f"• 突破失败：损失10%修为，有概率死亡\n",
-                    f"• 死亡后：所有数据清除，需重新入仙途\n",
-                    f"=" * 28,
+                    "• 突破成功：境界提升，肉身更强\n",
+                    "• 突破失败：损失10%修为，有概率死亡\n",
+                    "• 死亡后：所有数据清除，需重新入仙途\n",
+                    "=" * 28,
                 ]
             )
         else:
             info_lines.extend(
                 [
-                    f"━━━━━━━━━━━━━━━\n",
-                    f"【突破说明】\n",
+                    "━━━━━━━━━━━━━━━\n",
+                    "【突破说明】\n",
                     f"• 使用命令：{CMD_BREAKTHROUGH} 或 {CMD_BREAKTHROUGH} [破境丹名称]\n",
-                    f"• 突破成功：境界提升，实力大增\n",
-                    f"• 突破失败：损失10%修为，有概率死亡\n",
-                    f"• 死亡后：所有数据清除，需重新入仙途\n",
-                    f"=" * 28,
+                    "• 突破成功：境界提升，实力大增\n",
+                    "• 突破失败：损失10%修为，有概率死亡\n",
+                    "• 死亡后：所有数据清除，需重新入仙途\n",
+                    "=" * 28,
                 ]
             )
 

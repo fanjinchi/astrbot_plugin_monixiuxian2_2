@@ -4,9 +4,7 @@
 参照NoneBot2插件的xn_xiuxian_impart实现
 """
 
-from typing import Tuple, Dict, Optional
 from ..data.data_manager import DataBase
-from ..models import Player
 from ..models_extended import ImpartInfo
 
 
@@ -18,7 +16,7 @@ class ImpartManager:
 
     async def get_impart_info(
         self, user_id: str
-    ) -> Tuple[bool, str, Optional[ImpartInfo]]:
+    ) -> tuple[bool, str, ImpartInfo | None]:
         """获取传承信息"""
         impart_info = await self.db.ext.get_impart_info(user_id)
         if not impart_info:
@@ -41,7 +39,7 @@ MP加成：{impart_info.impart_mp_per * 100:.1f}%
 
     async def update_impart(
         self, user_id: str, type_name: str, value: float
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         更新传承属性（通常由物品使用或事件触发）
         type_name: hp/mp/atk/know/burst

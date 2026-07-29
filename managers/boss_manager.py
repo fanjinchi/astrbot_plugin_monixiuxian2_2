@@ -6,10 +6,11 @@ Boss系统管理器 - 处理Boss生成、战斗、奖励等逻辑
 
 import random
 import time
-from typing import Tuple, Dict, Optional, List, TYPE_CHECKING
+from typing import TYPE_CHECKING
+
 from ..data.data_manager import DataBase
-from ..models_extended import Boss, UserStatus
 from ..models import Player
+from ..models_extended import Boss, UserStatus
 from .combat_manager import CombatManager, CombatStats
 
 if TYPE_CHECKING:
@@ -134,8 +135,8 @@ class BossManager:
         self.levels = self.config.get("levels", self.BOSS_LEVELS)
 
     async def spawn_boss(
-        self, base_exp: int = 100000, level_config: Optional[Dict] = None
-    ) -> Tuple[bool, str, Optional[Boss]]:
+        self, base_exp: int = 100000, level_config: dict | None = None
+    ) -> tuple[bool, str, Boss | None]:
         """
         生成Boss
 
@@ -209,7 +210,7 @@ ATK：{atk}
 
         return True, msg, boss
 
-    async def challenge_boss(self, user_id: str) -> Tuple[bool, str, Optional[Dict]]:
+    async def challenge_boss(self, user_id: str) -> tuple[bool, str, dict | None]:
         """
         挑战Boss
 
@@ -372,7 +373,7 @@ HP：{battle_result["player_final_hp"]}/{player_stats.max_hp}
 
         return True, full_msg, battle_result
 
-    async def get_boss_info(self) -> Tuple[bool, str, Optional[Boss]]:
+    async def get_boss_info(self) -> tuple[bool, str, Boss | None]:
         """
         获取当前Boss信息
 
@@ -405,7 +406,7 @@ ATK：{boss.atk}
 
     async def auto_spawn_boss(
         self, player_count: int = 0
-    ) -> Tuple[bool, str, Optional[Boss]]:
+    ) -> tuple[bool, str, Boss | None]:
         """
         自动生成Boss（定时任务使用）
         根据服务器玩家数量和平均等级自动调整Boss难度
@@ -448,7 +449,7 @@ ATK：{boss.atk}
 
     async def _roll_boss_drops(
         self, player: Player, boss: Boss
-    ) -> List[Tuple[str, int]]:
+    ) -> list[tuple[str, int]]:
         """
         根据Boss等级随机掉落物品
 

@@ -1,7 +1,8 @@
 # handlers/impart_handlers.py
 from astrbot.api.event import AstrMessageEvent
-from ..managers.impart_manager import ImpartManager
+
 from ..data.data_manager import DataBase
+from ..managers.impart_manager import ImpartManager
 
 
 class ImpartHandlers:

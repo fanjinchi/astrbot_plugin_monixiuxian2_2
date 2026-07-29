@@ -1,9 +1,10 @@
 # handlers/equipment_handler.py
 
 from astrbot.api.event import AstrMessageEvent
-from ..data import DataBase
-from ..core import EquipmentManager, PillManager, StorageRingManager
+
 from ..config_manager import ConfigManager
+from ..core import EquipmentManager, PillManager, StorageRingManager
+from ..data import DataBase
 from ..models import Player
 from .utils import player_required
 
@@ -225,7 +226,7 @@ class EquipmentHandler:
                     player, unequipped_item_name, 1, silent=True
                 )
                 if store_success:
-                    storage_msg = f"\n已存入储物戒"
+                    storage_msg = "\n已存入储物戒"
                 else:
                     storage_msg = f"\n⚠️ 存入储物戒失败：{store_msg}"
 

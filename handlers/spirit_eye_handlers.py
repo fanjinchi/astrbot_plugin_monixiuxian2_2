@@ -2,6 +2,7 @@
 """天地灵眼处理器"""
 
 from astrbot.api.event import AstrMessageEvent
+
 from ..data import DataBase
 from ..managers.spirit_eye_manager import SpiritEyeManager
 from ..models import Player

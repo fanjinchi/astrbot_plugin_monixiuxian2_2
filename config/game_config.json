@@ -8,7 +8,25 @@
         "spar_cooldown": 60,
         "boss_crit_rate": 30,
         "crit_damage_multiplier": 1.5,
+        "action_limit": 200,
+        "dodge_cap": 0.5,
         "comment": "战斗冷却（秒）和暴击配置"
+    },
+    "skill_system": {
+        "breakthrough_success_learn_rate": 0.2,
+        "breakthrough_fail_learn_rate": 0.1,
+        "cultivation_learn_rate": 0.15,
+        "cultivation_learn_interval_hours": 2,
+        "universal_pool_rate": 0.05,
+        "universal_pool_no_heart_rate": 0.03,
+        "random_growth_step": 5,
+        "max_technique_slots": 3,
+        "battle_report_merge_count": 10,
+        "comment": "技能系统：领悟概率、通用池概率、成长步长"
+    },
+    "pve": {
+        "difficulty_multiplier": 1.0,
+        "comment": "PvE难度系数"
     },
     "bank": {
         "daily_interest_rate": 0.001,

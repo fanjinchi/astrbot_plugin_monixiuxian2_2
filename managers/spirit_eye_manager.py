@@ -1,9 +1,9 @@
 # managers/spirit_eye_manager.py
 """天地灵眼系统管理器"""
 
-import time
 import random
-from typing import Tuple, Optional, Dict, List
+import time
+
 from ..data import DataBase
 from ..models import Player
 
@@ -24,7 +24,7 @@ class SpiritEyeManager:
     def __init__(self, db: DataBase):
         self.db = db
 
-    async def get_user_spirit_eye(self, user_id: str) -> Optional[Dict]:
+    async def get_user_spirit_eye(self, user_id: str) -> dict | None:
         """获取用户占据的灵眼"""
         async with self.db.conn.execute(
             "SELECT * FROM spirit_eyes WHERE owner_id = ?", (user_id,)
@@ -34,7 +34,7 @@ class SpiritEyeManager:
                 return dict(row)
             return None
 
-    async def get_available_spirit_eyes(self) -> List[Dict]:
+    async def get_available_spirit_eyes(self) -> list[dict]:
         """获取所有无主的灵眼"""
         async with self.db.conn.execute(
             "SELECT * FROM spirit_eyes WHERE owner_id IS NULL OR owner_id = ''"
@@ -42,7 +42,7 @@ class SpiritEyeManager:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
 
-    async def spawn_spirit_eye(self) -> Tuple[bool, str]:
+    async def spawn_spirit_eye(self) -> tuple[bool, str]:
         """生成新灵眼（定时调用）"""
         # 随机生成灵眼类型
         roll = random.randint(1, 100)
@@ -67,7 +67,7 @@ class SpiritEyeManager:
 
         return True, f"天地间出现了一处【{config['name']}】！速来抢占！"
 
-    async def claim_spirit_eye(self, player: Player, eye_id: int) -> Tuple[bool, str]:
+    async def claim_spirit_eye(self, player: Player, eye_id: int) -> tuple[bool, str]:
         """抢占灵眼（原子操作）"""
         await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
@@ -117,11 +117,11 @@ class SpiritEyeManager:
                 f"每小时可获得 {eye['exp_per_hour']:,} 修为！\n"
                 f"使用 /灵眼收取 领取收益"
             )
-        except Exception as e:
+        except Exception:
             await self.db.conn.rollback()
             raise
 
-    async def collect_spirit_eye(self, player: Player) -> Tuple[bool, str]:
+    async def collect_spirit_eye(self, player: Player) -> tuple[bool, str]:
         """收取灵眼收益"""
         eye = await self.get_user_spirit_eye(player.user_id)
         if not eye:
@@ -158,7 +158,7 @@ class SpiritEyeManager:
             f"获得修为：+{exp_income:,}"
         )
 
-    async def release_spirit_eye(self, user_id: str) -> Tuple[bool, str]:
+    async def release_spirit_eye(self, user_id: str) -> tuple[bool, str]:
         """释放灵眼"""
         eye = await self.get_user_spirit_eye(user_id)
         if not eye:

@@ -1,0 +1,49 @@
+{
+  "心法列表": [
+    {
+      "id": "heart_001",
+      "name": "长春功",
+      "description": "基础心法，延年益寿",
+      "rank": "凡品",
+      "required_level_index": 0,
+      "passive_bonus": {
+        "hp_percent": 0.1
+      },
+      "skill_pool": [
+        {"skill_id": "common_001", "learn_coefficient": 1.0},
+        {"skill_id": "common_002", "learn_coefficient": 0.8}
+      ],
+      "route": "通用"
+    },
+    {
+      "id": "heart_002",
+      "name": "焚天诀",
+      "description": "火系心法，攻击凌厉",
+      "rank": "圣品",
+      "required_level_index": 10,
+      "passive_bonus": {
+        "damage_percent": 0.15
+      },
+      "skill_pool": [
+        {"skill_id": "spirit_001", "learn_coefficient": 0.6},
+        {"skill_id": "common_001", "learn_coefficient": 0.9}
+      ],
+      "route": "灵修"
+    },
+    {
+      "id": "heart_003",
+      "name": "不动明王经",
+      "description": "佛门炼体心法",
+      "rank": "珍品",
+      "required_level_index": 5,
+      "passive_bonus": {
+        "armor_value": 20
+      },
+      "skill_pool": [
+        {"skill_id": "body_001", "learn_coefficient": 0.7},
+        {"skill_id": "common_002", "learn_coefficient": 1.0}
+      ],
+      "route": "体修"
+    }
+  ]
+}

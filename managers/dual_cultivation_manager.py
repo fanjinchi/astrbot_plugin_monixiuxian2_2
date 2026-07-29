@@ -2,8 +2,7 @@
 """双修系统管理器"""
 
 import time
-import json
-from typing import Tuple, Optional, Dict
+
 from ..data import DataBase
 from ..models import Player
 from ..models_extended import UserStatus
@@ -48,7 +47,7 @@ class DualCultivationManager:
             row = await cursor.fetchone()
             return row[0] if row else 0
 
-    async def _get_pending_request(self, target_id: str) -> Optional[Dict]:
+    async def _get_pending_request(self, target_id: str) -> dict | None:
         """获取待处理的双修请求"""
         now = int(time.time())
 
@@ -86,7 +85,7 @@ class DualCultivationManager:
         )
         await self.db.conn.commit()
 
-    async def send_request(self, initiator: Player, target_id: str) -> Tuple[bool, str]:
+    async def send_request(self, initiator: Player, target_id: str) -> tuple[bool, str]:
         """发起双修请求"""
         if initiator.user_id == target_id:
             return False, "❌ 不能与自己双修。"
@@ -141,7 +140,7 @@ class DualCultivationManager:
             f"请求将在5分钟后过期。"
         )
 
-    async def accept_request(self, acceptor: Player) -> Tuple[bool, str]:
+    async def accept_request(self, acceptor: Player) -> tuple[bool, str]:
         """接受双修请求"""
         request = await self._get_pending_request(acceptor.user_id)
         if not request:
@@ -158,7 +157,7 @@ class DualCultivationManager:
         )
         if exp_ratio > DUAL_CULT_MAX_EXP_RATIO:
             await self._delete_request(request["id"])
-            return False, f"❌ 双方修为差距已超过限制，双修取消。"
+            return False, "❌ 双方修为差距已超过限制，双修取消。"
 
         now = int(time.time())
 
@@ -202,7 +201,7 @@ class DualCultivationManager:
             f"下次双修：1小时后"
         )
 
-    async def reject_request(self, rejecter_id: str) -> Tuple[bool, str]:
+    async def reject_request(self, rejecter_id: str) -> tuple[bool, str]:
         """拒绝双修请求"""
         request = await self._get_pending_request(rejecter_id)
         if not request:
@@ -213,7 +212,7 @@ class DualCultivationManager:
 
         return True, f"已拒绝【{from_name}】的双修请求。"
 
-    async def _get_last_dual_time(self, user_id: str) -> Optional[int]:
+    async def _get_last_dual_time(self, user_id: str) -> int | None:
         """获取上次双修时间"""
         async with self.db.conn.execute(
             "SELECT last_dual_time FROM dual_cultivation WHERE user_id = ?", (user_id,)

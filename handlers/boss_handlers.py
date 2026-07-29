@@ -1,8 +1,10 @@
 # handlers/boss_handlers.py
-from typing import Tuple, Optional, Dict, Any
+from typing import Any
+
 from astrbot.api.event import AstrMessageEvent
-from ..managers.boss_manager import BossManager
+
 from ..data.data_manager import DataBase
+from ..managers.boss_manager import BossManager
 
 
 class BossHandlers:
@@ -17,7 +19,7 @@ class BossHandlers:
 
     async def handle_boss_fight(
         self, user_id: str
-    ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    ) -> tuple[bool, str, dict[str, Any] | None]:
         """
         挑战世界Boss
 
@@ -30,7 +32,7 @@ class BossHandlers:
         success, msg, battle_result = await self.boss_mgr.challenge_boss(user_id)
         return success, msg, battle_result
 
-    async def handle_spawn_boss(self) -> Tuple[bool, str, Optional[Any]]:
+    async def handle_spawn_boss(self) -> tuple[bool, str, Any | None]:
         """
         生成世界Boss
 

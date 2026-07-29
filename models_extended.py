@@ -1,12 +1,12 @@
 # models.py - 新增模型定义
 
+import json
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import TYPE_CHECKING, List, Optional
-import json
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .config_manager import ConfigManager
+    pass
 
 
 class UserStatus(IntEnum):
@@ -46,7 +46,7 @@ class Sect:
     secbuff: str = "0"  # 辅修功法buff ID列表（JSON字符串）
     elixir_room_level: int = 0  # 丹房等级
 
-    def get_mainbuff_list(self) -> List[int]:
+    def get_mainbuff_list(self) -> list[int]:
         """获取主修功法ID列表"""
         try:
             if self.mainbuff == "0" or not self.mainbuff:
@@ -59,11 +59,11 @@ class Sect:
         except:
             return []
 
-    def set_mainbuff_list(self, buff_list: List[int]):
+    def set_mainbuff_list(self, buff_list: list[int]):
         """设置主修功法ID列表"""
         self.mainbuff = json.dumps(buff_list, ensure_ascii=False) if buff_list else "0"
 
-    def get_secbuff_list(self) -> List[int]:
+    def get_secbuff_list(self) -> list[int]:
         """获取辅修功法ID列表"""
         try:
             if self.secbuff == "0" or not self.secbuff:
@@ -76,7 +76,7 @@ class Sect:
         except:
             return []
 
-    def set_secbuff_list(self, buff_list: List[int]):
+    def set_secbuff_list(self, buff_list: list[int]):
         """设置辅修功法ID列表"""
         self.secbuff = json.dumps(buff_list, ensure_ascii=False) if buff_list else "0"
 

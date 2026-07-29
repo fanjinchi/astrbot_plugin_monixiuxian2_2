@@ -3,7 +3,8 @@
 排行榜系统管理器 - 处理各种排行榜逻辑
 """
 
-from typing import Tuple, List, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional
+
 from ..data.data_manager import DataBase
 from ..managers.combat_manager import CombatManager
 
@@ -61,7 +62,7 @@ class RankingManager:
 
         self.equipment_manager = EquipmentManager(self.db, self.config_manager)
 
-    async def get_level_ranking(self, limit: int = 10) -> Tuple[bool, str]:
+    async def get_level_ranking(self, limit: int = 10) -> tuple[bool, str]:
         """
         境界排行榜
 
@@ -92,7 +93,7 @@ class RankingManager:
 
         return True, msg
 
-    async def get_power_ranking(self, limit: int = 10) -> Tuple[bool, str]:
+    async def get_power_ranking(self, limit: int = 10) -> tuple[bool, str]:
         """
         战力排行榜（基于综合属性）
 
@@ -121,13 +122,13 @@ class RankingManager:
             # 排行榜显示基础战力，不含临时丹药效果（更公平）
             total_attrs = player.get_total_attributes(equipped_items, None)
 
-            # 战力 = 物伤 + 法伤 + 物防 + 法防 + 精神力/10
+            # 战力 = 伤害 + 身法 + 迅捷 + 气血 + 护甲值//2
             combat_power = (
-                int(total_attrs["physical_damage"])
-                + int(total_attrs["magic_damage"])
-                + int(total_attrs["physical_defense"])
-                + int(total_attrs["magic_defense"])
-                + int(total_attrs["mental_power"]) // 10
+                int(total_attrs["damage"])
+                + int(total_attrs["agility"])
+                + int(total_attrs["speed"])
+                + int(total_attrs["hp"])
+                + int(total_attrs.get("armor_value", 0)) // 2
             )
             player_power.append((player, combat_power, total_attrs))
 
@@ -139,19 +140,15 @@ class RankingManager:
 
         for idx, (player, power, attrs) in enumerate(sorted_players, 1):
             name = _safe_name(player, player.user_id)
-            # 显示主要攻击属性（根据修炼类型）
-            if player.cultivation_type == "体修":
-                main_atk = int(attrs["physical_damage"])
-                atk_label = "物伤"
-            else:
-                main_atk = int(attrs["magic_damage"])
-                atk_label = "法伤"
+            # 显示主要攻击属性
+            main_atk = int(attrs["damage"])
+            atk_label = "伤害"
             msg += f"{idx}. {name}\n"
             msg += f"   战力：{power:,} | {atk_label}：{main_atk:,}\n\n"
 
         return True, msg
 
-    async def get_wealth_ranking(self, limit: int = 10) -> Tuple[bool, str]:
+    async def get_wealth_ranking(self, limit: int = 10) -> tuple[bool, str]:
         """
         财富排行榜（灵石）
 
@@ -179,7 +176,7 @@ class RankingManager:
 
         return True, msg
 
-    async def get_sect_ranking(self, limit: int = 10) -> Tuple[bool, str]:
+    async def get_sect_ranking(self, limit: int = 10) -> tuple[bool, str]:
         """
         宗门排行榜（建设度）
 
@@ -216,7 +213,7 @@ class RankingManager:
 
         return True, msg
 
-    async def get_deposit_ranking(self, limit: int = 10) -> Tuple[bool, str]:
+    async def get_deposit_ranking(self, limit: int = 10) -> tuple[bool, str]:
         """
         存款排行榜（银行存款）
 
@@ -245,7 +242,7 @@ class RankingManager:
 
     async def get_contribution_ranking(
         self, sect_id: int, limit: int = 10
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         宗门贡献度排行榜
 
@@ -276,7 +273,7 @@ class RankingManager:
             sect_name = sect_name[:MAX_NAME_LENGTH] + "…"
 
         msg = f"📊 {sect_name} 贡献排行\n"
-        msg += f"━━━━━━━━━━━━━━━\n"
+        msg += "━━━━━━━━━━━━━━━\n"
 
         for idx, member in enumerate(sorted_members, 1):
             name = _safe_name(member, member.user_id)

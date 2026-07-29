@@ -2,7 +2,7 @@
 """传承PK系统管理器"""
 
 import random
-from typing import Tuple
+
 from ..data import DataBase
 from ..models import Player
 from .combat_manager import CombatManager
@@ -19,7 +19,7 @@ class ImpartPkManager:
 
     async def challenge_impart(
         self, attacker: Player, defender: Player
-    ) -> Tuple[bool, str, dict]:
+    ) -> tuple[bool, str, dict]:
         """发起传承挑战
 
         Args:

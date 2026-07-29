@@ -1,9 +1,10 @@
 import json
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
 from astrbot.api import logger
-from .data.default_configs import SECT_CONFIG, BOSS_CONFIG, RIFT_CONFIG, ALCHEMY_CONFIG
+
+from .data.default_configs import ALCHEMY_CONFIG, BOSS_CONFIG, RIFT_CONFIG, SECT_CONFIG
 
 
 class ConfigManager:
@@ -11,36 +12,40 @@ class ConfigManager:
 
     def __init__(self, base_dir: Path):
         self._base_dir = base_dir
-        self.level_data: List[dict] = []  # 灵修境界数据
-        self.body_level_data: List[dict] = []  # 体修境界数据
-        self.items_data: Dict[str, dict] = {}  # 物品数据，key为物品名称
-        self.weapons_data: Dict[str, dict] = {}  # 武器数据，key为武器名称
-        self.pills_data: Dict[str, dict] = {}  # 破境丹数据，key为丹药名称
-        self.exp_pills_data: Dict[str, dict] = {}  # 修为丹数据，key为丹药名称
-        self.utility_pills_data: Dict[str, dict] = {}  # 功能丹数据，key为丹药名称
-        self.storage_rings_data: Dict[str, dict] = {}  # 储物戒数据，key为储物戒名称
+        self.level_data: list[dict] = []  # 灵修境界数据
+        self.body_level_data: list[dict] = []  # 体修境界数据
+        self.items_data: dict[str, dict] = {}  # 物品数据，key为物品名称
+        self.weapons_data: dict[str, dict] = {}  # 武器数据，key为武器名称
+        self.pills_data: dict[str, dict] = {}  # 破境丹数据，key为丹药名称
+        self.exp_pills_data: dict[str, dict] = {}  # 修为丹数据，key为丹药名称
+        self.utility_pills_data: dict[str, dict] = {}  # 功能丹数据，key为丹药名称
+        self.storage_rings_data: dict[str, dict] = {}  # 储物戒数据，key为储物戒名称
 
         # 新增系统配置
-        self.sect_config: Dict[str, Any] = {}
-        self.boss_config: Dict[str, Any] = {}
-        self.rift_config: Dict[str, Any] = {}
-        self.alchemy_config: Dict[str, Any] = {}
+        self.sect_config: dict[str, Any] = {}
+        self.boss_config: dict[str, Any] = {}
+        self.rift_config: dict[str, Any] = {}
+        self.alchemy_config: dict[str, Any] = {}
+
+        # Load new system configs
+        self.skills_data: dict[str, dict] = {}  # Skill definitions
+        self.heart_methods_data: dict[str, dict] = {}  # Heart method definitions
 
         self._load_all()
 
-    def get_level_data(self, cultivation_type: str = "灵修") -> List[dict]:
+    def get_level_data(self, cultivation_type: str = "灵修") -> list[dict]:
         """根据修炼类型获取对应的境界数据"""
         if cultivation_type == "体修":
             return self.body_level_data
         return self.level_data
 
-    def _load_json_data(self, file_path: Path) -> List[dict]:
+    def _load_json_data(self, file_path: Path) -> list[dict]:
         """加载JSON配置文件（列表格式）"""
         if not file_path.exists():
             logger.warning(f"数据文件 {file_path} 不存在，将使用空数据。")
             return []
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
                 logger.info(f"成功加载 {file_path.name} (共 {len(data)} 条数据)。")
                 return data
@@ -48,7 +53,7 @@ class ConfigManager:
             logger.error(f"加载数据文件 {file_path} 失败: {e}")
             return []
 
-    def _load_config_with_default(self, file_path: Path, default_config: Dict) -> Dict:
+    def _load_config_with_default(self, file_path: Path, default_config: dict) -> dict:
         """加载配置，如果不存在则创建默认配置"""
         if not file_path.exists():
             try:
@@ -63,7 +68,7 @@ class ConfigManager:
                 return default_config
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
                 logger.info(f"成功加载配置文件: {file_path.name}")
                 return data
@@ -71,13 +76,13 @@ class ConfigManager:
             logger.error(f"加载配置文件 {file_path} 失败: {e}")
             return default_config
 
-    def _load_items_data(self, file_path: Path) -> Dict[str, dict]:
+    def _load_items_data(self, file_path: Path) -> dict[str, dict]:
         """加载物品配置文件并转换为字典（key为物品名称）"""
         if not file_path.exists():
             logger.warning(f"物品数据文件 {file_path} 不存在，将使用空数据。")
             return {}
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
 
                 if isinstance(data, list):
@@ -151,10 +156,18 @@ class ConfigManager:
 
         self._pill_names_cache = None
 
+        # Load new skill system configs
+        self.skills_data = self._load_items_data(config_dir / "skills.json")
+        self.heart_methods_data = self._load_items_data(
+            config_dir / "heart_methods.json"
+        )
+
         logger.info(
             f"配置管理器初始化完成，"
             f"加载了 {len(self.level_data)} 个灵修境界配置，"
             f"{len(self.body_level_data)} 个体修境界配置，"
+            f"{len(self.skills_data)} 个技能配置，"
+            f"{len(self.heart_methods_data)} 个心法配置，"
             f"以及新系统配置 (宗门/Boss/秘境/炼丹)"
         )
 

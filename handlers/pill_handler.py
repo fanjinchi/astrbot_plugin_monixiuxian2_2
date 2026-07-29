@@ -1,10 +1,11 @@
 # handlers/pill_handler.py
 
 from astrbot.api.event import AstrMessageEvent
-from ..data import DataBase
-from ..core import PillManager
-from ..models import Player
+
 from ..config_manager import ConfigManager
+from ..core import PillManager
+from ..data import DataBase
+from ..models import Player
 from .utils import player_required
 
 CMD_USE_PILL = "服用丹药"
@@ -152,7 +153,7 @@ class PillHandler:
 
         # 构建丹药信息显示
         info_lines = [
-            f"--- 丹药信息 ---",
+            "--- 丹药信息 ---",
             f"名称：{pill_data.get('name', '未知')}",
             f"品级：{pill_data.get('rank', '未知')}",
             f"类型：{self._get_subtype_display(pill_data.get('subtype', ''))}",
@@ -177,7 +178,7 @@ class PillHandler:
         # 效果描述
         effect_type = pill_data.get("effect_type", "")
         if effect_type:
-            info_lines.append(f"\n【效果】")
+            info_lines.append("\n【效果】")
             info_lines.append(self._get_effect_description(pill_data))
 
         info_lines.append("-" * 20)

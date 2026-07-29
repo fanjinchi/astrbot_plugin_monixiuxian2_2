@@ -2,8 +2,8 @@
 """灵石银行系统管理器 - 包含存取款、贷款、流水记录功能"""
 
 import time
-from decimal import Decimal, ROUND_DOWN
-from typing import Tuple, List, Optional
+from decimal import ROUND_DOWN, Decimal
+
 from ..data import DataBase
 from ..models import Player
 
@@ -101,7 +101,7 @@ class BankManager:
         # 向下取整返回
         return int(interest.quantize(Decimal("1"), rounding=ROUND_DOWN))
 
-    async def deposit(self, player: Player, amount: int) -> Tuple[bool, str]:
+    async def deposit(self, player: Player, amount: int) -> tuple[bool, str]:
         """存入灵石"""
         if amount <= 0:
             return False, "存款金额必须大于0。"
@@ -140,11 +140,11 @@ class BankManager:
 
             await self.db.conn.commit()
             return True, f"成功存入 {amount:,} 灵石！\n当前余额：{new_balance:,} 灵石"
-        except Exception as e:
+        except Exception:
             await self.db.conn.rollback()
             raise
 
-    async def withdraw(self, player: Player, amount: int) -> Tuple[bool, str]:
+    async def withdraw(self, player: Player, amount: int) -> tuple[bool, str]:
         """取出灵石"""
         if amount <= 0:
             return False, "取款金额必须大于0。"
@@ -175,11 +175,11 @@ class BankManager:
                 True,
                 f"成功取出 {amount:,} 灵石！\n当前余额：{new_balance:,} 灵石\n当前持有：{player.gold:,} 灵石",
             )
-        except Exception as e:
+        except Exception:
             await self.db.conn.rollback()
             raise
 
-    async def claim_interest(self, player: Player) -> Tuple[bool, str]:
+    async def claim_interest(self, player: Player) -> tuple[bool, str]:
         """领取利息"""
         bank_data = await self.db.ext.get_bank_account(player.user_id)
         if not bank_data or bank_data["balance"] <= 0:
@@ -206,7 +206,7 @@ class BankManager:
 
     # ===== 贷款相关 =====
 
-    async def get_loan_info(self, player: Player) -> Optional[dict]:
+    async def get_loan_info(self, player: Player) -> dict | None:
         """获取贷款详情"""
         loan = await self.db.ext.get_active_loan(player.user_id)
         if not loan:
@@ -235,7 +235,7 @@ class BankManager:
 
     async def borrow(
         self, player: Player, amount: int, loan_type: str = "normal"
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """申请贷款
 
         Args:
@@ -301,11 +301,11 @@ class BankManager:
                 f"当前持有：{player.gold:,} 灵石\n"
                 f"💀 逾期将被银行追杀致死！"
             )
-        except Exception as e:
+        except Exception:
             await self.db.conn.rollback()
             raise
 
-    async def repay(self, player: Player) -> Tuple[bool, str]:
+    async def repay(self, player: Player) -> tuple[bool, str]:
         """还款"""
         await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
@@ -357,11 +357,11 @@ class BankManager:
                 f"━━━━━━━━━━━━━━━\n"
                 f"当前持有：{player.gold:,} 灵石"
             )
-        except Exception as e:
+        except Exception:
             await self.db.conn.rollback()
             raise
 
-    async def check_and_process_overdue_loans(self) -> List[dict]:
+    async def check_and_process_overdue_loans(self) -> list[dict]:
         """检查并处理逾期贷款 - 逾期玩家将被银行追杀致死
 
         Returns:
@@ -388,7 +388,7 @@ class BankManager:
 
             # 记录流水
             await self._add_transaction(
-                loan["user_id"], "bank_kill", 0, 0, f"逾期未还款，被银行追杀致死"
+                loan["user_id"], "bank_kill", 0, 0, "逾期未还款，被银行追杀致死"
             )
 
             processed.append({**loan, "player_name": player_name, "death": True})
@@ -411,12 +411,12 @@ class BankManager:
             user_id, trans_type, amount, balance_after, description, now
         )
 
-    async def get_transactions(self, user_id: str, limit: int = 20) -> List[dict]:
+    async def get_transactions(self, user_id: str, limit: int = 20) -> list[dict]:
         """获取交易流水"""
         return await self.db.ext.get_bank_transactions(user_id, limit)
 
     # ===== 排行榜 =====
 
-    async def get_deposit_ranking(self, limit: int = 10) -> List[dict]:
+    async def get_deposit_ranking(self, limit: int = 10) -> list[dict]:
         """获取存款排行榜"""
         return await self.db.ext.get_deposit_ranking(limit)

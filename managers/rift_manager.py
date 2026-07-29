@@ -14,8 +14,8 @@ try:
     from ..data.data_manager import DataBase
     from ..managers.enemy_manager import EnemyManager  # noqa: F401
     from ..managers.pve_combat_manager import (
-        PVECombatManager,
         RIFT_LEVEL_DIFFICULTY_MAP,
+        PVECombatManager,
     )
     from ..models import Player
     from ..models_extended import UserStatus

@@ -1,11 +1,13 @@
 # data/data_manager.py
 
-import aiosqlite
 import json
 from dataclasses import fields
 from pathlib import Path
-from typing import Tuple, List, Optional
+
+import aiosqlite
+
 from astrbot.api import logger
+
 from ..models import Player
 from .database_extended import DatabaseExtended
 
@@ -51,7 +53,7 @@ class DataBase:
     def __init__(self, db_file: str = "xiuxian_data_lite.db"):
         self.db_path = Path(db_file)
         self.conn: aiosqlite.Connection = None
-        self.ext: Optional[DatabaseExtended] = None  # 扩展操作类
+        self.ext: DatabaseExtended | None = None  # 扩展操作类
 
     async def connect(self):
         """连接数据库"""
@@ -191,7 +193,7 @@ class DataBase:
 
     # ===== 商店数据操作 =====
 
-    async def get_shop_data(self, shop_id: str = "global") -> Tuple[int, List[dict]]:
+    async def get_shop_data(self, shop_id: str = "global") -> tuple[int, list[dict]]:
         """获取商店数据
 
         Args:
@@ -215,7 +217,7 @@ class DataBase:
             return 0, []
 
     async def update_shop_data(
-        self, shop_id: str, last_refresh_time: int, current_items: List[dict]
+        self, shop_id: str, last_refresh_time: int, current_items: list[dict]
     ):
         """更新商店数据
 

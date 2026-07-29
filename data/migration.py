@@ -12,7 +12,7 @@ from astrbot.api import logger
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 21  # v21: 添加系统配置表，补齐全新安装时缺失的表和字段
+LATEST_DB_VERSION = 22  # v22: 四主属性重构，废弃旧五维/精神力/MP
 
 MIGRATION_TASKS: dict[
     int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]
@@ -47,7 +47,7 @@ class MigrationManager:
                 logger.info("未检测到数据库版本，将进行全新安装...")
                 await self.conn.execute("BEGIN")
                 # 使用最新的建表函数
-                await _create_all_tables_v21(self.conn)
+                await _create_all_tables_v22(self.conn)
                 await self.conn.execute(
                     "INSERT INTO db_info (version) VALUES (?)", (LATEST_DB_VERSION,)
                 )
@@ -784,6 +784,405 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
     logger.info("数据库表已创建完成（v2 - 完整修仙系统）")
 
 
+async def _create_all_tables_v22(conn: aiosqlite.Connection):
+    """创建v22最新完整schema，全新安装时直接得到新四主属性框架。"""
+
+    # 数据库版本信息表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS db_info (
+            version INTEGER NOT NULL
+        )
+    """)
+
+    # 玩家表 - 四主属性新框架
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS players (
+            user_id TEXT PRIMARY KEY,
+            user_name TEXT NOT NULL DEFAULT '',
+            level_index INTEGER NOT NULL DEFAULT 0,
+            cultivation_type TEXT NOT NULL DEFAULT '灵修',
+            lifespan INTEGER NOT NULL DEFAULT 100,
+            experience INTEGER NOT NULL DEFAULT 0,
+            gold INTEGER NOT NULL DEFAULT 0,
+            state TEXT NOT NULL DEFAULT '空闲',
+            cultivation_start_time INTEGER NOT NULL DEFAULT 0,
+            last_check_in_date TEXT NOT NULL DEFAULT '',
+            level_up_rate INTEGER NOT NULL DEFAULT 0,
+
+            damage INTEGER NOT NULL DEFAULT 10,
+            agility INTEGER NOT NULL DEFAULT 5,
+            speed INTEGER NOT NULL DEFAULT 5,
+            hp INTEGER NOT NULL DEFAULT 100,
+            armor_value INTEGER NOT NULL DEFAULT 0,
+
+            weapon TEXT NOT NULL DEFAULT '',
+            armor TEXT NOT NULL DEFAULT '',
+            main_technique TEXT NOT NULL DEFAULT '',
+            techniques TEXT NOT NULL DEFAULT '[]',
+
+            learned_skills TEXT NOT NULL DEFAULT '[]',
+            study_target TEXT NOT NULL DEFAULT '',
+
+            sect_id INTEGER NOT NULL DEFAULT 0,
+            sect_position INTEGER NOT NULL DEFAULT 4,
+            sect_contribution INTEGER NOT NULL DEFAULT 0,
+            sect_task INTEGER NOT NULL DEFAULT 0,
+            sect_elixir_get INTEGER NOT NULL DEFAULT 0,
+
+            blessed_spot_flag INTEGER NOT NULL DEFAULT 0,
+            blessed_spot_name TEXT NOT NULL DEFAULT '',
+
+            active_pill_effects TEXT NOT NULL DEFAULT '[]',
+            permanent_pill_gains TEXT NOT NULL DEFAULT '{}',
+            has_resurrection_pill INTEGER NOT NULL DEFAULT 0,
+            has_debuff_shield INTEGER NOT NULL DEFAULT 0,
+            pills_inventory TEXT NOT NULL DEFAULT '{}',
+
+            storage_ring TEXT NOT NULL DEFAULT '基础储物戒',
+            storage_ring_items TEXT NOT NULL DEFAULT '{}',
+
+            daily_pill_usage TEXT NOT NULL DEFAULT '{}',
+            last_daily_reset TEXT NOT NULL DEFAULT ''
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_player_level ON players(level_index)"
+    )
+
+    # 商店表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS shop (
+            shop_id TEXT PRIMARY KEY,
+            last_refresh_time INTEGER NOT NULL DEFAULT 0,
+            current_items TEXT NOT NULL DEFAULT '[]'
+        )
+    """)
+    await conn.execute("""
+        INSERT OR IGNORE INTO shop (shop_id, last_refresh_time, current_items)
+        VALUES ('global', 0, '[]')
+    """)
+
+    # 宗门表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS sects (
+            sect_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sect_name TEXT NOT NULL UNIQUE,
+            sect_owner TEXT NOT NULL,
+            sect_scale INTEGER NOT NULL DEFAULT 0,
+            sect_used_stone INTEGER NOT NULL DEFAULT 0,
+            sect_fairyland INTEGER NOT NULL DEFAULT 0,
+            sect_materials INTEGER NOT NULL DEFAULT 0,
+            mainbuff TEXT NOT NULL DEFAULT '0',
+            secbuff TEXT NOT NULL DEFAULT '0',
+            elixir_room_level INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_sect_owner ON sects(sect_owner)")
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sect_scale ON sects(sect_scale DESC)"
+    )
+
+    # Buff信息表（简化，旧字段废弃）
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS buff_info (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL UNIQUE
+        )
+    """)
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_buff_user ON buff_info(user_id)")
+
+    # Boss表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS boss (
+            boss_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            boss_name TEXT NOT NULL,
+            boss_level TEXT NOT NULL,
+            hp INTEGER NOT NULL,
+            max_hp INTEGER NOT NULL,
+            atk INTEGER NOT NULL,
+            defense INTEGER NOT NULL DEFAULT 0,
+            stone_reward INTEGER NOT NULL DEFAULT 0,
+            create_time INTEGER NOT NULL DEFAULT 0,
+            status INTEGER NOT NULL DEFAULT 1
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_boss_status ON boss(status, create_time DESC)"
+    )
+
+    # 秘境表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS rifts (
+            rift_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rift_name TEXT NOT NULL,
+            rift_level INTEGER NOT NULL,
+            required_level INTEGER NOT NULL,
+            rewards TEXT NOT NULL DEFAULT '{}'
+        )
+    """)
+
+    # 传承信息表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS impart_info (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL UNIQUE,
+            impart_hp_per REAL NOT NULL DEFAULT 0.0,
+            impart_mp_per REAL NOT NULL DEFAULT 0.0,
+            impart_atk_per REAL NOT NULL DEFAULT 0.0,
+            impart_know_per REAL NOT NULL DEFAULT 0.0,
+            impart_burst_per REAL NOT NULL DEFAULT 0.0
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_impart_user ON impart_info(user_id)"
+    )
+
+    # 用户CD表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_cd (
+            user_id TEXT PRIMARY KEY,
+            type INTEGER NOT NULL DEFAULT 0,
+            create_time INTEGER NOT NULL DEFAULT 0,
+            scheduled_time INTEGER NOT NULL DEFAULT 0,
+            extra_data TEXT NOT NULL DEFAULT '{}'
+        )
+    """)
+
+    # 赠予请求表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS pending_gifts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            receiver_id TEXT NOT NULL,
+            sender_id TEXT NOT NULL,
+            sender_name TEXT NOT NULL DEFAULT '',
+            item_name TEXT NOT NULL,
+            count INTEGER NOT NULL DEFAULT 1,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pending_gifts_receiver ON pending_gifts(receiver_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pending_gifts_expires ON pending_gifts(expires_at)"
+    )
+
+    # 银行账户表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS bank_accounts (
+            user_id TEXT PRIMARY KEY,
+            balance INTEGER NOT NULL DEFAULT 0,
+            last_interest_time INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+
+    # 银行贷款表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS bank_loans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            principal INTEGER NOT NULL DEFAULT 0,
+            interest_rate REAL NOT NULL DEFAULT 0.005,
+            borrowed_at INTEGER NOT NULL,
+            due_at INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            loan_type TEXT NOT NULL DEFAULT 'normal',
+            UNIQUE(user_id, status)
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_loans_user ON bank_loans(user_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_loans_status ON bank_loans(status)"
+    )
+
+    # 银行交易流水表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS bank_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            trans_type TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            balance_after INTEGER NOT NULL DEFAULT 0,
+            description TEXT NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_trans_user ON bank_transactions(user_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bank_trans_time ON bank_transactions(created_at)"
+    )
+
+    # 悬赏任务表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS bounty_tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            bounty_id INTEGER NOT NULL,
+            bounty_name TEXT NOT NULL,
+            target_type TEXT NOT NULL,
+            target_count INTEGER NOT NULL,
+            current_progress INTEGER NOT NULL DEFAULT 0,
+            rewards TEXT NOT NULL DEFAULT '{}',
+            start_time INTEGER NOT NULL,
+            expire_time INTEGER NOT NULL,
+            status INTEGER NOT NULL DEFAULT 1
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bounty_user ON bounty_tasks(user_id)"
+    )
+
+    # 洞天福地表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS blessed_lands (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL UNIQUE,
+            land_type INTEGER NOT NULL DEFAULT 1,
+            land_name TEXT NOT NULL DEFAULT '小洞天',
+            level INTEGER NOT NULL DEFAULT 1,
+            exp_bonus REAL NOT NULL DEFAULT 0.05,
+            gold_per_hour INTEGER NOT NULL DEFAULT 100,
+            last_collect_time INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_blessed_lands_user ON blessed_lands(user_id)"
+    )
+
+    # 灵田表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS spirit_farms (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL UNIQUE,
+            level INTEGER NOT NULL DEFAULT 1,
+            crops TEXT NOT NULL DEFAULT '[]'
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spirit_farms_user ON spirit_farms(user_id)"
+    )
+
+    # 双修记录表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS dual_cultivation (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL UNIQUE,
+            last_dual_time INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dual_user ON dual_cultivation(user_id)"
+    )
+
+    # 天地灵眼表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS spirit_eyes (
+            eye_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            eye_type INTEGER NOT NULL DEFAULT 1,
+            eye_name TEXT NOT NULL DEFAULT '下品灵眼',
+            exp_per_hour INTEGER NOT NULL DEFAULT 500,
+            spawn_time INTEGER NOT NULL,
+            owner_id TEXT,
+            owner_name TEXT,
+            claim_time INTEGER,
+            last_collect_time INTEGER
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spirit_eyes_owner ON spirit_eyes(owner_id)"
+    )
+
+    # 双修请求表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS dual_cultivation_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            from_id TEXT NOT NULL,
+            from_name TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dual_req_target ON dual_cultivation_requests(target_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dual_req_expires ON dual_cultivation_requests(expires_at)"
+    )
+
+    # 战斗冷却表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS combat_cooldowns (
+            user_id TEXT PRIMARY KEY,
+            last_duel_time INTEGER NOT NULL DEFAULT 0,
+            last_spar_time INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+
+    # 系统配置表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS system_config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    await conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_system_config_updated
+        ON system_config(updated_at)
+    """)
+
+    # 插入默认秘境数据
+    import json
+
+    default_rifts = [
+        (1, "青云秘境", 1, 0, json.dumps({"exp": [500, 1500], "gold": [200, 800]})),
+        (2, "落日峡谷", 2, 3, json.dumps({"exp": [1500, 4000], "gold": [500, 2000]})),
+        (3, "万妖洞", 3, 6, json.dumps({"exp": [3000, 8000], "gold": [1000, 5000]})),
+        (
+            4,
+            "玄冰地宫",
+            4,
+            10,
+            json.dumps({"exp": [5000, 15000], "gold": [2000, 10000]}),
+        ),
+        (
+            5,
+            "上古遗迹",
+            5,
+            15,
+            json.dumps({"exp": [10000, 30000], "gold": [5000, 20000]}),
+        ),
+    ]
+    for rift in default_rifts:
+        await conn.execute(
+            "INSERT OR IGNORE INTO rifts (rift_id, rift_name, rift_level, required_level, rewards) VALUES (?, ?, ?, ?, ?)",
+            rift,
+        )
+
+    # 插入初始灵眼数据
+    import time
+
+    now = int(time.time())
+    initial_eyes = [
+        (1, "下品灵眼", 500, now),
+        (1, "下品灵眼", 500, now),
+        (2, "中品灵眼", 2000, now),
+    ]
+    for eye in initial_eyes:
+        await conn.execute(
+            "INSERT INTO spirit_eyes (eye_type, eye_name, exp_per_hour, spawn_time) VALUES (?, ?, ?, ?)",
+            eye,
+        )
+
+    logger.info("数据库表已创建完成（v22 - 四主属性框架）")
+
+
 async def _create_all_tables_v21(conn: aiosqlite.Connection):
     """创建v21最新完整schema，全新安装时直接得到全部表和字段。"""
 
@@ -809,6 +1208,90 @@ async def _create_all_tables_v21(conn: aiosqlite.Connection):
     """)
 
     logger.info("数据库表已创建完成（v21 - 完整修仙系统）")
+
+
+@migration(22)
+async def _migrate_to_v22(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """迁移到v22 - 四主属性重构：废弃旧五维/精神力/MP，引入伤害/身法/迅捷/气血 + 功法领悟"""
+    logger.info("开始迁移到v22：四主属性重构")
+
+    # 1. 重建 players 表（新 schema，旧数据废弃不做映射）
+    await conn.execute("DROP TABLE IF EXISTS players")
+    await conn.execute("""
+        CREATE TABLE players (
+            user_id TEXT PRIMARY KEY,
+            user_name TEXT NOT NULL DEFAULT '',
+            level_index INTEGER NOT NULL DEFAULT 0,
+            cultivation_type TEXT NOT NULL DEFAULT '灵修',
+            lifespan INTEGER NOT NULL DEFAULT 100,
+            experience INTEGER NOT NULL DEFAULT 0,
+            gold INTEGER NOT NULL DEFAULT 0,
+            state TEXT NOT NULL DEFAULT '空闲',
+            cultivation_start_time INTEGER NOT NULL DEFAULT 0,
+            last_check_in_date TEXT NOT NULL DEFAULT '',
+            level_up_rate INTEGER NOT NULL DEFAULT 0,
+
+            -- 四主属性（新框架）
+            damage INTEGER NOT NULL DEFAULT 10,
+            agility INTEGER NOT NULL DEFAULT 5,
+            speed INTEGER NOT NULL DEFAULT 5,
+            hp INTEGER NOT NULL DEFAULT 100,
+
+            -- 护甲（装备派生，独立存储便于计算）
+            armor_value INTEGER NOT NULL DEFAULT 0,
+
+            -- 装备栏
+            weapon TEXT NOT NULL DEFAULT '',
+            armor TEXT NOT NULL DEFAULT '',
+            main_technique TEXT NOT NULL DEFAULT '',
+            techniques TEXT NOT NULL DEFAULT '[]',
+
+            -- 功法领悟系统
+            learned_skills TEXT NOT NULL DEFAULT '[]',
+            study_target TEXT NOT NULL DEFAULT '',
+
+            -- 宗门系统
+            sect_id INTEGER NOT NULL DEFAULT 0,
+            sect_position INTEGER NOT NULL DEFAULT 4,
+            sect_contribution INTEGER NOT NULL DEFAULT 0,
+            sect_task INTEGER NOT NULL DEFAULT 0,
+            sect_elixir_get INTEGER NOT NULL DEFAULT 0,
+
+            -- 洞天福地
+            blessed_spot_flag INTEGER NOT NULL DEFAULT 0,
+            blessed_spot_name TEXT NOT NULL DEFAULT '',
+
+            -- 丹药系统
+            active_pill_effects TEXT NOT NULL DEFAULT '[]',
+            permanent_pill_gains TEXT NOT NULL DEFAULT '{}',
+            has_resurrection_pill INTEGER NOT NULL DEFAULT 0,
+            has_debuff_shield INTEGER NOT NULL DEFAULT 0,
+            pills_inventory TEXT NOT NULL DEFAULT '{}',
+
+            -- 储物戒
+            storage_ring TEXT NOT NULL DEFAULT '基础储物戒',
+            storage_ring_items TEXT NOT NULL DEFAULT '{}',
+
+            -- 每日限制
+            daily_pill_usage TEXT NOT NULL DEFAULT '{}',
+            last_daily_reset TEXT NOT NULL DEFAULT ''
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_player_level ON players(level_index)"
+    )
+
+    # 2. 清理 buff_info 表（旧 buff 字段废弃）
+    await conn.execute("DROP TABLE IF EXISTS buff_info")
+    await conn.execute("""
+        CREATE TABLE buff_info (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL UNIQUE
+        )
+    """)
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_buff_user ON buff_info(user_id)")
+
+    logger.info("v22迁移完成：四主属性重构，旧数据已废弃")
 
 
 @migration(21)

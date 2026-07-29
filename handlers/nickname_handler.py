@@ -2,7 +2,9 @@
 """道号系统处理器"""
 
 import re
+
 from astrbot.api.event import AstrMessageEvent
+
 from ..data import DataBase
 from ..models import Player
 from .utils import player_required

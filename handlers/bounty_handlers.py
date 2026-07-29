@@ -2,6 +2,7 @@
 """悬赏令处理器"""
 
 from astrbot.api.event import AstrMessageEvent
+
 from ..data import DataBase
 from ..managers.bounty_manager import BountyManager
 from ..models import Player

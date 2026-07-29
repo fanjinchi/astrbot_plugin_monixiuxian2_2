@@ -1,14 +1,16 @@
 # handlers/player_handler.py
-import time
 import random
+import time
 from datetime import datetime
-from astrbot.api.event import AstrMessageEvent
+
 from astrbot.api import AstrBotConfig
-from ..data import DataBase
+from astrbot.api.event import AstrMessageEvent
+
+from ..config_manager import ConfigManager
 from ..core import CultivationManager, PillManager
+from ..data import DataBase
 from ..models import Player
 from ..models_extended import UserStatus
-from ..config_manager import ConfigManager
 from .utils import player_required
 
 CMD_START_XIUXIAN = "我要修仙"
@@ -86,7 +88,7 @@ class PlayerHandler:
         # 验证职业类型
         cultivation_type = cultivation_type.strip()
         if cultivation_type not in ["灵修", "体修"]:
-            yield event.plain_result(f"职业选择错误！请选择「灵修」或「体修」。")
+            yield event.plain_result("职业选择错误！请选择「灵修」或「体修」。")
             return
 
         # 生成新玩家

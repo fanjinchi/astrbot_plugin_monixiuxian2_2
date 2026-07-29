@@ -2,10 +2,11 @@
 # 通用工具函数和装饰器
 
 import time
+from collections.abc import AsyncGenerator, Callable, Coroutine
 from functools import wraps
-from typing import Callable, Coroutine, AsyncGenerator
 
 from astrbot.api.event import AstrMessageEvent
+
 from ..models import Player
 from ..models_extended import UserStatus
 

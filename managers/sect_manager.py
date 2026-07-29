@@ -6,10 +6,9 @@
 
 import random
 import time
-from typing import Tuple, List, Optional, Dict
+
 from ..data.data_manager import DataBase
 from ..models_extended import Sect, UserStatus
-from ..models import Player
 
 SECT_NAME_MIN_LENGTH = 2
 SECT_NAME_MAX_LENGTH = 12
@@ -35,7 +34,7 @@ class SectManager:
         self.db = db
         self.config = config_manager.sect_config if config_manager else {}
 
-    def _validate_sect_name(self, name: str) -> Tuple[bool, str]:
+    def _validate_sect_name(self, name: str) -> tuple[bool, str]:
         """验证宗门名称"""
         if len(name) < SECT_NAME_MIN_LENGTH or len(name) > SECT_NAME_MAX_LENGTH:
             return (
@@ -44,7 +43,7 @@ class SectManager:
             )
         for forbidden in SECT_NAME_FORBIDDEN:
             if forbidden.lower() in name.lower():
-                return False, f"❌ 宗门名称包含禁用词汇！"
+                return False, "❌ 宗门名称包含禁用词汇！"
         return True, ""
 
     async def create_sect(
@@ -53,7 +52,7 @@ class SectManager:
         sect_name: str,
         required_stone: int = None,
         required_level: int = None,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         创建宗门
 
@@ -128,7 +127,7 @@ class SectManager:
 
         return True, f"✨ 恭喜！你成功创建了宗门『{sect_name}』，成为一代宗主！"
 
-    async def join_sect(self, user_id: str, sect_name: str) -> Tuple[bool, str]:
+    async def join_sect(self, user_id: str, sect_name: str) -> tuple[bool, str]:
         """
         加入宗门
 
@@ -162,7 +161,7 @@ class SectManager:
 
         return True, f"✨ 你成功加入了宗门『{sect_name}』，成为外门弟子！"
 
-    async def leave_sect(self, user_id: str) -> Tuple[bool, str]:
+    async def leave_sect(self, user_id: str) -> tuple[bool, str]:
         """
         退出宗门
 
@@ -193,7 +192,7 @@ class SectManager:
 
         return True, f"✨ 你已退出宗门『{sect_name}』！"
 
-    async def donate_to_sect(self, user_id: str, stone_amount: int) -> Tuple[bool, str]:
+    async def donate_to_sect(self, user_id: str, stone_amount: int) -> tuple[bool, str]:
         """
         宗门捐献（1灵石 = 10建设度）
 
@@ -234,7 +233,7 @@ class SectManager:
             f"✨ 捐献成功！消耗 {stone_amount} 灵石，宗门获得 {scale_gained} 建设度！\n你的宗门贡献度：{player.sect_contribution}",
         )
 
-    async def get_sect_info(self, user_id: str) -> Tuple[bool, str, Optional[Dict]]:
+    async def get_sect_info(self, user_id: str) -> tuple[bool, str, dict | None]:
         """
         获取宗门信息
 
@@ -291,7 +290,7 @@ class SectManager:
 
         return True, info_msg, sect_data
 
-    async def list_all_sects(self) -> Tuple[bool, str]:
+    async def list_all_sects(self) -> tuple[bool, str]:
         """
         获取所有宗门列表
 
@@ -319,7 +318,7 @@ class SectManager:
 
     async def change_position(
         self, operator_id: str, target_id: str, new_position: int
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         变更宗门职位
 
@@ -368,7 +367,7 @@ class SectManager:
 
     async def transfer_ownership(
         self, current_owner_id: str, new_owner_id: str
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         宗主传位
 
@@ -411,7 +410,7 @@ class SectManager:
 
         return True, f"✨ 宗主之位已传给 {new_owner_name}！你现在是长老。"
 
-    async def kick_member(self, operator_id: str, target_id: str) -> Tuple[bool, str]:
+    async def kick_member(self, operator_id: str, target_id: str) -> tuple[bool, str]:
         """
         踢出宗门成员
 
@@ -458,7 +457,7 @@ class SectManager:
 
         return True, f"✨ 已将 {target_name} 踢出宗门！"
 
-    async def perform_sect_task(self, user_id: str) -> Tuple[bool, str]:
+    async def perform_sect_task(self, user_id: str) -> tuple[bool, str]:
         """
         执行宗门任务
 
@@ -515,7 +514,7 @@ class SectManager:
 
     async def handle_owner_death(
         self, sect_id: int, dead_owner_id: str
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """处理宗主死亡，自动传位或解散宗门"""
         members = await self.db.ext.get_sect_members(sect_id)
         # 过滤掉死亡的宗主

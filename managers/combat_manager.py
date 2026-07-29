@@ -5,7 +5,6 @@
 """
 
 import random
-from typing import Tuple, Dict, Optional, List
 from dataclasses import dataclass
 
 
@@ -31,7 +30,7 @@ class CombatManager:
     @staticmethod
     def calculate_hp_mp(
         experience: int, hp_buff: float = 0.0, mp_buff: float = 0.0
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """
         根据修为计算HP和MP
 
@@ -75,7 +74,7 @@ class CombatManager:
     @staticmethod
     def calculate_turn_attack(
         base_atk: int, crit_rate: int = 0, atk_buff: float = 0.0
-    ) -> Tuple[bool, int]:
+    ) -> tuple[bool, int]:
         """
         计算单回合攻击伤害
 
@@ -118,7 +117,7 @@ class CombatManager:
     @classmethod
     def player_vs_player(
         cls, player1: CombatStats, player2: CombatStats, combat_type: int = 1
-    ) -> Dict:
+    ) -> dict:
         """
         玩家vs玩家战斗
 
@@ -137,7 +136,7 @@ class CombatManager:
             - player2_final_mp: 玩家2最终MP
         """
         combat_log = []
-        combat_log.append(f"☆━━━━ 战斗开始 ━━━━☆")
+        combat_log.append("☆━━━━ 战斗开始 ━━━━☆")
         combat_log.append(f"{player1.name} VS {player2.name}")
         combat_log.append(
             f"{player1.name}：HP {player1.hp}/{player1.max_hp}，ATK {player1.atk}"
@@ -197,7 +196,7 @@ class CombatManager:
             combat_log.append(f"☆━━━━ {player2.name} 胜利！━━━━☆")
         else:
             winner = "平局"
-            combat_log.append(f"☆━━━━ 平局！━━━━☆")
+            combat_log.append("☆━━━━ 平局！━━━━☆")
 
         # 如果是切磋，不消耗HP/MP
         if combat_type == 1:
@@ -223,7 +222,7 @@ class CombatManager:
         }
 
     @classmethod
-    def player_vs_boss(cls, player: CombatStats, boss: CombatStats) -> Dict:
+    def player_vs_boss(cls, player: CombatStats, boss: CombatStats) -> dict:
         """
         玩家vs Boss战斗
 
@@ -235,7 +234,7 @@ class CombatManager:
             战斗结果字典
         """
         combat_log = []
-        combat_log.append(f"☆━━━━ Boss战开始 ━━━━☆")
+        combat_log.append("☆━━━━ Boss战开始 ━━━━☆")
         combat_log.append(f"{player.name} 挑战 {boss.name}")
         combat_log.append(
             f"{player.name}：HP {player.hp}/{player.max_hp}，ATK {player.atk}"
@@ -298,7 +297,7 @@ class CombatManager:
         else:
             winner = "平局"
             reward = 0
-            combat_log.append(f"☆━━━━ 战斗超时，平局！━━━━☆")
+            combat_log.append("☆━━━━ 战斗超时，平局！━━━━☆")
 
         return {
             "winner": winner,

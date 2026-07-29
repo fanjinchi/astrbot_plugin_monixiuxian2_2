@@ -1,9 +1,10 @@
 # managers/spirit_farm_manager.py
 """灵田系统管理器"""
 
-import time
 import json
-from typing import Tuple, Optional, Dict, List, TYPE_CHECKING
+import time
+from typing import TYPE_CHECKING
+
 from ..data import DataBase
 from ..models import Player
 
@@ -63,7 +64,7 @@ class SpiritFarmManager:
         self.db = db
         self.storage_ring_manager = storage_ring_manager
 
-    async def get_user_farm(self, user_id: str) -> Optional[Dict]:
+    async def get_user_farm(self, user_id: str) -> dict | None:
         """获取用户灵田信息"""
         async with self.db.conn.execute(
             "SELECT * FROM spirit_farms WHERE user_id = ?", (user_id,)
@@ -75,7 +76,7 @@ class SpiritFarmManager:
                 return data
             return None
 
-    async def create_farm(self, player: Player) -> Tuple[bool, str]:
+    async def create_farm(self, player: Player) -> tuple[bool, str]:
         """开垦灵田"""
         existing = await self.get_user_farm(player.user_id)
         if existing:
@@ -106,7 +107,7 @@ class SpiritFarmManager:
             "可种植：灵草、血灵草、冰心草..."
         )
 
-    async def plant_herb(self, player: Player, herb_name: str) -> Tuple[bool, str]:
+    async def plant_herb(self, player: Player, herb_name: str) -> tuple[bool, str]:
         """种植灵草"""
         if herb_name not in SPIRIT_HERBS:
             herbs_list = "、".join(SPIRIT_HERBS.keys())
@@ -145,7 +146,7 @@ class SpiritFarmManager:
             f"当前种植：{len(crops)}/{max_slots}"
         )
 
-    async def harvest(self, player: Player) -> Tuple[bool, str]:
+    async def harvest(self, player: Player) -> tuple[bool, str]:
         """收获灵草"""
         farm = await self.get_user_farm(player.user_id)
         if not farm:
@@ -222,7 +223,7 @@ class SpiritFarmManager:
             msg_lines.append(f"获得修为：+{total_exp:,}")
             msg_lines.append(f"获得灵石：+{total_gold:,}")
             if stored_items:
-                msg_lines.append(f"📦 存入储物戒：")
+                msg_lines.append("📦 存入储物戒：")
                 for item in stored_items:
                     msg_lines.append(f"  {item}")
 
@@ -237,7 +238,7 @@ class SpiritFarmManager:
 
         return True, "\n".join(msg_lines)
 
-    async def upgrade_farm(self, player: Player) -> Tuple[bool, str]:
+    async def upgrade_farm(self, player: Player) -> tuple[bool, str]:
         """升级灵田"""
         farm = await self.get_user_farm(player.user_id)
         if not farm:

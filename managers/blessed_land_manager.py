@@ -2,8 +2,7 @@
 """洞天福地系统管理器"""
 
 import time
-import json
-from typing import Tuple, Optional, Dict
+
 from ..data import DataBase
 from ..models import Player
 
@@ -60,7 +59,7 @@ class BlessedLandManager:
     def __init__(self, db: DataBase):
         self.db = db
 
-    async def get_user_blessed_land(self, user_id: str) -> Optional[Dict]:
+    async def get_user_blessed_land(self, user_id: str) -> dict | None:
         """获取用户洞天信息"""
         async with self.db.conn.execute(
             "SELECT * FROM blessed_lands WHERE user_id = ?", (user_id,)
@@ -72,7 +71,7 @@ class BlessedLandManager:
 
     async def purchase_blessed_land(
         self, player: Player, land_type: int
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """购买洞天"""
         if land_type not in BLESSED_LANDS:
             return (
@@ -125,7 +124,7 @@ class BlessedLandManager:
             f"使用 /洞天收取 领取产出"
         )
 
-    async def upgrade_blessed_land(self, player: Player) -> Tuple[bool, str]:
+    async def upgrade_blessed_land(self, player: Player) -> tuple[bool, str]:
         """升级洞天"""
         land = await self.get_user_blessed_land(player.user_id)
         if not land:
@@ -172,7 +171,7 @@ class BlessedLandManager:
             f"花费：{upgrade_cost:,} 灵石"
         )
 
-    async def collect_income(self, player: Player) -> Tuple[bool, str]:
+    async def collect_income(self, player: Player) -> tuple[bool, str]:
         """收取洞天产出"""
         land = await self.get_user_blessed_land(player.user_id)
         if not land:

@@ -2,6 +2,7 @@
 """洞天福地处理器"""
 
 from astrbot.api.event import AstrMessageEvent
+
 from ..data import DataBase
 from ..managers.blessed_land_manager import BlessedLandManager
 from ..models import Player

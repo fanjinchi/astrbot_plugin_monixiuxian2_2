@@ -5,16 +5,16 @@
 
 ## 1. 数据层与配置重构
 
-- [ ] 1.1 数据库迁移（`data/migration.py` 新增版本）：`players` 表按四主属性（伤害/身法/迅捷/气血）重建，废弃旧五维、精神力/MP、atkpractice 等旧字段；新增已领悟功法字段（JSON）与修习目标字段；旧数据直接废弃不做映射（design D7 / attribute-numerics「旧数据废弃」）
-- [ ] 1.2 十进制境界配置：重写 `config/level_config.json` 与 `body_level_config.json`（每大境界 = 初期+一阶~九阶，十位编码大境界；含各境界四主属性基础值；升级曲线数值暂沿用旧表占位，保持 config 可调）
-- [ ] 1.3 装备词条化：`config/weapons.json` 增加武器系数 K、基础伤害、触发技词条；心法配置增加属性被动与配套功法列表（各功法带领悟概率系数）；新增功法定义配置（触发技+大招+路线倍率）与通用功法池配置
-- [ ] 1.4 `config/game_config.json` 新增战斗参数区：领悟概率（0.20/0.10/0.15 与 2h 步长）、通用池概率（0.05/0.03）、行动上限 200、闪避上限 0.5、暴击倍率 1.5、战报合并默认 10 条、随机成长步长 N、PvE 难度系数
+- [x] 1.1 数据库迁移（`data/migration.py` 新增版本 v22）：`players` 表按四主属性（damage/agility/speed/hp）重建，废弃旧五维、精神力/MP、atkpractice 等旧字段；新增已领悟功法字段 `learned_skills`（JSON）与修习目标字段 `study_target`；旧数据直接废弃不做映射。同步重建 `buff_info` 表（旧字段废弃）。
+- [x] 1.2 十进制境界配置：重写 `config/level_config.json`（99 个灵修等级）与 `body_level_config.json`（99 个体修等级）。十位 = 大境界序号（0=练气/锻体, 1=筑基/铜皮...），个位 = 小阶段（0=初期, 1-9=一阶~九阶）；练气/锻体无初期，一阶从 level 1 开始。每个等级含四主属性基础值（base_damage/agility/speed/hp）与突破所需修为（exp_needed）、成功率（success_rate）。数值从旧 36 境界映射占位，保持 config 可调。
+- [x] 1.3 装备词条化：`config/weapons.json` 增加 `weapon_coefficient_k`（武器系数 K，按类别区分大/小武器）、`base_damage`（基础伤害）、`armor_value`（护甲值）、`trigger_skills`（触发技结构，占位空列表）、`route_multiplier`（路线倍率）。新增 `config/skills.json`（功法定义：触发技+大招+路线倍率+领悟概率系数）与 `config/heart_methods.json`（心法定义：属性被动+配套功法列表）。
+- [x] 1.4 `config/game_config.json` 新增 `skill_system` 战斗参数区：breakthrough_success_learn_rate=0.2、breakthrough_fail_learn_rate=0.1、cultivation_learn_rate=0.15（每满 2 小时一次）、universal_pool_rate=0.05、universal_pool_no_heart_rate=0.03、random_growth_step=5、max_technique_slots=3、battle_report_merge_count=10。新增 `pve` 区 difficulty_multiplier=1.0。combat 区新增 action_limit=200、dodge_cap=0.5。
 
 ## 2. 属性与模型层
 
-- [ ] 2.1 `models.py`：Player 重构为四主属性 + 护甲（装备派生）+ 已领悟功法/修习目标字段；重写 `get_total_attributes`（废弃 exp 派生与旧五维）
-- [ ] 2.2 `models_extended.py`：评估 UserStatus 是否需新增「修习中」状态，如需则同步更新 `handlers/utils.py` 的 `BUSY_STATE_ALLOWED_COMMANDS`
-- [ ] 2.3 `managers/ranking_manager.py`：战力公式按四主属性 + 装备/功法加权重写（废弃旧公式）
+- [x] 2.1 `models.py`：Player 重构为四主属性（damage/agility/speed/hp）+ armor_value（护甲）+ learned_skills（已领悟功法 JSON）+ study_target（修习目标）。Item 重构为四主属性 + weapon_coefficient_k + base_damage + armor_value + route_multiplier + trigger_skills + passive_bonus + skill_pool。重写 `get_total_attributes`：基础属性 + 装备按路线倍率叠加 + 心法被动加成 + 丹药倍率（废弃 exp 派生与旧五维）。
+- [x] 2.2 `models_extended.py`：评估 UserStatus 是否需新增「修习中」状态——**不需要新增状态**（修习目标只是字段，无进行中状态），已确认。
+- [x] 2.3 `managers/ranking_manager.py`：战力公式重写为 `damage + agility + speed + hp + armor_value//2`（废弃旧「物伤+法伤+物防+法防+精神力//10」公式）。
 
 ## 3. 技能系统（skill-system）
 

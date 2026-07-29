@@ -3,10 +3,11 @@
 扩展数据库操作类，包含宗门、Boss、秘境等新系统的CRUD方法
 """
 
-import aiosqlite
 import json
-from typing import List, Optional
-from ..models_extended import Sect, BuffInfo, Boss, Rift, ImpartInfo, UserCd
+
+import aiosqlite
+
+from ..models_extended import Boss, BuffInfo, ImpartInfo, Rift, Sect, UserCd
 
 
 class DatabaseExtended:
@@ -45,7 +46,7 @@ class DatabaseExtended:
             row = await cursor.fetchone()
             return row[0] if row else None
 
-    async def get_sect_by_id(self, sect_id: int) -> Optional[Sect]:
+    async def get_sect_by_id(self, sect_id: int) -> Sect | None:
         """根据ID获取宗门信息"""
         async with self.conn.execute(
             "SELECT * FROM sects WHERE sect_id = ?", (sect_id,)
@@ -55,7 +56,7 @@ class DatabaseExtended:
                 return Sect(**dict(row))
             return None
 
-    async def get_sect_by_owner(self, owner_id: str) -> Optional[Sect]:
+    async def get_sect_by_owner(self, owner_id: str) -> Sect | None:
         """根据宗主ID获取宗门信息"""
         async with self.conn.execute(
             "SELECT * FROM sects WHERE sect_owner = ?", (owner_id,)
@@ -65,7 +66,7 @@ class DatabaseExtended:
                 return Sect(**dict(row))
             return None
 
-    async def get_sect_by_name(self, sect_name: str) -> Optional[Sect]:
+    async def get_sect_by_name(self, sect_name: str) -> Sect | None:
         """根据宗门名称获取宗门信息"""
         async with self.conn.execute(
             "SELECT * FROM sects WHERE sect_name = ?", (sect_name,)
@@ -105,7 +106,7 @@ class DatabaseExtended:
         await self.conn.execute("DELETE FROM sects WHERE sect_id = ?", (sect_id,))
         await self.conn.commit()
 
-    async def get_all_sects(self) -> List[Sect]:
+    async def get_all_sects(self) -> list[Sect]:
         """获取所有宗门"""
         async with self.conn.execute(
             "SELECT * FROM sects ORDER BY sect_scale DESC"
@@ -163,7 +164,7 @@ class DatabaseExtended:
         )
         await self.conn.commit()
 
-    async def get_buff_info(self, user_id: str) -> Optional[BuffInfo]:
+    async def get_buff_info(self, user_id: str) -> BuffInfo | None:
         """获取用户buff信息"""
         async with self.conn.execute(
             "SELECT * FROM buff_info WHERE user_id = ?", (user_id,)
@@ -239,7 +240,7 @@ class DatabaseExtended:
             row = await cursor.fetchone()
             return row[0] if row else None
 
-    async def get_active_boss(self) -> Optional[Boss]:
+    async def get_active_boss(self) -> Boss | None:
         """获取当前存活的Boss"""
         async with self.conn.execute(
             "SELECT * FROM boss WHERE status = 1 ORDER BY create_time DESC LIMIT 1"
@@ -249,7 +250,7 @@ class DatabaseExtended:
                 return Boss(**dict(row))
             return None
 
-    async def get_boss_by_id(self, boss_id: int) -> Optional[Boss]:
+    async def get_boss_by_id(self, boss_id: int) -> Boss | None:
         """根据ID获取Boss信息"""
         async with self.conn.execute(
             "SELECT * FROM boss WHERE boss_id = ?", (boss_id,)
@@ -307,7 +308,7 @@ class DatabaseExtended:
             row = await cursor.fetchone()
             return row[0] if row else None
 
-    async def get_rift_by_id(self, rift_id: int) -> Optional[Rift]:
+    async def get_rift_by_id(self, rift_id: int) -> Rift | None:
         """根据ID获取秘境信息"""
         async with self.conn.execute(
             "SELECT * FROM rifts WHERE rift_id = ?", (rift_id,)
@@ -317,7 +318,7 @@ class DatabaseExtended:
                 return Rift(**dict(row))
             return None
 
-    async def get_all_rifts(self) -> List[Rift]:
+    async def get_all_rifts(self) -> list[Rift]:
         """获取所有秘境"""
         async with self.conn.execute(
             "SELECT * FROM rifts ORDER BY rift_level ASC"
@@ -340,7 +341,7 @@ class DatabaseExtended:
         )
         await self.conn.commit()
 
-    async def get_impart_info(self, user_id: str) -> Optional[ImpartInfo]:
+    async def get_impart_info(self, user_id: str) -> ImpartInfo | None:
         """获取用户传承信息"""
         async with self.conn.execute(
             "SELECT * FROM impart_info WHERE user_id = ?", (user_id,)
@@ -383,7 +384,7 @@ class DatabaseExtended:
         )
         await self.conn.commit()
 
-    async def get_user_cd(self, user_id: str) -> Optional[UserCd]:
+    async def get_user_cd(self, user_id: str) -> UserCd | None:
         """获取用户CD信息"""
         async with self.conn.execute(
             "SELECT * FROM user_cd WHERE user_id = ?", (user_id,)
@@ -427,7 +428,6 @@ class DatabaseExtended:
             extra_data: 额外数据（如秘境ID等）
         """
         import time
-        import json
 
         extra_json = json.dumps(extra_data or {}, ensure_ascii=False)
         await self.conn.execute(
@@ -488,7 +488,7 @@ class DatabaseExtended:
         await self.conn.execute("UPDATE players SET sect_elixir_get = 0")
         await self.conn.commit()
 
-    async def get_sect_members(self, sect_id: int) -> List:
+    async def get_sect_members(self, sect_id: int) -> list:
         """获取宗门所有成员"""
         from ..models import Player
 
@@ -508,7 +508,7 @@ class DatabaseExtended:
 
     # ===== Phase 2: 灵石银行 CRUD =====
 
-    async def get_bank_account(self, user_id: str) -> Optional[dict]:
+    async def get_bank_account(self, user_id: str) -> dict | None:
         """获取银行账户信息"""
         async with self.conn.execute(
             "SELECT balance, last_interest_time FROM bank_accounts WHERE user_id = ?",
@@ -537,7 +537,7 @@ class DatabaseExtended:
 
     # ===== Phase 2: 悬赏令系统 CRUD =====
 
-    async def get_active_bounty(self, user_id: str) -> Optional[dict]:
+    async def get_active_bounty(self, user_id: str) -> dict | None:
         """获取用户当前进行中的悬赏任务"""
         async with self.conn.execute(
             "SELECT * FROM bounty_tasks WHERE user_id = ? AND status = 1", (user_id,)
@@ -608,7 +608,7 @@ class DatabaseExtended:
 
     # ===== 系统配置 CRUD =====
 
-    async def get_system_config(self, key: str) -> Optional[str]:
+    async def get_system_config(self, key: str) -> str | None:
         """获取系统配置"""
         async with self.conn.execute(
             "SELECT value FROM system_config WHERE key = ?", (key,)
@@ -672,7 +672,7 @@ class DatabaseExtended:
             row = await cursor.fetchone()
             return row[0] if row else None
 
-    async def get_pending_gift(self, receiver_id: str) -> Optional[dict]:
+    async def get_pending_gift(self, receiver_id: str) -> dict | None:
         """获取接收者的待处理赠予请求（最新的一个）"""
         import time
 
@@ -705,7 +705,7 @@ class DatabaseExtended:
                 }
             return None
 
-    async def get_all_pending_gifts(self, receiver_id: str) -> List[dict]:
+    async def get_all_pending_gifts(self, receiver_id: str) -> list[dict]:
         """获取接收者的所有待处理赠予请求"""
         import time
 
@@ -759,7 +759,7 @@ class DatabaseExtended:
 
     # ===== Phase 3: 银行贷款系统 CRUD =====
 
-    async def get_active_loan(self, user_id: str) -> Optional[dict]:
+    async def get_active_loan(self, user_id: str) -> dict | None:
         """获取用户当前活跃的贷款"""
         async with self.conn.execute(
             """SELECT id, user_id, principal, interest_rate, borrowed_at, due_at, status, loan_type
@@ -814,7 +814,7 @@ class DatabaseExtended:
         )
         await self.conn.commit()
 
-    async def get_overdue_loans(self, current_time: int) -> List[dict]:
+    async def get_overdue_loans(self, current_time: int) -> list[dict]:
         """获取所有逾期贷款"""
         loans = []
         async with self.conn.execute(
@@ -855,7 +855,7 @@ class DatabaseExtended:
         )
         await self.conn.commit()
 
-    async def get_bank_transactions(self, user_id: str, limit: int = 20) -> List[dict]:
+    async def get_bank_transactions(self, user_id: str, limit: int = 20) -> list[dict]:
         """获取用户银行交易流水"""
         transactions = []
         async with self.conn.execute(
@@ -877,7 +877,7 @@ class DatabaseExtended:
                 )
         return transactions
 
-    async def get_deposit_ranking(self, limit: int = 10) -> List[dict]:
+    async def get_deposit_ranking(self, limit: int = 10) -> list[dict]:
         """获取存款排行榜"""
         rankings = []
         async with self.conn.execute(

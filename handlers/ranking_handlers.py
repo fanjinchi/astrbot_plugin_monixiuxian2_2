@@ -1,7 +1,8 @@
 # handlers/ranking_handlers.py
 from astrbot.api.event import AstrMessageEvent
-from ..managers.ranking_manager import RankingManager
+
 from ..data.data_manager import DataBase
+from ..managers.ranking_manager import RankingManager
 
 
 class RankingHandlers:

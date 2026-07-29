@@ -4,9 +4,9 @@
 """
 
 import random
-from typing import Tuple, List, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
+
 from ..data.data_manager import DataBase
-from ..models import Player
 from ..models_extended import UserStatus
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class AlchemyManager:
                 recipe_id = int(recipe["id"])
                 self.recipes[recipe_id] = self._normalize_recipe(recipe_id, recipe)
 
-    def _normalize_recipe(self, recipe_id: int, recipe: Dict) -> Dict:
+    def _normalize_recipe(self, recipe_id: int, recipe: dict) -> dict:
         """标准化配方字段，兼容不同格式的配置"""
         name = recipe.get("name", f"丹药{recipe_id}")
 
@@ -63,7 +63,7 @@ class AlchemyManager:
             "desc": desc,
         }
 
-    def _generate_pill_desc(self, pill_config: Dict) -> str:
+    def _generate_pill_desc(self, pill_config: dict) -> str:
         """根据丹药配置生成描述"""
         rank = pill_config.get("rank", "")
 
@@ -92,7 +92,7 @@ class AlchemyManager:
 
         return f"{rank}丹药"
 
-    def _get_pill_config_by_name(self, name: str) -> Optional[Dict]:
+    def _get_pill_config_by_name(self, name: str) -> dict | None:
         """根据丹药名称从配置中获取丹药信息"""
         if not self.config_manager:
             return None
@@ -119,7 +119,7 @@ class AlchemyManager:
 
         return None
 
-    async def get_available_recipes(self, user_id: str) -> Tuple[bool, str]:
+    async def get_available_recipes(self, user_id: str) -> tuple[bool, str]:
         """
         获取可用的丹药配方
 
@@ -160,7 +160,7 @@ class AlchemyManager:
 
     async def craft_pill(
         self, user_id: str, pill_id: int
-    ) -> Tuple[bool, str, Optional[Dict]]:
+    ) -> tuple[bool, str, dict | None]:
         """
         炼制丹药
 
@@ -224,7 +224,7 @@ class AlchemyManager:
         if missing_materials:
             return (
                 False,
-                f"❌ 材料不足！\n" + "\n".join(f"  · {m}" for m in missing_materials),
+                "❌ 材料不足！\n" + "\n".join(f"  · {m}" for m in missing_materials),
                 None,
             )
 
