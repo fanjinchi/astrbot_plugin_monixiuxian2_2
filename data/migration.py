@@ -1294,6 +1294,26 @@ async def _migrate_to_v22(conn: aiosqlite.Connection, config_manager: ConfigMana
     logger.info("v22迁移完成：四主属性重构，旧数据已废弃")
 
 
+@migration(23)
+async def _migrate_to_v23(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """迁移到v23 - 新增玩家战报合并条数偏好字段"""
+    logger.info("开始迁移到v23：新增战报合并条数偏好")
+
+    async with conn.execute("PRAGMA table_info(players)") as cursor:
+        columns = {row[1] for row in await cursor.fetchall()}
+
+    if "battle_report_merge_count" not in columns:
+        await conn.execute(
+            "ALTER TABLE players ADD COLUMN battle_report_merge_count INTEGER NOT NULL DEFAULT 0"
+        )
+        logger.info("已添加 battle_report_merge_count 字段")
+    else:
+        logger.info("battle_report_merge_count 字段已存在，跳过")
+
+    await conn.commit()
+    logger.info("v23迁移完成：战报合并条数偏好")
+
+
 @migration(21)
 async def _migrate_to_v21(conn: aiosqlite.Connection, config_manager: ConfigManager):
     """迁移到v21 - 创建系统配置表并补齐user_cd.extra_data字段"""

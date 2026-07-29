@@ -6,6 +6,7 @@ from .equipment_manager import EquipmentManager
 from .gm_manager import GMManager
 from .pill_manager import PillManager
 from .shop_manager import ShopManager
+from .skill_manager import SkillManager
 from .storage_ring_manager import StorageRingManager
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "ShopManager",
     "StorageRingManager",
     "GMManager",
+    "SkillManager",
 ]

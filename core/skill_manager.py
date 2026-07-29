@@ -276,6 +276,9 @@ class SkillManager:
         """Return a skill definition with star-level multipliers applied.
 
         Trigger rate and effect value are boosted by star level.
+        A normalized ``trigger_timing`` key is injected so the combat engine
+        can filter skills by phase (on_attack / on_defense / on_crit /
+        round_start / ultimate).
         """
         result = dict(skill_def)
         trigger = result.get("trigger_skill")
@@ -287,6 +290,16 @@ class SkillManager:
             trigger["trigger_rate"] = min(rate * (1 + bonus), 1.0)
             trigger["effect_value"] = value * (1 + bonus)
             trigger["star_level"] = star_level
+            # Normalize timing for the combat engine
+            condition = trigger.get("trigger_condition", "")
+            timing_map = {
+                "attack": "on_attack",
+                "defend": "on_defense",
+                "crit": "on_crit",
+                "round_start": "round_start",
+                "once_per_battle": "ultimate",
+            }
+            trigger["trigger_timing"] = timing_map.get(condition, condition)
             result["trigger_skill"] = trigger
 
         ultimate = result.get("ultimate")
@@ -296,6 +309,15 @@ class SkillManager:
             ultimate = dict(ultimate)
             ultimate["effect_value"] = value * (1 + bonus)
             ultimate["star_level"] = star_level
+            condition = ultimate.get("trigger_condition", "once_per_battle")
+            timing_map = {
+                "attack": "on_attack",
+                "defend": "on_defense",
+                "crit": "on_crit",
+                "round_start": "round_start",
+                "once_per_battle": "ultimate",
+            }
+            ultimate["trigger_timing"] = timing_map.get(condition, condition)
             result["ultimate"] = ultimate
 
         result["current_star_level"] = star_level

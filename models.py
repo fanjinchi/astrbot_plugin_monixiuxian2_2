@@ -128,6 +128,8 @@ class Player:
     learned_skills: str = "[]"  # Learned skills (JSON list)
     study_target: str = ""  # Current study target skill ID
 
+    # Battle report preference (0 = use game_config default)
+    battle_report_merge_count: int = 0
     # Sect system
     sect_id: int = 0
     sect_position: int = 4  # 0=宗主,1=长老,2=亲传,3=内门,4=外门
@@ -240,14 +242,16 @@ class Player:
     def get_total_attributes(
         self, equipped_items: list[Item], pill_multipliers: dict | None = None
     ) -> dict:
-        """Calculate total attributes with equipment and pill bonuses
+        """Calculate total combat attributes from base, equipment, and pills.
+
+        The new framework uses four main attributes plus additive armor.
 
         Args:
             equipped_items: List of equipped items
             pill_multipliers: Optional pill attribute multipliers
 
         Returns:
-            Dict with all combat attributes
+            Dict with damage, agility, speed, hp, armor_value and exp_multiplier.
         """
         # Base attributes from player
         total = {
@@ -270,10 +274,9 @@ class Player:
             total["hp"] += int(item.hp * mult)
             total["armor_value"] += int(item.armor_value * mult)
 
-            # Heart method exclusive
+            # Heart method exclusive passive bonuses
             if item.item_type == "main_technique":
                 total["exp_multiplier"] += item.exp_multiplier
-                # Apply passive bonuses
                 try:
                     passive = json.loads(item.passive_bonus)
                     for key, value in passive.items():
@@ -286,11 +289,11 @@ class Player:
                         elif key == "speed_percent":
                             total["speed"] = int(total["speed"] * (1 + value))
                         elif key == "armor_value":
-                            total["armor_value"] += value
+                            total["armor_value"] += int(value)
                 except json.JSONDecodeError:
                     pass
 
-        # Apply pill multipliers
+        # Apply pill multipliers (new attribute keys)
         if pill_multipliers:
             total["damage"] = int(total["damage"] * pill_multipliers.get("damage", 1.0))
             total["agility"] = int(

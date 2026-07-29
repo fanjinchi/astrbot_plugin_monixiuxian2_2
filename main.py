@@ -34,6 +34,7 @@ from .handlers import (
     SpiritEyeHandlers,
     SpiritFarmHandlers,
     StorageRingHandler,
+    TechniqueHandler,
 )
 from .managers import (
     AdventureManager,
@@ -100,6 +101,12 @@ CMD_ACCEPT_GIFT = "接收"
 CMD_REJECT_GIFT = "拒绝"
 CMD_SEARCH_ITEM = "搜索物品"
 CMD_RETRIEVE_ALL = "取出所有"
+
+# 功法/修习目标指令
+CMD_SET_STUDY_TARGET = "修习目标"
+CMD_SHOW_STUDY_TARGET = "我的修习"
+CMD_CLEAR_STUDY_TARGET = "取消修习"
+CMD_SET_BATTLE_REPORT_COUNT = "战报条数"
 
 # 宗门系统指令
 CMD_CREATE_SECT = "创建宗门"
@@ -221,18 +228,26 @@ class XiuXianPlugin(Star):
         self.db = DataBase(str(db_path))
 
         self.misc_handler = MiscHandler(self.db)
-        self.player_handler = PlayerHandler(self.db, self.config, self.config_manager)
+        self.player_handler = PlayerHandler(
+            self.db, self.config, self.config_manager, self.skill_manager
+        )
         self.equipment_handler = EquipmentHandler(self.db, self.config_manager)
         self.breakthrough_handler = BreakthroughHandler(
-            self.db, self.config_manager, self.config
+            self.db, self.config_manager, self.config, self.skill_manager
         )
         self.pill_handler = PillHandler(self.db, self.config_manager)
         self.shop_handler = ShopHandler(self.db, self.config, self.config_manager)
         self.storage_ring_handler = StorageRingHandler(self.db, self.config_manager)
 
         # 初始化核心管理器
-        from .core import EquipmentManager, GMManager, StorageRingManager
+        from .core import (
+            EquipmentManager,
+            GMManager,
+            SkillManager,
+            StorageRingManager,
+        )
 
+        self.skill_manager = SkillManager(self.config_manager)
         self.storage_ring_mgr = StorageRingManager(self.db, self.config_manager)
         self.equipment_mgr = EquipmentManager(
             self.db, self.config_manager, self.storage_ring_mgr
@@ -242,15 +257,21 @@ class XiuXianPlugin(Star):
         self.bank_mgr = BankManager(self.db, self.config)
         self.bounty_mgr = BountyManager(self.db, self.storage_ring_mgr)
 
-        self.combat_mgr = CombatManager()
-        self.enemy_mgr = EnemyManager()
+        self.combat_mgr = CombatManager(self.config_manager, self.skill_manager)
+        self.enemy_mgr = EnemyManager(config_manager=self.config_manager)
         self.impart_mgr = ImpartManager(self.db)
         self.pve_combat_mgr = PVECombatManager(
-            self.combat_mgr, self.enemy_mgr, self.config_manager, self.impart_mgr
+            self.combat_mgr,
+            self.enemy_mgr,
+            self.config_manager,
+            self.impart_mgr,
         )
         self.sect_mgr = SectManager(self.db, self.config_manager)
         self.boss_mgr = BossManager(
-            self.db, self.combat_mgr, self.config_manager, self.storage_ring_mgr
+            self.db,
+            self.combat_mgr,
+            self.config_manager,
+            self.storage_ring_mgr,
         )
         self.rift_mgr = RiftManager(
             self.db, self.config_manager, self.storage_ring_mgr, self.pve_combat_mgr
@@ -282,6 +303,9 @@ class XiuXianPlugin(Star):
         self.boss_handlers = BossHandlers(self.db, self.boss_mgr)
         self.combat_handlers = CombatHandlers(
             self.db, self.combat_mgr, self.config_manager
+        )
+        self.technique_handler = TechniqueHandler(
+            self.db, self.config_manager, self.skill_manager, self.storage_ring_mgr
         )
         self.ranking_handlers = RankingHandlers(self.db, self.rank_mgr)
         self.rift_handlers = RiftHandlers(self.db, self.rift_mgr)
@@ -789,6 +813,39 @@ class XiuXianPlugin(Star):
     @require_whitelist
     async def handle_breakthrough(self, event: AstrMessageEvent, pill_name: str = ""):
         async for r in self.breakthrough_handler.handle_breakthrough(event, pill_name):
+            yield r
+
+    # 功法/修习目标指令
+    @filter.command(CMD_SET_STUDY_TARGET, "将已拥有的功法设为修习目标")
+    @require_whitelist
+    async def handle_set_study_target(
+        self, event: AstrMessageEvent, skill_name: str = ""
+    ):
+        async for r in self.technique_handler.handle_set_study_target(
+            event, skill_name
+        ):
+            yield r
+
+    @filter.command(CMD_SHOW_STUDY_TARGET, "查看当前修习目标")
+    @require_whitelist
+    async def handle_show_study_target(self, event: AstrMessageEvent):
+        async for r in self.technique_handler.handle_show_study_target(event):
+            yield r
+
+    @filter.command(CMD_CLEAR_STUDY_TARGET, "取消当前修习目标")
+    @require_whitelist
+    async def handle_clear_study_target(self, event: AstrMessageEvent):
+        async for r in self.technique_handler.handle_clear_study_target(event):
+            yield r
+
+    @filter.command(CMD_SET_BATTLE_REPORT_COUNT, "设置战报合并条数（1-50）")
+    @require_whitelist
+    async def handle_set_battle_report_count(
+        self, event: AstrMessageEvent, count: str = ""
+    ):
+        async for r in self.technique_handler.handle_set_battle_report_count(
+            event, count
+        ):
             yield r
 
     @filter.command(CMD_USE_PILL, "服用丹药")

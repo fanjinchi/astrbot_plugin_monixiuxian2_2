@@ -26,6 +26,7 @@ from .shop_handler import ShopHandler
 from .spirit_eye_handlers import SpiritEyeHandlers
 from .spirit_farm_handlers import SpiritFarmHandlers
 from .storage_ring_handler import StorageRingHandler
+from .technique_handler import TechniqueHandler
 
 __all__ = [
     "PlayerHandler",
@@ -35,6 +36,7 @@ __all__ = [
     "PillHandler",
     "ShopHandler",
     "StorageRingHandler",
+    "TechniqueHandler",
     "SectHandlers",
     "BossHandlers",
     "CombatHandlers",

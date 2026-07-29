@@ -1,18 +1,30 @@
 # core/cultivation_manager.py
+from __future__ import annotations
+
 import random
+from typing import TYPE_CHECKING
 
 from astrbot.api import AstrBotConfig, logger
 
 from ..config_manager import ConfigManager
 from ..models import Player
 
+if TYPE_CHECKING:
+    from ..core.skill_manager import SkillManager
+
 
 class CultivationManager:
     """修炼管理器，包含角色生成和闭关修炼功能"""
 
-    def __init__(self, config: AstrBotConfig, config_manager: ConfigManager):
+    def __init__(
+        self,
+        config: AstrBotConfig,
+        config_manager: ConfigManager,
+        skill_manager: SkillManager | None = None,
+    ):
         self.config = config
         self.config_manager = config_manager
+        self.skill_manager = skill_manager
 
         # 灵根名称到配置项键的映射
         self.root_to_config_key = {
@@ -314,11 +326,14 @@ class CultivationManager:
     def generate_new_player_stats(
         self, user_id: str, cultivation_type: str = "灵修"
     ) -> Player:
-        """生成新玩家的初始数据
+        """Generate initial player stats using the four-main-attribute framework.
 
         Args:
-            user_id: 用户ID
-            cultivation_type: 修炼类型，"灵修"或"体修"
+            user_id: User ID.
+            cultivation_type: "灵修" or "体修".
+
+        Returns:
+            A new Player instance.
         """
         import random
 
@@ -326,7 +341,6 @@ class CultivationManager:
         initial_gold = self.config["VALUES"]["INITIAL_GOLD"]
 
         if cultivation_type == "灵修":
-            # 灵修初始数据：寿命100，修为0，灵气100-1000，法伤5-100，物伤5，法防0，物防5，精神力100-500
             return Player(
                 user_id=user_id,
                 spiritual_root=f"{root}灵根",
@@ -334,19 +348,13 @@ class CultivationManager:
                 lifespan=100,
                 experience=0,
                 gold=initial_gold,
-                spiritual_qi=random.randint(100, 1000),
-                max_spiritual_qi=random.randint(100, 1000),
-                blood_qi=0,
-                max_blood_qi=0,
-                magic_damage=random.randint(5, 100),
-                physical_damage=5,
-                magic_defense=0,
-                physical_defense=5,
-                mental_power=random.randint(100, 500),
+                damage=random.randint(8, 18),
+                agility=random.randint(5, 15),
+                speed=random.randint(5, 15),
+                hp=random.randint(90, 130),
+                armor_value=0,
             )
         else:  # 体修
-            # 体修初始数据：寿命50-100，修为0，气血100-500，法伤0，物伤100-500，法防50-200，物防100-500，精神力100-500
-            initial_blood_qi = random.randint(100, 500)
             return Player(
                 user_id=user_id,
                 spiritual_root=f"{root}灵根",
@@ -354,15 +362,11 @@ class CultivationManager:
                 lifespan=random.randint(50, 100),
                 experience=0,
                 gold=initial_gold,
-                spiritual_qi=0,
-                max_spiritual_qi=0,
-                blood_qi=initial_blood_qi,
-                max_blood_qi=initial_blood_qi,
-                magic_damage=0,
-                physical_damage=random.randint(100, 500),
-                magic_defense=random.randint(50, 200),
-                physical_defense=random.randint(100, 500),
-                mental_power=random.randint(100, 500),
+                damage=random.randint(15, 30),
+                agility=random.randint(3, 10),
+                speed=random.randint(5, 12),
+                hp=random.randint(120, 180),
+                armor_value=random.randint(3, 10),
             )
 
     def get_spiritual_root_speed(self, player: Player) -> float:
@@ -429,3 +433,21 @@ class CultivationManager:
             f"获得修为 {total_exp}"
         )
         return total_exp
+
+    def apply_cultivation_comprehension(self, player: Player, hours: int) -> list[dict]:
+        """Apply skill comprehension rolls at cultivation end.
+
+        Rolls once every ``cultivation_learn_interval_hours`` (default 2h)
+        at the configured rate. Requires an equipped heart method and only
+        draws from the heart method pool + study target (no universal pool).
+
+        Args:
+            player: The player ending cultivation.
+            hours: Effective cultivation hours used for reward calculation.
+
+        Returns:
+            List of learned skill definitions (empty if no rolls or all fail).
+        """
+        if not self.skill_manager or hours <= 0:
+            return []
+        return self.skill_manager.roll_cultivation_comprehension(player, hours)

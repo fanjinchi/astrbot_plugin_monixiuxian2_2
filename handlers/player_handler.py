@@ -7,7 +7,7 @@ from astrbot.api import AstrBotConfig
 from astrbot.api.event import AstrMessageEvent
 
 from ..config_manager import ConfigManager
-from ..core import CultivationManager, PillManager
+from ..core import CultivationManager, PillManager, SkillManager
 from ..data import DataBase
 from ..models import Player
 from ..models_extended import UserStatus
@@ -27,12 +27,19 @@ class PlayerHandler:
     """玩家基础信息处理器 - 支持灵修/体修选择"""
 
     def __init__(
-        self, db: DataBase, config: AstrBotConfig, config_manager: ConfigManager
+        self,
+        db: DataBase,
+        config: AstrBotConfig,
+        config_manager: ConfigManager,
+        skill_manager: SkillManager | None = None,
     ):
         self.db = db
         self.config = config
         self.config_manager = config_manager
-        self.cultivation_manager = CultivationManager(config, config_manager)
+        self.skill_manager = skill_manager
+        self.cultivation_manager = CultivationManager(
+            config, config_manager, skill_manager
+        )
         self.pill_manager = PillManager(self.db, self.config_manager)
 
     async def handle_start_xiuxian(
@@ -119,7 +126,7 @@ class PlayerHandler:
 
     @player_required
     async def handle_player_info(self, player: Player, event: AstrMessageEvent):
-        """处理查看玩家信息 - 展示新属性"""
+        """处理查看玩家信息 - 展示四主属性与新战力。"""
         display_name = event.get_sender_name()
         required_exp = player.get_required_exp(self.config_manager)
 
@@ -136,18 +143,13 @@ class PlayerHandler:
         )
         total_attrs = player.get_total_attributes(equipped_items, pill_multipliers)
 
-        # 图片生成暂时禁用（缺少资源文件会导致效果很差）
-        # 直接使用优化后的文本格式显示
-
-        # 文本模式 (完整信息显示)
-
-        # 获取战力（综合攻防）
+        # 新战力公式：四主属性 + 护甲//2
         combat_power = (
-            int(total_attrs["physical_damage"])
-            + int(total_attrs["magic_damage"])
-            + int(total_attrs["physical_defense"])
-            + int(total_attrs["magic_defense"])
-            + int(total_attrs["mental_power"]) // 10
+            int(total_attrs["damage"])
+            + int(total_attrs["agility"])
+            + int(total_attrs["speed"])
+            + int(total_attrs["hp"])
+            + int(total_attrs.get("armor_value", 0)) // 2
         )
 
         # 获取宗门信息
@@ -178,6 +180,23 @@ class PlayerHandler:
             f"+{player.level_up_rate}%" if player.level_up_rate > 0 else "0%"
         )
 
+        # 获取修习目标
+        study_target_name = "无"
+        if self.skill_manager:
+            study_info = self.skill_manager.get_study_target_info(player)
+            if study_info.get("has_target"):
+                study_target_name = study_info.get("name", "未知")
+
+        # 获取战报合并条数偏好
+        merge_count = self.config_manager.game_config.get("skill_system", {}).get(
+            "battle_report_merge_count", 10
+        )
+        if player.battle_report_merge_count > 0:
+            merge_count = max(1, min(50, player.battle_report_merge_count))
+
+        # 获取已领悟功法数量
+        learned_count = len(player.get_learned_skills())
+
         # 构建信息显示
         dao_hao = player.user_name if player.user_name else display_name
 
@@ -194,37 +213,22 @@ class PlayerHandler:
             f"  灵根：{player.spiritual_root}\n"
             f"  突破加成：{breakthrough_rate}\n"
             f"\n"
-            f"【修炼属性】\n"
-            f"  修炼方式：{player.cultivation_type}\n"
-            f"  状态：{player.state}\n"
-            f"  寿命：{player.lifespan}\n"
-            f"  精神力：{total_attrs['mental_power']}\n"
-        )
-
-        # 根据修炼类型添加不同属性
-        if player.cultivation_type == "体修":
-            reply_msg += (
-                f"  气血：{player.blood_qi}/{total_attrs.get('max_blood_qi', 0)}\n"
-                f"  物伤：{total_attrs['physical_damage']}\n"
-                f"  法伤：{total_attrs['magic_damage']}\n"
-                f"  物防：{total_attrs['physical_defense']}\n"
-                f"  法防：{total_attrs['magic_defense']}\n"
-            )
-        else:
-            reply_msg += (
-                f"  灵气：{player.spiritual_qi}/{total_attrs.get('max_spiritual_qi', 0)}\n"
-                f"  法伤：{total_attrs['magic_damage']}\n"
-                f"  物伤：{total_attrs['physical_damage']}\n"
-                f"  法防：{total_attrs['magic_defense']}\n"
-                f"  物防：{total_attrs['physical_defense']}\n"
-            )
-
-        reply_msg += (
+            f"【四主属性】\n"
+            f"  伤害：{total_attrs['damage']}\n"
+            f"  身法：{total_attrs['agility']}\n"
+            f"  迅捷：{total_attrs['speed']}\n"
+            f"  气血：{total_attrs['hp']}\n"
+            f"  护甲：{total_attrs.get('armor_value', 0)}\n"
             f"\n"
             f"【装备信息】\n"
             f"  主修功法：{technique_name}\n"
             f"  法器：{weapon_name}\n"
             f"  防具：{armor_name}\n"
+            f"\n"
+            f"【功法修习】\n"
+            f"  已领悟功法：{learned_count}\n"
+            f"  修习目标：{study_target_name}\n"
+            f"  战报合并条数：{merge_count}\n"
             f"\n"
             f"【宗门信息】\n"
             f"  所在宗门：{sect_name}\n"
@@ -354,8 +358,21 @@ class PlayerHandler:
             player, effective_minutes, technique_bonus, pill_multipliers
         )
 
-        # 更新玩家数据
         player.experience += gained_exp
+
+        # 闭关悟道判定：每满 2 小时一次，每次 15%（需装备心法，仅配套池+修习目标）
+        effective_hours = effective_minutes // 60
+        learn_msgs = []
+        if self.cultivation_manager.skill_manager and effective_hours > 0:
+            learned_list = self.cultivation_manager.apply_cultivation_comprehension(
+                player, effective_hours
+            )
+            for learned in learned_list:
+                learn_msgs.append(
+                    f"🎁 闭关悟道，领悟功法【{learned.get('name', '未知')}】！"
+                )
+
+        # 更新玩家状态
         player.state = "空闲"
         player.cultivation_start_time = 0
         await self.db.update_player(player)
@@ -387,6 +404,8 @@ class PlayerHandler:
             "━━━━━━━━━━━━━━━\n"
             "道友已回归红尘，可继续修行。"
         )
+        if learn_msgs:
+            reply_msg += "\n\n" + "\n".join(learn_msgs)
         yield event.plain_result(reply_msg)
 
     @player_required

@@ -39,9 +39,9 @@
 
 ## 6. 成长流程接入
 
-- [ ] 6.1 `core/breakthrough_manager.py`：突破成功随机一项主属性 +N（仅成功发放）；成功 20% / 失败 10% 领悟判定接入 skill_manager
-- [ ] 6.2 `core/cultivation_manager.py`：闭关结算时按「每满 2 小时一次、每次 15%」判定领悟（需装备心法，仅配套池+修习目标）
-- [ ] 6.3 `handlers/`：新增「修习目标」设置/查看指令、「战报条数」设置指令；属性面板指令改为四主属性展示；相关指令注册进 `main.py` 并加 `@require_whitelist`
+- [x] 6.1 `core/breakthrough_manager.py`：突破成功随机一项主属性 +N（仅成功发放）；成功 20% / 失败 10% 领悟判定接入 skill_manager
+- [x] 6.2 `core/cultivation_manager.py`：闭关结算时按「每满 2 小时一次、每次 15%」判定领悟（需装备心法，仅配套池+修习目标）
+- [x] 6.3 `handlers/`：新增「修习目标」设置/查看指令、「战报条数」设置指令；属性面板指令改为四主属性展示；相关指令注册进 `main.py` 并加 `@require_whitelist`
 
 ## 7. 测试与收尾
 

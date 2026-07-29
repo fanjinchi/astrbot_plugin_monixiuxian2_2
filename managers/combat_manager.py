@@ -517,6 +517,18 @@ class CombatManager:
         mp = int(experience * (1 + mp_buff))
         return hp, mp
 
+    def _get_merge_count(self, player) -> int:
+        """Return the player's battle report merge count preference.
+
+        Falls back to the game_config default if the player has not set one.
+        """
+        default = self.engine._skill_cfg.get("battle_report_merge_count", 10)
+        if hasattr(player, "battle_report_merge_count"):
+            val = getattr(player, "battle_report_merge_count", 0)
+            if isinstance(val, int) and val > 0:
+                return max(1, min(50, val))
+        return default
+
     @staticmethod
     def calculate_turn_attack(
         base_atk: int, crit_rate: int = 0, atk_buff: float = 0.0
@@ -563,7 +575,10 @@ class CombatManager:
         f2 = self.engine.build_fighter_from_player(player2, is_attacker=False)
 
         combat_type_str = "duel" if combat_type == 2 else "spar"
-        result = self.engine.resolve_combat(f1, f2, combat_type_str)
+        merge_count = self._get_merge_count(player1)
+        result = self.engine.resolve_combat(
+            f1, f2, combat_type_str, merge_count=merge_count
+        )
 
         # Map to legacy return format
         return {
@@ -585,7 +600,8 @@ class CombatManager:
         f1 = self.engine.build_fighter_from_player(player, is_attacker=True)
         f2 = self.engine.build_fighter_from_player(boss, is_attacker=False)
 
-        result = self.engine.resolve_combat(f1, f2, "pve")
+        merge_count = self._get_merge_count(player)
+        result = self.engine.resolve_combat(f1, f2, "pve", merge_count=merge_count)
 
         # Calculate reward based on damage dealt
         damage_dealt = f2.max_hp - result.fighter2_final_hp

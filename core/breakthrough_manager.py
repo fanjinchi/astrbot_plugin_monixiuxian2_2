@@ -1,6 +1,9 @@
 # core/breakthrough_manager.py
 
+from __future__ import annotations
+
 import random
+from typing import TYPE_CHECKING
 
 from astrbot.api import logger
 
@@ -8,14 +11,24 @@ from ..config_manager import ConfigManager
 from ..data import DataBase
 from ..models import Player
 
+if TYPE_CHECKING:
+    from ..core.skill_manager import SkillManager
+
 
 class BreakthroughManager:
     """突破管理器 - 处理境界突破相关逻辑"""
 
-    def __init__(self, db: DataBase, config_manager: ConfigManager, config: dict):
+    def __init__(
+        self,
+        db: DataBase,
+        config_manager: ConfigManager,
+        config: dict,
+        skill_manager: SkillManager | None = None,
+    ):
         self.db = db
         self.config_manager = config_manager
         self.config = config
+        self.skill_manager = skill_manager
 
     def check_breakthrough_requirements(self, player: Player) -> tuple[bool, str]:
         """检查玩家是否满足突破条件
@@ -141,112 +154,72 @@ class BreakthroughManager:
         next_level_name = next_level_data["level_name"]
 
         if breakthrough_success:
-            # 突破成功 - 提升境界并更新属性
-            old_level_index = player.level_index
+            # 突破成功 - 提升境界并触发随机成长
             player.level_index = next_level_index
 
-            # 直接从下一境界配置中读取突破增量，并累加到玩家属性上
-            # 这样可以保留玩家初始化时的随机属性值
-            lifespan_gain = next_level_data.get("breakthrough_lifespan_gain", 0)
-            mental_power_gain = next_level_data.get("breakthrough_mental_power_gain", 0)
-            physical_damage_gain = next_level_data.get(
-                "breakthrough_physical_damage_gain", 0
+            growth_attr = random.choice(["damage", "agility", "speed", "hp"])
+            growth_step = self.config_manager.game_config.get("skill_system", {}).get(
+                "random_growth_step", 5
             )
-            magic_damage_gain = next_level_data.get("breakthrough_magic_damage_gain", 0)
-            physical_defense_gain = next_level_data.get(
-                "breakthrough_physical_defense_gain", 0
-            )
-            magic_defense_gain = next_level_data.get(
-                "breakthrough_magic_defense_gain", 0
-            )
+            growth_amount = growth_step
+            old_attr_value = getattr(player, growth_attr)
+            setattr(player, growth_attr, old_attr_value + growth_amount)
 
-            # 根据修炼类型处理灵气/气血增长
-            if player.cultivation_type == "体修":
-                # 体修使用气血
-                blood_qi_gain = next_level_data.get("breakthrough_blood_qi_gain", 0)
-                player.max_blood_qi += blood_qi_gain
-                player.blood_qi = player.max_blood_qi  # 恢复满气血
-                energy_name = "气血"
-                energy_gain = blood_qi_gain
-            else:
-                # 灵修使用灵气
-                spiritual_qi_gain = next_level_data.get(
-                    "breakthrough_spiritual_qi_gain", 0
-                )
-                player.max_spiritual_qi += spiritual_qi_gain
-                player.spiritual_qi = player.max_spiritual_qi  # 恢复满灵气
-                energy_name = "灵气"
-                energy_gain = spiritual_qi_gain
-
-            # 应用属性增长
-            player.lifespan += lifespan_gain
-            player.physical_damage += physical_damage_gain
-            player.magic_damage += magic_damage_gain
-            player.physical_defense += physical_defense_gain
-            player.magic_defense += magic_defense_gain
-            player.mental_power += mental_power_gain
-
-            # 保存到数据库
             await self.db.update_player(player)
 
             # 检查并处理突破贷款自动还款
             loan_msg = await self._handle_breakthrough_loan_repay(player)
 
-            # 根据修炼类型生成不同的成功消息
-            if player.cultivation_type == "体修":
-                success_msg = (
-                    f"✨ 突破成功！✨\n"
-                    f"━━━━━━━━━━━━━━━\n"
-                    f"{rate_info}\n"
-                    f"━━━━━━━━━━━━━━━\n"
-                    f"恭喜你从【{current_level_name}】突破至【{next_level_name}】！\n"
-                    f"境界提升，肉身更加强横！\n"
-                    f"\n【属性增长】\n"
-                    f"寿命 +{lifespan_gain}\n"
-                    f"最大气血 +{energy_gain}\n"
-                    f"物伤 +{physical_damage_gain}\n"
-                    f"物防 +{physical_defense_gain}\n"
-                    f"法防 +{magic_defense_gain}\n"
-                    f"精神力 +{mental_power_gain}\n"
-                    f"\n【当前属性】\n"
-                    f"寿命：{player.lifespan}\n"
-                    f"最大气血：{player.max_blood_qi}\n"
-                    f"物伤：{player.physical_damage}\n"
-                    f"物防：{player.physical_defense}\n"
-                    f"法防：{player.magic_defense}\n"
-                    f"精神力：{player.mental_power}"
+            attr_name_map = {
+                "damage": "伤害",
+                "agility": "身法",
+                "speed": "迅捷",
+                "hp": "气血",
+            }
+            growth_attr_name = attr_name_map.get(growth_attr, growth_attr)
+
+            # 领悟判定（成功 20%）
+            learn_msgs = []
+            if self.skill_manager:
+                learned = self.skill_manager.roll_breakthrough_success_comprehension(
+                    player
                 )
-            else:
-                success_msg = (
-                    f"✨ 突破成功！✨\n"
-                    f"━━━━━━━━━━━━━━━\n"
-                    f"{rate_info}\n"
-                    f"━━━━━━━━━━━━━━━\n"
-                    f"恭喜你从【{current_level_name}】突破至【{next_level_name}】！\n"
-                    f"境界提升，实力大增！\n"
-                    f"\n【属性增长】\n"
-                    f"寿命 +{lifespan_gain}\n"
-                    f"最大灵气 +{energy_gain}\n"
-                    f"法伤 +{magic_damage_gain}\n"
-                    f"物伤 +{physical_damage_gain}\n"
-                    f"法防 +{magic_defense_gain}\n"
-                    f"物防 +{physical_defense_gain}\n"
-                    f"精神力 +{mental_power_gain}\n"
-                    f"\n【当前属性】\n"
-                    f"寿命：{player.lifespan}\n"
-                    f"最大灵气：{player.max_spiritual_qi}\n"
-                    f"法伤：{player.magic_damage}\n"
-                    f"物伤：{player.physical_damage}\n"
-                    f"法防：{player.magic_defense}\n"
-                    f"物防：{player.physical_defense}\n"
-                    f"精神力：{player.mental_power}"
+                if learned:
+                    learn_msgs.append(
+                        f"🎁 福至心灵，领悟功法【{learned.get('name', '未知')}】！"
+                    )
+                fallback = self.skill_manager.roll_universal_pool_breakthrough(
+                    player, success=True
                 )
+                if fallback:
+                    learn_msgs.append(
+                        f"🎁 破境感悟，领悟通用功法【{fallback.get('name', '未知')}】！"
+                    )
+
+            success_msg = (
+                f"✨ 突破成功！✨\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"{rate_info}\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"恭喜你从【{current_level_name}】突破至【{next_level_name}】！\n"
+                f"\n【属性增长】\n"
+                f"{growth_attr_name} +{growth_amount}\n"
+                f"\n【当前属性】\n"
+                f"伤害：{player.damage}\n"
+                f"身法：{player.agility}\n"
+                f"迅捷：{player.speed}\n"
+                f"气血：{player.hp}\n"
+                f"护甲：{player.armor_value}"
+            )
+            if learn_msgs:
+                success_msg += "\n\n" + "\n".join(learn_msgs)
 
             logger.info(
-                f"玩家 {player.user_id} 突破成功：{current_level_name} -> {next_level_name}"
+                f"玩家 {player.user_id} 突破成功："
+                f"{current_level_name} -> {next_level_name}, "
+                f"成长 {growth_attr_name}+{growth_amount}"
             )
 
-            # 如果有贷款相关消息，追加到成功消息后
             if loan_msg:
                 success_msg += f"\n\n{loan_msg}"
 
@@ -322,6 +295,24 @@ class BreakthroughManager:
 
                 await self.db.update_player(player)
 
+                # 领悟判定（失败 10% 软保底）
+                learn_msgs = []
+                if self.skill_manager:
+                    learned = self.skill_manager.roll_breakthrough_fail_comprehension(
+                        player
+                    )
+                    if learned:
+                        learn_msgs.append(
+                            f"🎁 破而后立，领悟功法【{learned.get('name', '未知')}】！"
+                        )
+                    fallback = self.skill_manager.roll_universal_pool_breakthrough(
+                        player, success=False
+                    )
+                    if fallback:
+                        learn_msgs.append(
+                            f"🎁 破境感悟，领悟通用功法【{fallback.get('name', '未知')}】！"
+                        )
+
                 fail_msg = (
                     f"❌ 突破失败 ❌\n"
                     f"━━━━━━━━━━━━━━━\n"
@@ -332,9 +323,12 @@ class BreakthroughManager:
                     f"当前修为：{player.experience}\n"
                     f"请继续修炼，再接再厉！"
                 )
+                if learn_msgs:
+                    fail_msg += "\n\n" + "\n".join(learn_msgs)
 
                 logger.info(
-                    f"玩家 {player.user_id} 突破失败：{current_level_name} -> {next_level_name}，"
+                    f"玩家 {player.user_id} 突破失败："
+                    f"{current_level_name} -> {next_level_name}，"
                     f"损失修为 {exp_penalty}"
                 )
 

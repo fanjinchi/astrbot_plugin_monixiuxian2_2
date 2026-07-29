@@ -3,7 +3,7 @@
 from astrbot.api.event import AstrMessageEvent
 
 from ..config_manager import ConfigManager
-from ..core import BreakthroughManager, PillManager
+from ..core import BreakthroughManager, PillManager, SkillManager
 from ..data import DataBase
 from ..models import Player
 from .utils import player_required
@@ -17,11 +17,19 @@ __all__ = ["BreakthroughHandler"]
 class BreakthroughHandler:
     """突破系统处理器"""
 
-    def __init__(self, db: DataBase, config_manager: ConfigManager, config: dict):
+    def __init__(
+        self,
+        db: DataBase,
+        config_manager: ConfigManager,
+        config: dict,
+        skill_manager: SkillManager | None = None,
+    ):
         self.db = db
         self.config_manager = config_manager
         self.config = config
-        self.breakthrough_manager = BreakthroughManager(db, config_manager, config)
+        self.breakthrough_manager = BreakthroughManager(
+            db, config_manager, config, skill_manager
+        )
         self.pill_manager = PillManager(db, config_manager)
 
     @player_required
