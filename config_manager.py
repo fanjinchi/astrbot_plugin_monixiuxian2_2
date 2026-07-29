@@ -77,7 +77,14 @@ class ConfigManager:
             return default_config
 
     def _load_items_data(self, file_path: Path) -> dict[str, dict]:
-        """加载物品配置文件并转换为字典（key为物品名称）"""
+        """加载物品配置文件并转换为字典（key为物品名称）
+
+        支持三种顶层格式：
+        - list: [{"name": ..., ...}, ...]
+        - dict-of-dict: {"id": {"name": ..., ...}, ...}
+        - dict-of-list: {"分组": [{"name": ..., ...}, ...], ...}
+          展平为 name→definition 的字典，并在 definition 中注入 ``_group`` 字段保留分组。
+        """
         if not file_path.exists():
             logger.warning(f"物品数据文件 {file_path} 不存在，将使用空数据。")
             return {}
@@ -93,11 +100,24 @@ class ConfigManager:
                     }
                 elif isinstance(data, dict):
                     items_dict = {}
-                    for item_id, item_data in data.items():
-                        if isinstance(item_data, dict) and item_data.get("name"):
-                            if "id" not in item_data:
-                                item_data["id"] = item_id
-                            items_dict[item_data["name"]] = item_data
+                    for key, value in data.items():
+                        if isinstance(value, dict) and value.get("name"):
+                            # dict-of-dict entry
+                            if "id" not in value:
+                                value["id"] = key
+                            items_dict[value["name"]] = value
+                        elif isinstance(value, list):
+                            # dict-of-list: flatten each item and remember its group
+                            for item in value:
+                                if isinstance(item, dict) and item.get("name"):
+                                    item["_group"] = key
+                                    if "id" not in item:
+                                        item["id"] = item["name"]
+                                    items_dict[item["name"]] = item
+                        else:
+                            logger.warning(
+                                f"物品数据文件 {file_path} 中的键 {key} 格式不正确，已跳过。"
+                            )
                 else:
                     logger.error(
                         f"物品数据文件 {file_path} 格式不正确，应该是数组或字典。"

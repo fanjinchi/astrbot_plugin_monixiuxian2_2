@@ -82,8 +82,10 @@ class SkillManager:
 
         # 3. Universal pool (breakthrough channels only)
         if channel.startswith("breakthrough"):
-            universal_skills = self.config_manager.skills_data.get("通用功法池", [])
-            for skill_def in universal_skills:
+            universal_group = "通用功法池"
+            for skill_def in self.config_manager.skills_data.values():
+                if skill_def.get("_group") != universal_group:
+                    continue
                 skill_id = skill_def.get("id")
                 if skill_id:
                     pool.append(
@@ -209,7 +211,11 @@ class SkillManager:
         # For success: 5% from universal pool; for fail: 3% independent
         base_rate = self._skill_cfg.get(rate_key, 0.05 if success else 0.03)
 
-        universal_skills = self.config_manager.skills_data.get("通用功法池", [])
+        universal_skills = [
+            skill
+            for skill in self.config_manager.skills_data.values()
+            if skill.get("_group") == "通用功法池"
+        ]
         if not universal_skills:
             return None
 
@@ -265,11 +271,9 @@ class SkillManager:
 
     def _find_skill_definition(self, skill_id: str) -> dict | None:
         """Find a skill definition by ID across all skill categories."""
-        for category, skills in self.config_manager.skills_data.items():
-            if isinstance(skills, list):
-                for skill in skills:
-                    if skill.get("id") == skill_id:
-                        return skill
+        for skill in self.config_manager.skills_data.values():
+            if isinstance(skill, dict) and skill.get("id") == skill_id:
+                return skill
         return None
 
     def _apply_star_to_def(self, skill_def: dict, star_level: int) -> dict:
@@ -431,11 +435,9 @@ class SkillManager:
 
     def _find_skill_id_by_name(self, name: str) -> str | None:
         """Find skill ID by its display name."""
-        for category, skills in self.config_manager.skills_data.items():
-            if isinstance(skills, list):
-                for skill in skills:
-                    if skill.get("name") == name:
-                        return skill.get("id")
+        skill = self.config_manager.skills_data.get(name)
+        if isinstance(skill, dict):
+            return skill.get("id")
         return None
 
     # ------------------------------------------------------------------

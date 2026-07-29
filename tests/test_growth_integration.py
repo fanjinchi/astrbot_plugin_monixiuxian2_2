@@ -72,43 +72,41 @@ class FakeConfigManager:
 
     def __init__(self, game_config=None):
         self.skills_data = {
-            "通用功法池": [
-                {
-                    "id": "common_001",
-                    "name": "基础吐纳",
-                    "trigger_skill": {
-                        "name": "气息流转",
-                        "trigger_condition": "attack",
-                        "trigger_rate": 0.15,
-                        "effect": "damage_bonus",
-                        "effect_value": 1.2,
-                    },
-                    "ultimate": None,
-                    "route_multiplier": {"灵修": 1.0, "体修": 1.0},
-                    "learn_coefficient": 1.0,
+            "基础吐纳": {
+                "id": "common_001",
+                "name": "基础吐纳",
+                "_group": "通用功法池",
+                "trigger_skill": {
+                    "name": "气息流转",
+                    "trigger_condition": "attack",
+                    "trigger_rate": 0.15,
+                    "effect": "damage_bonus",
+                    "effect_value": 1.2,
                 },
-            ],
-            "灵修专属": [
-                {
-                    "id": "spirit_001",
-                    "name": "御剑术",
-                    "trigger_skill": {
-                        "name": "剑气纵横",
-                        "trigger_condition": "attack",
-                        "trigger_rate": 0.25,
-                        "effect": "damage_bonus",
-                        "effect_value": 1.5,
-                    },
-                    "ultimate": {
-                        "name": "万剑归宗",
-                        "trigger_condition": "once_per_battle",
-                        "effect": "massive_damage",
-                        "effect_value": 3.0,
-                    },
-                    "route_multiplier": {"灵修": 1.2, "体修": 0.6},
-                    "learn_coefficient": 0.8,
+                "ultimate": None,
+                "route_multiplier": {"灵修": 1.0, "体修": 1.0},
+                "learn_coefficient": 1.0,
+            },
+            "御剑术": {
+                "id": "spirit_001",
+                "name": "御剑术",
+                "_group": "灵修专属",
+                "trigger_skill": {
+                    "name": "剑气纵横",
+                    "trigger_condition": "attack",
+                    "trigger_rate": 0.25,
+                    "effect": "damage_bonus",
+                    "effect_value": 1.5,
                 },
-            ],
+                "ultimate": {
+                    "name": "万剑归宗",
+                    "trigger_condition": "once_per_battle",
+                    "effect": "massive_damage",
+                    "effect_value": 3.0,
+                },
+                "route_multiplier": {"灵修": 1.2, "体修": 0.6},
+                "learn_coefficient": 0.8,
+            },
         }
         self.heart_methods_data = {
             "长春功": {
