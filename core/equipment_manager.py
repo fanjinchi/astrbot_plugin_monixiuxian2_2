@@ -1,5 +1,6 @@
 # core/equipment_manager.py
 
+import json
 from typing import TYPE_CHECKING
 
 from ..data import DataBase
@@ -8,6 +9,37 @@ from ..models import Item, Player
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
     from .storage_ring_manager import StorageRingManager
+
+
+def _json_str(value) -> str:
+    """Convert a dict/list to JSON string; pass through strings."""
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return "{}" if isinstance(value, dict) else "[]"
+
+
+def _normalize_item_type(item_config: dict) -> str:
+    """Resolve item type to the new equipment type enum."""
+    item_type = item_config.get("type", "")
+    if item_type == "法器":
+        subtype = item_config.get("subtype", "")
+        if subtype == "武器":
+            return "weapon"
+        if subtype == "防具":
+            return "armor"
+        return "accessory"
+    if item_type == "功法":
+        return "technique"
+    # Heart methods do not carry a type but have passive_bonus / skill_pool.
+    if "passive_bonus" in item_config or "skill_pool" in item_config:
+        return "main_technique"
+    # Techniques/skills carry trigger_skill / ultimate.
+    if "trigger_skill" in item_config or "ultimate" in item_config:
+        return "technique"
+    return item_type
 
 
 class EquipmentManager:
@@ -24,7 +56,11 @@ class EquipmentManager:
         self.storage_ring_manager = storage_ring_manager
 
     def parse_item_from_name(
-        self, item_name: str, items_data: dict, weapons_data: dict = None
+        self,
+        item_name: str,
+        items_data: dict,
+        weapons_data: dict | None = None,
+        heart_methods_data: dict | None = None,
     ) -> Item | None:
         """从物品名称解析为Item对象
 
@@ -32,6 +68,7 @@ class EquipmentManager:
             item_name: 物品名称
             items_data: 物品配置数据字典
             weapons_data: 武器配置数据字典（可选）
+            heart_methods_data: 心法配置数据字典（可选）
 
         Returns:
             Item对象，如果未找到则返回None
@@ -39,50 +76,48 @@ class EquipmentManager:
         if not item_name or item_name == "":
             return None
 
-        # 先从物品配置中查找
         item_config = items_data.get(item_name)
-
-        # 如果没找到且提供了武器配置，从武器配置中查找
         if not item_config and weapons_data:
             item_config = weapons_data.get(item_name)
+        if not item_config and heart_methods_data:
+            item_config = heart_methods_data.get(item_name)
 
         if not item_config:
             return None
 
-        # 处理新旧格式兼容性
-        item_type = item_config.get("type", "")
+        item_type = _normalize_item_type(item_config)
+
+        # New four-main-attribute framework fields (preferred)
+        damage = item_config.get("damage", 0)
+        agility = item_config.get("agility", 0)
+        speed = item_config.get("speed", 0)
+        hp = item_config.get("hp", 0)
+        armor_value = item_config.get("armor_value", 0)
+        weapon_coefficient_k = item_config.get("weapon_coefficient_k", 1.0)
+        base_damage = item_config.get("base_damage", 0)
+        route_multiplier = item_config.get("route_multiplier", {})
+        trigger_skills = item_config.get("trigger_skills", [])
+        passive_bonus = item_config.get("passive_bonus", {})
+        skill_pool = item_config.get("skill_pool", [])
+
+        # Legacy five-dimension mapping for old config files
         physical_damage = item_config.get("physical_damage", 0)
-        physical_defense = item_config.get("physical_defense", 0)
         magic_damage = item_config.get("magic_damage", 0)
+        physical_defense = item_config.get("physical_defense", 0)
         magic_defense = item_config.get("magic_defense", 0)
-        mental_power = item_config.get("mental_power", 0)
+        if physical_damage or magic_damage:
+            damage = max(damage, physical_damage + magic_damage)
+        if physical_defense or magic_defense:
+            armor_value = max(armor_value, physical_defense + magic_defense)
 
-        # 旧格式兼容：处理 items.json 中的法器（equip_effects 格式）
-        if "equip_effects" in item_config:
-            equip_effects = item_config["equip_effects"]
-            # 旧格式 attack -> physical_damage
-            if "attack" in equip_effects:
-                physical_damage = equip_effects["attack"]
-            # 旧格式 defense -> physical_defense
-            if "defense" in equip_effects:
-                physical_defense = equip_effects["defense"]
-            # 旧格式 max_hp 可用于体修的 blood_qi 加成
-
-        # 旧格式兼容：处理类型映射
-        # "法器" + subtype="武器" -> "weapon"
-        # "法器" + subtype="防具" -> "armor"
-        # "法器" + subtype="饰品" -> "accessory" (暂不支持装备)
-        if item_type == "法器":
-            subtype = item_config.get("subtype", "")
-            if subtype == "武器":
-                item_type = "weapon"
-            elif subtype == "防具":
-                item_type = "armor"
-            elif subtype == "饰品":
-                item_type = "accessory"
-        elif item_type == "功法":
-            # 旧格式功法 -> technique
-            item_type = "technique"
+        # Legacy equip_effects mapping (items.json 法器)
+        equip_effects = item_config.get("equip_effects", {})
+        attack = equip_effects.get("attack", 0)
+        defense = equip_effects.get("defense", 0)
+        if attack:
+            damage = max(damage, attack)
+        if defense:
+            armor_value = max(armor_value, defense)
 
         return Item(
             item_id=item_config.get("id", item_name),
@@ -92,14 +127,18 @@ class EquipmentManager:
             rank=item_config.get("rank", ""),
             required_level_index=item_config.get("required_level_index", 0),
             weapon_category=item_config.get("weapon_category", ""),
-            magic_damage=magic_damage,
-            physical_damage=physical_damage,
-            magic_defense=magic_defense,
-            physical_defense=physical_defense,
-            mental_power=mental_power,
+            damage=damage,
+            agility=agility,
+            speed=speed,
+            hp=hp,
+            armor_value=armor_value,
+            weapon_coefficient_k=weapon_coefficient_k,
+            base_damage=base_damage,
+            route_multiplier=_json_str(route_multiplier),
+            trigger_skills=_json_str(trigger_skills),
             exp_multiplier=item_config.get("exp_multiplier", 0.0),
-            spiritual_qi=item_config.get("spiritual_qi", 0),
-            blood_qi=item_config.get("blood_qi", 0),
+            passive_bonus=_json_str(passive_bonus),
+            skill_pool=_json_str(skill_pool),
         )
 
     def get_equipped_items(
