@@ -18,6 +18,9 @@ from pathlib import Path
 sys.modules.setdefault("astrbot", _mock.MagicMock())
 sys.modules.setdefault("astrbot.api", _mock.MagicMock())
 sys.modules.setdefault("astrbot.api.logger", _mock.MagicMock())
+sys.modules.setdefault("astrbot.api.all", _mock.MagicMock())
+sys.modules.setdefault("astrbot.api.event", _mock.MagicMock())
+sys.modules.setdefault("astrbot.api.star", _mock.MagicMock())
 
 # Determine the plugin root directory
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent

@@ -95,9 +95,9 @@ class CombatHandlers:
 
     async def _fetch_player(self, user_id: str) -> Player | None:
         """Load player by ID; returns None if not found."""
-        player = await self.db.get_player_by_id(user_id)
-        return player
+        return await self.db.get_player_by_id(user_id)
 
+    async def handle_duel(self, event: AstrMessageEvent, target: str):
         """决斗 (消耗气血)"""
         user_id = event.get_sender_id()
         target_id = await self._get_target_id(event, target)
