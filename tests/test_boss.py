@@ -74,7 +74,7 @@ def mock_config_manager(sample_level_config):
 def mock_combat_engine():
     """CombatEngine mock with deterministic build_fighter and resolve_combat."""
     engine = MagicMock()
-    engine.build_fighter_from_player = MagicMock(
+    engine.build_fighter_from_player = AsyncMock(
         side_effect=lambda p: FighterState(
             user_id=p.user_id,
             name=p.user_name or p.user_id,

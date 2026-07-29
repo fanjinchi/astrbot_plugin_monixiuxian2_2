@@ -32,6 +32,8 @@ class FakeSkillManager:
             "御剑术": {"id": "spirit_001"},
             "烈火诀": {"id": "fire_001"},
         }
+        self.learned_skills = set()  # skill_id set
+        self._skill_cfg = {"max_technique_slots": 4}
 
     def _find_skill_id_by_name(self, name: str) -> str | None:
         skill = self.skills_data.get(name)
@@ -39,21 +41,26 @@ class FakeSkillManager:
             return skill.get("id")
         return None
 
-    def can_equip_technique(self, player, technique_name, all_skill_ids):
+    async def _is_skill_learned(self, player, skill_id: str) -> bool:
+        return skill_id in self.learned_skills
+
+    async def can_equip_technique(self, player, technique_name, all_skill_ids):
         skill_id = self._find_skill_id_by_name(technique_name)
         if skill_id is None:
             return False, f"未找到功法【{technique_name}】"
         if skill_id not in set(all_skill_ids):
             return False, f"功法【{technique_name}】尚未领悟，无法装备"
-        learned = {entry.get("skill_id") for entry in player.get_learned_skills()}
-        if skill_id not in learned:
+        if not await self._is_skill_learned(player, skill_id):
             return False, f"功法【{technique_name}】尚未领悟，无法装备"
-        techniques = player.get_techniques_list()
-        if technique_name in techniques:
-            return False, f"功法【{technique_name}】已装备"
-        if len(techniques) >= 3:
-            return False, "功法栏已满（最多3个），请先卸下其他功法"
         return True, ""
+
+    async def set_study_target(self, player, skill_id, owned_skill_ids):
+        if skill_id not in owned_skill_ids:
+            return False, "你尚未拥有该功法，无法设为修习目标"
+        if skill_id in self.learned_skills:
+            return False, "该功法已领悟，无需再修习"
+        player.study_target = skill_id
+        return True, f"已将【基础吐纳】设为修习目标"
 
 
 class FakePlayer:
@@ -68,8 +75,8 @@ class FakePlayer:
         self.armor = kwargs.get("armor", "")
         self.main_technique = kwargs.get("main_technique", "")
         self.techniques = kwargs.get("techniques", "[]")
-        self.learned_skills = kwargs.get("learned_skills", "[]")
         self.storage_ring_items = kwargs.get("storage_ring_items", "{}")
+        self.study_target = kwargs.get("study_target", "")
 
     def get_techniques_list(self):
         try:
@@ -79,15 +86,6 @@ class FakePlayer:
 
     def set_techniques_list(self, techniques_list):
         self.techniques = json.dumps(techniques_list, ensure_ascii=False)
-
-    def get_learned_skills(self):
-        try:
-            return json.loads(self.learned_skills)
-        except Exception:
-            return []
-
-    def set_learned_skills(self, skills):
-        self.learned_skills = json.dumps(skills, ensure_ascii=False)
 
     def get_storage_ring_items(self):
         try:
@@ -125,33 +123,25 @@ class TestCollectOwnedSkillIds:
         """Owned skill IDs include storage, equipped techniques and current item."""
         player = FakePlayer(
             techniques='["基础吐纳"]',
-            learned_skills='[{"skill_id":"spirit_001","star_level":1}]',
             storage_ring_items='{"御剑术": 1}',
         )
         ids = handler._collect_owned_skill_ids(player, "基础吐纳")
         assert "common_001" in ids
-        assert "spirit_001" in ids
+        assert "spirit_001" in ids  # from storage ring
 
 
 class TestEquipTechniqueValidation:
     @pytest.mark.asyncio
     async def test_unlearned_technique_is_rejected(self, handler):
-        """Equipping a technique the player has not learned must fail."""
+        """Unlearned technique redirects to study target (now set as study target)."""
         player = FakePlayer(
             user_id="u1",
             techniques="[]",
-            learned_skills="[]",
             storage_ring_items='{"基础吐纳": 1}',
         )
+        handler.skill_manager.learned_skills = set()
         handler.db.get_player_by_id = AsyncMock(return_value=player)
-        # Patch internal managers to avoid database calls.
         handler.storage_ring_manager.has_item = MagicMock(return_value=True)
-        handler.storage_ring_manager.retrieve_item = AsyncMock(
-            return_value=(True, "")
-        )
-        handler.storage_ring_manager.store_item = AsyncMock(
-            return_value=(True, "")
-        )
 
         event = MagicMock()
         event.get_sender_id.return_value = "u1"
@@ -161,26 +151,20 @@ class TestEquipTechniqueValidation:
             pass
 
         msg = event.plain_result.call_args[0][0]
-        assert "尚未领悟" in msg
-        handler.storage_ring_manager.retrieve_item.assert_not_awaited()
+        # Should succeed as study target is set
+        assert "已将" in msg or "设为修习目标" in msg
 
     @pytest.mark.asyncio
-    async def test_slot_limit_is_rejected(self, handler):
-        """Equipping a fourth technique must fail."""
+    async def test_slot_limit_unlearned_is_study_target(self, handler):
+        """Unlearned technique is now set as study target, not rejected."""
         player = FakePlayer(
             user_id="u1",
             techniques='["基础吐纳","铁布衫","御剑术"]',
-            learned_skills='[{"skill_id":"common_001","star_level":1},{"skill_id":"common_002","star_level":1},{"skill_id":"spirit_001","star_level":1},{"skill_id":"fire_001","star_level":1}]',
             storage_ring_items='{"烈火诀": 1}',
         )
+        handler.skill_manager.learned_skills = set()
         handler.db.get_player_by_id = AsyncMock(return_value=player)
         handler.storage_ring_manager.has_item = MagicMock(return_value=True)
-        handler.storage_ring_manager.retrieve_item = AsyncMock(
-            return_value=(True, "")
-        )
-        handler.storage_ring_manager.store_item = AsyncMock(
-            return_value=(True, "")
-        )
 
         event = MagicMock()
         event.get_sender_id.return_value = "u1"
@@ -190,25 +174,20 @@ class TestEquipTechniqueValidation:
             pass
 
         msg = event.plain_result.call_args[0][0]
-        assert "已满" in msg
+        # Should succeed — it becomes study target
+        assert "已将" in msg or "设为修习目标" in msg
 
     @pytest.mark.asyncio
-    async def test_learned_technique_is_accepted(self, handler):
-        """Equipping a learned technique within slot limit succeeds."""
+    async def test_learned_technique_is_study_target_rejected(self, handler):
+        """Learned technique is rejected with 'activate' hint."""
         player = FakePlayer(
             user_id="u1",
             techniques="[]",
-            learned_skills='[{"skill_id":"common_001","star_level":1}]',
             storage_ring_items='{"基础吐纳": 1}',
         )
+        handler.skill_manager.learned_skills = {"common_001"}
         handler.db.get_player_by_id = AsyncMock(return_value=player)
         handler.storage_ring_manager.has_item = MagicMock(return_value=True)
-        handler.storage_ring_manager.retrieve_item = AsyncMock(
-            return_value=(True, "")
-        )
-        handler.storage_ring_manager.store_item = AsyncMock(
-            return_value=(True, "")
-        )
 
         event = MagicMock()
         event.get_sender_id.return_value = "u1"
@@ -218,5 +197,5 @@ class TestEquipTechniqueValidation:
             pass
 
         msg = event.plain_result.call_args[0][0]
-        assert "已装备功法" in msg
-        handler.storage_ring_manager.retrieve_item.assert_awaited_once()
+        # Should be rejected with "激活功法" hint
+        assert "已领悟" in msg and "激活功法" in msg

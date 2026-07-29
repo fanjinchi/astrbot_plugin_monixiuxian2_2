@@ -41,7 +41,7 @@ RiftManager = _rift_mod.RiftManager
 def mock_combat_engine():
     """A fake combat engine returning deterministic results."""
     engine = MagicMock()
-    engine.build_fighter_from_player = MagicMock(
+    engine.build_fighter_from_player = AsyncMock(
         side_effect=lambda p: MagicMock(
             user_id=p.user_id,
             name=p.user_name or p.name,

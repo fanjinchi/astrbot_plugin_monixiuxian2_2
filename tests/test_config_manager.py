@@ -36,25 +36,31 @@ def test_config_manager_loads_weapon_coefficient_k(config_manager):
     assert config_manager.weapons_data["青铜剑"].get("weapon_coefficient_k") is not None
 
 
-def test_skill_manager_works_with_flattened_skills(config_manager):
+@pytest.mark.asyncio
+async def test_skill_manager_works_with_flattened_skills(config_manager):
     """SkillManager must not mix universal skills into the main pool."""
-    mgr = SkillManager(config_manager)
+    class FakeDbExt:
+        async def is_skill_learned(self, user_id, skill_id):
+            return False
+
+        async def learn_or_star_up(self, user_id, skill_id, source=""):
+            return True, 1
+
+    class FakeDb:
+        def __init__(self):
+            self.ext = FakeDbExt()
+
+    mgr = SkillManager(config_manager, FakeDb())
 
     class FakePlayer:
+        user_id = "test"
         main_technique = ""
         study_target = ""
-        learned_skills = "[]"
 
         def get_techniques_list(self):
             return []
 
-        def get_learned_skills(self):
-            return []
-
-        def set_learned_skills(self, skills):
-            self.learned_skills = skills
-
-    pool = mgr._build_comprehension_pool(FakePlayer(), "breakthrough_success")
+    pool = await mgr._build_comprehension_pool(FakePlayer(), "breakthrough_success")
     assert not any(entry["source"] == "universal" for entry in pool)
 
     # Universal fallback is provided separately for breakthrough without heart method.
@@ -63,7 +69,7 @@ def test_skill_manager_works_with_flattened_skills(config_manager):
     original_random = _random.random
     try:
         _random.random = lambda: 0.01  # below 3% fallback rate
-        result = mgr.roll_universal_pool_breakthrough(FakePlayer(), success=True)
+        result = await mgr.roll_universal_pool_breakthrough(FakePlayer(), success=True)
         if result is not None:
             assert "id" in result
     finally:

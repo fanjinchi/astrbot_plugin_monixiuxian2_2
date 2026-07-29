@@ -30,6 +30,56 @@ CombatManager = _combat_mod.CombatManager
 # ------------------------------------------------------------------
 
 
+class FakeDbExt:
+    """In-memory player_skills store mirroring database_extended CRUD."""
+
+    def __init__(self):
+        self.player_skills: dict[tuple[str, str], dict] = {}
+
+    async def get_learned_skills(self, user_id: str) -> list[dict]:
+        return [
+            {
+                "skill_id": key[1],
+                "star_level": value["star_level"],
+                "source": value["source"],
+                "learned_at": value["learned_at"],
+            }
+            for key, value in self.player_skills.items()
+            if key[0] == user_id
+        ]
+
+    async def is_skill_learned(self, user_id: str, skill_id: str) -> bool:
+        return (user_id, skill_id) in self.player_skills
+
+    async def get_star_level(self, user_id: str, skill_id: str) -> int:
+        entry = self.player_skills.get((user_id, skill_id))
+        return entry["star_level"] if entry else 1
+
+    async def learn_or_star_up(
+        self, user_id: str, skill_id: str, source: str = ""
+    ) -> tuple[bool, int]:
+        import time
+
+        now = int(time.time())
+        key = (user_id, skill_id)
+        if key not in self.player_skills:
+            self.player_skills[key] = {
+                "star_level": 1,
+                "source": source,
+                "learned_at": now,
+            }
+            return True, 1
+        self.player_skills[key]["star_level"] += 1
+        self.player_skills[key]["source"] = source
+        self.player_skills[key]["learned_at"] = now
+        return False, self.player_skills[key]["star_level"]
+
+
+class FakeDb:
+    def __init__(self):
+        self.ext = FakeDbExt()
+
+
 class FakePlayer:
     """Minimal Player stub for skill / combat tests."""
 
@@ -37,7 +87,6 @@ class FakePlayer:
         self.user_id = kwargs.get("user_id", "test")
         self.main_technique = kwargs.get("main_technique", "")
         self.study_target = kwargs.get("study_target", "")
-        self.learned_skills = kwargs.get("learned_skills", "[]")
         self.techniques = kwargs.get("techniques", "[]")
         self.weapon = kwargs.get("weapon", "")
         self.armor = kwargs.get("armor", "")
@@ -50,15 +99,6 @@ class FakePlayer:
         self.speed = kwargs.get("speed", 5)
         self.hp = kwargs.get("hp", 100)
         self.armor_value = kwargs.get("armor_value", 0)
-
-    def get_learned_skills(self):
-        try:
-            return json.loads(self.learned_skills)
-        except Exception:
-            return []
-
-    def set_learned_skills(self, skills):
-        self.learned_skills = json.dumps(skills, ensure_ascii=False)
 
     def get_techniques_list(self):
         try:
@@ -120,6 +160,7 @@ class FakeConfigManager:
             },
         }
         self.weapons_data = {}
+        self.items_data = {}
         self.game_config = game_config or {
             "skill_system": {
                 "breakthrough_success_learn_rate": 0.20,
@@ -129,7 +170,7 @@ class FakeConfigManager:
                 "universal_pool_rate": 0.05,
                 "universal_pool_no_heart_rate": 0.03,
                 "random_growth_step": 5,
-                "max_technique_slots": 3,
+                "max_technique_slots": 4,
                 "battle_report_merge_count": 10,
             }
         }
@@ -146,8 +187,13 @@ def cfg():
 
 
 @pytest.fixture
-def mgr(cfg):
-    return SkillManager(cfg)
+def db():
+    return FakeDb()
+
+
+@pytest.fixture
+def mgr(cfg, db):
+    return SkillManager(cfg, db)
 
 
 # ------------------------------------------------------------------
@@ -181,51 +227,54 @@ def test_new_player_starts_at_level_one():
         def __getitem__(self, key):
             return self.get(key)
 
-    mgr = CultivationManager(DummyConfig(), FakeConfigManager())
-    player = mgr.generate_new_player_stats("u1", cultivation_type="灵修")
+    mgr2 = CultivationManager(DummyConfig(), FakeConfigManager())
+    player = mgr2.generate_new_player_stats("u1", cultivation_type="灵修")
     assert player.level_index == 1
 
-    player_body = mgr.generate_new_player_stats("u2", cultivation_type="体修")
+    player_body = mgr2.generate_new_player_stats("u2", cultivation_type="体修")
     assert player_body.level_index == 1
 
 
-def test_breakthrough_success_comprehension_pool(mgr):
+@pytest.mark.asyncio
+async def test_breakthrough_success_comprehension_pool(mgr, db):
     """Breakthrough success pool contains heart-method pool + study target."""
     player = FakePlayer(main_technique="长春功", study_target="spirit_001")
-    pool = mgr._build_comprehension_pool(player, "breakthrough_success")
+    pool = await mgr._build_comprehension_pool(player, "breakthrough_success")
     skill_ids = {e["skill_id"] for e in pool}
     assert "common_001" in skill_ids  # from heart method pool
     assert "spirit_001" in skill_ids  # study target
     assert not any(e["source"] == "universal" for e in pool)
 
 
-def test_breakthrough_fail_comprehension_pool(mgr):
+@pytest.mark.asyncio
+async def test_breakthrough_fail_comprehension_pool(mgr, db):
     """Breakthrough fail pool uses same rules as success and excludes universal."""
     player = FakePlayer(main_technique="长春功", study_target="spirit_001")
-    pool = mgr._build_comprehension_pool(player, "breakthrough_fail")
+    pool = await mgr._build_comprehension_pool(player, "breakthrough_fail")
     skill_ids = {e["skill_id"] for e in pool}
     assert "common_001" in skill_ids
     assert not any(e["source"] == "universal" for e in pool)
 
 
-def test_universal_pool_no_heart_method(mgr):
+@pytest.mark.asyncio
+async def test_universal_pool_no_heart_method(mgr, db):
     """Without heart method, universal pool fallback provides entry on breakthrough."""
     player = FakePlayer(main_technique="")
-    # Force the fallback probability check to pass
     _original = random.random
-    random.random = lambda: 0.01  # always below 0.03
+    random.random = lambda: 0.01
     try:
-        result = mgr.roll_universal_pool_breakthrough(player, success=False)
+        result = await mgr.roll_universal_pool_breakthrough(player, success=False)
         if result is not None:
             assert "id" in result
     finally:
         random.random = _original
 
 
-def test_universal_pool_with_heart_method_returns_none(mgr):
+@pytest.mark.asyncio
+async def test_universal_pool_with_heart_method_returns_none(mgr, db):
     """With heart method equipped, universal fallback is not used."""
     player = FakePlayer(main_technique="长春功")
-    result = mgr.roll_universal_pool_breakthrough(player, success=True)
+    result = await mgr.roll_universal_pool_breakthrough(player, success=True)
     assert result is None
 
 
@@ -234,28 +283,29 @@ def test_universal_pool_with_heart_method_returns_none(mgr):
 # ------------------------------------------------------------------
 
 
-def test_cultivation_pool_no_universal(mgr):
+@pytest.mark.asyncio
+async def test_cultivation_pool_no_universal(mgr, db):
     """Cultivation channel must NOT include universal pool."""
     player = FakePlayer(main_technique="长春功")
-    pool = mgr._build_comprehension_pool(player, "cultivation")
+    pool = await mgr._build_comprehension_pool(player, "cultivation")
     sources = {e["source"] for e in pool}
     assert "universal" not in sources
 
 
-def test_cultivation_comprehension_roll_count(mgr):
+@pytest.mark.asyncio
+async def test_cultivation_comprehension_roll_count(mgr, db):
     """roll_cultivation_comprehension rolls once per interval (2h default)."""
     player = FakePlayer(main_technique="长春功")
-    # With no learned skills, comprehension should find common_001 from pool
-    results = mgr.roll_cultivation_comprehension(player, hours=6)
-    # 6h gives 3 rolls; with random there may be 0-3 results
+    results = await mgr.roll_cultivation_comprehension(player, hours=6)
     assert isinstance(results, list)
     assert len(results) <= 3
 
 
-def test_cultivation_comprehension_no_heart_method_skips(mgr):
+@pytest.mark.asyncio
+async def test_cultivation_comprehension_no_heart_method_skips(mgr, db):
     """Without heart method, cultivation pool is empty (universal excluded)."""
     player = FakePlayer(main_technique="")
-    pool = mgr._build_comprehension_pool(player, "cultivation")
+    pool = await mgr._build_comprehension_pool(player, "cultivation")
     assert pool == []
 
 
@@ -264,37 +314,40 @@ def test_cultivation_comprehension_no_heart_method_skips(mgr):
 # ------------------------------------------------------------------
 
 
-def test_set_study_target_success(mgr):
+@pytest.mark.asyncio
+async def test_set_study_target_success(mgr, db):
     """Valid owned + unlearned skill can be set as study target."""
     player = FakePlayer()
-    ok, msg = mgr.set_study_target(player, "common_001", ["common_001"])
+    ok, msg = await mgr.set_study_target(player, "common_001", ["common_001"])
     assert ok
     assert player.study_target == "common_001"
     assert "基础吐纳" in msg
 
 
-def test_set_study_target_not_owned(mgr):
+@pytest.mark.asyncio
+async def test_set_study_target_not_owned(mgr, db):
     """Cannot set target for skill the player does not own."""
     player = FakePlayer()
-    ok, msg = mgr.set_study_target(player, "common_001", [])
+    ok, msg = await mgr.set_study_target(player, "common_001", [])
     assert not ok
     assert "尚未拥有" in msg
 
 
-def test_set_study_target_already_learned(mgr):
+@pytest.mark.asyncio
+async def test_set_study_target_already_learned(mgr, db):
     """Cannot set target for already-learned skill."""
-    player = FakePlayer(
-        learned_skills='[{"skill_id":"common_001","star_level":1}]'
-    )
-    ok, msg = mgr.set_study_target(player, "common_001", ["common_001"])
+    await db.ext.learn_or_star_up("test", "common_001", "test")
+    player = FakePlayer()
+    ok, msg = await mgr.set_study_target(player, "common_001", ["common_001"])
     assert not ok
     assert "已领悟" in msg
 
 
-def test_study_target_auto_cleared_on_learn(mgr):
+@pytest.mark.asyncio
+async def test_study_target_auto_cleared_on_learn(mgr, db):
     """Learning the target skill clears the study target."""
     player = FakePlayer(study_target="common_001")
-    mgr._resolve_and_learn(player, {"skill_id": "common_001", "source": "test"})
+    await mgr._resolve_and_learn(player, {"skill_id": "common_001", "source": "test"})
     assert player.study_target == ""
 
 
@@ -337,37 +390,37 @@ def test_clear_study_target_none(mgr):
 def test_merge_count_player_preference():
     """CombatManager._get_merge_count returns player preference when set."""
     cfg = FakeConfigManager()
-    mgr = CombatManager(cfg, None)
+    mgr2 = CombatManager(cfg, None)
     player = FakePlayer(battle_report_merge_count=42)
-    assert mgr._get_merge_count(player) == 42
+    assert mgr2._get_merge_count(player) == 42
 
 
 def test_merge_count_falls_back_to_config():
     """Falls back to game_config default when player value is 0."""
     cfg = FakeConfigManager()
-    mgr = CombatManager(cfg, None)
+    mgr2 = CombatManager(cfg, None)
     player = FakePlayer(battle_report_merge_count=0)
-    assert mgr._get_merge_count(player) == 10
+    assert mgr2._get_merge_count(player) == 10
 
 
 def test_merge_count_clamps_high():
     """Values above 50 are clamped to 50."""
     cfg = FakeConfigManager()
-    mgr = CombatManager(cfg, None)
-    assert mgr._get_merge_count(FakePlayer(battle_report_merge_count=100)) == 50
+    mgr2 = CombatManager(cfg, None)
+    assert mgr2._get_merge_count(FakePlayer(battle_report_merge_count=100)) == 50
 
 
 def test_merge_count_ignores_negative():
     """Negative values fall back to default."""
     cfg = FakeConfigManager()
-    mgr = CombatManager(cfg, None)
-    assert mgr._get_merge_count(FakePlayer(battle_report_merge_count=-5)) == 10
+    mgr2 = CombatManager(cfg, None)
+    assert mgr2._get_merge_count(FakePlayer(battle_report_merge_count=-5)) == 10
 
 
 def test_merge_count_handles_non_int():
     """Non-integer values fall back to default (hasattr returns True for 0)."""
     cfg = FakeConfigManager()
-    mgr = CombatManager(cfg, None)
+    mgr2 = CombatManager(cfg, None)
     player = FakePlayer()
     player.battle_report_merge_count = "not-int"
-    assert mgr._get_merge_count(player) == 10
+    assert mgr2._get_merge_count(player) == 10

@@ -1,4 +1,4 @@
-"""Tests for database migrations (v22 four-main-attribute redesign and v24)."""
+"""Tests for database migrations (v25 player_skills)."""
 
 import aiosqlite
 import pytest
@@ -8,15 +8,21 @@ from tests.helpers import load_module, load_package_module
 _migration_mod = load_module("migration_test", "data/migration.py")
 MigrationManager = _migration_mod.MigrationManager
 _create_all_tables_v21 = _migration_mod._create_all_tables_v21
+_create_all_tables_v22 = _migration_mod._create_all_tables_v22
 LATEST_DB_VERSION = _migration_mod.LATEST_DB_VERSION
 
-_data_mod = load_package_module("data/data_manager.py", "astrbot_plugin_monixiuxian2_2.data.data_manager")
+_data_mod = load_package_module(
+    "data/data_manager.py",
+    "astrbot_plugin_monixiuxian2_2.data.data_manager",
+)
 DataBase = _data_mod.DataBase
-Player = load_package_module("models.py", "astrbot_plugin_monixiuxian2_2.models").Player
+Player = load_package_module(
+    "models.py", "astrbot_plugin_monixiuxian2_2.models"
+).Player
 
 
 class DummyConfigManager:
-    """ConfigManager stub; migrations v22/v23/v24 do not use it."""
+    """ConfigManager stub; migrations do not use it."""
 
     pass
 
@@ -40,12 +46,23 @@ async def test_fresh_install_reaches_latest_version():
         "speed",
         "hp",
         "armor_value",
-        "learned_skills",
         "study_target",
         "battle_report_merge_count",
         "spiritual_root",
     }
     assert new_fields <= columns, f"Missing new fields: {new_fields - columns}"
+
+    # learned_skills column must NOT exist
+    assert "learned_skills" not in columns, "learned_skills column still present"
+
+    # player_skills table must exist
+    async with aiosqlite.connect(":memory:") as db_conn2:
+        await MigrationManager(db_conn2, DummyConfigManager()).migrate()
+        async with db_conn2.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='player_skills'"
+        ) as cursor:
+            row = await cursor.fetchone()
+        assert row is not None, "player_skills table not found"
 
 
 @pytest.mark.asyncio
@@ -102,7 +119,6 @@ async def test_v21_to_latest_migration_rebuilds_players():
             "speed",
             "hp",
             "armor_value",
-            "learned_skills",
             "study_target",
             "battle_report_merge_count",
             "spiritual_root",
@@ -122,6 +138,8 @@ async def test_v21_to_latest_migration_rebuilds_players():
         }
         assert not old_fields & columns, f"Old fields still present: {old_fields & columns}"
 
+        assert "learned_skills" not in columns, "learned_skills column still present"
+
         async with db_conn.execute("SELECT COUNT(*) FROM players") as cursor:
             count = (await cursor.fetchone())[0]
         assert count == 0, "Old players should be discarded during v22 migration"
@@ -129,6 +147,13 @@ async def test_v21_to_latest_migration_rebuilds_players():
         async with db_conn.execute("PRAGMA table_info(buff_info)") as cursor:
             buff_cols = {row[1] for row in await cursor.fetchall()}
         assert buff_cols == {"id", "user_id"}
+
+        # player_skills table must exist
+        async with db_conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='player_skills'"
+        ) as cursor:
+            row = await cursor.fetchone()
+        assert row is not None, "player_skills table not found"
 
 
 @pytest.mark.asyncio
@@ -158,3 +183,41 @@ async def test_v23_to_v24_adds_spiritual_root():
         async with db_conn.execute("PRAGMA table_info(players)") as cursor:
             columns = {row[1] for row in await cursor.fetchall()}
         assert "spiritual_root" in columns
+
+
+@pytest.mark.asyncio
+async def test_player_skills_crud():
+    """player_skills CRUD: learn, check, star level, get all."""
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        db = DataBase(":memory:")
+        db.conn = db_conn
+        db.ext = _data_mod.DatabaseExtended(db_conn)
+
+        # Fresh: no learned skills
+        skills = await db.ext.get_learned_skills("u1")
+        assert skills == []
+
+        # Learn a new skill
+        is_new, star = await db.ext.learn_or_star_up("u1", "common_001", "test")
+        assert is_new
+        assert star == 1
+
+        # Now learned
+        assert await db.ext.is_skill_learned("u1", "common_001")
+        assert not await db.ext.is_skill_learned("u1", "nonexist")
+
+        # Get star level
+        assert await db.ext.get_star_level("u1", "common_001") == 1
+
+        # Duplicate learn: star up
+        is_new2, star2 = await db.ext.learn_or_star_up("u1", "common_001", "retest")
+        assert not is_new2
+        assert star2 == 2
+
+        # Get learned skills list
+        skills = await db.ext.get_learned_skills("u1")
+        assert len(skills) == 1
+        assert skills[0]["skill_id"] == "common_001"
+        assert skills[0]["star_level"] == 2
+        assert skills[0]["source"] == "retest"

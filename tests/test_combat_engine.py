@@ -1,5 +1,6 @@
 """Tests for the unified combat engine (combat-core spec)."""
 
+import pytest
 import random
 import sys
 from pathlib import Path
@@ -31,7 +32,7 @@ class FakeConfigManager:
 class FakeSkillManager:
     """Minimal fake skill manager for tests."""
 
-    def get_battle_loadout(self, player):
+    async def get_battle_loadout(self, player):
         return {
             "trigger_skills": [],
             "ultimates": [],
@@ -552,7 +553,8 @@ class FakePlayer:
 
 
 class TestBuildFighterFromPlayer:
-    def test_equipment_bonuses_applied_to_fighter(self):
+    @pytest.mark.asyncio
+    async def test_equipment_bonuses_applied_to_fighter(self):
         """FighterState damage/hp/armor include equipment bonuses."""
         config = FakeConfigManager({
             "combat": {"action_limit": 200, "dodge_cap": 0.5, "crit_damage_multiplier": 1.5},
@@ -579,13 +581,14 @@ class TestBuildFighterFromPlayer:
             damage=10, hp=100, armor_value=0, weapon="Test Sword", armor="Test Armor"
         )
 
-        fighter = engine.build_fighter_from_player(player)
+        fighter = await engine.build_fighter_from_player(player)
         assert fighter.damage == 25  # base 10 + weapon 15
         assert fighter.speed == 10  # base 5 + weapon 5
         assert fighter.max_hp == 130  # base 100 + armor 30
         assert fighter.armor_value == 20  # armor only
 
-    def test_heart_method_passive_applied(self):
+    @pytest.mark.asyncio
+    async def test_heart_method_passive_applied(self):
         """Heart-method passive bonuses flow into FighterState attributes."""
         config = FakeConfigManager({
             "combat": {"action_limit": 200, "dodge_cap": 0.5, "crit_damage_multiplier": 1.5},
@@ -601,6 +604,6 @@ class TestBuildFighterFromPlayer:
             damage=100, hp=100, armor_value=0, main_technique="Test Heart"
         )
 
-        fighter = engine.build_fighter_from_player(player)
+        fighter = await engine.build_fighter_from_player(player)
         assert fighter.damage == 110  # 100 * 1.1
         assert fighter.max_hp == 120  # 100 * 1.2

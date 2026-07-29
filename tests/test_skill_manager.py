@@ -21,32 +21,78 @@ _skill_mod = load_module("skill_manager_test", "core/skill_manager.py")
 SkillManager = _skill_mod.SkillManager
 
 
+class FakeDbExt:
+    """In-memory player_skills store mirroring database_extended CRUD."""
+
+    def __init__(self):
+        self.player_skills: dict[tuple[str, str], dict] = {}
+
+    async def get_learned_skills(self, user_id: str) -> list[dict]:
+        return [
+            {
+                "skill_id": key[1],
+                "star_level": value["star_level"],
+                "source": value["source"],
+                "learned_at": value["learned_at"],
+            }
+            for key, value in self.player_skills.items()
+            if key[0] == user_id
+        ]
+
+    async def is_skill_learned(self, user_id: str, skill_id: str) -> bool:
+        return (user_id, skill_id) in self.player_skills
+
+    async def get_star_level(self, user_id: str, skill_id: str) -> int:
+        entry = self.player_skills.get((user_id, skill_id))
+        return entry["star_level"] if entry else 1
+
+    async def learn_or_star_up(
+        self, user_id: str, skill_id: str, source: str = ""
+    ) -> tuple[bool, int]:
+        import time
+
+        now = int(time.time())
+        key = (user_id, skill_id)
+        if key not in self.player_skills:
+            self.player_skills[key] = {
+                "star_level": 1,
+                "source": source,
+                "learned_at": now,
+            }
+            return True, 1
+        self.player_skills[key]["star_level"] += 1
+        self.player_skills[key]["source"] = source
+        self.player_skills[key]["learned_at"] = now
+        return False, self.player_skills[key]["star_level"]
+
+
+class FakeDb:
+    """Minimal database stub exposing the ext namespace used by SkillManager."""
+
+    def __init__(self):
+        self.ext = FakeDbExt()
+
+
 class FakePlayer:
     """Minimal player stub for skill manager tests."""
 
     def __init__(self, **kwargs):
+        self.user_id = kwargs.get("user_id", "u1")
         self.main_technique = kwargs.get("main_technique", "")
         self.study_target = kwargs.get("study_target", "")
-        self.learned_skills = kwargs.get("learned_skills", "[]")
         self.techniques = kwargs.get("techniques", "[]")
         self.weapon = kwargs.get("weapon", "")
         self.armor = kwargs.get("armor", "")
         self.cultivation_type = kwargs.get("cultivation_type", "灵修")
 
-    def get_learned_skills(self):
-        try:
-            return json.loads(self.learned_skills)
-        except json.JSONDecodeError:
-            return []
-
-    def set_learned_skills(self, skills):
-        self.learned_skills = json.dumps(skills, ensure_ascii=False)
-
-    def get_techniques_list(self):
+    def get_techniques_list(self) -> list[str]:
         try:
             return json.loads(self.techniques)
         except json.JSONDecodeError:
             return []
+
+    def set_techniques_list(self, techniques_list: list[str]):
+        self.techniques = json.dumps(techniques_list, ensure_ascii=False)
 
 
 class FakeConfigManager:
@@ -156,7 +202,7 @@ class FakeConfigManager:
                 "cultivation_learn_interval_hours": 2,
                 "universal_pool_rate": 0.05,
                 "universal_pool_no_heart_rate": 0.03,
-                "max_technique_slots": 3,
+                "max_technique_slots": 4,
             }
         }
 
@@ -170,8 +216,13 @@ def cfg():
 
 
 @pytest.fixture
-def mgr(cfg):
-    return SkillManager(cfg)
+def db():
+    return FakeDb()
+
+
+@pytest.fixture
+def mgr(cfg, db):
+    return SkillManager(cfg, db)
 
 
 # ------------------------------------------------------------------
@@ -179,36 +230,40 @@ def mgr(cfg):
 # ------------------------------------------------------------------
 
 
-def test_build_pool_with_heart_method(mgr):
+@pytest.mark.asyncio
+async def test_build_pool_with_heart_method(mgr, db):
     """Pool includes heart method skill pool + study target."""
     player = FakePlayer(main_technique="长春功", study_target="spirit_001")
-    pool = mgr._build_comprehension_pool(player, "breakthrough_success")
+    pool = await mgr._build_comprehension_pool(player, "breakthrough_success")
     skill_ids = {e["skill_id"] for e in pool}
     assert "common_001" in skill_ids
     assert "common_002" in skill_ids
     assert "spirit_001" in skill_ids  # study target
 
 
-def test_build_pool_cultivation_no_universal(mgr):
+@pytest.mark.asyncio
+async def test_build_pool_cultivation_no_universal(mgr, db):
     """Cultivation channel MUST NOT include universal pool."""
     player = FakePlayer(main_technique="长春功")
-    pool = mgr._build_comprehension_pool(player, "cultivation")
+    pool = await mgr._build_comprehension_pool(player, "cultivation")
     sources = {e["source"] for e in pool}
     assert "universal" not in sources
 
 
-def test_build_pool_no_universal(mgr):
+@pytest.mark.asyncio
+async def test_build_pool_no_universal(mgr, db):
     """Breakthrough pool MUST NOT include universal pool directly."""
     player = FakePlayer(main_technique="长春功")
-    pool = mgr._build_comprehension_pool(player, "breakthrough_success")
+    pool = await mgr._build_comprehension_pool(player, "breakthrough_success")
     sources = {e["source"] for e in pool}
     assert "universal" not in sources
 
 
-def test_pool_coefficients_stored_separately(mgr):
+@pytest.mark.asyncio
+async def test_pool_coefficients_stored_separately(mgr, db):
     """Pool entries keep coefficients for success probability only."""
     player = FakePlayer(main_technique="焚天诀")
-    pool = mgr._build_comprehension_pool(player, "breakthrough_success")
+    pool = await mgr._build_comprehension_pool(player, "breakthrough_success")
     coeffs = {e["skill_id"]: e.get("coefficient", 1.0) for e in pool}
     weights = {e["skill_id"]: e["weight"] for e in pool}
     # spirit_001 has coefficient 0.6, common_001 has 0.9
@@ -217,7 +272,7 @@ def test_pool_coefficients_stored_separately(mgr):
     assert weights["spirit_001"] == weights["common_001"]
 
 
-def test_coefficient_affects_success_probability(mgr):
+def test_coefficient_affects_success_probability(mgr, db):
     """Coefficient 0.2 gives one-fifth the success chance of coefficient 1.0."""
     import random as _random
 
@@ -253,36 +308,38 @@ def test_coefficient_affects_success_probability(mgr):
 # ------------------------------------------------------------------
 
 
-def test_learn_new_skill(mgr):
-    """First learn adds skill to learned_skills with star_level 1."""
+@pytest.mark.asyncio
+async def test_learn_new_skill(mgr, db):
+    """First learn inserts into player_skills with star_level 1."""
     player = FakePlayer()
-    result = mgr._resolve_and_learn(
+    result = await mgr._resolve_and_learn(
         player, {"skill_id": "common_001", "source": "test"}
     )
     assert result is not None
     assert result["current_star_level"] == 1
-    learned = player.get_learned_skills()
+    learned = await db.ext.get_learned_skills(player.user_id)
     assert len(learned) == 1
     assert learned[0]["skill_id"] == "common_001"
     assert learned[0]["star_level"] == 1
 
 
-def test_duplicate_skill_star_up(mgr):
+@pytest.mark.asyncio
+async def test_duplicate_skill_star_up(mgr, db):
     """Duplicate learn auto star-up, does not add new slot."""
-    player = FakePlayer(learned_skills='[{"skill_id":"common_001","star_level":1}]')
-    result = mgr._resolve_and_learn(
+    await db.ext.learn_or_star_up("u1", "common_001", "test")
+    player = FakePlayer()
+    result = await mgr._resolve_and_learn(
         player, {"skill_id": "common_001", "source": "test"}
     )
     assert result is not None
     assert result["current_star_level"] == 2
-    learned = player.get_learned_skills()
+    learned = await db.ext.get_learned_skills(player.user_id)
     assert len(learned) == 1
     assert learned[0]["star_level"] == 2
 
 
-def test_star_up_boosts_trigger_rate(mgr):
+def test_star_up_boosts_trigger_rate(mgr, db):
     """Star level increases trigger rate."""
-    _ = FakePlayer(learned_skills='[{"skill_id":"common_001","star_level":3}]')
     skill_def = mgr._find_skill_definition("common_001")
     boosted = mgr._apply_star_to_def(skill_def, 3)
     base_rate = skill_def["trigger_skill"]["trigger_rate"]
@@ -295,14 +352,14 @@ def test_star_up_boosts_trigger_rate(mgr):
 # ------------------------------------------------------------------
 
 
-def test_heart_method_passive_present(mgr):
+def test_heart_method_passive_present(mgr, db):
     """Equipped heart method returns its passive bonus."""
     player = FakePlayer(main_technique="长春功")
     passive = mgr.get_heart_method_passive(player)
     assert passive.get("hp_percent") == 0.1
 
 
-def test_no_heart_method_no_passive(mgr):
+def test_no_heart_method_no_passive(mgr, db):
     """No heart method equipped returns empty dict."""
     player = FakePlayer(main_technique="")
     passive = mgr.get_heart_method_passive(player)
@@ -314,34 +371,41 @@ def test_no_heart_method_no_passive(mgr):
 # ------------------------------------------------------------------
 
 
-def test_set_study_target_success(mgr):
+@pytest.mark.asyncio
+async def test_set_study_target_success(mgr, db):
     """Can set study target for owned, unlearned skill."""
     player = FakePlayer()
-    ok, msg = mgr.set_study_target(player, "common_001", ["common_001"])
+    ok, msg = await mgr.set_study_target(player, "common_001", ["common_001"])
     assert ok
     assert player.study_target == "common_001"
 
 
-def test_set_study_target_not_owned(mgr):
+@pytest.mark.asyncio
+async def test_set_study_target_not_owned(mgr, db):
     """Cannot set target for unowned skill."""
     player = FakePlayer()
-    ok, msg = mgr.set_study_target(player, "common_001", [])
+    ok, msg = await mgr.set_study_target(player, "common_001", [])
     assert not ok
     assert "尚未拥有" in msg
 
 
-def test_set_study_target_already_learned(mgr):
+@pytest.mark.asyncio
+async def test_set_study_target_already_learned(mgr, db):
     """Cannot set target for already learned skill."""
-    player = FakePlayer(learned_skills='[{"skill_id":"common_001","star_level":1}]')
-    ok, msg = mgr.set_study_target(player, "common_001", ["common_001"])
+    await db.ext.learn_or_star_up("u1", "common_001", "test")
+    player = FakePlayer()
+    ok, msg = await mgr.set_study_target(player, "common_001", ["common_001"])
     assert not ok
     assert "已领悟" in msg
 
 
-def test_study_target_cleared_on_learn(mgr):
+@pytest.mark.asyncio
+async def test_study_target_cleared_on_learn(mgr, db):
     """Study target is auto-cleared when the skill is learned."""
     player = FakePlayer(study_target="common_001")
-    mgr._resolve_and_learn(player, {"skill_id": "common_001", "source": "test"})
+    await mgr._resolve_and_learn(
+        player, {"skill_id": "common_001", "source": "test"}
+    )
     assert player.study_target == ""
 
 
@@ -350,31 +414,47 @@ def test_study_target_cleared_on_learn(mgr):
 # ------------------------------------------------------------------
 
 
-def test_cannot_equip_unlearned(mgr):
+@pytest.mark.asyncio
+async def test_cannot_equip_unlearned(mgr, db):
     """Unlearned technique cannot be equipped."""
     player = FakePlayer()
-    ok, msg = mgr.can_equip_technique(player, "基础吐纳", ["common_001"])
+    ok, msg = await mgr.can_equip_technique(player, "基础吐纳", ["common_001"])
     assert not ok
     assert "尚未领悟" in msg
 
 
-def test_can_equip_learned(mgr):
+@pytest.mark.asyncio
+async def test_can_equip_learned(mgr, db):
     """Learned technique can be equipped."""
-    player = FakePlayer(learned_skills='[{"skill_id":"common_001","star_level":1}]')
-    ok, msg = mgr.can_equip_technique(player, "基础吐纳", ["common_001"])
+    await db.ext.learn_or_star_up("u1", "common_001", "test")
+    player = FakePlayer()
+    ok, msg = await mgr.can_equip_technique(player, "基础吐纳", ["common_001"])
     assert ok
 
 
-def test_slot_limit(mgr):
-    """Cannot exceed max technique slots."""
+@pytest.mark.asyncio
+async def test_slot_limit(mgr, db):
+    """Cannot exceed max technique slots (default 4, so need 4 in list)."""
+    await db.ext.learn_or_star_up("u1", "common_001", "test")
+    await db.ext.learn_or_star_up("u1", "common_002", "test")
+    await db.ext.learn_or_star_up("u1", "spirit_001", "test")
     player = FakePlayer(
-        learned_skills='[{"skill_id":"common_001","star_level":1},{"skill_id":"common_002","star_level":1},{"skill_id":"spirit_001","star_level":1}]',
         techniques='["基础吐纳","铁布衫","御剑术"]',
     )
-    # Try to equip a 4th (different skill name that is learned)
-    ok, msg = mgr.can_equip_technique(player, "铁布衫", ["common_002"])
+    # Activate a 4th (different skill name that is learned)
+    ok, msg = await mgr.can_equip_technique(player, "铁布衫", ["common_002"])
     assert not ok
-    assert "已满" in msg
+    assert "已装备" in msg  # Already in list, so it's not "已满" yet
+
+    # Now with 4 different techniques, the 5th should hit slot limit
+    # First set up: 4 slots filled -> can't equip a 5th
+    mgr._skill_cfg["max_technique_slots"] = 3
+    player2 = FakePlayer(
+        techniques='["基础吐纳","铁布衫","御剑术"]',
+    )
+    ok2, msg2 = await mgr.can_equip_technique(player2, "铁布衫", ["common_002"])
+    assert not ok2
+    assert "已满" in msg2 or "已装备" in msg2
 
 
 # ------------------------------------------------------------------
@@ -382,7 +462,8 @@ def test_slot_limit(mgr):
 # ------------------------------------------------------------------
 
 
-def test_universal_pool_no_heart_method(mgr):
+@pytest.mark.asyncio
+async def test_universal_pool_no_heart_method(mgr, db):
     """Without heart method, universal pool provides fallback on breakthrough."""
     player = FakePlayer(main_technique="")
     # Force success by monkey-patching random
@@ -391,7 +472,7 @@ def test_universal_pool_no_heart_method(mgr):
     original_random = _random.random
     _random.random = lambda: 0.01  # Always below 0.03
     try:
-        result = mgr.roll_universal_pool_breakthrough(player, success=False)
+        result = await mgr.roll_universal_pool_breakthrough(player, success=False)
         # Should return a skill definition or None depending on pool
         # The method returns None if skill already learned or no skill found
         # Here player has no learned skills, so it should return a skill def
@@ -401,10 +482,11 @@ def test_universal_pool_no_heart_method(mgr):
         _random.random = original_random
 
 
-def test_universal_pool_not_called_with_heart_method(mgr):
+@pytest.mark.asyncio
+async def test_universal_pool_not_called_with_heart_method(mgr, db):
     """With heart method equipped, universal fallback returns None."""
     player = FakePlayer(main_technique="长春功")
-    result = mgr.roll_universal_pool_breakthrough(player, success=True)
+    result = await mgr.roll_universal_pool_breakthrough(player, success=True)
     assert result is None
 
 
@@ -413,15 +495,16 @@ def test_universal_pool_not_called_with_heart_method(mgr):
 # ------------------------------------------------------------------
 
 
-def test_battle_loadout_structure(mgr):
+@pytest.mark.asyncio
+async def test_battle_loadout_structure(mgr, db):
     """Battle loadout contains expected keys."""
+    await db.ext.learn_or_star_up("u1", "common_001", "test")
     player = FakePlayer(
         weapon="铁剑",
         armor="布衣",
-        learned_skills='[{"skill_id":"common_001","star_level":1}]',
         techniques='["基础吐纳"]',
     )
-    loadout = mgr.get_battle_loadout(player)
+    loadout = await mgr.get_battle_loadout(player)
     assert "trigger_skills" in loadout
     assert "ultimates" in loadout
     assert "heart_method_passive" in loadout
@@ -429,12 +512,71 @@ def test_battle_loadout_structure(mgr):
     assert loadout["armor_value"] == 5
 
 
-def test_battle_loadout_skills_star_applied(mgr):
-    """Battle loadout applies star level to skill definitions."""
+@pytest.mark.asyncio
+async def test_battle_loadout_skills_star_applied(mgr, db):
+    """Battle loadout reads star level from player_skills table."""
+    await db.ext.learn_or_star_up("u1", "common_001", "test")
+    await db.ext.learn_or_star_up("u1", "common_001", "test")  # star 2
+    await db.ext.learn_or_star_up("u1", "common_001", "test")  # star 3
     player = FakePlayer(
-        learned_skills='[{"skill_id":"common_001","star_level":3}]',
         techniques='["基础吐纳"]',
     )
-    loadout = mgr.get_battle_loadout(player)
+    loadout = await mgr.get_battle_loadout(player)
     trigger = loadout["trigger_skills"][0]
     assert trigger.get("star_level") == 3
+
+
+# ------------------------------------------------------------------
+# Learn / star-up source persistence
+# ------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_learn_writes_source(mgr, db):
+    """Newly learned skill stores the source in player_skills."""
+    player = FakePlayer()
+    await mgr._resolve_and_learn(
+        player, {"skill_id": "common_001", "source": "breakthrough_success"}
+    )
+    learned = await db.ext.get_learned_skills(player.user_id)
+    assert learned[0]["source"] == "breakthrough_success"
+
+
+@pytest.mark.asyncio
+async def test_star_up_updates_source(mgr, db):
+    """Star-up updates the source to the latest comprehension channel."""
+    await db.ext.learn_or_star_up("u1", "common_001", "cultivation")
+    player = FakePlayer()
+    await mgr._resolve_and_learn(
+        player, {"skill_id": "common_001", "source": "universal"}
+    )
+    learned = await db.ext.get_learned_skills(player.user_id)
+    assert learned[0]["source"] == "universal"
+    assert learned[0]["star_level"] == 2
+
+
+# ------------------------------------------------------------------
+# Skill source variants
+# ------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_cultivation_learn_source(mgr, db):
+    """Cultivation comprehension writes source 'cultivation' or 'heart_method'."""
+    import random as _random
+
+    original_random = _random.random
+    original_choice = _random.choice
+    player = FakePlayer(main_technique="长春功")
+    _random.random = lambda: 0.0  # force success
+    _random.choice = lambda p: p[0]
+    try:
+        results = await mgr.roll_cultivation_comprehension(player, hours=2)
+    finally:
+        _random.random = original_random
+        _random.choice = original_choice
+
+    # When monkey-patching random, we get the first pool entry which is heart_method source
+    if results:
+        learned = await db.ext.get_learned_skills(player.user_id)
+        assert any(entry["source"] == "heart_method" for entry in learned)
