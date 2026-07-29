@@ -13,10 +13,26 @@ Implements the spec-driven combat-core requirements:
 
 from __future__ import annotations
 
+import json
 import math
+import os
 import random
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+
+try:
+    from ..models import Item
+except ImportError:
+    # Standalone execution / test loading bypasses the package root.
+    import importlib.util
+
+    _plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _spec = importlib.util.spec_from_file_location(
+        "combat_models", os.path.join(_plugin_root, "models.py")
+    )
+    _models_mod = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_models_mod)
+    Item = _models_mod.Item
 
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
@@ -139,42 +155,27 @@ class CombatEngine:
         rounds = 0
 
         while fighter1.hp > 0 and fighter2.hp > 0 and total_actions < action_limit:
-            rounds += 1
-            log.append(f"-- 第 {rounds} 回合 --")
+            # Start a new round every two actions; round-start skills fire once per round.
+            if total_actions % 2 == 0:
+                rounds += 1
+                log.append(f"-- 第 {rounds} 回合 --")
+                self._process_round_start_skills(fighter1, log)
+                self._process_round_start_skills(fighter2, log)
 
-            # Round-start trigger skills for both fighters
-            self._process_round_start_skills(fighter1, log)
-            self._process_round_start_skills(fighter2, log)
-
-            # Determine who acts this action (speed-weighted)
+            # Determine who acts this action (speed-weighted, independent each action)
             if self._roll_initiative(fighter1, fighter2):
-                # Fighter1 attacks Fighter2
                 self._resolve_attack(
                     fighter1, fighter2, dodge_cap, crit_multiplier, log
                 )
-                total_actions += 1
-                if fighter2.hp <= 0:
-                    break
-                # Fighter2 counter-attacks if still alive
-                self._resolve_attack(
-                    fighter2, fighter1, dodge_cap, crit_multiplier, log
-                )
-                total_actions += 1
             else:
-                # Fighter2 attacks Fighter1
                 self._resolve_attack(
                     fighter2, fighter1, dodge_cap, crit_multiplier, log
                 )
-                total_actions += 1
-                if fighter1.hp <= 0:
-                    break
-                # Fighter1 counter-attacks if still alive
-                self._resolve_attack(
-                    fighter1, fighter2, dodge_cap, crit_multiplier, log
-                )
-                total_actions += 1
+            total_actions += 1
 
-            log.append("")
+            # Add a blank line after each completed round (every two actions)
+            if total_actions % 2 == 0:
+                log.append("")
 
         # Determine winner
         if fighter1.hp <= 0 and fighter2.hp <= 0:
@@ -210,45 +211,121 @@ class CombatEngine:
     ) -> FighterState:
         """Build a FighterState from a Player model.
 
-        Uses skill_manager.get_battle_loadout() if available and applies
-        heart-method passive bonuses to the fighter's base attributes.
+        Uses ``Player.get_total_attributes`` to include equipment bonuses,
+        route multipliers and heart-method passive bonuses. Weapon data and
+        active skills are provided by ``skill_manager.get_battle_loadout``.
         """
         loadout: dict = {}
         if self.skill_manager:
             loadout = self.skill_manager.get_battle_loadout(player)
 
-        damage = player.damage
-        agility = player.agility
-        speed = player.speed
-        hp = player.hp
-        armor_value = player.armor_value + loadout.get("armor_value", 0)
-
-        passive = loadout.get("heart_method_passive", {})
-        if passive:
-            if "hp_percent" in passive:
-                hp = int(hp * (1 + passive["hp_percent"]))
-            if "damage_percent" in passive:
-                damage = int(damage * (1 + passive["damage_percent"]))
-            if "agility_percent" in passive:
-                agility = int(agility * (1 + passive["agility_percent"]))
-            if "speed_percent" in passive:
-                speed = int(speed * (1 + passive["speed_percent"]))
-            if "armor_value" in passive:
-                armor_value += int(passive["armor_value"])
+        equipped_items = self._build_equipped_items(player)
+        total_attrs = player.get_total_attributes(equipped_items, pill_multipliers=None)
 
         return FighterState(
             user_id=player.user_id,
             name=player.user_name or player.user_id,
-            hp=hp,
-            max_hp=hp,
-            damage=damage,
-            agility=agility,
-            speed=speed,
-            armor_value=armor_value,
+            hp=total_attrs["hp"],
+            max_hp=total_attrs["hp"],
+            damage=total_attrs["damage"],
+            agility=total_attrs["agility"],
+            speed=total_attrs["speed"],
+            armor_value=total_attrs["armor_value"],
             weapon_k=loadout.get("weapon_coefficient_k", 1.0),
             base_damage=loadout.get("base_damage", 0),
             trigger_skills=loadout.get("trigger_skills", []),
             ultimates=loadout.get("ultimates", []),
+        )
+
+    def _build_equipped_items(self, player: Player) -> list[Item]:
+        """Build Item objects for the player's current equipment."""
+        items: list[Item] = []
+        slot_names = [
+            player.weapon,
+            player.armor,
+            player.main_technique,
+        ] + player.get_techniques_list()
+        for name in slot_names:
+            if not name:
+                continue
+            item = self._parse_item_config(name)
+            if item:
+                items.append(item)
+        return items
+
+    def _parse_item_config(self, name: str) -> Item | None:
+        """Parse a named equipment config into an Item instance."""
+        cfg = self.config_manager.items_data.get(name)
+        if not cfg:
+            cfg = self.config_manager.weapons_data.get(name)
+        if not cfg:
+            cfg = self.config_manager.heart_methods_data.get(name)
+        if not cfg:
+            return None
+
+        item_type = cfg.get("type", "")
+        subtype = cfg.get("subtype", "")
+        if item_type == "法器":
+            if subtype == "武器":
+                item_type = "weapon"
+            elif subtype == "防具":
+                item_type = "armor"
+            else:
+                item_type = "accessory"
+        elif item_type == "功法":
+            item_type = "technique"
+        elif "passive_bonus" in cfg or "skill_pool" in cfg:
+            item_type = "main_technique"
+        elif "trigger_skill" in cfg or "ultimate" in cfg:
+            item_type = "technique"
+
+        def _json_str(value) -> str:
+            if isinstance(value, str):
+                return value
+            try:
+                return json.dumps(value, ensure_ascii=False)
+            except (TypeError, ValueError):
+                return "{}" if isinstance(value, dict) else "[]"
+
+        # Legacy five-dimension mapping for old config files
+        damage = cfg.get("damage", 0)
+        armor_value = cfg.get("armor_value", 0)
+        physical_damage = cfg.get("physical_damage", 0)
+        magic_damage = cfg.get("magic_damage", 0)
+        physical_defense = cfg.get("physical_defense", 0)
+        magic_defense = cfg.get("magic_defense", 0)
+        if physical_damage or magic_damage:
+            damage = max(damage, physical_damage + magic_damage)
+        if physical_defense or magic_defense:
+            armor_value = max(armor_value, physical_defense + magic_defense)
+        equip_effects = cfg.get("equip_effects", {})
+        attack = equip_effects.get("attack", 0)
+        defense = equip_effects.get("defense", 0)
+        if attack:
+            damage = max(damage, attack)
+        if defense:
+            armor_value = max(armor_value, defense)
+
+        return Item(
+            item_id=cfg.get("id", name),
+            name=name,
+            item_type=item_type,
+            description=cfg.get("description", ""),
+            rank=cfg.get("rank", ""),
+            required_level_index=cfg.get("required_level_index", 0),
+            weapon_category=cfg.get("weapon_category", ""),
+            damage=damage,
+            agility=cfg.get("agility", 0),
+            speed=cfg.get("speed", 0),
+            hp=cfg.get("hp", 0),
+            armor_value=armor_value,
+            weapon_coefficient_k=cfg.get("weapon_coefficient_k", 1.0),
+            base_damage=cfg.get("base_damage", 0),
+            route_multiplier=_json_str(cfg.get("route_multiplier", {})),
+            trigger_skills=_json_str(cfg.get("trigger_skills", [])),
+            exp_multiplier=cfg.get("exp_multiplier", 0.0),
+            passive_bonus=_json_str(cfg.get("passive_bonus", {})),
+            skill_pool=_json_str(cfg.get("skill_pool", [])),
         )
 
     # ------------------------------------------------------------------

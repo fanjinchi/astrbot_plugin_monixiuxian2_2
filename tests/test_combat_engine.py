@@ -23,6 +23,9 @@ class FakeConfigManager:
 
     def __init__(self, game_config=None):
         self.game_config = game_config or {}
+        self.items_data = {}
+        self.weapons_data = {}
+        self.heart_methods_data = {}
 
 
 class FakeSkillManager:
@@ -93,6 +96,50 @@ class TestInitiative:
         f1_actions = sum(1 for _ in range(1000) if engine._roll_initiative(f1, f2))
         ratio = f1_actions / 1000
         assert 0.45 < ratio < 0.55, f"Expected ~0.5, got {ratio:.3f}"
+
+
+class TestCombatActionDistribution:
+    def test_speed_double_gets_twice_as_many_actions_in_full_combat(self):
+        """In a full combat, 2x speed yields ~2x total actions for the faster fighter."""
+        engine = make_engine({"combat": {"action_limit": 200}})
+        f1 = make_fighter("Fast", 1000, 1, 5, 20)
+        f2 = make_fighter("Slow", 1000, 1, 5, 10)
+
+        actions: list[str] = []
+        original_resolve = engine._resolve_attack
+
+        def tracking_resolve(attacker, defender, *args, **kwargs):
+            actions.append(attacker.name)
+            original_resolve(attacker, defender, *args, **kwargs)
+
+        engine._resolve_attack = tracking_resolve
+        engine.resolve_combat(f1, f2)
+
+        fast_actions = actions.count("Fast")
+        slow_actions = actions.count("Slow")
+        ratio = fast_actions / slow_actions if slow_actions > 0 else float("inf")
+        assert 1.7 < ratio < 2.3, f"Expected ratio ~2.0, got {ratio:.2f}"
+
+    def test_each_action_is_independent(self):
+        """Each action is decided independently; equal speed stays near 50/50."""
+        engine = make_engine()
+        f1 = make_fighter("A", 1000, 1, 5, 10)
+        f2 = make_fighter("B", 1000, 1, 5, 10)
+
+        actions: list[str] = []
+        original_resolve = engine._resolve_attack
+
+        def tracking_resolve(attacker, defender, *args, **kwargs):
+            actions.append(attacker.name)
+            original_resolve(attacker, defender, *args, **kwargs)
+
+        engine._resolve_attack = tracking_resolve
+        engine.resolve_combat(f1, f2)
+
+        a_actions = actions.count("A")
+        total = len(actions)
+        ratio = a_actions / total if total > 0 else 0
+        assert 0.4 < ratio < 0.6, f"Expected ~0.5, got {ratio:.3f}"
 
 
 # ------------------------------------------------------------------
@@ -428,3 +475,128 @@ class TestLegacyAdapter:
         result = mgr.engine.resolve_combat(f1, f2)
         assert result.winner in ("A", "B", "draw")
         assert isinstance(result.combat_log, list)
+
+
+# ------------------------------------------------------------------
+# FighterState built from Player total attributes
+# ------------------------------------------------------------------
+
+
+class FakePlayer:
+    """Minimal Player stub for build_fighter_from_player tests."""
+
+    def __init__(self, **kwargs):
+        self.user_id = kwargs.get("user_id", "test")
+        self.user_name = kwargs.get("user_name", "Tester")
+        self.cultivation_type = kwargs.get("cultivation_type", "灵修")
+        self.damage = kwargs.get("damage", 10)
+        self.agility = kwargs.get("agility", 5)
+        self.speed = kwargs.get("speed", 5)
+        self.hp = kwargs.get("hp", 100)
+        self.armor_value = kwargs.get("armor_value", 0)
+        self.weapon = kwargs.get("weapon", "")
+        self.armor = kwargs.get("armor", "")
+        self.main_technique = kwargs.get("main_technique", "")
+        self.techniques = kwargs.get("techniques", "[]")
+
+    def get_techniques_list(self):
+        try:
+            import json
+
+            return json.loads(self.techniques)
+        except Exception:
+            return []
+
+    def get_total_attributes(self, equipped_items, pill_multipliers=None):
+        import json
+
+        total = {
+            "damage": self.damage,
+            "agility": self.agility,
+            "speed": self.speed,
+            "hp": self.hp,
+            "armor_value": self.armor_value,
+            "exp_multiplier": 0.0,
+        }
+        for item in equipped_items:
+            mult = item.get_route_multiplier(self.cultivation_type)
+            total["damage"] += int(item.damage * mult)
+            total["agility"] += int(item.agility * mult)
+            total["speed"] += int(item.speed * mult)
+            total["hp"] += int(item.hp * mult)
+            total["armor_value"] += int(item.armor_value * mult)
+            if item.item_type == "main_technique":
+                try:
+                    passive = json.loads(item.passive_bonus)
+                except (json.JSONDecodeError, TypeError):
+                    passive = {}
+                for key, value in passive.items():
+                    if key == "hp_percent":
+                        total["hp"] = int(total["hp"] * (1 + value))
+                    elif key == "damage_percent":
+                        total["damage"] = int(total["damage"] * (1 + value))
+                    elif key == "agility_percent":
+                        total["agility"] = int(total["agility"] * (1 + value))
+                    elif key == "speed_percent":
+                        total["speed"] = int(total["speed"] * (1 + value))
+                    elif key == "armor_value":
+                        total["armor_value"] += int(value)
+        if pill_multipliers:
+            for key in ["damage", "agility", "speed", "hp", "armor_value"]:
+                total[key] = int(total[key] * pill_multipliers.get(key, 1.0))
+        return total
+
+
+class TestBuildFighterFromPlayer:
+    def test_equipment_bonuses_applied_to_fighter(self):
+        """FighterState damage/hp/armor include equipment bonuses."""
+        config = FakeConfigManager({
+            "combat": {"action_limit": 200, "dodge_cap": 0.5, "crit_damage_multiplier": 1.5},
+            "skill_system": {"battle_report_merge_count": 10},
+        })
+        config.weapons_data = {
+            "Test Sword": {
+                "damage": 15,
+                "speed": 5,
+                "weapon_coefficient_k": 1.2,
+                "base_damage": 10,
+            }
+        }
+        config.items_data = {
+            "Test Armor": {
+                "type": "法器",
+                "subtype": "防具",
+                "armor_value": 20,
+                "hp": 30,
+            }
+        }
+        engine = CombatEngine(config, FakeSkillManager())
+        player = FakePlayer(
+            damage=10, hp=100, armor_value=0, weapon="Test Sword", armor="Test Armor"
+        )
+
+        fighter = engine.build_fighter_from_player(player)
+        assert fighter.damage == 25  # base 10 + weapon 15
+        assert fighter.speed == 10  # base 5 + weapon 5
+        assert fighter.max_hp == 130  # base 100 + armor 30
+        assert fighter.armor_value == 20  # armor only
+
+    def test_heart_method_passive_applied(self):
+        """Heart-method passive bonuses flow into FighterState attributes."""
+        config = FakeConfigManager({
+            "combat": {"action_limit": 200, "dodge_cap": 0.5, "crit_damage_multiplier": 1.5},
+            "skill_system": {"battle_report_merge_count": 10},
+        })
+        config.heart_methods_data = {
+            "Test Heart": {
+                "passive_bonus": {"hp_percent": 0.2, "damage_percent": 0.1},
+            }
+        }
+        engine = CombatEngine(config, FakeSkillManager())
+        player = FakePlayer(
+            damage=100, hp=100, armor_value=0, main_technique="Test Heart"
+        )
+
+        fighter = engine.build_fighter_from_player(player)
+        assert fighter.damage == 110  # 100 * 1.1
+        assert fighter.max_hp == 120  # 100 * 1.2
