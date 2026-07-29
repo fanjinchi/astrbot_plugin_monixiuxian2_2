@@ -149,7 +149,7 @@ class CombatHandlers:
         # TODO: impart buff mapping to new attribute system (design pending)
 
         # 战斗
-        result = self.combat_mgr.player_vs_player(p1, p2, combat_type=2)  # 2=决斗
+        result = await self.combat_mgr.player_vs_player(p1, p2, combat_type=2)  # 2=决斗
 
         # 结算（写入最终气血）
         p1.hp = result["player1_final_hp"]
@@ -209,7 +209,7 @@ class CombatHandlers:
 
         # TODO: impart buff mapping to new attribute system (design pending)
 
-        result = self.combat_mgr.player_vs_player(p1, p2, combat_type=1)  # 1=切磋
+        result = await self.combat_mgr.player_vs_player(p1, p2, combat_type=1)  # 1=切磋
 
         # 写入最终气血（切磋原本不消耗，但统一引擎可能修正数值）
         p1.hp = result["player1_final_hp"]

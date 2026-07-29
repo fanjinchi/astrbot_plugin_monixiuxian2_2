@@ -391,4 +391,4 @@ class CultivationManager:
         """
         if not self.skill_manager or hours <= 0:
             return []
-        return self.skill_manager.roll_cultivation_comprehension(player, hours)
+        return await self.skill_manager.roll_cultivation_comprehension(player, hours)

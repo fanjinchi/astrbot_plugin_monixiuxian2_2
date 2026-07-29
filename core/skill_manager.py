@@ -11,12 +11,15 @@ This module handles the skill acquisition and management layer:
 - Battle loadout export for the combat engine (Group 4).
 """
 
+from __future__ import annotations
+
 import json
 import random
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
+    from ..data import DataBase
     from ..models import Player
 
 
@@ -27,15 +30,16 @@ class SkillManager:
     STAR_UP_RATE_BONUS = 0.20
     STAR_UP_EFFECT_BONUS = 0.20
 
-    def __init__(self, config_manager: "ConfigManager"):
+    def __init__(self, config_manager: "ConfigManager", db: "DataBase" | None = None):
         self.config_manager = config_manager
+        self.db = db
         self._skill_cfg = config_manager.game_config.get("skill_system", {})
 
     # ------------------------------------------------------------------
     # Comprehension pool building
     # ------------------------------------------------------------------
 
-    def _build_comprehension_pool(
+    async def _build_comprehension_pool(
         self,
         player: "Player",
         channel: str,  # "breakthrough_success" | "breakthrough_fail" | "cultivation"
@@ -75,7 +79,7 @@ class SkillManager:
 
         # 2. Study target
         study_target = player.study_target
-        if study_target and not self._is_skill_learned(player, study_target):
+        if study_target and not await self._is_skill_learned(player, study_target):
             pool.append(
                 {
                     "skill_id": study_target,
@@ -87,10 +91,11 @@ class SkillManager:
 
         return pool
 
-    def _is_skill_learned(self, player: "Player", skill_id: str) -> bool:
+    async def _is_skill_learned(self, player: "Player", skill_id: str) -> bool:
         """Check if a skill is already learned by the player."""
-        learned = player.get_learned_skills()
-        return any(entry.get("skill_id") == skill_id for entry in learned)
+        if self.db is None or self.db.ext is None:
+            return False
+        return await self.db.ext.is_skill_learned(player.user_id, skill_id)
 
     # ------------------------------------------------------------------
     # Comprehension roll helpers
@@ -119,7 +124,9 @@ class SkillManager:
     # Public comprehension API (three channels)
     # ------------------------------------------------------------------
 
-    def roll_breakthrough_success_comprehension(self, player: "Player") -> dict | None:
+    async def roll_breakthrough_success_comprehension(
+        self, player: "Player"
+    ) -> dict | None:
         """Comprehension roll on breakthrough success.
 
         With an equipped heart method: first roll the heart-method pool +
@@ -134,16 +141,16 @@ class SkillManager:
             return None
 
         base_rate = self._skill_cfg.get("breakthrough_success_learn_rate", 0.20)
-        pool = self._build_comprehension_pool(player, "breakthrough_success")
+        pool = await self._build_comprehension_pool(player, "breakthrough_success")
         chosen = self._roll_comprehension(pool, base_rate)
         if chosen is None:
             return None
 
         universal_rate = self._skill_cfg.get("universal_pool_rate", 0.05)
         if random.random() < universal_rate:
-            universal_skill = self._pick_universal_skill(player)
+            universal_skill = await self._pick_universal_skill(player)
             if universal_skill:
-                return self._resolve_and_learn(
+                return await self._resolve_and_learn(
                     player,
                     {
                         "skill_id": universal_skill["id"],
@@ -151,9 +158,11 @@ class SkillManager:
                     },
                 )
 
-        return self._resolve_and_learn(player, chosen)
+        return await self._resolve_and_learn(player, chosen)
 
-    def roll_breakthrough_fail_comprehension(self, player: "Player") -> dict | None:
+    async def roll_breakthrough_fail_comprehension(
+        self, player: "Player"
+    ) -> dict | None:
         """Comprehension roll on breakthrough failure ("破而后立").
 
         Uses the same pool rules as ``roll_breakthrough_success_comprehension``
@@ -163,16 +172,16 @@ class SkillManager:
             return None
 
         base_rate = self._skill_cfg.get("breakthrough_fail_learn_rate", 0.10)
-        pool = self._build_comprehension_pool(player, "breakthrough_fail")
+        pool = await self._build_comprehension_pool(player, "breakthrough_fail")
         chosen = self._roll_comprehension(pool, base_rate)
         if chosen is None:
             return None
 
         universal_rate = self._skill_cfg.get("universal_pool_rate", 0.05)
         if random.random() < universal_rate:
-            universal_skill = self._pick_universal_skill(player)
+            universal_skill = await self._pick_universal_skill(player)
             if universal_skill:
-                return self._resolve_and_learn(
+                return await self._resolve_and_learn(
                     player,
                     {
                         "skill_id": universal_skill["id"],
@@ -180,9 +189,9 @@ class SkillManager:
                     },
                 )
 
-        return self._resolve_and_learn(player, chosen)
+        return await self._resolve_and_learn(player, chosen)
 
-    def roll_cultivation_comprehension(
+    async def roll_cultivation_comprehension(
         self, player: "Player", hours: int
     ) -> list[dict]:
         """Comprehension roll on cultivation end.
@@ -197,10 +206,10 @@ class SkillManager:
 
         results: list[dict] = []
         for _ in range(roll_count):
-            pool = self._build_comprehension_pool(player, "cultivation")
+            pool = await self._build_comprehension_pool(player, "cultivation")
             chosen = self._roll_comprehension(pool, base_rate)
             if chosen:
-                learned = self._resolve_and_learn(player, chosen)
+                learned = await self._resolve_and_learn(player, chosen)
                 if learned:
                     results.append(learned)
         return results
@@ -209,7 +218,7 @@ class SkillManager:
     # Universal pool fallback (no heart method equipped)
     # ------------------------------------------------------------------
 
-    def roll_universal_pool_breakthrough(
+    async def roll_universal_pool_breakthrough(
         self, player: "Player", success: bool
     ) -> dict | None:
         """Independent universal pool roll for breakthrough (no heart method).
@@ -227,18 +236,18 @@ class SkillManager:
 
         base_rate = self._skill_cfg.get("universal_pool_no_heart_rate", 0.03)
 
-        universal_skill = self._pick_universal_skill(player)
+        universal_skill = await self._pick_universal_skill(player)
         if universal_skill is None:
             return None
 
         if random.random() < base_rate:
-            return self._resolve_and_learn(
+            return await self._resolve_and_learn(
                 player,
                 {"skill_id": universal_skill["id"], "source": "universal_fallback"},
             )
         return None
 
-    def _pick_universal_skill(self, player: "Player") -> dict | None:
+    async def _pick_universal_skill(self, player: "Player") -> dict | None:
         """Pick a random unlearned skill from the universal pool.
 
         Returns the skill definition or None if all universal skills are
@@ -249,7 +258,7 @@ class SkillManager:
             for skill in self.config_manager.skills_data.values()
             if skill.get("_group") == "通用功法池"
             and skill.get("id")
-            and not self._is_skill_learned(player, skill["id"])
+            and not await self._is_skill_learned(player, skill["id"])
         ]
         if not universal_skills:
             return None
@@ -259,40 +268,36 @@ class SkillManager:
     # Learn / star-up logic
     # ------------------------------------------------------------------
 
-    def _resolve_and_learn(self, player: "Player", chosen: dict) -> dict | None:
+    async def _resolve_and_learn(self, player: "Player", chosen: dict) -> dict | None:
         """Resolve a chosen skill ID to its full definition and update player state.
 
         Handles star-up for duplicates. Clears study_target if matched.
         Returns the skill definition (with current star level) or None.
         """
+        if self.db is None or self.db.ext is None:
+            return None
+
         skill_id = chosen["skill_id"]
+        source = chosen.get("source", "")
 
         # Find skill definition across all categories
         skill_def = self._find_skill_definition(skill_id)
         if skill_def is None:
             return None
 
-        learned_list = player.get_learned_skills()
-
-        # Check if already learned -> star up
-        for entry in learned_list:
-            if entry.get("skill_id") == skill_id:
-                entry["star_level"] = entry.get("star_level", 1) + 1
-                player.set_learned_skills(learned_list)
-                # Clear study target if it was this skill
-                if player.study_target == skill_id:
-                    player.study_target = ""
-                return self._apply_star_to_def(skill_def, entry["star_level"])
-
-        # New learn
-        learned_list.append({"skill_id": skill_id, "star_level": 1})
-        player.set_learned_skills(learned_list)
+        is_new, star_level = await self.db.ext.learn_or_star_up(
+            player.user_id, skill_id, source
+        )
 
         # Clear study target if matched
         if player.study_target == skill_id:
             player.study_target = ""
 
-        return self._apply_star_to_def(skill_def, 1)
+        # Provide a source hint in the returned definition for callers
+        result = self._apply_star_to_def(skill_def, star_level)
+        result["learn_source"] = source
+        result["is_new_learn"] = is_new
+        return result
 
     def _find_skill_definition(self, skill_id: str) -> dict | None:
         """Find a skill definition by ID across all skill categories."""
@@ -356,7 +361,7 @@ class SkillManager:
     # Study target management
     # ------------------------------------------------------------------
 
-    def set_study_target(
+    async def set_study_target(
         self, player: "Player", skill_id: str, owned_skill_ids: list[str]
     ) -> tuple[bool, str]:
         """Set a skill as the player's study target.
@@ -368,7 +373,7 @@ class SkillManager:
         if skill_id not in owned_skill_ids:
             return False, "你尚未拥有该功法，无法设为修习目标"
 
-        if self._is_skill_learned(player, skill_id):
+        if await self._is_skill_learned(player, skill_id):
             return False, "该功法已领悟，无需再修习"
 
         player.study_target = skill_id
@@ -431,7 +436,7 @@ class SkillManager:
     # Equipment validation
     # ------------------------------------------------------------------
 
-    def can_equip_technique(
+    async def can_equip_technique(
         self, player: "Player", technique_name: str, all_skill_ids: list[str]
     ) -> tuple[bool, str]:
         """Check if a technique (功法) can be equipped.
@@ -445,7 +450,7 @@ class SkillManager:
         if skill_id is None:
             return False, f"未找到功法【{technique_name}】"
 
-        if not self._is_skill_learned(player, skill_id):
+        if not await self._is_skill_learned(player, skill_id):
             return False, f"功法【{technique_name}】尚未领悟，无法装备"
 
         techniques_list = player.get_techniques_list()
@@ -469,7 +474,7 @@ class SkillManager:
     # Battle loadout export (for Group 4 combat engine)
     # ------------------------------------------------------------------
 
-    def get_battle_loadout(self, player: "Player") -> dict:
+    async def get_battle_loadout(self, player: "Player") -> dict:
         """Export the player's full battle loadout for the combat engine.
 
         Returns a dict with:
@@ -515,15 +520,15 @@ class SkillManager:
             skill_id = self._find_skill_id_by_name(tech_name)
             if skill_id is None:
                 continue
-            if not self._is_skill_learned(player, skill_id):
+            if not await self._is_skill_learned(player, skill_id):
                 continue  # Should not happen if validation is correct
 
             skill_def = self._find_skill_definition(skill_id)
             if skill_def is None:
                 continue
 
-            # Apply star level
-            star_level = self._get_skill_star_level(player, skill_id)
+            # Apply star level from persistent table
+            star_level = await self._get_skill_star_level(player, skill_id)
             skill_def = self._apply_star_to_def(skill_def, star_level)
 
             trigger = skill_def.get("trigger_skill")
@@ -536,9 +541,8 @@ class SkillManager:
 
         return loadout
 
-    def _get_skill_star_level(self, player: "Player", skill_id: str) -> int:
-        """Get the star level of a learned skill."""
-        for entry in player.get_learned_skills():
-            if entry.get("skill_id") == skill_id:
-                return entry.get("star_level", 1)
-        return 1
+    async def _get_skill_star_level(self, player: "Player", skill_id: str) -> int:
+        """Get the star level of a learned skill from the database."""
+        if self.db is None or self.db.ext is None:
+            return 1
+        return await self.db.ext.get_star_level(player.user_id, skill_id)

@@ -195,7 +195,7 @@ class PlayerHandler:
             merge_count = max(1, min(50, player.battle_report_merge_count))
 
         # 获取已领悟功法数量
-        learned_count = len(player.get_learned_skills())
+        learned_count = len(await self.db.ext.get_learned_skills(player.user_id))
 
         # 构建信息显示
         dao_hao = player.user_name if player.user_name else display_name
@@ -364,7 +364,7 @@ class PlayerHandler:
         effective_hours = effective_minutes // 60
         learn_msgs = []
         if self.cultivation_manager.skill_manager and effective_hours > 0:
-            learned_list = self.cultivation_manager.apply_cultivation_comprehension(
+            learned_list = await self.cultivation_manager.apply_cultivation_comprehension(
                 player, effective_hours
             )
             for learned in learned_list:

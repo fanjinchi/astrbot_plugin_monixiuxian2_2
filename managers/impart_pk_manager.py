@@ -34,8 +34,8 @@ class ImpartPkManager:
 
         # Use the unified combat engine
         engine: CombatEngine = self.combat_mgr.engine
-        f1 = engine.build_fighter_from_player(attacker, is_attacker=True)
-        f2 = engine.build_fighter_from_player(defender, is_attacker=False)
+        f1 = await engine.build_fighter_from_player(attacker, is_attacker=True)
+        f2 = await engine.build_fighter_from_player(defender, is_attacker=False)
 
         result = engine.resolve_combat(f1, f2, combat_type="impart_pk")
 

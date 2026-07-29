@@ -206,7 +206,7 @@ class CombatEngine:
             total_actions=total_actions,
         )
 
-    def build_fighter_from_player(
+    async def build_fighter_from_player(
         self, player: Player, is_attacker: bool = True
     ) -> FighterState:
         """Build a FighterState from a Player model.
@@ -217,7 +217,7 @@ class CombatEngine:
         """
         loadout: dict = {}
         if self.skill_manager:
-            loadout = self.skill_manager.get_battle_loadout(player)
+            loadout = await self.skill_manager.get_battle_loadout(player)
 
         equipped_items = self._build_equipped_items(player)
         total_attrs = player.get_total_attributes(equipped_items, pill_multipliers=None)
@@ -644,12 +644,12 @@ class CombatManager:
         practice_bonus = atkpractice * 0.04
         return max(int(base_atk * (1 + practice_bonus + atk_buff)), 1)
 
-    def player_vs_player(
+    async def player_vs_player(
         self, player1: Player, player2: Player, combat_type: int = 1
     ) -> dict:
         """Legacy PvP entry point (combat_type: 1=spar, 2=duel)."""
-        f1 = self.engine.build_fighter_from_player(player1, is_attacker=True)
-        f2 = self.engine.build_fighter_from_player(player2, is_attacker=False)
+        f1 = await self.engine.build_fighter_from_player(player1, is_attacker=True)
+        f2 = await self.engine.build_fighter_from_player(player2, is_attacker=False)
 
         combat_type_str = "duel" if combat_type == 2 else "spar"
         merge_count = self._get_merge_count(player1)
@@ -672,10 +672,10 @@ class CombatManager:
             "rounds": result.rounds,
         }
 
-    def player_vs_boss(self, player: Player, boss: Player) -> dict:
+    async def player_vs_boss(self, player: Player, boss: Player) -> dict:
         """Legacy PvE entry point (Boss battle)."""
-        f1 = self.engine.build_fighter_from_player(player, is_attacker=True)
-        f2 = self.engine.build_fighter_from_player(boss, is_attacker=False)
+        f1 = await self.engine.build_fighter_from_player(player, is_attacker=True)
+        f2 = await self.engine.build_fighter_from_player(boss, is_attacker=False)
 
         merge_count = self._get_merge_count(player)
         result = self.engine.resolve_combat(f1, f2, "pve", merge_count=merge_count)

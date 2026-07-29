@@ -235,7 +235,7 @@ class XiuXianPlugin(Star):
             StorageRingManager,
         )
 
-        self.skill_manager = SkillManager(self.config_manager)
+        self.skill_manager = SkillManager(self.config_manager, self.db)
         self.storage_ring_mgr = StorageRingManager(self.db, self.config_manager)
         self.equipment_mgr = EquipmentManager(
             self.db, self.config_manager, self.storage_ring_mgr

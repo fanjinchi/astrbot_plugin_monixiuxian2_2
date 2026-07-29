@@ -398,7 +398,7 @@ HP：{max_hp}
             return False, "❌ 你当前正忙，无法挑战Boss！", None
 
         # 4. 构建玩家战斗状态
-        player_fighter = self.engine.build_fighter_from_player(player)
+        player_fighter = await self.engine.build_fighter_from_player(player)
 
         # 5. 构建Boss战斗状态
         boss_stats = self._boss_stats_from_boss(boss)

@@ -181,14 +181,14 @@ class BreakthroughManager:
             # 领悟判定（成功 20%）
             learn_msgs = []
             if self.skill_manager:
-                learned = self.skill_manager.roll_breakthrough_success_comprehension(
+                learned = await self.skill_manager.roll_breakthrough_success_comprehension(
                     player
                 )
                 if learned:
                     learn_msgs.append(
                         f"🎁 福至心灵，领悟功法【{learned.get('name', '未知')}】！"
                     )
-                fallback = self.skill_manager.roll_universal_pool_breakthrough(
+                fallback = await self.skill_manager.roll_universal_pool_breakthrough(
                     player, success=True
                 )
                 if fallback:
@@ -298,14 +298,14 @@ class BreakthroughManager:
                 # 领悟判定（失败 10% 软保底）
                 learn_msgs = []
                 if self.skill_manager:
-                    learned = self.skill_manager.roll_breakthrough_fail_comprehension(
+                    learned = await self.skill_manager.roll_breakthrough_fail_comprehension(
                         player
                     )
                     if learned:
                         learn_msgs.append(
                             f"🎁 破而后立，领悟功法【{learned.get('name', '未知')}】！"
                         )
-                    fallback = self.skill_manager.roll_universal_pool_breakthrough(
+                    fallback = await self.skill_manager.roll_universal_pool_breakthrough(
                         player, success=False
                     )
                     if fallback:

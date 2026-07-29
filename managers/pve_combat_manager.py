@@ -356,7 +356,7 @@ class PVECombatManager:
             return None
 
         # 4. 构建玩家与敌人的 FighterState
-        player_fighter = self.combat_engine.build_fighter_from_player(player)
+        player_fighter = await self.combat_engine.build_fighter_from_player(player)
         enemy_fighter = self._build_enemy_fighter(enemy)
 
         # 5. 执行统一战斗引擎
