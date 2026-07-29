@@ -12,7 +12,9 @@ from astrbot.api import logger
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 25  # v25: 技能领悟持久化到 player_skills，players 移除 learned_skills
+LATEST_DB_VERSION = (
+    25  # v25: 技能领悟持久化到 player_skills，players 移除 learned_skills
+)
 
 MIGRATION_TASKS: dict[
     int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]

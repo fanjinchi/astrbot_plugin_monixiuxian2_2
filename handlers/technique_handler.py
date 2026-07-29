@@ -95,9 +95,7 @@ class TechniqueHandler:
             )
             return
 
-        ok, msg = await self.skill_manager.set_study_target(
-            player, skill_id, owned_ids
-        )
+        ok, msg = await self.skill_manager.set_study_target(player, skill_id, owned_ids)
         if ok:
             await self.db.update_player(player)
             yield event.plain_result(f"✅ {msg}")

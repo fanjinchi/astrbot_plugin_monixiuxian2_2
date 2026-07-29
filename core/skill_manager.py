@@ -30,7 +30,7 @@ class SkillManager:
     STAR_UP_RATE_BONUS = 0.20
     STAR_UP_EFFECT_BONUS = 0.20
 
-    def __init__(self, config_manager: "ConfigManager", db: "DataBase" | None = None):
+    def __init__(self, config_manager: ConfigManager, db: DataBase | None = None):
         self.config_manager = config_manager
         self.db = db
         self._skill_cfg = config_manager.game_config.get("skill_system", {})
@@ -41,7 +41,7 @@ class SkillManager:
 
     async def _build_comprehension_pool(
         self,
-        player: "Player",
+        player: Player,
         channel: str,  # "breakthrough_success" | "breakthrough_fail" | "cultivation"
     ) -> list[dict]:
         """Build the comprehension pool for a given channel.
@@ -91,7 +91,7 @@ class SkillManager:
 
         return pool
 
-    async def _is_skill_learned(self, player: "Player", skill_id: str) -> bool:
+    async def _is_skill_learned(self, player: Player, skill_id: str) -> bool:
         """Check if a skill is already learned by the player."""
         if self.db is None or self.db.ext is None:
             return False
@@ -125,7 +125,7 @@ class SkillManager:
     # ------------------------------------------------------------------
 
     async def roll_breakthrough_success_comprehension(
-        self, player: "Player"
+        self, player: Player
     ) -> dict | None:
         """Comprehension roll on breakthrough success.
 
@@ -160,9 +160,7 @@ class SkillManager:
 
         return await self._resolve_and_learn(player, chosen)
 
-    async def roll_breakthrough_fail_comprehension(
-        self, player: "Player"
-    ) -> dict | None:
+    async def roll_breakthrough_fail_comprehension(self, player: Player) -> dict | None:
         """Comprehension roll on breakthrough failure ("破而后立").
 
         Uses the same pool rules as ``roll_breakthrough_success_comprehension``
@@ -192,7 +190,7 @@ class SkillManager:
         return await self._resolve_and_learn(player, chosen)
 
     async def roll_cultivation_comprehension(
-        self, player: "Player", hours: int
+        self, player: Player, hours: int
     ) -> list[dict]:
         """Comprehension roll on cultivation end.
 
@@ -219,7 +217,7 @@ class SkillManager:
     # ------------------------------------------------------------------
 
     async def roll_universal_pool_breakthrough(
-        self, player: "Player", success: bool
+        self, player: Player, success: bool
     ) -> dict | None:
         """Independent universal pool roll for breakthrough (no heart method).
 
@@ -247,7 +245,7 @@ class SkillManager:
             )
         return None
 
-    async def _pick_universal_skill(self, player: "Player") -> dict | None:
+    async def _pick_universal_skill(self, player: Player) -> dict | None:
         """Pick a random unlearned skill from the universal pool.
 
         Returns the skill definition or None if all universal skills are
@@ -268,7 +266,7 @@ class SkillManager:
     # Learn / star-up logic
     # ------------------------------------------------------------------
 
-    async def _resolve_and_learn(self, player: "Player", chosen: dict) -> dict | None:
+    async def _resolve_and_learn(self, player: Player, chosen: dict) -> dict | None:
         """Resolve a chosen skill ID to its full definition and update player state.
 
         Handles star-up for duplicates. Clears study_target if matched.
@@ -362,7 +360,7 @@ class SkillManager:
     # ------------------------------------------------------------------
 
     async def set_study_target(
-        self, player: "Player", skill_id: str, owned_skill_ids: list[str]
+        self, player: Player, skill_id: str, owned_skill_ids: list[str]
     ) -> tuple[bool, str]:
         """Set a skill as the player's study target.
 
@@ -379,7 +377,7 @@ class SkillManager:
         player.study_target = skill_id
         return True, f"已将【{self._get_skill_name(skill_id)}】设为修习目标"
 
-    def clear_study_target(self, player: "Player") -> tuple[bool, str]:
+    def clear_study_target(self, player: Player) -> tuple[bool, str]:
         """Clear the player's study target."""
         if not player.study_target:
             return False, "当前没有修习目标"
@@ -387,7 +385,7 @@ class SkillManager:
         player.study_target = ""
         return True, f"已取消修习目标【{self._get_skill_name(old)}】"
 
-    def get_study_target_info(self, player: "Player") -> dict:
+    def get_study_target_info(self, player: Player) -> dict:
         """Get study target display info."""
         skill_id = player.study_target
         if not skill_id:
@@ -411,7 +409,7 @@ class SkillManager:
     # Heart method passive bonus
     # ------------------------------------------------------------------
 
-    def get_heart_method_passive(self, player: "Player") -> dict[str, int | float]:
+    def get_heart_method_passive(self, player: Player) -> dict[str, int | float]:
         """Get the passive bonus dict from the equipped heart method.
 
         Returns empty dict if no heart method equipped or no passive defined.
@@ -437,7 +435,7 @@ class SkillManager:
     # ------------------------------------------------------------------
 
     async def can_equip_technique(
-        self, player: "Player", technique_name: str, all_skill_ids: list[str]
+        self, player: Player, technique_name: str, all_skill_ids: list[str]
     ) -> tuple[bool, str]:
         """Check if a technique (功法) can be equipped.
 
@@ -474,7 +472,7 @@ class SkillManager:
     # Battle loadout export (for Group 4 combat engine)
     # ------------------------------------------------------------------
 
-    async def get_battle_loadout(self, player: "Player") -> dict:
+    async def get_battle_loadout(self, player: Player) -> dict:
         """Export the player's full battle loadout for the combat engine.
 
         Returns a dict with:
@@ -541,7 +539,7 @@ class SkillManager:
 
         return loadout
 
-    async def _get_skill_star_level(self, player: "Player", skill_id: str) -> int:
+    async def _get_skill_star_level(self, player: Player, skill_id: str) -> int:
         """Get the star level of a learned skill from the database."""
         if self.db is None or self.db.ext is None:
             return 1

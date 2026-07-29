@@ -364,8 +364,10 @@ class PlayerHandler:
         effective_hours = effective_minutes // 60
         learn_msgs = []
         if self.cultivation_manager.skill_manager and effective_hours > 0:
-            learned_list = await self.cultivation_manager.apply_cultivation_comprehension(
-                player, effective_hours
+            learned_list = (
+                await self.cultivation_manager.apply_cultivation_comprehension(
+                    player, effective_hours
+                )
             )
             for learned in learned_list:
                 learn_msgs.append(

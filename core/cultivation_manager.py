@@ -375,7 +375,9 @@ class CultivationManager:
         )
         return total_exp
 
-    def apply_cultivation_comprehension(self, player: Player, hours: int) -> list[dict]:
+    async def apply_cultivation_comprehension(
+        self, player: Player, hours: int
+    ) -> list[dict]:
         """Apply skill comprehension rolls at cultivation end.
 
         Rolls once every ``cultivation_learn_interval_hours`` (default 2h)
