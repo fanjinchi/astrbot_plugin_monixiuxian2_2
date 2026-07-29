@@ -349,27 +349,15 @@ class ShopHandler:
 
         # 处理各种效果（乘以数量）
         for _ in range(quantity):
-            # 恢复/扣除气血
+            # 恢复/扣除气血（新框架统一为 hp）
             if "add_hp" in effects:
                 hp_change = effects["add_hp"]
-                if player.cultivation_type == "体修":
-                    old_blood = player.blood_qi
-                    player.blood_qi = max(
-                        0, min(player.max_blood_qi, player.blood_qi + hp_change)
-                    )
-                    if hp_change > 0:
-                        effect_msgs.append(f"气血+{player.blood_qi - old_blood}")
-                    else:
-                        effect_msgs.append(f"气血{hp_change}")
+                old_hp = player.hp
+                player.hp = max(1, player.hp + hp_change)
+                if hp_change > 0:
+                    effect_msgs.append(f"气血+{player.hp - old_hp}")
                 else:
-                    old_qi = player.spiritual_qi
-                    player.spiritual_qi = max(
-                        0, min(player.max_spiritual_qi, player.spiritual_qi + hp_change)
-                    )
-                    if hp_change > 0:
-                        effect_msgs.append(f"灵气+{player.spiritual_qi - old_qi}")
-                    else:
-                        effect_msgs.append(f"灵气{hp_change}")
+                    effect_msgs.append(f"气血{hp_change}")
 
             # 增加修为
             if "add_experience" in effects:
@@ -377,45 +365,41 @@ class ShopHandler:
                 player.experience += exp_gain
                 effect_msgs.append(f"修为+{exp_gain}")
 
-            # 增加最大气血/灵气上限
+            # 增加气血上限（新框架统一为 hp）
             if "add_max_hp" in effects:
                 max_hp_gain = effects["add_max_hp"]
-                if player.cultivation_type == "体修":
-                    player.max_blood_qi += max_hp_gain
-                    effect_msgs.append(f"最大气血+{max_hp_gain}")
-                else:
-                    player.max_spiritual_qi += max_hp_gain
-                    effect_msgs.append(f"最大灵气+{max_hp_gain}")
+                player.hp = max(1, player.hp + max_hp_gain)
+                effect_msgs.append(f"气血上限+{max_hp_gain}")
 
-            # 增加灵力（映射到法伤）
+            # 增加灵力（新框架映射到伤害）
             if "add_spiritual_power" in effects:
                 sp_gain = effects["add_spiritual_power"]
-                player.magic_damage += sp_gain
-                effect_msgs.append(f"法伤+{sp_gain}")
+                player.damage += sp_gain
+                effect_msgs.append(f"伤害+{sp_gain}")
 
-            # 增加精神力
+            # 增加精神力（新框架映射到身法）
             if "add_mental_power" in effects:
                 mp_gain = effects["add_mental_power"]
-                player.mental_power += mp_gain
-                effect_msgs.append(f"精神力+{mp_gain}")
+                player.agility += mp_gain
+                effect_msgs.append(f"身法+{mp_gain}")
 
-            # 增加攻击力（映射到物伤）
+            # 增加攻击力（新框架映射到伤害）
             if "add_attack" in effects:
                 atk_gain = effects["add_attack"]
-                player.physical_damage += atk_gain
+                player.damage += atk_gain
                 if atk_gain > 0:
-                    effect_msgs.append(f"物伤+{atk_gain}")
+                    effect_msgs.append(f"伤害+{atk_gain}")
                 else:
-                    effect_msgs.append(f"物伤{atk_gain}")
+                    effect_msgs.append(f"伤害{atk_gain}")
 
-            # 增加防御力（映射到物防）
+            # 增加防御力（新框架映射到护甲）
             if "add_defense" in effects:
                 def_gain = effects["add_defense"]
-                player.physical_defense += def_gain
+                player.armor_value += def_gain
                 if def_gain > 0:
-                    effect_msgs.append(f"物防+{def_gain}")
+                    effect_msgs.append(f"护甲+{def_gain}")
                 else:
-                    effect_msgs.append(f"物防{def_gain}")
+                    effect_msgs.append(f"护甲{def_gain}")
 
             # 增加/扣除灵石
             if "add_gold" in effects:
@@ -445,14 +429,12 @@ class ShopHandler:
                 else:
                     effect_msgs.append(f"突破成功率{int(bonus * 100)}%(1小时)")
 
-        # 确保属性不为负
-        player.physical_damage = max(0, player.physical_damage)
-        player.magic_damage = max(0, player.magic_damage)
-        player.physical_defense = max(0, player.physical_defense)
-        player.magic_defense = max(0, player.magic_defense)
-        player.mental_power = max(0, player.mental_power)
-        player.spiritual_qi = min(player.spiritual_qi, player.max_spiritual_qi)
-        player.blood_qi = min(player.blood_qi, player.max_blood_qi)
+        # 确保新四主属性与护甲不为负
+        player.damage = max(0, player.damage)
+        player.agility = max(0, player.agility)
+        player.speed = max(0, player.speed)
+        player.hp = max(1, player.hp)
+        player.armor_value = max(0, player.armor_value)
 
         await self.db.update_player(player)
 

@@ -105,6 +105,8 @@ class TestCombatActionDistribution:
         f1 = make_fighter("Fast", 1000, 1, 5, 20)
         f2 = make_fighter("Slow", 1000, 1, 5, 10)
 
+        random.seed(20260729)  # Deterministic statistical check
+
         actions: list[str] = []
         original_resolve = engine._resolve_attack
 
@@ -125,6 +127,8 @@ class TestCombatActionDistribution:
         engine = make_engine()
         f1 = make_fighter("A", 1000, 1, 5, 10)
         f2 = make_fighter("B", 1000, 1, 5, 10)
+
+        random.seed(20260729)  # Deterministic statistical check
 
         actions: list[str] = []
         original_resolve = engine._resolve_attack

@@ -68,33 +68,24 @@ class EquipmentHandler:
             equipment_lines.append("\n--- 装备属性加成 ---\n")
             total_attrs = player.get_total_attributes(equipped_items, pill_multipliers)
 
-            # 计算加成值（总属性 - 基础属性）
-            magic_damage_bonus = total_attrs["magic_damage"] - player.magic_damage
-            physical_damage_bonus = (
-                total_attrs["physical_damage"] - player.physical_damage
-            )
-            magic_defense_bonus = total_attrs["magic_defense"] - player.magic_defense
-            physical_defense_bonus = (
-                total_attrs["physical_defense"] - player.physical_defense
-            )
-            mental_power_bonus = total_attrs["mental_power"] - player.mental_power
-            max_spiritual_qi_bonus = (
-                total_attrs["max_spiritual_qi"] - player.max_spiritual_qi
-            )
+            # 计算加成值（总属性 - 基础属性），新四主属性框架
+            damage_bonus = total_attrs["damage"] - player.damage
+            agility_bonus = total_attrs["agility"] - player.agility
+            speed_bonus = total_attrs["speed"] - player.speed
+            hp_bonus = total_attrs["hp"] - player.hp
+            armor_bonus = total_attrs["armor_value"] - player.armor_value
             exp_multiplier = total_attrs["exp_multiplier"]
 
-            if magic_damage_bonus > 0:
-                equipment_lines.append(f"⚔️ 法伤 +{magic_damage_bonus}\n")
-            if physical_damage_bonus > 0:
-                equipment_lines.append(f"🗡️ 物伤 +{physical_damage_bonus}\n")
-            if magic_defense_bonus > 0:
-                equipment_lines.append(f"🛡️ 法防 +{magic_defense_bonus}\n")
-            if physical_defense_bonus > 0:
-                equipment_lines.append(f"🪨 物防 +{physical_defense_bonus}\n")
-            if mental_power_bonus > 0:
-                equipment_lines.append(f"🧠 精神力 +{mental_power_bonus}\n")
-            if max_spiritual_qi_bonus > 0:
-                equipment_lines.append(f"✨ 灵气容量 +{max_spiritual_qi_bonus}\n")
+            if damage_bonus > 0:
+                equipment_lines.append(f"⚔️ 伤害 +{damage_bonus}\n")
+            if agility_bonus > 0:
+                equipment_lines.append(f"🌀 身法 +{agility_bonus}\n")
+            if speed_bonus > 0:
+                equipment_lines.append(f"⚡ 迅捷 +{speed_bonus}\n")
+            if hp_bonus > 0:
+                equipment_lines.append(f"❤️ 气血 +{hp_bonus}\n")
+            if armor_bonus > 0:
+                equipment_lines.append(f"🛡️ 护甲 +{armor_bonus}\n")
             if exp_multiplier > 0:
                 equipment_lines.append(f"📈 修为倍率 +{exp_multiplier:.1%}\n")
 

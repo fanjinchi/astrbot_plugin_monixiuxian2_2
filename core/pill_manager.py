@@ -324,29 +324,27 @@ class PillManager:
 
         if level_key not in permanent_gains:
             permanent_gains[level_key] = {
-                "physical_damage": 0,
-                "magic_damage": 0,
-                "physical_defense": 0,
-                "magic_defense": 0,
-                "mental_power": 0,
+                "damage": 0,
+                "agility": 0,
+                "speed": 0,
+                "hp": 0,
+                "armor_value": 0,
                 "lifespan": 0,
-                "max_spiritual_qi": 0,
-                "max_blood_qi": 0,
             }
 
         # 计算基础属性（当前境界突破时获得的属性）
         base_attrs = self._get_base_attributes_for_level(player, player.level_index)
 
-        # 检查各项属性是否已达上限
+        # 检查各项属性是否已达上限（gain_key 保持与 pills.json 配置兼容）
         attr_mapping = {
-            "physical_damage_gain": ("physical_damage", "物伤"),
-            "magic_damage_gain": ("magic_damage", "法伤"),
-            "physical_defense_gain": ("physical_defense", "物防"),
-            "magic_defense_gain": ("magic_defense", "法防"),
-            "mental_power_gain": ("mental_power", "精神力"),
+            "physical_damage_gain": ("damage", "伤害"),
+            "magic_damage_gain": ("damage", "伤害"),
+            "physical_defense_gain": ("armor_value", "护甲"),
+            "magic_defense_gain": ("armor_value", "护甲"),
+            "mental_power_gain": ("agility", "身法"),
             "lifespan_gain": ("lifespan", "寿命"),
-            "max_spiritual_qi_gain": ("max_spiritual_qi", "最大灵气"),
-            "max_blood_qi_gain": ("max_blood_qi", "最大气血"),
+            "max_spiritual_qi_gain": ("hp", "气血"),
+            "max_blood_qi_gain": ("hp", "气血"),
         }
 
         gains_applied = {}
@@ -512,33 +510,16 @@ class PillManager:
             level_index: 境界索引
 
         Returns:
-            基础属性字典
+            基础属性字典（新四主属性框架）
         """
-        level_data = self.config_manager.get_level_data(player.cultivation_type)
-        # 兜底：如果数据为空，使用灵修配置避免索引错误
-        if not level_data:
-            level_data = self.config_manager.level_data
-
-        # 越界保护
-        if level_data:
-            level_index = min(level_index, len(level_data) - 1)
-            level_config = level_data[level_index]
-        else:
-            level_config = {}
-
+        # New framework: cap is relative to the player's current attributes.
         return {
-            "physical_damage": level_config.get(
-                "breakthrough_physical_damage_gain", 10
-            ),
-            "magic_damage": level_config.get("breakthrough_magic_damage_gain", 10),
-            "physical_defense": level_config.get(
-                "breakthrough_physical_defense_gain", 5
-            ),
-            "magic_defense": level_config.get("breakthrough_magic_defense_gain", 5),
-            "mental_power": level_config.get("breakthrough_mental_power_gain", 100),
-            "lifespan": level_config.get("breakthrough_lifespan_gain", 100),
-            "max_spiritual_qi": level_config.get("breakthrough_spiritual_qi_gain", 100),
-            "max_blood_qi": level_config.get("breakthrough_blood_qi_gain", 100),
+            "damage": max(player.damage, 1),
+            "agility": max(player.agility, 1),
+            "speed": max(player.speed, 1),
+            "hp": max(player.hp, 1),
+            "armor_value": max(player.armor_value, 1),
+            "lifespan": max(player.lifespan, 1),
         }
 
     async def handle_resurrection(self, player: Player) -> bool:
@@ -743,21 +724,20 @@ class PillManager:
             player.lifespan += total_regen
             changed = True
 
+        # 气血回复/消耗（新框架统一为 hp）
         if "spiritual_qi_regen_per_minute" in effect:
             total_qi = effect["spiritual_qi_regen_per_minute"] * minutes
-            player.spiritual_qi = min(
-                player.max_spiritual_qi, player.spiritual_qi + total_qi
-            )
+            player.hp += total_qi
             changed = True
 
         if "blood_qi_regen_per_minute" in effect:
             total_blood = effect["blood_qi_regen_per_minute"] * minutes
-            player.blood_qi = min(player.max_blood_qi, player.blood_qi + total_blood)
+            player.hp += total_blood
             changed = True
 
         if "blood_qi_cost_per_minute" in effect:
             total_cost = effect["blood_qi_cost_per_minute"] * minutes
-            player.blood_qi = max(0, player.blood_qi - total_cost)
+            player.hp = max(1, player.hp - total_cost)
             changed = True
 
         if changed:
@@ -772,14 +752,12 @@ class PillManager:
             return False
 
         attr_keys = [
-            "physical_damage",
-            "magic_damage",
-            "physical_defense",
-            "magic_defense",
-            "mental_power",
+            "damage",
+            "agility",
+            "speed",
+            "hp",
+            "armor_value",
             "lifespan",
-            "max_spiritual_qi",
-            "max_blood_qi",
         ]
 
         changed = False
