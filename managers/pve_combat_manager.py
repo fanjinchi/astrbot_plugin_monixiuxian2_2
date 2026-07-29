@@ -1,6 +1,7 @@
-# managers/pve_combat_manager.py
-"""
-PVE战斗管理器 - 处理玩家vs环境的战斗触发、奖励计算和结果格式化
+"""PVE战斗管理器 - 处理玩家vs环境的战斗触发、奖励计算和结果格式化。
+
+现版本已接入统一 CombatEngine：敌人与玩家均被转换为 FighterState 后调用
+``resolve_combat``，胜负判定与奖励规则保持不变。
 """
 
 import importlib.util
@@ -21,15 +22,15 @@ def _load_module(name, rel_path):
 
 
 try:
-    from ..managers.combat_manager import CombatManager, CombatStats
+    from ..managers.combat_manager import CombatEngine, CombatManager, FighterState
     from ..managers.enemy_manager import Enemy, EnemyManager
     from ..models import Player
 except ImportError:
     # Standalone execution (for testing)
-    # Use prefixed module names to avoid colliding with real package imports.
     _cm = _load_module("pve_combat_manager_combat", "managers/combat_manager.py")
+    CombatEngine = _cm.CombatEngine
     CombatManager = _cm.CombatManager
-    CombatStats = _cm.CombatStats
+    FighterState = _cm.FighterState
 
     _em = _load_module("pve_combat_manager_enemy", "managers/enemy_manager.py")
     EnemyManager = _em.EnemyManager
@@ -51,24 +52,15 @@ RIFT_LEVEL_DIFFICULTY_MAP = {
 
 def calculate_equipment_atk_bonus(player: Player, config_manager) -> int:
     """
-    计算装备提供的攻击力加成
+    计算装备提供的攻击力加成（旧接口，保留兼容）。
 
     与 handlers/combat_handlers.py:_calculate_equipment_bonus 对齐，
     仅统计武器的 atk、physical_damage、magic_damage。
-
-    Args:
-        player: 玩家对象
-        config_manager: 配置管理器，包含武器数据
-
-    Returns:
-        装备提供的总攻击力加成，无配置或装备时返回0
     """
     if not config_manager:
         return 0
 
     total_atk = 0
-
-    # 武器
     if player.weapon and player.weapon in config_manager.weapons_data:
         data = config_manager.weapons_data[player.weapon]
         total_atk += data.get("atk", 0)
@@ -80,24 +72,14 @@ def calculate_equipment_atk_bonus(player: Player, config_manager) -> int:
 
 def calculate_equipment_defense(player: Player, config_manager) -> int:
     """
-    计算装备提供的防御力
+    计算装备提供的防御力（旧接口，保留兼容）。
 
-    与 handlers/combat_handlers.py:_calculate_equipment_bonus 对齐，
     仅统计防具的 physical_defense 和 magic_defense。
-
-    Args:
-        player: 玩家对象
-        config_manager: 配置管理器，包含物品数据
-
-    Returns:
-        装备提供的总防御力，无配置或装备时返回0
     """
     if not config_manager:
         return 0
 
     total_defense = 0
-
-    # 防具
     if player.armor and player.armor in config_manager.items_data:
         data = config_manager.items_data[player.armor]
         total_defense += data.get("physical_defense", 0)
@@ -120,12 +102,13 @@ class PVECombatManager:
         初始化PVE战斗管理器
 
         Args:
-            combat_mgr: 战斗系统管理器，用于执行战斗计算
+            combat_mgr: 统一战斗引擎或其 Legacy 适配器。
             enemy_mgr: 敌人管理器，用于生成敌人
             config_manager: 配置管理器，可选，用于读取装备数据
             impart_manager: 传承管理器，可选，用于获取传承加成
         """
-        self.combat_mgr = combat_mgr
+        # 兼容直接传入 CombatEngine 或 Legacy CombatManager
+        self.combat_engine = getattr(combat_mgr, "engine", combat_mgr)
         self.enemy_mgr = enemy_mgr
         self.config_manager = config_manager
         self.impart_manager = impart_manager
@@ -232,73 +215,17 @@ class PVECombatManager:
         # 默认返回普通敌人
         return "normal"
 
-    async def _build_player_combat_stats(self, player: Player) -> CombatStats:
-        """
-        构建玩家战斗属性
-
-        从Player对象计算完整的CombatStats，包括传承加成和装备防御。
-
-        Args:
-            player: 玩家对象
-
-        Returns:
-            玩家的CombatStats对象
-        """
-        # Import logger inside method to avoid import issues
-        from astrbot.api import logger
-
-        # 获取传承信息用于buff加成
-        # 由于PVECombatManager不直接持有db引用，这里使用config_manager获取传承信息
-        # 如果config_manager可用且有相关方法，则调用；否则使用默认值
-        hp_buff = 0.0
-        mp_buff = 0.0
-        atk_buff = 0.0
-        crit_rate = 0
-
-        # 尝试从传承管理器获取传承加成
-        if self.impart_manager:
-            try:
-                _success, _msg, impart_info = await self.impart_manager.get_impart_info(
-                    player.user_id
-                )
-                if impart_info:
-                    hp_buff = getattr(impart_info, "impart_hp_per", 0.0) or 0.0
-                    mp_buff = getattr(impart_info, "impart_mp_per", 0.0) or 0.0
-                    atk_buff = getattr(impart_info, "impart_atk_per", 0.0) or 0.0
-                    # impart_know_per 以小数存储（0.1 = 10%），乘以 100 并四舍五入转为整数百分比
-                    raw_crit = getattr(impart_info, "impart_know_per", 0.0) or 0.0
-                    crit_rate = int(round(raw_crit * 100))
-            except Exception as e:
-                logger.warning(f"获取传承信息失败: {e}")
-
-        # 计算最大HP/MP（按修为计算）
-        max_hp, max_mp = self.combat_mgr.calculate_hp_mp(
-            player.experience, hp_buff, mp_buff
-        )
-
-        # 计算基础攻击力
-        base_atk = self.combat_mgr.calculate_atk(
-            player.experience, player.atkpractice, atk_buff
-        )
-
-        # 计算装备攻击加成（与 _prepare_combat_stats 对齐）
-        equipment_atk_bonus = calculate_equipment_atk_bonus(player, self.config_manager)
-        final_atk = base_atk + equipment_atk_bonus
-
-        # 计算装备防御（仅防具，与 _prepare_combat_stats 对齐）
-        equipment_defense = calculate_equipment_defense(player, self.config_manager)
-
-        return CombatStats(
-            user_id=player.user_id,
-            name=player.user_name if player.user_name else f"道友{player.user_id}",
-            hp=player.hp,
-            max_hp=max_hp,
-            mp=player.mp,
-            max_mp=max_mp,
-            atk=final_atk,
-            defense=equipment_defense,
-            crit_rate=crit_rate,
-            exp=player.experience,
+    def _build_enemy_fighter(self, enemy: Enemy) -> FighterState:
+        """Build a FighterState directly from an Enemy object."""
+        return FighterState(
+            user_id=enemy.user_id,
+            name=enemy.name,
+            hp=enemy.hp,
+            max_hp=enemy.max_hp,
+            damage=enemy.damage,
+            agility=enemy.agility,
+            speed=enemy.speed,
+            armor_value=enemy.armor_value,
         )
 
     def _calculate_rewards(
@@ -325,10 +252,9 @@ class PVECombatManager:
         }
 
         winner = result.get("winner", "")
-        # In player_vs_boss: winner = player.user_id if player wins, else boss.user_id
-        # Enemy user_id starts with "enemy_", so we check that to determine if enemy won
+        # In engine: winner = player.user_id if player wins, else enemy.user_id
         is_enemy_winner = isinstance(winner, str) and winner.startswith("enemy_")
-        is_draw = winner == "平局"
+        is_draw = winner == "draw"
 
         if is_draw:
             # 平局：奖励不变
@@ -365,7 +291,7 @@ class PVECombatManager:
 
         winner = result.get("winner", "")
         is_enemy_winner = isinstance(winner, str) and winner.startswith("enemy_")
-        is_draw = winner == "平局"
+        is_draw = winner == "draw"
 
         if is_draw:
             lines.append("⚖️ 战斗结果：平局")
@@ -401,7 +327,8 @@ class PVECombatManager:
         """
         触发PVE战斗的主入口
 
-        完整的战斗流程：判定触发 → 选择敌人 → 生成敌人 → 构建玩家属性 → 执行战斗 → 计算奖励 → 格式化结果
+        完整的战斗流程：判定触发 → 选择敌人 → 生成敌人 → 构建双方 FighterState
+        → 调用统一 CombatEngine → 计算奖励 → 格式化结果
 
         Args:
             player: 玩家对象
@@ -428,35 +355,32 @@ class PVECombatManager:
             logger.error(f"生成敌人失败: {e}")
             return None
 
-        # 4. 构建玩家战斗属性
-        player_stats = await self._build_player_combat_stats(player)
+        # 4. 构建玩家与敌人的 FighterState
+        player_fighter = self.combat_engine.build_fighter_from_player(player)
+        enemy_fighter = self._build_enemy_fighter(enemy)
 
-        # 5. 将敌人转换为 CombatStats
-        enemy_stats = CombatStats(
-            user_id=enemy.user_id,
-            name=enemy.name,
-            hp=enemy.hp,
-            max_hp=enemy.max_hp,
-            mp=enemy.mp,
-            max_mp=enemy.max_mp,
-            atk=enemy.atk,
-            defense=enemy.defense,
-            crit_rate=enemy.crit_rate,
-            exp=enemy.exp,
+        # 5. 执行统一战斗引擎
+        result = self.combat_engine.resolve_combat(
+            player_fighter, enemy_fighter, combat_type="pve"
         )
 
-        # 6. 执行战斗
-        result = self.combat_mgr.player_vs_boss(player_stats, enemy_stats)
+        # 6. 将战斗后的当前 HP 写回玩家对象
+        player.hp = result.fighter1_final_hp
 
-        # 7. 将战斗后的当前 HP/MP 写回玩家对象
-        player.hp = player_stats.hp
-        player.mp = player_stats.mp
-
-        # 8. 计算奖励
+        # 7. 计算奖励
         if base_rewards is None:
             base_rewards = {"exp": 100, "gold": 50}
-        rewards = self._calculate_rewards(result, base_rewards, enemy)
 
-        # 9. 格式化并返回结果
-        msg = self._format_combat_result(result, enemy, rewards)
+        # Build the legacy-style result dict used by reward calculation
+        legacy_result = {
+            "winner": result.winner,
+            "combat_log": result.combat_log,
+            "player_final_hp": result.fighter1_final_hp,
+            "player_final_mp": result.fighter1_final_hp,
+            "reward": 0,
+        }
+        rewards = self._calculate_rewards(legacy_result, base_rewards, enemy)
+
+        # 8. 格式化并返回结果
+        msg = self._format_combat_result(legacy_result, enemy, rewards)
         return msg, rewards

@@ -4,6 +4,9 @@ Implements the spec-driven combat-core requirements:
 - Speed-weighted initiative: P(A acts) = speed_A / (speed_A + speed_B)
 - Muxxu damage formula: floor((base_dmg + dmg_attr * K) * skill_mult * random - armor)
 - Unified resolution chain: dodge -> block -> crit -> trigger -> ultimate -> damage
+- Trigger skill timings: on_attack, on_defense, on_crit, round_start
+- Control effects: stun skips the next action right
+- Counter effects trigger on defense
 - Battle report merged into chunks (configurable, default 10)
 - Action limit with draw (default 200)
 """
@@ -60,6 +63,11 @@ class FighterState:
     ultimates: list[dict] = field(default_factory=list)
     # Track which ultimates have been used this battle
     used_ultimates: set[str] = field(default_factory=set)
+    # Control/status state
+    skip_next_action: bool = False
+    # Multipliers for the next attack (set by round_start / on_defense effects)
+    next_attack_mult: float = 1.0
+    incoming_damage_mult: float = 1.0
 
 
 @dataclass
@@ -118,10 +126,12 @@ class CombatEngine:
         log.append("☆━━━━ 战斗开始 ━━━━☆")
         log.append(f"{fighter1.name} VS {fighter2.name}")
         log.append(
-            f"{fighter1.name}：气血 {fighter1.hp}/{fighter1.max_hp}，伤害 {fighter1.damage}，身法 {fighter1.agility}，迅捷 {fighter1.speed}"
+            f"{fighter1.name}：气血 {fighter1.hp}/{fighter1.max_hp}，"
+            f"伤害 {fighter1.damage}，身法 {fighter1.agility}，迅捷 {fighter1.speed}"
         )
         log.append(
-            f"{fighter2.name}：气血 {fighter2.hp}/{fighter2.max_hp}，伤害 {fighter2.damage}，身法 {fighter2.agility}，迅捷 {fighter2.speed}"
+            f"{fighter2.name}：气血 {fighter2.hp}/{fighter2.max_hp}，"
+            f"伤害 {fighter2.damage}，身法 {fighter2.agility}，迅捷 {fighter2.speed}"
         )
         log.append("")
 
@@ -131,6 +141,10 @@ class CombatEngine:
         while fighter1.hp > 0 and fighter2.hp > 0 and total_actions < action_limit:
             rounds += 1
             log.append(f"-- 第 {rounds} 回合 --")
+
+            # Round-start trigger skills for both fighters
+            self._process_round_start_skills(fighter1, log)
+            self._process_round_start_skills(fighter2, log)
 
             # Determine who acts this action (speed-weighted)
             if self._roll_initiative(fighter1, fighter2):
@@ -196,21 +210,41 @@ class CombatEngine:
     ) -> FighterState:
         """Build a FighterState from a Player model.
 
-        Uses skill_manager.get_battle_loadout() if available.
+        Uses skill_manager.get_battle_loadout() if available and applies
+        heart-method passive bonuses to the fighter's base attributes.
         """
         loadout: dict = {}
         if self.skill_manager:
             loadout = self.skill_manager.get_battle_loadout(player)
 
+        damage = player.damage
+        agility = player.agility
+        speed = player.speed
+        hp = player.hp
+        armor_value = player.armor_value + loadout.get("armor_value", 0)
+
+        passive = loadout.get("heart_method_passive", {})
+        if passive:
+            if "hp_percent" in passive:
+                hp = int(hp * (1 + passive["hp_percent"]))
+            if "damage_percent" in passive:
+                damage = int(damage * (1 + passive["damage_percent"]))
+            if "agility_percent" in passive:
+                agility = int(agility * (1 + passive["agility_percent"]))
+            if "speed_percent" in passive:
+                speed = int(speed * (1 + passive["speed_percent"]))
+            if "armor_value" in passive:
+                armor_value += int(passive["armor_value"])
+
         return FighterState(
             user_id=player.user_id,
             name=player.user_name or player.user_id,
-            hp=player.hp,
-            max_hp=player.hp,
-            damage=player.damage,
-            agility=player.agility,
-            speed=player.speed,
-            armor_value=player.armor_value + loadout.get("armor_value", 0),
+            hp=hp,
+            max_hp=hp,
+            damage=damage,
+            agility=agility,
+            speed=speed,
+            armor_value=armor_value,
             weapon_k=loadout.get("weapon_coefficient_k", 1.0),
             base_damage=loadout.get("base_damage", 0),
             trigger_skills=loadout.get("trigger_skills", []),
@@ -228,6 +262,74 @@ class CombatEngine:
             return random.random() < 0.5
         return random.random() < (f1.speed / total_speed)
 
+    def _process_round_start_skills(
+        self, fighter: FighterState, log: list[str]
+    ) -> None:
+        """Resolve round_start trigger skills for a fighter."""
+        for skill in fighter.trigger_skills:
+            if skill.get("trigger_timing") != "round_start":
+                continue
+            rate = skill.get("trigger_rate", 0.0)
+            if random.random() >= rate:
+                continue
+            effect = skill.get("effect_type", "")
+            value = skill.get("effect_value", 0)
+            if effect in ("damage_bonus", "combo"):
+                fighter.next_attack_mult += value
+                log.append(
+                    f"{fighter.name} 触发【{skill.get('name', '未知')}】，"
+                    f"下回合攻势更盛！"
+                )
+
+    def _process_trigger_skills(
+        self,
+        timing: str,
+        actor: FighterState,
+        target: FighterState,
+        log: list[str],
+        *,
+        damage_mult: float = 1.0,
+    ) -> dict:
+        """Resolve trigger skills of ``actor`` for the given timing.
+
+        Returns a dict with ``damage_mult`` and any control flags. Counter damage
+        is applied immediately; stun/damage-reduction are applied to ``target``.
+        """
+        result = {"damage_mult": damage_mult}
+        for skill in actor.trigger_skills:
+            if skill.get("trigger_timing") != timing:
+                continue
+            rate = skill.get("trigger_rate", 0.0)
+            if random.random() >= rate:
+                continue
+
+            effect = skill.get("effect_type", "")
+            value = skill.get("effect_value", 0)
+            skill_name = skill.get("name", "未知")
+
+            if effect in ("damage_bonus", "combo"):
+                result["damage_mult"] += value
+                log.append(f"{actor.name} 触发【{skill_name}】，攻势更盛！")
+            elif effect == "stun":
+                target.skip_next_action = True
+                log.append(
+                    f"{actor.name} 触发【{skill_name}】，"
+                    f"{target.name} 被眩晕，下回合无法出手！"
+                )
+            elif effect == "counter" and timing == "on_defense":
+                counter_dmg = max(1, int(actor.damage * value))
+                target.hp -= counter_dmg
+                log.append(
+                    f"{actor.name} 触发【{skill_name}】反击，"
+                    f"对 {target.name} 造成 {counter_dmg} 点伤害！"
+                )
+            elif effect == "damage_reduction":
+                # Reduces the next incoming attack damage
+                reduction = 1.0 - float(value)
+                target.incoming_damage_mult *= max(0.0, reduction)
+                log.append(f"{actor.name} 触发【{skill_name}】，受到的伤害降低！")
+        return result
+
     def _resolve_attack(
         self,
         attacker: FighterState,
@@ -237,6 +339,12 @@ class CombatEngine:
         log: list[str],
     ) -> None:
         """Resolve a single attack action through the full chain."""
+        # Stun check: skip this action right
+        if attacker.skip_next_action:
+            attacker.skip_next_action = False
+            log.append(f"{attacker.name} 处于眩晕状态，无法出手！")
+            return
+
         # 1. Dodge
         dodge_rate = self._calc_dodge_rate(attacker, defender, dodge_cap)
         if random.random() < dodge_rate:
@@ -254,48 +362,46 @@ class CombatEngine:
         if is_crit:
             log.append(f"{attacker.name} 目光如电，寻得破绽！")
 
-        # 4. Trigger skills (attack phase)
-        trigger_damage_mult = 1.0
-        for skill in attacker.trigger_skills:
-            if skill.get("trigger_timing") == "on_attack":
-                rate = skill.get("trigger_rate", 0.0)
-                if random.random() < rate:
-                    effect = skill.get("effect_type", "")
-                    value = skill.get("effect_value", 0)
-                    if effect == "damage_bonus":
-                        trigger_damage_mult += value
-                        log.append(
-                            f"{attacker.name} 触发【{skill.get('name', '未知')}】，攻势更盛！"
-                        )
-                    elif effect == "combo":
-                        trigger_damage_mult += value
-                        log.append(
-                            f"{attacker.name} 触发【{skill.get('name', '未知')}】，连击！"
-                        )
-                    elif effect == "counter":
-                        # Counter is handled on defense, skip here
-                        pass
+        skill_mult = 1.0
 
-        # 5. Ultimate (once per battle per ultimate)
+        # 4. Trigger skills - on_crit
+        if is_crit:
+            crit_result = self._process_trigger_skills(
+                "on_crit", attacker, defender, log, damage_mult=skill_mult
+            )
+            skill_mult = crit_result["damage_mult"]
+
+        # 5. Trigger skills - on_attack
+        attack_result = self._process_trigger_skills(
+            "on_attack", attacker, defender, log, damage_mult=skill_mult
+        )
+        skill_mult = attack_result["damage_mult"]
+
+        # 6. Ultimate (once per battle per ultimate)
         ultimate_mult = 1.0
         for ult in attacker.ultimates:
             ult_id = ult.get("id", "")
-            if ult_id not in attacker.used_ultimates:
-                rate = ult.get("trigger_rate", 0.0)
-                if random.random() < rate:
-                    attacker.used_ultimates.add(ult_id)
-                    ultimate_mult += ult.get("effect_value", 0.5)
-                    log.append(
-                        f"{attacker.name} 施展大招【{ult.get('name', '绝招')}】，天地变色！"
-                    )
-                    break  # Only one ultimate per action
+            if ult_id in attacker.used_ultimates:
+                continue
+            rate = ult.get("trigger_rate", 0.0)
+            if random.random() < rate:
+                attacker.used_ultimates.add(ult_id)
+                ultimate_mult += ult.get("effect_value", 0.5)
+                log.append(
+                    f"{attacker.name} 施展大招【{ult.get('name', '绝招')}】，天地变色！"
+                )
+                break  # Only one ultimate per action
 
-        # 6. Damage calculation (Muxxu formula)
+        # Apply round-start / previous defensive multipliers
+        total_skill_mult = skill_mult * ultimate_mult * attacker.next_attack_mult
+        attacker.next_attack_mult = 1.0
+
+        # 7. Damage calculation (Muxxu formula)
         raw_damage = self._calc_damage(
             attacker.damage,
             attacker.weapon_k,
             attacker.base_damage,
-            trigger_damage_mult * ultimate_mult,
+            total_skill_mult,
             is_crit,
             crit_multiplier,
         )
@@ -304,8 +410,12 @@ class CombatEngine:
         if blocked:
             raw_damage = max(1, raw_damage // 2)
 
-        # Apply armor
-        final_damage = max(1, raw_damage - defender.armor_value)
+        # Apply armor and incoming damage reduction
+        final_damage = max(
+            1,
+            int(raw_damage * defender.incoming_damage_mult) - defender.armor_value,
+        )
+        defender.incoming_damage_mult = 1.0
 
         defender.hp -= final_damage
 
@@ -314,6 +424,10 @@ class CombatEngine:
         else:
             log.append(f"{attacker.name} 发起攻击，造成 {final_damage} 点伤害")
         log.append(f"{defender.name} 剩余气血: {max(0, defender.hp)}")
+
+        # 8. Trigger skills - on_defense (counter / stun / damage reduction)
+        if defender.hp > 0:
+            self._process_trigger_skills("on_defense", defender, attacker, log)
 
     def _calc_dodge_rate(
         self, attacker: FighterState, defender: FighterState, cap: float

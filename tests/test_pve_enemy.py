@@ -161,39 +161,40 @@ SAMPLE_ENEMIES_CONFIG = {
 }
 
 # Simplified level_config covering level indices 0-31 (mirroring real level_config.json)
+# with the new four-main-attribute base values.
 SAMPLE_LEVEL_CONFIG = [
-    {"level_name": "炼气期一层", "exp_needed": 0},  # 0
-    {"level_name": "炼气期二层", "exp_needed": 500},  # 1
-    {"level_name": "炼气期三层", "exp_needed": 1200},  # 2
-    {"level_name": "炼气期四层", "exp_needed": 2000},  # 3
-    {"level_name": "炼气期五层", "exp_needed": 3000},  # 4
-    {"level_name": "炼气期六层", "exp_needed": 4500},  # 5
-    {"level_name": "炼气期七层", "exp_needed": 6500},  # 6
-    {"level_name": "炼气期八层", "exp_needed": 9000},  # 7
-    {"level_name": "炼气期九层", "exp_needed": 12000},  # 8
-    {"level_name": "炼气期十层", "exp_needed": 16000},  # 9
-    {"level_name": "炼气期十层", "exp_needed": 16000},  # 10
-    {"level_name": "筑基期初期", "exp_needed": 25000},  # 11
-    {"level_name": "筑基期初期", "exp_needed": 25000},  # 12
-    {"level_name": "筑基期中期", "exp_needed": 45000},  # 13
-    {"level_name": "筑基期中期", "exp_needed": 45000},  # 14
-    {"level_name": "筑基期中期", "exp_needed": 45000},  # 15
-    {"level_name": "筑基期中期", "exp_needed": 45000},  # 16
-    {"level_name": "筑基期中期", "exp_needed": 45000},  # 17
-    {"level_name": "筑基期中期", "exp_needed": 45000},  # 18
-    {"level_name": "金丹期初期", "exp_needed": 150000},  # 19
-    {"level_name": "金丹期初期", "exp_needed": 150000},  # 20
-    {"level_name": "金丹期初期", "exp_needed": 150000},  # 21
-    {"level_name": "金丹期初期", "exp_needed": 150000},  # 22
-    {"level_name": "金丹期初期", "exp_needed": 150000},  # 23
-    {"level_name": "金丹期初期", "exp_needed": 150000},  # 24
-    {"level_name": "金丹期初期", "exp_needed": 150000},  # 25
-    {"level_name": "金丹期初期", "exp_needed": 150000},  # 26
-    {"level_name": "金丹期初期", "exp_needed": 150000},  # 27
-    {"level_name": "大乘期初期", "exp_needed": 600000000},  # 28
-    {"level_name": "大乘期初期", "exp_needed": 600000000},  # 29
-    {"level_name": "大乘期初期", "exp_needed": 600000000},  # 30
-    {"level_name": "大乘期初期", "exp_needed": 600000000},  # 31
+    {"level_name": "炼气期一层", "exp_needed": 0, "base_damage": 10, "base_agility": 5, "base_speed": 5, "base_hp": 100},  # 0
+    {"level_name": "炼气期二层", "exp_needed": 500, "base_damage": 13, "base_agility": 6, "base_speed": 5, "base_hp": 115},  # 1
+    {"level_name": "炼气期三层", "exp_needed": 1200, "base_damage": 16, "base_agility": 7, "base_speed": 6, "base_hp": 130},  # 2
+    {"level_name": "炼气期四层", "exp_needed": 2000, "base_damage": 19, "base_agility": 8, "base_speed": 6, "base_hp": 145},  # 3
+    {"level_name": "炼气期五层", "exp_needed": 3000, "base_damage": 22, "base_agility": 9, "base_speed": 7, "base_hp": 160},  # 4
+    {"level_name": "炼气期六层", "exp_needed": 4500, "base_damage": 25, "base_agility": 10, "base_speed": 7, "base_hp": 175},  # 5
+    {"level_name": "炼气期七层", "exp_needed": 6500, "base_damage": 28, "base_agility": 11, "base_speed": 8, "base_hp": 190},  # 6
+    {"level_name": "炼气期八层", "exp_needed": 9000, "base_damage": 31, "base_agility": 12, "base_speed": 8, "base_hp": 205},  # 7
+    {"level_name": "炼气期九层", "exp_needed": 12000, "base_damage": 34, "base_agility": 13, "base_speed": 9, "base_hp": 220},  # 8
+    {"level_name": "炼气期十层", "exp_needed": 16000, "base_damage": 37, "base_agility": 14, "base_speed": 9, "base_hp": 235},  # 9
+    {"level_name": "炼气期十层", "exp_needed": 16000, "base_damage": 37, "base_agility": 14, "base_speed": 9, "base_hp": 235},  # 10
+    {"level_name": "筑基期初期", "exp_needed": 25000, "base_damage": 40, "base_agility": 15, "base_speed": 10, "base_hp": 250},  # 11
+    {"level_name": "筑基期初期", "exp_needed": 25000, "base_damage": 40, "base_agility": 15, "base_speed": 10, "base_hp": 250},  # 12
+    {"level_name": "筑基期中期", "exp_needed": 45000, "base_damage": 46, "base_agility": 17, "base_speed": 11, "base_hp": 280},  # 13
+    {"level_name": "筑基期中期", "exp_needed": 45000, "base_damage": 46, "base_agility": 17, "base_speed": 11, "base_hp": 280},  # 14
+    {"level_name": "筑基期中期", "exp_needed": 45000, "base_damage": 46, "base_agility": 17, "base_speed": 11, "base_hp": 280},  # 15
+    {"level_name": "筑基期中期", "exp_needed": 45000, "base_damage": 46, "base_agility": 17, "base_speed": 11, "base_hp": 280},  # 16
+    {"level_name": "筑基期中期", "exp_needed": 45000, "base_damage": 46, "base_agility": 17, "base_speed": 11, "base_hp": 280},  # 17
+    {"level_name": "筑基期中期", "exp_needed": 45000, "base_damage": 46, "base_agility": 17, "base_speed": 11, "base_hp": 280},  # 18
+    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 19
+    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 20
+    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 21
+    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 22
+    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 23
+    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 24
+    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 25
+    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 26
+    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 27
+    {"level_name": "大乘期初期", "exp_needed": 600000000, "base_damage": 1000, "base_agility": 300, "base_speed": 300, "base_hp": 10000},  # 28
+    {"level_name": "大乘期初期", "exp_needed": 600000000, "base_damage": 1000, "base_agility": 300, "base_speed": 300, "base_hp": 10000},  # 29
+    {"level_name": "大乘期初期", "exp_needed": 600000000, "base_damage": 1000, "base_agility": 300, "base_speed": 300, "base_hp": 10000},  # 30
+    {"level_name": "大乘期初期", "exp_needed": 600000000, "base_damage": 1000, "base_agility": 300, "base_speed": 300, "base_hp": 10000},  # 31
 ]
 
 
@@ -271,33 +272,40 @@ class TestGroupSelection:
 
 
 class TestStatCalculation:
-    """Verify spawn_enemy stat formulas with level-based base_exp."""
+    """Verify spawn_enemy stat formulas with level-based base attributes."""
+
+    def _fix_random_base(self, enemy_manager, enemy_level):
+        """Patch _randomize_base_value to return the exact base value for tests."""
+        return patch.object(
+            enemy_manager,
+            "_randomize_base_value",
+            side_effect=lambda base: base,
+        )
 
     def test_normal_stats(self, enemy_manager):
-        """Normal enemy: base_exp = exp_needed(enemy_level);
-        HP = (base_exp//2)*hp_mult; ATK = (base_exp//10)*atk_mult."""
+        """Normal enemy: four main attributes from level base * template mults."""
         with (
             patch("random.choice") as mock_choice,
             patch("enemy_manager.random.randint") as mock_randint,
+            self._fix_random_base(enemy_manager, 10),
         ):
             mock_choice.return_value = SAMPLE_ENEMIES_CONFIG["enemy_groups"][0][
                 "templates"
             ][0]  # "wolf" template
-            mock_randint.return_value = 10  # fixed enemy level
+            mock_randint.return_value = 10
 
             enemy = enemy_manager.spawn_enemy(player_level=10, category="normal")
 
-            base_exp = SAMPLE_LEVEL_CONFIG[10]["exp_needed"]  # 16000
-            assert enemy.exp == base_exp
-
-            expected_hp = int((base_exp // 2) * 0.6)
-            expected_atk = int((base_exp // 10) * 0.85)
+            base = SAMPLE_LEVEL_CONFIG[10]
+            assert enemy.exp == base["exp_needed"]
+            expected_hp = int(base["base_hp"] * 0.6)
+            expected_damage = int(base["base_damage"] * 0.85)
             assert enemy.hp == expected_hp
             assert enemy.max_hp == expected_hp
-            assert enemy.atk == expected_atk
-            assert enemy.mp == base_exp
-            assert enemy.max_mp == base_exp
-            assert enemy.defense == 3
+            assert enemy.damage == expected_damage
+            assert enemy.agility == base["base_agility"]
+            assert enemy.speed == base["base_speed"]
+            assert enemy.armor_value == 3
             assert enemy.crit_rate == 10
 
     def test_elite_stats(self, enemy_manager):
@@ -305,6 +313,7 @@ class TestStatCalculation:
         with (
             patch("random.choice") as mock_choice,
             patch("enemy_manager.random.randint") as mock_randint,
+            self._fix_random_base(enemy_manager, 10),
         ):
             mock_choice.side_effect = [
                 SAMPLE_ENEMIES_CONFIG["enemy_groups"][0]["templates"][0],
@@ -314,14 +323,13 @@ class TestStatCalculation:
 
             enemy = enemy_manager.spawn_enemy(player_level=10, category="elite")
 
-            base_exp = SAMPLE_LEVEL_CONFIG[10]["exp_needed"]  # 16000
-            assert enemy.exp == base_exp
-
-            expected_hp = int((base_exp // 2) * 0.6 * 0.9)
-            expected_atk = int((base_exp // 10) * 0.85 * 1.0)
+            base = SAMPLE_LEVEL_CONFIG[10]
+            assert enemy.exp == base["exp_needed"]
+            expected_hp = int(base["base_hp"] * 0.6 * 0.9)
+            expected_damage = int(base["base_damage"] * 0.85 * 1.0)
             assert enemy.hp == expected_hp
-            assert enemy.atk == expected_atk
-            assert enemy.defense == 3 + 5
+            assert enemy.damage == expected_damage
+            assert enemy.armor_value == 3 + 5
             assert enemy.crit_rate == 10 + 5
 
     def test_boss_stats(self, enemy_manager):
@@ -329,6 +337,7 @@ class TestStatCalculation:
         with (
             patch("random.choice") as mock_choice,
             patch("enemy_manager.random.randint") as mock_randint,
+            self._fix_random_base(enemy_manager, 10),
         ):
             mock_choice.side_effect = [
                 SAMPLE_ENEMIES_CONFIG["enemy_groups"][0]["templates"][0],
@@ -338,14 +347,13 @@ class TestStatCalculation:
 
             enemy = enemy_manager.spawn_enemy(player_level=10, category="boss")
 
-            base_exp = SAMPLE_LEVEL_CONFIG[10]["exp_needed"]  # 16000
-            assert enemy.exp == base_exp
-
-            expected_hp = int((base_exp // 2) * 0.6 * 1.2)
-            expected_atk = int((base_exp // 10) * 0.85 * 1.2)
+            base = SAMPLE_LEVEL_CONFIG[10]
+            assert enemy.exp == base["exp_needed"]
+            expected_hp = int(base["base_hp"] * 0.6 * 1.2)
+            expected_damage = int(base["base_damage"] * 0.85 * 1.2)
             assert enemy.hp == expected_hp
-            assert enemy.atk == expected_atk
-            assert enemy.defense == 3 + 15
+            assert enemy.damage == expected_damage
+            assert enemy.armor_value == 3 + 15
             assert enemy.crit_rate == 10 + 10
 
     def test_different_levels_and_groups(self, enemy_manager):
@@ -363,15 +371,16 @@ class TestStatCalculation:
             ):
                 mock_choice.side_effect = lambda lst: lst[0]
                 mock_randint.return_value = level
-                enemy = enemy_manager.spawn_enemy(player_level=level, category="normal")
+                enemy = enemy_manager.spawn_enemy(
+                    player_level=level, category="normal"
+                )
                 assert enemy.exp > 0
                 assert enemy.hp > 0
-                assert enemy.atk > 0
-                assert enemy.mp > 0
+                assert enemy.damage > 0
                 assert enemy.user_id.startswith("enemy_")
 
     def test_minimal_level(self, enemy_manager):
-        """With level 0 (exp_needed=0), enemy has 0 stats."""
+        """With level 0 (no base stats), enemy has minimal 1 stats."""
         with (
             patch("random.choice") as mock_choice,
             patch("enemy_manager.random.randint") as mock_randint,
@@ -380,8 +389,8 @@ class TestStatCalculation:
             mock_randint.return_value = 0
             enemy = enemy_manager.spawn_enemy(player_level=1, category="normal")
             assert enemy.exp == 0
-            assert enemy.hp == 0
-            assert enemy.atk == 0
+            assert enemy.hp == 1
+            assert enemy.damage == 1
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -506,11 +515,20 @@ class TestErrorHandling:
 class TestLevelBasedSpawning:
     """Enemy level is randomly chosen within the group's level_range."""
 
+    def _fixed_base_patch(self, enemy_manager):
+        """Disable ±10% randomization so randint calls reflect only level selection."""
+        return patch.object(
+            enemy_manager,
+            "_randomize_base_value",
+            side_effect=lambda base: base,
+        )
+
     def test_random_level_in_range(self, enemy_manager):
         """Enemy level is clamped by group range, player realm, and player level ±2."""
         with (
             patch("random.choice") as mock_choice,
             patch("enemy_manager.random.randint") as mock_randint,
+            self._fixed_base_patch(enemy_manager),
         ):
             mock_choice.side_effect = lambda lst: lst[0]
             mock_randint.return_value = 9
@@ -524,6 +542,7 @@ class TestLevelBasedSpawning:
         with (
             patch("random.choice") as mock_choice,
             patch("enemy_manager.random.randint") as mock_randint,
+            self._fixed_base_patch(enemy_manager),
         ):
             mock_choice.side_effect = lambda lst: lst[0]
             mock_randint.return_value = 30
@@ -577,6 +596,7 @@ class TestLevelBasedSpawning:
         with (
             patch("random.choice") as mock_choice,
             patch("enemy_manager.random.randint") as mock_randint,
+            self._fixed_base_patch(enemy_manager),
         ):
             mock_choice.side_effect = lambda lst: lst[0]
             mock_randint.return_value = 9
@@ -602,6 +622,7 @@ class TestLevelBasedSpawning:
         with (
             patch("random.choice") as mock_choice,
             patch("enemy_manager.random.randint") as mock_randint,
+            self._fixed_base_patch(enemy_manager),
         ):
             mock_choice.side_effect = lambda lst: lst[0]
             mock_randint.return_value = 28
@@ -639,13 +660,16 @@ class TestEnemyDataclass:
             name="Test",
             hp=100,
             max_hp=100,
-            mp=50,
-            max_mp=50,
-            atk=20,
+            damage=20,
+            agility=5,
+            speed=5,
+            armor_value=0,
+            exp=5000,
         )
-        assert enemy.defense == 0
+        assert enemy.armor_value == 0
         assert enemy.crit_rate == 0
-        assert enemy.exp == 0
+        assert enemy.mp == 0
+        assert enemy.atk == 0
 
     def test_all_fields(self):
         enemy = Enemy(
@@ -653,13 +677,17 @@ class TestEnemyDataclass:
             name="Test",
             hp=100,
             max_hp=100,
+            damage=20,
+            agility=5,
+            speed=5,
+            armor_value=10,
+            exp=5000,
+            crit_rate=15,
             mp=50,
             max_mp=50,
             atk=20,
             defense=10,
-            crit_rate=15,
-            exp=5000,
         )
-        assert enemy.defense == 10
+        assert enemy.armor_value == 10
         assert enemy.crit_rate == 15
         assert enemy.exp == 5000

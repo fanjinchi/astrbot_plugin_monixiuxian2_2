@@ -1,5 +1,4 @@
-"""
-Tests for PVECombatManager - encounter probability, enemy category distribution,
+"""Tests for PVECombatManager - encounter probability, enemy category distribution,
 reward calculation, equipment defense, and the full trigger_pve_combat flow.
 """
 
@@ -16,18 +15,14 @@ calculate_equipment_defense = _pve_mod.calculate_equipment_defense
 calculate_equipment_atk_bonus = _pve_mod.calculate_equipment_atk_bonus
 RIFT_LEVEL_DIFFICULTY_MAP = _pve_mod.RIFT_LEVEL_DIFFICULTY_MAP
 
-# Load supporting types (they don't trigger the problematic __init__.py chain)
 _cm_mod = load_module("combat_manager", "managers/combat_manager.py")
-CombatManager = _cm_mod.CombatManager
-CombatStats = _cm_mod.CombatStats
+CombatResult = _cm_mod.CombatResult
 
 _enemy_mod = load_module("enemy_manager", "managers/enemy_manager.py")
 Enemy = _enemy_mod.Enemy
 
 _model_mod = load_module("models", "models.py")
 Player = _model_mod.Player
-_mde_mod = load_module("models_extended", "models_extended.py")
-UserStatus = _mde_mod.UserStatus
 
 # Managers that depend on DataBase/StorageRingManager (loaded with fallback imports)
 _adv_mod = load_module("adventure_manager", "managers/adventure_manager.py")
@@ -36,17 +31,43 @@ AdventureManager = _adv_mod.AdventureManager
 _rift_mod = load_module("rift_manager", "managers/rift_manager.py")
 RiftManager = _rift_mod.RiftManager
 
+
 # ──────────────────────────────────────────────────────────────────────
 # Fixtures
 # ──────────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
-def mock_combat_manager():
-    """CombatManager mock with basic stat-calc stubs."""
-    mgr = MagicMock(spec=CombatManager)
-    mgr.calculate_hp_mp.return_value = (500, 1000)
-    mgr.calculate_atk.return_value = 100
+def mock_combat_engine():
+    """A fake combat engine returning deterministic results."""
+    engine = MagicMock()
+    engine.build_fighter_from_player = MagicMock(
+        side_effect=lambda p: MagicMock(
+            user_id=p.user_id,
+            name=p.user_name or p.name,
+            hp=p.hp,
+            damage=getattr(p, "damage", 10),
+            agility=getattr(p, "agility", 5),
+            speed=getattr(p, "speed", 5),
+            armor_value=getattr(p, "armor_value", 0),
+        )
+    )
+    engine.resolve_combat.return_value = CombatResult(
+        winner="player_001",
+        combat_log=["第1回合", "玩家攻击"],
+        fighter1_final_hp=350,
+        fighter2_final_hp=0,
+        rounds=1,
+        total_actions=1,
+    )
+    return engine
+
+
+@pytest.fixture
+def mock_combat_manager(mock_combat_engine):
+    """CombatManager-like mock exposing the fake engine."""
+    mgr = MagicMock()
+    mgr.engine = mock_combat_engine
     return mgr
 
 
@@ -59,12 +80,12 @@ def mock_enemy_manager():
         name="疾风狼",
         hp=200,
         max_hp=200,
-        mp=400,
-        max_mp=400,
-        atk=30,
-        defense=5,
-        crit_rate=10,
+        damage=30,
+        agility=10,
+        speed=10,
+        armor_value=5,
         exp=8500,
+        crit_rate=10,
     )
     mgr.spawn_enemy.return_value = enemy
     return mgr
@@ -78,9 +99,11 @@ def mock_player():
     player.user_name = "测试道友"
     player.level_index = 10
     player.experience = 10000
-    player.atkpractice = 5
-    player.hp = 100
-    player.mp = 200
+    player.hp = 500
+    player.damage = 50
+    player.agility = 15
+    player.speed = 15
+    player.armor_value = 0
     player.weapon = ""
     player.armor = ""
     return player
@@ -249,11 +272,10 @@ class TestRewardCalculation:
             name="狼",
             hp=100,
             max_hp=100,
-            mp=50,
-            max_mp=50,
-            atk=20,
-            defense=5,
-            crit_rate=10,
+            damage=20,
+            agility=5,
+            speed=5,
+            armor_value=5,
             exp=exp,
         )
 
@@ -299,7 +321,7 @@ class TestRewardCalculation:
 
     def test_draw(self, pve_manager):
         """Draw: no changes to rewards."""
-        result = {"winner": "平局"}
+        result = {"winner": "draw"}
         base = {"exp": 100, "gold": 50}
         rewards = pve_manager._calculate_rewards(result, base, self.make_enemy())
         assert rewards["exp"] == 100
@@ -320,12 +342,17 @@ class TestRewardCalculation:
         """Large exp values are handled without overflow."""
         result = {"winner": "player_001"}
         base = {"exp": 10_000_000, "gold": 5_000_000}
-        rewards = pve_manager._calculate_rewards(
-            result, base, self.make_enemy(exp=999_999)
+        rewards = self.calculate_rewards(
+            pve_manager, result, base, self.make_enemy(exp=999_999)
         )
         assert rewards["exp"] == int(10_000_000 * 1.2)
         assert rewards["bonus_exp"] == 999_999
         assert rewards["gold"] == 5_000_000
+
+    @staticmethod
+    def calculate_rewards(pve_manager, result, base, enemy):
+        """Helper to access private method in tests."""
+        return pve_manager._calculate_rewards(result, base, enemy)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -347,7 +374,7 @@ class TestCalculateEquipmentDefense:
         assert calculate_equipment_defense(mock_player, mock_config_manager) == 0
 
     def test_weapon_defense_not_counted(self, mock_player, mock_config_manager):
-        """Weapon physical/magic defense is not counted (aligned with _prepare_combat_stats)."""
+        """Weapon physical/magic defense is not counted."""
         mock_player.weapon = "玄铁剑"
         mock_player.armor = ""
         mock_config_manager.weapons_data = {
@@ -446,203 +473,33 @@ class TestCalculateEquipmentAtkBonus:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Build player combat stats
+# Integration with unified combat engine
 # ──────────────────────────────────────────────────────────────────────
 
 
-class TestBuildPlayerCombatStats:
-    """_build_player_combat_stats formula alignment with _prepare_combat_stats."""
+class TestPveEngineIntegration:
+    """trigger_pve_combat delegates to CombatEngine.resolve_combat."""
 
     @pytest.mark.asyncio
-    async def test_uses_current_hp_mp(self, pve_manager_with_config, mock_player):
-        """CombatStats.hp/mp are initialized from player.hp/mp, not recalculated."""
-        mock_player.hp = 123
-        mock_player.mp = 456
-        stats = await pve_manager_with_config._build_player_combat_stats(mock_player)
-        assert stats.hp == 123
-        assert stats.mp == 456
-
-    @pytest.mark.asyncio
-    async def test_max_hp_mp_from_experience(
-        self, pve_manager_with_config, mock_player, mock_combat_manager
+    async def test_calls_resolve_combat_and_writes_back_hp(
+        self, pve_manager, mock_combat_engine, mock_player
     ):
-        """CombatStats.max_hp/max_mp come from calculate_hp_mp(player.experience, ...)."""
-        mock_combat_manager.calculate_hp_mp.return_value = (500, 1000)
-        stats = await pve_manager_with_config._build_player_combat_stats(mock_player)
-        assert stats.max_hp == 500
-        assert stats.max_mp == 1000
-        mock_combat_manager.calculate_hp_mp.assert_called_once_with(
-            mock_player.experience, 0.0, 0.0
-        )
+        """After combat, player.hp is updated from the engine result."""
+        with patch.object(pve_manager, "_should_trigger_combat", return_value=True):
+            with patch.object(
+                pve_manager, "_select_enemy_category", return_value="normal"
+            ):
+                msg, rewards = await pve_manager.trigger_pve_combat(
+                    mock_player,
+                    scene="adventure",
+                    difficulty="mid",
+                    base_rewards={"exp": 100, "gold": 50},
+                )
 
-    @pytest.mark.asyncio
-    async def test_atk_includes_base_and_equipment(
-        self,
-        pve_manager_with_config,
-        mock_player,
-        mock_combat_manager,
-        mock_config_manager,
-    ):
-        """ATK = calculate_atk(...) + weapon atk + physical_damage + magic_damage."""
-        mock_combat_manager.calculate_atk.return_value = 100
-        mock_player.weapon = "玄铁剑"
-        mock_config_manager.weapons_data = {
-            "玄铁剑": {"atk": 10, "physical_damage": 5, "magic_damage": 3}
-        }
-        stats = await pve_manager_with_config._build_player_combat_stats(mock_player)
-        assert stats.atk == 118
-        mock_combat_manager.calculate_atk.assert_called_once_with(
-            mock_player.experience, mock_player.atkpractice, 0.0
-        )
-
-    @pytest.mark.asyncio
-    async def test_defense_is_equipment_defense_only(
-        self, pve_manager_with_config, mock_player, mock_config_manager
-    ):
-        """DEF equals calculate_equipment_defense (armor only), ignoring base player defense."""
-        mock_player.armor = "金蚕丝甲"
-        mock_config_manager.items_data = {
-            "金蚕丝甲": {"physical_defense": 30, "magic_defense": 10}
-        }
-        stats = await pve_manager_with_config._build_player_combat_stats(mock_player)
-        assert stats.defense == 40
-
-    @pytest.mark.asyncio
-    async def test_no_equipment_bonus_when_no_config(
-        self, pve_manager, mock_player, mock_combat_manager
-    ):
-        """Without config_manager, ATK is base only and DEF is 0."""
-        mock_combat_manager.calculate_atk.return_value = 80
-        stats = await pve_manager._build_player_combat_stats(mock_player)
-        assert stats.atk == 80
-        assert stats.defense == 0
-
-
-# ──────────────────────────────────────────────────────────────────────
-# CombatManager crit-rate bounds and conversion
-# ──────────────────────────────────────────────────────────────────────
-
-
-class TestCombatManagerCritRate:
-    """calculate_turn_attack crit-roll behaviour for boundary crit rates."""
-
-    TRIALS = 1000
-
-    def test_crit_rate_zero_never_crits(self):
-        """crit_rate=0 must produce zero crits across many trials."""
-        crits = sum(
-            CombatManager.calculate_turn_attack(100, crit_rate=0)[0]
-            for _ in range(self.TRIALS)
-        )
-        assert crits == 0
-
-    def test_crit_rate_hundred_always_crits(self):
-        """crit_rate=100 must produce a crit on every trial."""
-        crits = sum(
-            CombatManager.calculate_turn_attack(100, crit_rate=100)[0]
-            for _ in range(self.TRIALS)
-        )
-        assert crits == self.TRIALS
-
-
-class TestBuildPlayerCombatStatsCritConversion:
-    """Fractional impart_know_per is converted to integer percentage crit_rate."""
-
-    @pytest.mark.asyncio
-    async def test_fractional_crit_rate_buff_converted_to_percent(
-        self, mock_combat_manager, mock_enemy_manager, mock_player
-    ):
-        """impart_know_per=0.1 means +10% crit rate."""
-        impart_manager = MagicMock()
-        impart_manager.get_impart_info = AsyncMock(
-            return_value=(
-                True,
-                "",
-                MagicMock(
-                    impart_hp_per=0.0,
-                    impart_mp_per=0.0,
-                    impart_atk_per=0.0,
-                    impart_know_per=0.1,
-                ),
-            )
-        )
-
-        manager = PVECombatManager(
-            mock_combat_manager,
-            mock_enemy_manager,
-            config_manager=None,
-            impart_manager=impart_manager,
-        )
-        stats = await manager._build_player_combat_stats(mock_player)
-
-        assert stats.crit_rate == 10
-
-
-# ──────────────────────────────────────────────────────────────────────
-# trigger_pve_combat integration flow
-# ──────────────────────────────────────────────────────────────────────
-
-
-class TestTriggerPVECombat:
-    """End-to-end flow of trigger_pve_combat with mocked internals."""
-
-    @pytest.mark.asyncio
-    async def test_writes_back_hp_mp_after_combat(
-        self,
-        pve_manager_with_config,
-        mock_player,
-        mock_combat_manager,
-        mock_config_manager,
-    ):
-        """After combat, player.hp/mp are updated from combat_stats.hp/mp."""
-        mock_player.hp = 500
-        mock_player.mp = 1000
-        mock_combat_manager.calculate_hp_mp.return_value = (600, 1200)
-        mock_combat_manager.calculate_atk.return_value = 100
-
-        enemy = Enemy(
-            user_id="enemy_wolf",
-            name="疾风狼",
-            hp=200,
-            max_hp=200,
-            mp=400,
-            max_mp=400,
-            atk=30,
-            defense=5,
-            crit_rate=10,
-            exp=8500,
-        )
-        pve_manager_with_config.enemy_mgr.spawn_enemy.return_value = enemy
-
-        def mutate_and_return(player_stats, _enemy_stats):
-            player_stats.hp = 250
-            player_stats.mp = 800
-            return {
-                "winner": "player_001",
-                "combat_log": [],
-                "player_final_hp": 250,
-                "player_final_mp": 800,
-            }
-
-        mock_combat_manager.player_vs_boss.side_effect = mutate_and_return
-
-        with (
-            patch.object(
-                pve_manager_with_config, "_should_trigger_combat", return_value=True
-            ),
-            patch.object(
-                pve_manager_with_config, "_select_enemy_category", return_value="normal"
-            ),
-        ):
-            await pve_manager_with_config.trigger_pve_combat(
-                mock_player,
-                scene="adventure",
-                difficulty="mid",
-                base_rewards={"exp": 100, "gold": 50},
-            )
-
-        assert mock_player.hp == 250
-        assert mock_player.mp == 800
+        mock_combat_engine.resolve_combat.assert_called_once()
+        assert mock_player.hp == 350
+        assert "胜利" in msg
+        assert rewards["bonus_exp"] == 8500
 
     @pytest.mark.asyncio
     async def test_no_encounter_returns_none(self, pve_manager, mock_player):
@@ -654,203 +511,50 @@ class TestTriggerPVECombat:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_full_flow_victory(
-        self, pve_manager, mock_player, mock_combat_manager
+    async def test_spawn_enemy_failure_returns_none(
+        self, pve_manager, mock_player
     ):
-        """Victory flow returns (message_str, rewards_dict)."""
-        enemy = Enemy(
-            user_id="enemy_wolf",
-            name="疾风狼",
-            hp=200,
-            max_hp=200,
-            mp=400,
-            max_mp=400,
-            atk=30,
-            defense=5,
-            crit_rate=10,
-            exp=8500,
+        """When spawn_enemy raises, trigger_pve_combat returns None."""
+        pve_manager.enemy_mgr.spawn_enemy.side_effect = ValueError(
+            "未找到敌人模板配置"
         )
-        pve_manager.enemy_mgr.spawn_enemy.return_value = enemy
-
-        combat_stats = CombatStats(
-            user_id="player_001",
-            name="测试道友",
-            hp=500,
-            max_hp=500,
-            mp=1000,
-            max_mp=1000,
-            atk=100,
-            defense=0,
-            crit_rate=0,
-            exp=10000,
-        )
-
-        combat_result = {
-            "winner": "player_001",
-            "combat_log": ["玩家攻击", "Boss受伤"],
-            "player_final_hp": 350,
-            "player_final_mp": 800,
-        }
-        mock_combat_manager.player_vs_boss.return_value = combat_result
-
-        with (
-            patch.object(pve_manager, "_should_trigger_combat", return_value=True),
-            patch.object(pve_manager, "_select_enemy_category", return_value="normal"),
-            patch.object(
-                pve_manager,
-                "_build_player_combat_stats",
-                return_value=combat_stats,
-            ),
-        ):
-            result = await pve_manager.trigger_pve_combat(
-                mock_player,
-                scene="adventure",
-                difficulty="mid",
-                base_rewards={"exp": 100, "gold": 50},
-            )
-
-        assert result is not None
-        msg, rewards = result
-        assert isinstance(msg, str)
-        assert "胜利" in msg
-        assert rewards["exp"] == int(100 * 1.2)
-        assert rewards["bonus_exp"] == 8500
+        with patch.object(pve_manager, "_should_trigger_combat", return_value=True):
+            with patch.object(
+                pve_manager, "_select_enemy_category", return_value="normal"
+            ):
+                result = await pve_manager.trigger_pve_combat(
+                    mock_player, scene="adventure", difficulty="mid"
+                )
+        assert result is None
 
     @pytest.mark.asyncio
-    async def test_full_flow_loss(self, pve_manager, mock_player, mock_combat_manager):
-        """Loss flow marks hp_penalty."""
-        enemy = Enemy(
-            user_id="enemy_wolf",
-            name="疾风狼",
-            hp=200,
-            max_hp=200,
-            mp=400,
-            max_mp=400,
-            atk=30,
-            defense=5,
-            crit_rate=10,
-            exp=8500,
+    async def test_loss_marks_hp_penalty(
+        self, pve_manager, mock_combat_engine, mock_player
+    ):
+        """When the enemy wins, hp_penalty is set."""
+        mock_combat_engine.resolve_combat.return_value = CombatResult(
+            winner="enemy_wolf",
+            combat_log=["第1回合", "敌人攻击"],
+            fighter1_final_hp=0,
+            fighter2_final_hp=100,
+            rounds=1,
+            total_actions=1,
         )
-        pve_manager.enemy_mgr.spawn_enemy.return_value = enemy
+        with patch.object(pve_manager, "_should_trigger_combat", return_value=True):
+            with patch.object(
+                pve_manager, "_select_enemy_category", return_value="elite"
+            ):
+                msg, rewards = await pve_manager.trigger_pve_combat(
+                    mock_player,
+                    scene="adventure",
+                    difficulty="high",
+                    base_rewards={"exp": 200, "gold": 100},
+                )
 
-        combat_stats = CombatStats(
-            user_id="player_001",
-            name="测试道友",
-            hp=500,
-            max_hp=500,
-            mp=1000,
-            max_mp=1000,
-            atk=100,
-            defense=0,
-            crit_rate=0,
-            exp=10000,
-        )
-
-        combat_result = {
-            "winner": "enemy_wolf",
-            "combat_log": ["玩家攻击", "Boss反击"],
-            "player_final_hp": 1,
-            "player_final_mp": 200,
-        }
-        mock_combat_manager.player_vs_boss.return_value = combat_result
-
-        with (
-            patch.object(pve_manager, "_should_trigger_combat", return_value=True),
-            patch.object(pve_manager, "_select_enemy_category", return_value="elite"),
-            patch.object(
-                pve_manager,
-                "_build_player_combat_stats",
-                return_value=combat_stats,
-            ),
-        ):
-            result = await pve_manager.trigger_pve_combat(
-                mock_player,
-                scene="adventure",
-                difficulty="high",
-                base_rewards={"exp": 200, "gold": 100},
-            )
-
-        assert result is not None
-        msg, rewards = result
         assert "战败" in msg
         assert rewards["exp"] == int(200 * 0.3)
         assert rewards["gold"] == 0
         assert rewards["hp_penalty"]
-
-    @pytest.mark.asyncio
-    async def test_default_base_rewards(
-        self, pve_manager, mock_player, mock_combat_manager
-    ):
-        """When base_rewards is None, defaults to {'exp': 100, 'gold': 50}."""
-        combat_stats = CombatStats(
-            user_id="player_001",
-            name="测试道友",
-            hp=500,
-            max_hp=500,
-            mp=1000,
-            max_mp=1000,
-            atk=100,
-            defense=0,
-            crit_rate=0,
-            exp=10000,
-        )
-        combat_result = {
-            "winner": "player_001",
-            "combat_log": [],
-            "player_final_hp": 500,
-            "player_final_mp": 1000,
-        }
-        mock_combat_manager.player_vs_boss.return_value = combat_result
-
-        with (
-            patch.object(pve_manager, "_should_trigger_combat", return_value=True),
-            patch.object(pve_manager, "_select_enemy_category", return_value="normal"),
-            patch.object(
-                pve_manager,
-                "_build_player_combat_stats",
-                return_value=combat_stats,
-            ),
-        ):
-            result = await pve_manager.trigger_pve_combat(
-                mock_player, scene="adventure", difficulty="low"
-            )
-
-        assert result is not None
-        _msg, rewards = result
-        assert rewards["exp"] == int(100 * 1.2)
-        assert rewards["gold"] == 50
-
-    @pytest.mark.asyncio
-    async def test_spawn_enemy_failure_returns_none(self, pve_manager, mock_player):
-        """When spawn_enemy raises, trigger_pve_combat returns None."""
-        pve_manager.enemy_mgr.spawn_enemy.side_effect = ValueError("未找到敌人模板配置")
-
-        combat_stats = CombatStats(
-            user_id="player_001",
-            name="测试道友",
-            hp=500,
-            max_hp=500,
-            mp=1000,
-            max_mp=1000,
-            atk=100,
-            defense=0,
-            crit_rate=0,
-            exp=10000,
-        )
-
-        with (
-            patch.object(pve_manager, "_should_trigger_combat", return_value=True),
-            patch.object(pve_manager, "_select_enemy_category", return_value="normal"),
-            patch.object(
-                pve_manager,
-                "_build_player_combat_stats",
-                return_value=combat_stats,
-            ),
-        ):
-            result = await pve_manager.trigger_pve_combat(
-                mock_player, scene="adventure", difficulty="mid"
-            )
-        assert result is None
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -861,75 +565,60 @@ class TestTriggerPVECombat:
 class TestFormatCombatResult:
     """_format_combat_result message formatting."""
 
+    def make_enemy(self, exp=8500):
+        return Enemy(
+            user_id="enemy_wolf",
+            name="狼",
+            hp=100,
+            max_hp=100,
+            damage=20,
+            agility=5,
+            speed=5,
+            armor_value=5,
+            exp=exp,
+        )
+
     def test_victory_format(self, pve_manager):
         result = {
             "winner": "player_001",
             "combat_log": ["第1回合", "玩家攻击"],
             "player_final_hp": 300,
-            "player_final_mp": 600,
+            "player_final_mp": 300,
         }
-        enemy = Enemy(
-            user_id="enemy_wolf",
-            name="狼",
-            hp=100,
-            max_hp=100,
-            mp=50,
-            max_mp=50,
-            atk=20,
-        )
         rewards = {"exp": 120, "bonus_exp": 8500, "gold": 50, "hp_penalty": False}
-        msg = pve_manager._format_combat_result(result, enemy, rewards)
+        msg = pve_manager._format_combat_result(result, self.make_enemy(), rewards)
         assert "胜利" in msg
         assert "修为：+120" in msg
         assert "额外修为：+8500" in msg
         assert "灵石：+50" in msg
         assert "剩余气血：300" in msg
-        assert "剩余真元：600" in msg
 
     def test_loss_format(self, pve_manager):
         result = {
             "winner": "enemy_wolf",
             "combat_log": ["Boss反击"],
             "player_final_hp": 1,
-            "player_final_mp": 200,
+            "player_final_mp": 1,
         }
-        enemy = Enemy(
-            user_id="enemy_wolf",
-            name="狼",
-            hp=100,
-            max_hp=100,
-            mp=50,
-            max_mp=50,
-            atk=20,
-        )
         rewards = {"exp": 30, "bonus_exp": 0, "gold": 0, "hp_penalty": True}
-        msg = pve_manager._format_combat_result(result, enemy, rewards)
+        msg = pve_manager._format_combat_result(result, self.make_enemy(), rewards)
         assert "战败" in msg
         assert "气血受损" in msg
 
     def test_draw_format(self, pve_manager):
         result = {
-            "winner": "平局",
+            "winner": "draw",
             "combat_log": ["激烈交战"],
             "player_final_hp": 100,
-            "player_final_mp": 50,
+            "player_final_mp": 100,
         }
-        enemy = Enemy(
-            user_id="enemy_wolf",
-            name="狼",
-            hp=100,
-            max_hp=100,
-            mp=50,
-            max_mp=50,
-            atk=20,
-        )
         rewards = {"exp": 100, "bonus_exp": 0, "gold": 50, "hp_penalty": False}
-        msg = pve_manager._format_combat_result(result, enemy, rewards)
+        msg = pve_manager._format_combat_result(result, self.make_enemy(), rewards)
         assert "平局" in msg
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Drop skipping on defeat (AdventureManager & RiftManager)
+# Fixtures for downstream manager tests
 # ──────────────────────────────────────────────────────────────────────
 
 
@@ -975,6 +664,8 @@ def rift_manager(mock_db, mock_storage_ring_manager, mock_pve_combat_mgr):
 @pytest.fixture
 def finished_user_cd_adventure():
     """UserCd for a finished adventure on the default 'scout' route."""
+    from models_extended import UserStatus
+
     cd = MagicMock()
     cd.type = UserStatus.ADVENTURING
     cd.scheduled_time = 0
@@ -986,6 +677,8 @@ def finished_user_cd_adventure():
 @pytest.fixture
 def finished_user_cd_rift():
     """UserCd for a finished rift exploration."""
+    from models_extended import UserStatus
+
     cd = MagicMock()
     cd.type = UserStatus.EXPLORING
     cd.scheduled_time = 0

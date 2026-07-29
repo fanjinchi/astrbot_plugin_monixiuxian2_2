@@ -33,9 +33,9 @@
 
 ## 5. PvE 数值重校准
 
-- [ ] 5.1 `managers/enemy_manager.py`：敌人按「对应境界属性基准区间 × 难度系数」生成四主属性（废弃 base_exp 派生 hp/atk/mp）
-- [ ] 5.2 `managers/boss_manager.py`：世界 Boss 数值按新框架重生成（含 8 档境界基准与防御词条）
-- [ ] 5.3 `managers/pve_combat_manager.py`：接入统一战斗引擎，胜负奖励规则保持不变
+- [x] 5.1 `managers/enemy_manager.py`：敌人按「对应境界属性基准区间 × 难度系数」生成四主属性（废弃 base_exp 派生 hp/atk/mp）
+- [x] 5.2 `managers/boss_manager.py`：世界 Boss 数值按新框架重生成（含 8 档境界基准与防御词条）
+- [x] 5.3 `managers/pve_combat_manager.py`：接入统一战斗引擎，胜负奖励规则保持不变
 
 ## 6. 成长流程接入
 

@@ -4,29 +4,39 @@
 用于PVE战斗系统
 """
 
+from __future__ import annotations
+
 import json
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from astrbot.api import logger
+
+if TYPE_CHECKING:
+    from ..config_manager import ConfigManager
 
 
 @dataclass
 class Enemy:
-    """敌人数据模型，与 CombatStats 字段兼容"""
+    """Enemy data model using the new four-main-attribute framework."""
 
     user_id: str
-    name: str  # 敌人名称
-    hp: int  # 当前气血
-    max_hp: int  # 最大气血
-    mp: int  # 当前真元
-    max_mp: int  # 最大真元
-    atk: int  # 攻击力
-    defense: int = 0  # 防御力
-    crit_rate: int = 0  # 会心率（百分比）
-    exp: int = 0  # 修为（用于计算属性）
+    name: str
+    hp: int
+    max_hp: int
+    damage: int
+    agility: int
+    speed: int
+    armor_value: int
+    exp: int
+    crit_rate: int = 0
+    # Legacy fields kept for compatibility with old callers/tests
+    mp: int = 0
+    max_mp: int = 0
+    atk: int = 0
+    defense: int = 0
 
 
 class EnemyManager:
@@ -109,14 +119,17 @@ class EnemyManager:
         {"exp_needed": 10000000},
     ]
 
-    def __init__(self, level_config: list = None):
+    def __init__(self, level_config: list = None, config_manager: ConfigManager = None):
         """
         初始化敌人管理器
 
         Args:
             level_config: 等级配置列表（可选）。若未提供，自动从
                 config/level_config.json 加载。
+            config_manager: 配置管理器（可选），用于读取 PvE 难度系数和
+                境界基础属性。
         """
+        self.config_manager: ConfigManager | None = config_manager
         self.enemy_groups: list[dict] = []
         self.difficulty_coefficients: dict = {}
         self.naming: dict = {}
@@ -136,6 +149,8 @@ class EnemyManager:
 
         if level_config is not None:
             self.level_config = level_config
+        elif self.config_manager is not None:
+            self.level_config = self.config_manager.level_data
         else:
             self.level_config = self._load_level_config()
 
@@ -182,10 +197,26 @@ class EnemyManager:
         # 等级超过31时，默认使用顶级分组
         return self.enemy_groups[-1] if self.enemy_groups else {}
 
-    def _get_exp_for_level(self, level_index: int) -> int:
-        """根据等级索引获取该等级突破所需修为（即等级初始值）。"""
+    def _global_difficulty_multiplier(self) -> float:
+        """读取 game_config 中的 PvE 全局难度系数。"""
+        if self.config_manager is None:
+            return 1.0
+        return self.config_manager.game_config.get("pve", {}).get(
+            "difficulty_multiplier", 1.0
+        )
+
+    def _randomize_base_value(self, base_value: int) -> int:
+        """在基准值 ±10% 范围内随机生成最终值，至少为 1。"""
+        if base_value <= 0:
+            return 1
+        low = max(1, int(base_value * 0.9))
+        high = max(low, int(base_value * 1.1))
+        return random.randint(low, high)
+
+    def _get_level_base(self, level_index: int, key: str) -> int:
+        """从等级配置中读取指定基础属性，缺失时返回合理默认值。"""
         if 0 <= level_index < len(self.level_config):
-            return self.level_config[level_index].get("exp_needed", 0)
+            return self.level_config[level_index].get(key, 0)
         return 0
 
     def _extract_realm_prefix(self, level_name: str) -> str:
@@ -253,14 +284,14 @@ class EnemyManager:
 
     def spawn_enemy(self, player_level: int, category: str) -> Enemy:
         """
-        生成一个敌人
+        生成一个敌人。
 
-        根据玩家等级选择敌人分组，在分组等级范围内随机选择敌人等级，
-        以该等级的突破修为作为基础修为，应用难度系数和类别倍率生成最终属性。
+        敌人的四主属性基于对应境界的基准区间，再乘以模板倍率、类别倍率
+        和全局 PvE 难度系数生成；不再使用旧的 base_exp 派生 hp/atk。
 
         Args:
             player_level: 玩家等级，用于选择敌人分组
-            category: 敌人类别，可选 "normal"（普通）、"elite"（精英）、"boss"（首领）
+            category: 敌人类别，可选 "normal" / "elite" / "boss"
 
         Returns:
             生成的敌人对象
@@ -275,10 +306,10 @@ class EnemyManager:
 
         template = random.choice(templates)
 
-        # 从模板获取基础倍率
+        # 模板基础倍率
         hp_mult = template.get("hp_mult", 1.0)
         atk_mult = template.get("atk_mult", 1.0)
-        defense = template.get("defense", 0)
+        armor_value = template.get("defense", 0)
         crit_rate = template.get("crit_rate", 0)
 
         # 应用类别倍率
@@ -286,23 +317,45 @@ class EnemyManager:
             elite_config = group.get("elite", {})
             hp_mult *= elite_config.get("hp_mult", 1.0)
             atk_mult *= elite_config.get("atk_mult", 1.0)
-            defense += elite_config.get("defense_bonus", 0)
+            armor_value += elite_config.get("defense_bonus", 0)
             crit_rate += elite_config.get("crit_rate_bonus", 0)
         elif category == "boss":
             boss_config = group.get("boss", {})
             hp_mult *= boss_config.get("hp_mult", 1.2)
             atk_mult *= boss_config.get("atk_mult", 1.2)
-            defense += boss_config.get("defense_bonus", 0)
+            armor_value += boss_config.get("defense_bonus", 0)
             crit_rate += boss_config.get("crit_rate_bonus", 0)
 
         level_range = group.get("level_range", [0, 0])
         enemy_level = self._choose_enemy_level(player_level, level_range)
-        base_exp = self._get_exp_for_level(enemy_level)
 
-        # 计算最终属性
-        hp = int((base_exp // 2) * hp_mult)
-        atk = int((base_exp // 10) * atk_mult)
-        mp = base_exp
+        # 从境界配置读取四主属性基准并应用 ±10% 随机区间
+        base_damage = self._get_level_base(enemy_level, "base_damage")
+        base_agility = self._get_level_base(enemy_level, "base_agility")
+        base_speed = self._get_level_base(enemy_level, "base_speed")
+        base_hp = self._get_level_base(enemy_level, "base_hp")
+
+        # 向后兼容：若配置缺少新字段，则用旧 exp_needed 派生基础值
+        if base_damage == 0 and base_hp == 0:
+            base_exp = self._get_level_base(enemy_level, "exp_needed")
+            base_damage = max(1, base_exp // 10)
+            base_hp = max(1, base_exp // 2)
+            base_agility = max(1, base_damage // 2)
+            base_speed = max(1, base_damage // 2)
+
+        damage = int(self._randomize_base_value(base_damage) * atk_mult)
+        hp = int(self._randomize_base_value(base_hp) * hp_mult)
+        agility = self._randomize_base_value(base_agility)
+        speed = self._randomize_base_value(base_speed)
+
+        # 应用全局 PvE 难度系数
+        difficulty_multiplier = self._global_difficulty_multiplier()
+        damage = max(1, int(damage * difficulty_multiplier))
+        hp = max(1, int(hp * difficulty_multiplier))
+        armor_value = max(0, int(armor_value * difficulty_multiplier))
+
+        # 修为奖励仍按敌人等级锚定
+        exp_reward = self._get_level_base(enemy_level, "exp_needed")
 
         # 组合敌人名称
         if category == "normal":
@@ -328,12 +381,17 @@ class EnemyManager:
             name=name,
             hp=hp,
             max_hp=hp,
-            mp=mp,
-            max_mp=mp,
-            atk=atk,
-            defense=defense,
+            damage=damage,
+            agility=agility,
+            speed=speed,
+            armor_value=armor_value,
+            exp=exp_reward,
             crit_rate=crit_rate,
-            exp=base_exp,
+            # 兼容旧字段
+            mp=exp_reward,
+            max_mp=exp_reward,
+            atk=damage,
+            defense=armor_value,
         )
 
     def get_drop_items(self, drop_tier: str) -> list[dict[str, Any]]:
