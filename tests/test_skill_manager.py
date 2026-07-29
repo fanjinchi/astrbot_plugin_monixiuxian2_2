@@ -140,6 +140,14 @@ class FakeConfigManager:
                 "armor_value": 5,
             },
         }
+        self.items_data = {
+            "玄铁甲": {
+                "name": "玄铁甲",
+                "type": "法器",
+                "subtype": "防具",
+                "armor_value": 10,
+            },
+        }
         self.game_config = {
             "skill_system": {
                 "breakthrough_success_learn_rate": 0.20,
@@ -189,21 +197,55 @@ def test_build_pool_cultivation_no_universal(mgr):
     assert "universal" not in sources
 
 
-def test_build_pool_breakthrough_includes_universal(mgr):
-    """Breakthrough channel includes universal pool."""
+def test_build_pool_no_universal(mgr):
+    """Breakthrough pool MUST NOT include universal pool directly."""
     player = FakePlayer(main_technique="长春功")
     pool = mgr._build_comprehension_pool(player, "breakthrough_success")
     sources = {e["source"] for e in pool}
-    assert "universal" in sources
+    assert "universal" not in sources
 
 
-def test_pool_weighted_by_coefficient(mgr):
-    """Rare skills have lower weight (coefficient)."""
+def test_pool_coefficients_stored_separately(mgr):
+    """Pool entries keep coefficients for success probability only."""
     player = FakePlayer(main_technique="焚天诀")
     pool = mgr._build_comprehension_pool(player, "breakthrough_success")
+    coeffs = {e["skill_id"]: e.get("coefficient", 1.0) for e in pool}
     weights = {e["skill_id"]: e["weight"] for e in pool}
     # spirit_001 has coefficient 0.6, common_001 has 0.9
-    assert weights["spirit_001"] < weights["common_001"]
+    assert coeffs["spirit_001"] < coeffs["common_001"]
+    # Selection weights are uniform
+    assert weights["spirit_001"] == weights["common_001"]
+
+
+def test_coefficient_affects_success_probability(mgr):
+    """Coefficient 0.2 gives one-fifth the success chance of coefficient 1.0."""
+    import random as _random
+
+    original_choice = _random.choice
+    original_random = _random.random
+    try:
+        # Coefficient 1.0: success boundary is base_rate * 1.0 = 0.5.
+        high_pool = [
+            {"skill_id": "high", "weight": 1.0, "coefficient": 1.0, "source": "test"},
+        ]
+        _random.choice = lambda p: high_pool[0]
+        _random.random = lambda: 0.4
+        assert mgr._roll_comprehension(high_pool, base_rate=0.5) is not None
+
+        # Coefficient 0.2: success boundary is 0.5 * 0.2 = 0.1.
+        low_pool = [
+            {"skill_id": "low", "weight": 1.0, "coefficient": 0.2, "source": "test"},
+        ]
+        _random.choice = lambda p: low_pool[0]
+        _random.random = lambda: 0.4
+        assert mgr._roll_comprehension(low_pool, base_rate=0.5) is None
+
+        # A roll below the 0.1 boundary succeeds.
+        _random.random = lambda: 0.05
+        assert mgr._roll_comprehension(low_pool, base_rate=0.5) is not None
+    finally:
+        _random.choice = original_choice
+        _random.random = original_random
 
 
 # ------------------------------------------------------------------

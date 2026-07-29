@@ -3,7 +3,7 @@
 from astrbot.api.event import AstrMessageEvent
 
 from ..config_manager import ConfigManager
-from ..core import EquipmentManager, PillManager, StorageRingManager
+from ..core import EquipmentManager, PillManager, SkillManager, StorageRingManager
 from ..data import DataBase
 from ..models import Player
 from .utils import player_required
@@ -18,9 +18,15 @@ __all__ = ["EquipmentHandler"]
 class EquipmentHandler:
     """装备系统处理器"""
 
-    def __init__(self, db: DataBase, config_manager: ConfigManager):
+    def __init__(
+        self,
+        db: DataBase,
+        config_manager: ConfigManager,
+        skill_manager: SkillManager | None = None,
+    ):
         self.db = db
         self.config_manager = config_manager
+        self.skill_manager = skill_manager
         self.storage_ring_manager = StorageRingManager(db, config_manager)
         self.equipment_manager = EquipmentManager(
             db, config_manager, self.storage_ring_manager
@@ -136,6 +142,16 @@ class EquipmentHandler:
             yield event.plain_result(f"【{item_name}】不是可装备的物品类型")
             return
 
+        # 功法类物品需要额外校验领悟状态和栏位
+        if item_type == "technique" and self.skill_manager is not None:
+            owned_skill_ids = self._collect_owned_skill_ids(player, item_name)
+            can_equip, err_msg = self.skill_manager.can_equip_technique(
+                player, item_name, owned_skill_ids
+            )
+            if not can_equip:
+                yield event.plain_result(f"❌ {err_msg}")
+                return
+
         # 检查储物戒中是否有该物品
         if not self.storage_ring_manager.has_item(player, item_name, 1):
             yield event.plain_result(
@@ -238,3 +254,31 @@ class EquipmentHandler:
             yield event.plain_result(f"✅ {message}{storage_msg}")
         else:
             yield event.plain_result(f"❌ {message}")
+
+    def _collect_owned_skill_ids(
+        self, player: Player, current_item_name: str
+    ) -> list[str]:
+        """Collect skill IDs the player currently owns.
+
+        Includes storage-ring items, learned skills, equipped techniques and
+        the item currently being equipped.
+        """
+        owned_names = set(player.get_storage_ring_items().keys())
+        owned_names.update(player.get_techniques_list())
+        owned_names.add(current_item_name)
+
+        owned_ids = set()
+        if self.skill_manager is None:
+            return list(owned_ids)
+
+        for name in owned_names:
+            skill_id = self.skill_manager._find_skill_id_by_name(name)
+            if skill_id:
+                owned_ids.add(skill_id)
+
+        for entry in player.get_learned_skills():
+            skill_id = entry.get("skill_id")
+            if skill_id:
+                owned_ids.add(skill_id)
+
+        return list(owned_ids)

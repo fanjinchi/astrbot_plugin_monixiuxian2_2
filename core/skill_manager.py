@@ -43,11 +43,14 @@ class SkillManager:
         """Build the comprehension pool for a given channel.
 
         Pool composition (design D4 / spec skill-system):
-        - Heart method skill pool (weighted by learn_coefficient) if equipped.
+        - Heart method skill pool (uniform selection; coefficient only affects
+          success probability, not selection weight).
         - Study target (if set and not yet learned).
-        - Universal pool (breakthrough channels only; cultivation MUST NOT access it).
+        - Universal pool is intentionally excluded here; it is handled by a
+          separate independent roll in breakthrough channels.
 
-        Returns a list of dicts: {"skill_id": str, "weight": float, "source": str}.
+        Returns a list of dicts:
+        {"skill_id": str, "weight": float, "coefficient": float, "source": str}.
         """
         pool: list[dict] = []
 
@@ -64,7 +67,8 @@ class SkillManager:
                         pool.append(
                             {
                                 "skill_id": skill_id,
-                                "weight": coeff,
+                                "weight": 1.0,
+                                "coefficient": coeff,
                                 "source": "heart_method",
                             }
                         )
@@ -76,25 +80,10 @@ class SkillManager:
                 {
                     "skill_id": study_target,
                     "weight": 1.0,
+                    "coefficient": 1.0,
                     "source": "study_target",
                 }
             )
-
-        # 3. Universal pool (breakthrough channels only)
-        if channel.startswith("breakthrough"):
-            universal_group = "通用功法池"
-            for skill_def in self.config_manager.skills_data.values():
-                if skill_def.get("_group") != universal_group:
-                    continue
-                skill_id = skill_def.get("id")
-                if skill_id:
-                    pool.append(
-                        {
-                            "skill_id": skill_id,
-                            "weight": 1.0,
-                            "source": "universal",
-                        }
-                    )
 
         return pool
 
@@ -108,34 +97,20 @@ class SkillManager:
     # ------------------------------------------------------------------
 
     def _roll_comprehension(self, pool: list[dict], base_rate: float) -> dict | None:
-        """Weighted random draw from the comprehension pool.
+        """Uniform random draw from the comprehension pool.
 
-        Actual comprehension rate for each entry = base_rate * weight.
-        We draw one entry with probability proportional to weight, then
-        roll against base_rate * weight for that entry.
+        The learn coefficient only affects the success probability:
+        actual comprehension rate = base_rate * coefficient.
+        Selection is uniform (fixed weight) so a coefficient of 0.2 gives
+        exactly one-fifth the success probability of coefficient 1.0.
         """
         if not pool:
             return None
 
-        total_weight = sum(entry["weight"] for entry in pool)
-        if total_weight <= 0:
-            return None
-
-        # Weighted random pick
-        pick = random.random() * total_weight
-        cumulative = 0.0
-        chosen = None
-        for entry in pool:
-            cumulative += entry["weight"]
-            if pick <= cumulative:
-                chosen = entry
-                break
-
-        if chosen is None:
-            chosen = pool[-1]
-
-        # Roll comprehension for the chosen skill
-        actual_rate = base_rate * chosen["weight"]
+        # Uniform selection: every pool entry has the same chance to be drawn.
+        chosen = random.choice(pool)
+        coefficient = chosen.get("coefficient", 1.0)
+        actual_rate = base_rate * coefficient
         if random.random() < actual_rate:
             return chosen
         return None
@@ -147,25 +122,64 @@ class SkillManager:
     def roll_breakthrough_success_comprehension(self, player: "Player") -> dict | None:
         """Comprehension roll on breakthrough success.
 
+        With an equipped heart method: first roll the heart-method pool +
+        study target. If a skill is learned, an independent 5% roll decides
+        whether the result is replaced by a universal-pool skill.
+        Without a heart method, the normal pool is empty and the universal
+        fallback is handled by ``roll_universal_pool_breakthrough``.
+
         Returns the learned skill definition (from skills_data) or None.
         """
+        if not player.main_technique:
+            return None
+
         base_rate = self._skill_cfg.get("breakthrough_success_learn_rate", 0.20)
         pool = self._build_comprehension_pool(player, "breakthrough_success")
         chosen = self._roll_comprehension(pool, base_rate)
         if chosen is None:
             return None
+
+        universal_rate = self._skill_cfg.get("universal_pool_rate", 0.05)
+        if random.random() < universal_rate:
+            universal_skill = self._pick_universal_skill(player)
+            if universal_skill:
+                return self._resolve_and_learn(
+                    player,
+                    {
+                        "skill_id": universal_skill["id"],
+                        "source": "universal",
+                    },
+                )
+
         return self._resolve_and_learn(player, chosen)
 
     def roll_breakthrough_fail_comprehension(self, player: "Player") -> dict | None:
         """Comprehension roll on breakthrough failure ("破而后立").
 
-        Returns the learned skill definition or None.
+        Uses the same pool rules as ``roll_breakthrough_success_comprehension``
+        with the fail base rate.
         """
+        if not player.main_technique:
+            return None
+
         base_rate = self._skill_cfg.get("breakthrough_fail_learn_rate", 0.10)
         pool = self._build_comprehension_pool(player, "breakthrough_fail")
         chosen = self._roll_comprehension(pool, base_rate)
         if chosen is None:
             return None
+
+        universal_rate = self._skill_cfg.get("universal_pool_rate", 0.05)
+        if random.random() < universal_rate:
+            universal_skill = self._pick_universal_skill(player)
+            if universal_skill:
+                return self._resolve_and_learn(
+                    player,
+                    {
+                        "skill_id": universal_skill["id"],
+                        "source": "universal",
+                    },
+                )
+
         return self._resolve_and_learn(player, chosen)
 
     def roll_cultivation_comprehension(
@@ -203,32 +217,43 @@ class SkillManager:
         When player has no heart method equipped, the normal comprehension
         pool is empty. This method provides the 3% fallback (design D4).
         Called separately from the main comprehension roll.
+
+        The ``success`` parameter is kept for API compatibility but the rate
+        is always ``universal_pool_no_heart_rate`` (3%) when no heart
+        method is equipped.
         """
         if player.main_technique:
             return None  # Has heart method, use normal pool
 
-        rate_key = "universal_pool_rate" if success else "universal_pool_no_heart_rate"
-        # For success: 5% from universal pool; for fail: 3% independent
-        base_rate = self._skill_cfg.get(rate_key, 0.05 if success else 0.03)
+        base_rate = self._skill_cfg.get("universal_pool_no_heart_rate", 0.03)
 
-        universal_skills = [
-            skill
-            for skill in self.config_manager.skills_data.values()
-            if skill.get("_group") == "通用功法池"
-        ]
-        if not universal_skills:
-            return None
-
-        chosen_def = random.choice(universal_skills)
-        skill_id = chosen_def.get("id")
-        if not skill_id or self._is_skill_learned(player, skill_id):
+        universal_skill = self._pick_universal_skill(player)
+        if universal_skill is None:
             return None
 
         if random.random() < base_rate:
             return self._resolve_and_learn(
-                player, {"skill_id": skill_id, "source": "universal_fallback"}
+                player,
+                {"skill_id": universal_skill["id"], "source": "universal_fallback"},
             )
         return None
+
+    def _pick_universal_skill(self, player: "Player") -> dict | None:
+        """Pick a random unlearned skill from the universal pool.
+
+        Returns the skill definition or None if all universal skills are
+        already learned or the pool is empty.
+        """
+        universal_skills = [
+            skill
+            for skill in self.config_manager.skills_data.values()
+            if skill.get("_group") == "通用功法池"
+            and skill.get("id")
+            and not self._is_skill_learned(player, skill["id"])
+        ]
+        if not universal_skills:
+            return None
+        return random.choice(universal_skills)
 
     # ------------------------------------------------------------------
     # Learn / star-up logic
@@ -476,9 +501,11 @@ class SkillManager:
                 for ts in weapon_def.get("trigger_skills", []):
                     loadout["trigger_skills"].append(ts)
 
-        # Armor
+        # Armor (from items.json or weapons.json)
         if player.armor:
-            armor_def = self.config_manager.weapons_data.get(player.armor)
+            armor_def = self.config_manager.items_data.get(player.armor)
+            if not armor_def:
+                armor_def = self.config_manager.weapons_data.get(player.armor)
             if armor_def:
                 loadout["armor_value"] += armor_def.get("armor_value", 0)
 
