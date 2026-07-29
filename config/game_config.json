@@ -20,7 +20,7 @@
         "universal_pool_rate": 0.05,
         "universal_pool_no_heart_rate": 0.03,
         "random_growth_step": 5,
-        "max_technique_slots": 3,
+        "max_technique_slots": 4,
         "battle_report_merge_count": 10,
         "comment": "技能系统：领悟概率、通用池概率、成长步长"
     },

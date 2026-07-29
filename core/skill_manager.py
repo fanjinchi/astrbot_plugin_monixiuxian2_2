@@ -454,7 +454,7 @@ class SkillManager:
             return False, f"功法【{technique_name}】尚未领悟，无法装备"
 
         techniques_list = player.get_techniques_list()
-        max_slots = self._skill_cfg.get("max_technique_slots", 3)
+        max_slots = self._skill_cfg.get("max_technique_slots", 4)
         if len(techniques_list) >= max_slots:
             return False, f"功法栏已满（最多{max_slots}个），请先卸下其他功法"
 
