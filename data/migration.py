@@ -12,7 +12,7 @@ from astrbot.api import logger
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 24  # v24: 补齐 players.spiritual_root 字段
+LATEST_DB_VERSION = 25  # v25: 技能领悟持久化到 player_skills，players 移除 learned_skills
 
 MIGRATION_TASKS: dict[
     int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]
@@ -821,7 +821,7 @@ async def _create_all_tables_v22(conn: aiosqlite.Connection):
             main_technique TEXT NOT NULL DEFAULT '',
             techniques TEXT NOT NULL DEFAULT '[]',
 
-            learned_skills TEXT NOT NULL DEFAULT '[]',
+            -- 功法领悟修习目标（已领悟技能存 player_skills 表）
             study_target TEXT NOT NULL DEFAULT '',
             battle_report_merge_count INTEGER NOT NULL DEFAULT 0,
 
@@ -1126,6 +1126,21 @@ async def _create_all_tables_v22(conn: aiosqlite.Connection):
         )
     """)
 
+    # player_skills 表：独立存储玩家已领悟技能与星级
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS player_skills (
+            user_id TEXT NOT NULL,
+            skill_id TEXT NOT NULL,
+            star_level INTEGER NOT NULL DEFAULT 1,
+            source TEXT NOT NULL DEFAULT '',
+            learned_at INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, skill_id)
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_player_skills_user ON player_skills(user_id)"
+    )
+
     # 系统配置表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS system_config (
@@ -1182,7 +1197,7 @@ async def _create_all_tables_v22(conn: aiosqlite.Connection):
             eye,
         )
 
-    logger.info("数据库表已创建完成（v22 - 四主属性框架）")
+    logger.info("数据库表已创建完成（v25 - 技能领悟持久化）")
 
 
 async def _create_all_tables_v21(conn: aiosqlite.Connection):
@@ -1335,6 +1350,97 @@ async def _migrate_to_v24(conn: aiosqlite.Connection, config_manager: ConfigMana
 
     await conn.commit()
     logger.info("v24迁移完成：spiritual_root 字段已补齐")
+
+
+@migration(25)
+async def _migrate_to_v25(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """迁移到v25 - 技能领悟持久化到 player_skills 表，players 移除 learned_skills。"""
+    logger.info("开始迁移到v25：技能领悟持久化")
+
+    # 1. 创建 player_skills 表
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS player_skills (
+            user_id TEXT NOT NULL,
+            skill_id TEXT NOT NULL,
+            star_level INTEGER NOT NULL DEFAULT 1,
+            source TEXT NOT NULL DEFAULT '',
+            learned_at INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, skill_id)
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_player_skills_user ON player_skills(user_id)"
+    )
+    logger.info("已创建 player_skills 表")
+
+    # 2. 移除 players 表的 learned_skills 列（如 SQLite 版本不支持 DROP COLUMN 则重建表）
+    async with conn.execute("PRAGMA table_info(players)") as cursor:
+        columns = {row[1] for row in await cursor.fetchall()}
+
+    if "learned_skills" in columns:
+        try:
+            await conn.execute("ALTER TABLE players DROP COLUMN learned_skills")
+            logger.info("已移除 players.learned_skills 列")
+        except Exception:
+            logger.info("SQLite 不支持 DROP COLUMN，将重建 players 表...")
+            columns_to_keep = columns - {"learned_skills"}
+            columns_str = ", ".join(columns_to_keep)
+
+            await conn.execute("""
+                CREATE TABLE players_new (
+                    user_id TEXT PRIMARY KEY,
+                    user_name TEXT NOT NULL DEFAULT '',
+                    level_index INTEGER NOT NULL DEFAULT 0,
+                    spiritual_root TEXT NOT NULL DEFAULT '未知',
+                    cultivation_type TEXT NOT NULL DEFAULT '灵修',
+                    lifespan INTEGER NOT NULL DEFAULT 100,
+                    experience INTEGER NOT NULL DEFAULT 0,
+                    gold INTEGER NOT NULL DEFAULT 0,
+                    state TEXT NOT NULL DEFAULT '空闲',
+                    cultivation_start_time INTEGER NOT NULL DEFAULT 0,
+                    last_check_in_date TEXT NOT NULL DEFAULT '',
+                    level_up_rate INTEGER NOT NULL DEFAULT 0,
+                    damage INTEGER NOT NULL DEFAULT 10,
+                    agility INTEGER NOT NULL DEFAULT 5,
+                    speed INTEGER NOT NULL DEFAULT 5,
+                    hp INTEGER NOT NULL DEFAULT 100,
+                    armor_value INTEGER NOT NULL DEFAULT 0,
+                    weapon TEXT NOT NULL DEFAULT '',
+                    armor TEXT NOT NULL DEFAULT '',
+                    main_technique TEXT NOT NULL DEFAULT '',
+                    techniques TEXT NOT NULL DEFAULT '[]',
+                    study_target TEXT NOT NULL DEFAULT '',
+                    battle_report_merge_count INTEGER NOT NULL DEFAULT 0,
+                    sect_id INTEGER NOT NULL DEFAULT 0,
+                    sect_position INTEGER NOT NULL DEFAULT 4,
+                    sect_contribution INTEGER NOT NULL DEFAULT 0,
+                    sect_task INTEGER NOT NULL DEFAULT 0,
+                    sect_elixir_get INTEGER NOT NULL DEFAULT 0,
+                    blessed_spot_flag INTEGER NOT NULL DEFAULT 0,
+                    blessed_spot_name TEXT NOT NULL DEFAULT '',
+                    active_pill_effects TEXT NOT NULL DEFAULT '[]',
+                    permanent_pill_gains TEXT NOT NULL DEFAULT '{}',
+                    has_resurrection_pill INTEGER NOT NULL DEFAULT 0,
+                    has_debuff_shield INTEGER NOT NULL DEFAULT 0,
+                    pills_inventory TEXT NOT NULL DEFAULT '{}',
+                    storage_ring TEXT NOT NULL DEFAULT '基础储物戒',
+                    storage_ring_items TEXT NOT NULL DEFAULT '{}',
+                    daily_pill_usage TEXT NOT NULL DEFAULT '{}',
+                    last_daily_reset TEXT NOT NULL DEFAULT ''
+                )
+            """)
+            await conn.execute(f"""
+                INSERT INTO players_new ({columns_str})
+                SELECT {columns_str} FROM players
+            """)
+            await conn.execute("DROP TABLE players")
+            await conn.execute("ALTER TABLE players_new RENAME TO players")
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_player_level ON players(level_index)"
+            )
+            logger.info("已重建 players 表并移除 learned_skills 列")
+
+    logger.info("v25迁移完成：技能领悟已持久化到 player_skills 表")
 
 
 @migration(21)
