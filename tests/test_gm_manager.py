@@ -208,6 +208,39 @@ class TestSetNumericAttributes:
         assert player.hp == 500
 
     @pytest.mark.asyncio
+    async def test_set_mp_maps_to_speed(self, gm_manager, mock_db):
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_set_mp(event, "500")
+
+        assert success is True
+        assert player.speed == 500
+
+    @pytest.mark.asyncio
+    async def test_set_atk_maps_to_damage(self, gm_manager, mock_db):
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_set_atk(event, "999")
+
+        assert success is True
+        assert player.damage == 999
+
+    @pytest.mark.asyncio
+    async def test_set_mental_power_maps_to_agility(self, gm_manager, mock_db):
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_set_mental_power(event, "123")
+
+        assert success is True
+        assert player.agility == 123
+
+    @pytest.mark.asyncio
     async def test_set_gold_with_at_mention(self, gm_manager, mock_db):
         player = make_player(user_id="88888")
         mock_db.get_player_by_id.return_value = player
@@ -221,7 +254,38 @@ class TestSetNumericAttributes:
         assert player.gold == 9999
 
 
-class TestGiveItems:
+    @pytest.mark.asyncio
+    async def test_set_mp_maps_to_speed(self, gm_manager, mock_db):
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_set_mp(event, "500")
+
+        assert success is True
+        assert player.speed == 500
+
+    @pytest.mark.asyncio
+    async def test_set_atk_maps_to_damage(self, gm_manager, mock_db):
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_set_atk(event, "999")
+
+        assert success is True
+        assert player.damage == 999
+
+    @pytest.mark.asyncio
+    async def test_set_mental_power_maps_to_agility(self, gm_manager, mock_db):
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_set_mental_power(event, "123")
+
+        assert success is True
+        assert player.agility == 123
     @pytest.mark.asyncio
     async def test_give_equipment_to_storage_ring(
         self, gm_manager, mock_db, mock_managers

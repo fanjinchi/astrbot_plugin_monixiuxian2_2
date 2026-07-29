@@ -264,9 +264,9 @@ class GMManager:
             "  设置修为 [@玩家/ID] <数值>\n"
             "  设置灵石 [@玩家/ID] <数值>\n"
             "  设置气血 [@玩家/ID] <数值>\n"
-            "  设置真元 [@玩家/ID] <数值>\n"
-            "  设置攻击 [@玩家/ID] <数值>\n"
-            "  设置精神力 [@玩家/ID] <数值>\n"
+            "  设置真元 [@玩家/ID] <数值> （映射为迅捷）\n"
+            "  设置攻击 [@玩家/ID] <数值> （映射为伤害）\n"
+            "  设置精神力 [@玩家/ID] <数值> （映射为身法）\n"
             "\n"
             "🎒 装备物品\n"
             "  给予装备 [@玩家/ID] <物品名> [数量]\n"
@@ -368,19 +368,20 @@ class GMManager:
     async def cmd_set_mp(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
-        return await self._set_numeric_attr(event, args, "真元", "mp", "真元")
+        # 真元字段已废弃，映射到迅捷以保持 GM 工具可用。
+        return await self._set_numeric_attr(event, args, "真元", "speed", "真元")
 
     async def cmd_set_atk(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
-        return await self._set_numeric_attr(event, args, "攻击", "atk", "攻击")
+        # 攻击字段已废弃，映射到伤害。
+        return await self._set_numeric_attr(event, args, "攻击", "damage", "攻击")
 
     async def cmd_set_mental_power(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
-        return await self._set_numeric_attr(
-            event, args, "精神力", "mental_power", "精神力"
-        )
+        # 精神力字段已废弃，映射到身法。
+        return await self._set_numeric_attr(event, args, "精神力", "agility", "精神力")
 
     async def cmd_give_equipment(
         self, event: "AstrMessageEvent", args: str

@@ -95,7 +95,7 @@ class Player:
     """Player data model - new four-main-attribute framework"""
 
     user_id: str
-    level_index: int = 0
+    level_index: int = 1
     spiritual_root: str = "未知"
     cultivation_type: str = "灵修"  # 灵修 or 体修
     user_name: str = ""  # Dao name
@@ -301,5 +301,8 @@ class Player:
             )
             total["speed"] = int(total["speed"] * pill_multipliers.get("speed", 1.0))
             total["hp"] = int(total["hp"] * pill_multipliers.get("hp", 1.0))
+            total["armor_value"] = int(
+                total["armor_value"] * pill_multipliers.get("armor_value", 1.0)
+            )
 
         return total

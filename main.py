@@ -227,19 +227,7 @@ class XiuXianPlugin(Star):
         db_path = plugin_data_path / db_filename
         self.db = DataBase(str(db_path))
 
-        self.misc_handler = MiscHandler(self.db)
-        self.player_handler = PlayerHandler(
-            self.db, self.config, self.config_manager, self.skill_manager
-        )
-        self.equipment_handler = EquipmentHandler(self.db, self.config_manager)
-        self.breakthrough_handler = BreakthroughHandler(
-            self.db, self.config_manager, self.config, self.skill_manager
-        )
-        self.pill_handler = PillHandler(self.db, self.config_manager)
-        self.shop_handler = ShopHandler(self.db, self.config, self.config_manager)
-        self.storage_ring_handler = StorageRingHandler(self.db, self.config_manager)
-
-        # 初始化核心管理器
+        # 初始化核心管理器（需在业务处理器之前）
         from .core import (
             EquipmentManager,
             GMManager,
@@ -252,6 +240,20 @@ class XiuXianPlugin(Star):
         self.equipment_mgr = EquipmentManager(
             self.db, self.config_manager, self.storage_ring_mgr
         )
+
+        self.misc_handler = MiscHandler(self.db)
+        self.player_handler = PlayerHandler(
+            self.db, self.config, self.config_manager, self.skill_manager
+        )
+        self.equipment_handler = EquipmentHandler(
+            self.db, self.config_manager, self.skill_manager
+        )
+        self.breakthrough_handler = BreakthroughHandler(
+            self.db, self.config_manager, self.config, self.skill_manager
+        )
+        self.pill_handler = PillHandler(self.db, self.config_manager)
+        self.shop_handler = ShopHandler(self.db, self.config, self.config_manager)
+        self.storage_ring_handler = StorageRingHandler(self.db, self.config_manager)
 
         # Phase 2: 灵石银行和悬赏令（GMManager 依赖 bounty_mgr，需提前初始化）
         self.bank_mgr = BankManager(self.db, self.config)

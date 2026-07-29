@@ -162,23 +162,50 @@ def test_random_growth_attribute_selection():
     assert selected in attrs
 
 
-def test_breakthrough_success_comprehension_called(mgr):
-    """roll_breakthrough_success_comprehension builds pool with heart method."""
+def test_new_player_starts_at_level_one():
+    """Newly generated players must start at level 1 (练气一阶 / 锻体一阶)."""
+    from tests.helpers import load_package_module
+
+    _cult_mod = load_package_module(
+        "core/cultivation_manager.py",
+        "astrbot_plugin_monixiuxian2_2.core.cultivation_manager",
+    )
+    CultivationManager = _cult_mod.CultivationManager
+
+    class DummyConfig:
+        def get(self, key, default=None):
+            if key == "VALUES":
+                return {"INITIAL_GOLD": 100}
+            return default
+
+        def __getitem__(self, key):
+            return self.get(key)
+
+    mgr = CultivationManager(DummyConfig(), FakeConfigManager())
+    player = mgr.generate_new_player_stats("u1", cultivation_type="灵修")
+    assert player.level_index == 1
+
+    player_body = mgr.generate_new_player_stats("u2", cultivation_type="体修")
+    assert player_body.level_index == 1
+
+
+def test_breakthrough_success_comprehension_pool(mgr):
+    """Breakthrough success pool contains heart-method pool + study target."""
     player = FakePlayer(main_technique="长春功", study_target="spirit_001")
     pool = mgr._build_comprehension_pool(player, "breakthrough_success")
     skill_ids = {e["skill_id"] for e in pool}
     assert "common_001" in skill_ids  # from heart method pool
     assert "spirit_001" in skill_ids  # study target
-    assert any(e["source"] == "universal" for e in pool)
+    assert not any(e["source"] == "universal" for e in pool)
 
 
 def test_breakthrough_fail_comprehension_pool(mgr):
-    """roll_breakthrough_fail_comprehension uses same pool rules as success."""
+    """Breakthrough fail pool uses same rules as success and excludes universal."""
     player = FakePlayer(main_technique="长春功", study_target="spirit_001")
     pool = mgr._build_comprehension_pool(player, "breakthrough_fail")
     skill_ids = {e["skill_id"] for e in pool}
     assert "common_001" in skill_ids
-    assert any(e["source"] == "universal" for e in pool)
+    assert not any(e["source"] == "universal" for e in pool)
 
 
 def test_universal_pool_no_heart_method(mgr):

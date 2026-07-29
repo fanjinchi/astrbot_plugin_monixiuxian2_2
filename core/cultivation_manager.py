@@ -343,6 +343,7 @@ class CultivationManager:
         if cultivation_type == "灵修":
             return Player(
                 user_id=user_id,
+                level_index=1,
                 spiritual_root=f"{root}灵根",
                 cultivation_type="灵修",
                 lifespan=100,
@@ -357,6 +358,7 @@ class CultivationManager:
         else:  # 体修
             return Player(
                 user_id=user_id,
+                level_index=1,
                 spiritual_root=f"{root}灵根",
                 cultivation_type="体修",
                 lifespan=random.randint(50, 100),

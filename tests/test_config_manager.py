@@ -37,12 +37,13 @@ def test_config_manager_loads_weapon_coefficient_k(config_manager):
 
 
 def test_skill_manager_works_with_flattened_skills(config_manager):
-    """SkillManager must find universal skills after config flattening."""
+    """SkillManager must not mix universal skills into the main pool."""
     mgr = SkillManager(config_manager)
 
     class FakePlayer:
         main_technique = ""
         study_target = ""
+        learned_skills = "[]"
 
         def get_techniques_list(self):
             return []
@@ -50,5 +51,20 @@ def test_skill_manager_works_with_flattened_skills(config_manager):
         def get_learned_skills(self):
             return []
 
+        def set_learned_skills(self, skills):
+            self.learned_skills = skills
+
     pool = mgr._build_comprehension_pool(FakePlayer(), "breakthrough_success")
-    assert any(entry["source"] == "universal" for entry in pool)
+    assert not any(entry["source"] == "universal" for entry in pool)
+
+    # Universal fallback is provided separately for breakthrough without heart method.
+    import random as _random
+
+    original_random = _random.random
+    try:
+        _random.random = lambda: 0.01  # below 3% fallback rate
+        result = mgr.roll_universal_pool_breakthrough(FakePlayer(), success=True)
+        if result is not None:
+            assert "id" in result
+    finally:
+        _random.random = original_random

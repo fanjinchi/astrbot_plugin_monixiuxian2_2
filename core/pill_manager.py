@@ -587,26 +587,29 @@ class PillManager:
         effects = player.get_active_pill_effects()
         current_time = int(time.time())
         multipliers = {
-            "physical_damage": 1.0,
-            "magic_damage": 1.0,
-            "physical_defense": 1.0,
-            "magic_defense": 1.0,
+            "damage": 1.0,
+            "agility": 1.0,
+            "speed": 1.0,
+            "hp": 1.0,
+            "armor_value": 1.0,
             "cultivation_speed": 1.0,
         }
 
-        # 累加临时效果
+        # 累加临时效果（旧键映射到四主属性新键）
         for effect in effects:
             expiry_time = effect.get("expiry_time", 0)
             if expiry_time > 0 and current_time >= expiry_time:
                 continue
-            if "physical_damage_multiplier" in effect:
-                multipliers["physical_damage"] += effect["physical_damage_multiplier"]
-            if "magic_damage_multiplier" in effect:
-                multipliers["magic_damage"] += effect["magic_damage_multiplier"]
-            if "physical_defense_multiplier" in effect:
-                multipliers["physical_defense"] += effect["physical_defense_multiplier"]
-            if "magic_defense_multiplier" in effect:
-                multipliers["magic_defense"] += effect["magic_defense_multiplier"]
+            damage_mult = effect.get("physical_damage_multiplier", 0.0) + effect.get(
+                "magic_damage_multiplier", 0.0
+            )
+            if damage_mult:
+                multipliers["damage"] += damage_mult
+            armor_mult = effect.get("physical_defense_multiplier", 0.0) + effect.get(
+                "magic_defense_multiplier", 0.0
+            )
+            if armor_mult:
+                multipliers["armor_value"] += armor_mult
             if "cultivation_multiplier" in effect:
                 multipliers["cultivation_speed"] += effect["cultivation_multiplier"]
 
