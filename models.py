@@ -109,6 +109,9 @@ class Player:
     last_check_in_date: str = ""  # YYYY-MM-DD
     level_up_rate: int = 0  # Breakthrough success rate bonus
 
+    # Breakthrough fail-streak pity counter
+    breakthrough_fail_streak: int = 0  # Consecutive failures without death
+
     # Equipment slots
     weapon: str = ""  # Weapon name
     armor: str = ""  # Armor name

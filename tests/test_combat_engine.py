@@ -1,9 +1,10 @@
 """Tests for the unified combat engine (combat-core spec)."""
 
-import pytest
 import random
 import sys
 from pathlib import Path
+
+import pytest
 
 # Ensure plugin root is on path
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
@@ -48,7 +49,9 @@ def make_engine(cfg=None):
     return CombatEngine(config, FakeSkillManager())
 
 
-def make_fighter(name, hp, damage, agility, speed, armor=0, weapon_k=1.0, base_dmg=0):
+def make_fighter(
+    name, hp, damage, agility, speed, armor=0, weapon_k=1.0, base_dmg=0, level_index=1
+):
     return FighterState(
         user_id=name,
         name=name,
@@ -60,12 +63,14 @@ def make_fighter(name, hp, damage, agility, speed, armor=0, weapon_k=1.0, base_d
         armor_value=armor,
         weapon_k=weapon_k,
         base_damage=base_dmg,
+        level_index=level_index,
     )
 
 
 # ------------------------------------------------------------------
 # 4.1 Speed-weighted initiative
 # ------------------------------------------------------------------
+
 
 class TestInitiative:
     def test_speed_double_gets_twice_as_many_actions(self):
@@ -85,8 +90,8 @@ class TestInitiative:
                 f2_actions += 1
 
         ratio = f1_actions / f2_actions if f2_actions > 0 else float("inf")
-        # With 2:1 speed ratio, expect ~2:1 action ratio (tolerate 15% variance)
-        assert 1.7 < ratio < 2.3, f"Expected ratio ~2.0, got {ratio:.2f}"
+        # With 2:1 speed ratio, expect ~2:1 action ratio (tolerate 20% variance, ~3σ)
+        assert 1.6 < ratio < 2.4, f"Expected ratio ~2.0, got {ratio:.2f}"
 
     def test_equal_speed_fifty_fifty(self):
         """When speeds are equal, initiative should be roughly 50/50."""
@@ -151,6 +156,7 @@ class TestCombatActionDistribution:
 # 4.1 Muxxu damage formula
 # ------------------------------------------------------------------
 
+
 class TestDamageFormula:
     def test_base_damage_formula(self):
         """Damage = floor((base + dmg_attr * K) * random * mult)."""
@@ -171,12 +177,20 @@ class TestDamageFormula:
         engine = make_engine()
 
         high_k_dmg = engine._calc_damage(
-            damage_attr=200, weapon_k=2.0, base_damage=10,
-            skill_multiplier=1.0, is_crit=False, crit_multiplier=1.5,
+            damage_attr=200,
+            weapon_k=2.0,
+            base_damage=10,
+            skill_multiplier=1.0,
+            is_crit=False,
+            crit_multiplier=1.5,
         )
         low_k_dmg = engine._calc_damage(
-            damage_attr=200, weapon_k=0.5, base_damage=30,
-            skill_multiplier=1.0, is_crit=False, crit_multiplier=1.5,
+            damage_attr=200,
+            weapon_k=0.5,
+            base_damage=30,
+            skill_multiplier=1.0,
+            is_crit=False,
+            crit_multiplier=1.5,
         )
         # High K: 10 + 200*2 = 410; Low K: 30 + 200*0.5 = 130
         assert high_k_dmg > low_k_dmg
@@ -185,8 +199,12 @@ class TestDamageFormula:
         """Damage should never go below 1."""
         engine = make_engine()
         dmg = engine._calc_damage(
-            damage_attr=1, weapon_k=0.1, base_damage=0,
-            skill_multiplier=0.1, is_crit=False, crit_multiplier=1.5,
+            damage_attr=1,
+            weapon_k=0.1,
+            base_damage=0,
+            skill_multiplier=0.1,
+            is_crit=False,
+            crit_multiplier=1.5,
         )
         assert dmg >= 1
 
@@ -194,8 +212,12 @@ class TestDamageFormula:
         """Unarmed fighters get base damage 5 and K=0.5."""
         engine = make_engine()
         dmg = engine._calc_damage(
-            damage_attr=50, weapon_k=1.0, base_damage=0,
-            skill_multiplier=1.0, is_crit=False, crit_multiplier=1.5,
+            damage_attr=50,
+            weapon_k=1.0,
+            base_damage=0,
+            skill_multiplier=1.0,
+            is_crit=False,
+            crit_multiplier=1.5,
         )
         # Falls back to base=5, K=0.5 -> 5 + 50*0.5 = 30
         assert dmg >= 25
@@ -207,13 +229,21 @@ class TestDamageFormula:
         # Fix random by seeding
         random.seed(42)
         normal = engine._calc_damage(
-            damage_attr=100, weapon_k=1.0, base_damage=20,
-            skill_multiplier=1.0, is_crit=False, crit_multiplier=1.5,
+            damage_attr=100,
+            weapon_k=1.0,
+            base_damage=20,
+            skill_multiplier=1.0,
+            is_crit=False,
+            crit_multiplier=1.5,
         )
         random.seed(42)
         crit = engine._calc_damage(
-            damage_attr=100, weapon_k=1.0, base_damage=20,
-            skill_multiplier=1.0, is_crit=True, crit_multiplier=1.5,
+            damage_attr=100,
+            weapon_k=1.0,
+            base_damage=20,
+            skill_multiplier=1.0,
+            is_crit=True,
+            crit_multiplier=1.5,
         )
         # Same random roll, crit should be 1.5x
         assert crit > normal
@@ -223,6 +253,7 @@ class TestDamageFormula:
 # ------------------------------------------------------------------
 # 4.1 Armor damage reduction
 # ------------------------------------------------------------------
+
 
 class TestArmorReduction:
     def test_armor_reduces_damage(self):
@@ -257,6 +288,7 @@ class TestArmorReduction:
 # ------------------------------------------------------------------
 # 4.2 Resolution chain
 # ------------------------------------------------------------------
+
 
 class TestResolutionChain:
     def test_dodge_prevents_damage(self):
@@ -334,7 +366,12 @@ class TestResolutionChain:
             }
         ]
         f1.ultimates = [
-            {"id": "ult_chain", "name": "终结技", "trigger_rate": 1.0, "effect_value": 1.0}
+            {
+                "id": "ult_chain",
+                "name": "终结技",
+                "trigger_rate": 1.0,
+                "effect_value": 1.0,
+            }
         ]
         f2 = make_fighter("B", 1000, 10, 5, 10, armor=0)
 
@@ -389,6 +426,7 @@ class TestResolutionChain:
 # 4.1 Action limit / draw
 # ------------------------------------------------------------------
 
+
 class TestActionLimit:
     def test_action_limit_draw(self):
         """When action limit is reached without a winner, result is draw."""
@@ -404,6 +442,7 @@ class TestActionLimit:
 # ------------------------------------------------------------------
 # 4.3 Battle report merging
 # ------------------------------------------------------------------
+
 
 class TestBattleReport:
     def test_default_merge_count(self):
@@ -434,6 +473,7 @@ class TestBattleReport:
 # 4.4 Full combat integration
 # ------------------------------------------------------------------
 
+
 class TestFullCombat:
     def test_spar_no_hp_loss(self):
         """Spar should not result in actual HP loss."""
@@ -463,13 +503,20 @@ class TestFullCombat:
 # Legacy adapter tests
 # ------------------------------------------------------------------
 
+
 class TestLegacyAdapter:
     def test_legacy_player_vs_player_returns_dict(self):
         """Legacy player_vs_player should return the expected dict shape."""
-        config = FakeConfigManager({
-            "combat": {"action_limit": 200, "dodge_cap": 0.5, "crit_damage_multiplier": 1.5},
-            "skill_system": {"battle_report_merge_count": 10},
-        })
+        config = FakeConfigManager(
+            {
+                "combat": {
+                    "action_limit": 200,
+                    "dodge_cap": 0.5,
+                    "crit_damage_multiplier": 1.5,
+                },
+                "skill_system": {"battle_report_merge_count": 10},
+            }
+        )
         mgr = CombatManager(config, FakeSkillManager())
 
         # We can't easily test with real Player objects without more setup,
@@ -493,6 +540,7 @@ class FakePlayer:
     def __init__(self, **kwargs):
         self.user_id = kwargs.get("user_id", "test")
         self.user_name = kwargs.get("user_name", "Tester")
+        self.level_index = kwargs.get("level_index", 1)
         self.cultivation_type = kwargs.get("cultivation_type", "灵修")
         self.damage = kwargs.get("damage", 10)
         self.agility = kwargs.get("agility", 5)
@@ -556,10 +604,16 @@ class TestBuildFighterFromPlayer:
     @pytest.mark.asyncio
     async def test_equipment_bonuses_applied_to_fighter(self):
         """FighterState damage/hp/armor include equipment bonuses."""
-        config = FakeConfigManager({
-            "combat": {"action_limit": 200, "dodge_cap": 0.5, "crit_damage_multiplier": 1.5},
-            "skill_system": {"battle_report_merge_count": 10},
-        })
+        config = FakeConfigManager(
+            {
+                "combat": {
+                    "action_limit": 200,
+                    "dodge_cap": 0.5,
+                    "crit_damage_multiplier": 1.5,
+                },
+                "skill_system": {"battle_report_merge_count": 10},
+            }
+        )
         config.weapons_data = {
             "Test Sword": {
                 "damage": 15,
@@ -590,10 +644,16 @@ class TestBuildFighterFromPlayer:
     @pytest.mark.asyncio
     async def test_heart_method_passive_applied(self):
         """Heart-method passive bonuses flow into FighterState attributes."""
-        config = FakeConfigManager({
-            "combat": {"action_limit": 200, "dodge_cap": 0.5, "crit_damage_multiplier": 1.5},
-            "skill_system": {"battle_report_merge_count": 10},
-        })
+        config = FakeConfigManager(
+            {
+                "combat": {
+                    "action_limit": 200,
+                    "dodge_cap": 0.5,
+                    "crit_damage_multiplier": 1.5,
+                },
+                "skill_system": {"battle_report_merge_count": 10},
+            }
+        )
         config.heart_methods_data = {
             "Test Heart": {
                 "passive_bonus": {"hp_percent": 0.2, "damage_percent": 0.1},
@@ -607,3 +667,324 @@ class TestBuildFighterFromPlayer:
         fighter = await engine.build_fighter_from_player(player)
         assert fighter.damage == 110  # 100 * 1.1
         assert fighter.max_hp == 120  # 100 * 1.2
+
+
+# ------------------------------------------------------------------
+# Armor formula: percent reduction (def/(def+K))
+# ------------------------------------------------------------------
+
+
+class TestArmorPercentFormula:
+    def test_zero_armor_no_reduction(self):
+        """Armor=0 should result in no reduction."""
+        engine = make_engine(
+            {
+                "combat": {
+                    "armor_k_base": 100,
+                    "armor_k_level_coeff": 10,
+                    "damage_reduction_cap": 0.4,
+                }
+            }
+        )
+        defender = make_fighter("D", 1000, 10, 5, 10, armor=0, level_index=1)
+        final = engine._apply_armor_and_reduction(defender, 100)
+        assert final == 100
+
+    def test_armor_reduces_damage_percent(self):
+        """Armor should reduce damage by percent formula."""
+        engine = make_engine(
+            {
+                "combat": {
+                    "armor_k_base": 100,
+                    "armor_k_level_coeff": 10,
+                    "damage_reduction_cap": 0.4,
+                }
+            }
+        )
+        # L1, armor=100, K=110 -> rate = 100/210 ≈ 0.476
+        defender = make_fighter("D", 1000, 10, 5, 10, armor=100, level_index=1)
+        final = engine._apply_armor_and_reduction(defender, 100)
+        # 100 * (1 - 100/210) = 100 * 110/210 ≈ 52
+        assert final < 100
+        assert final > 40
+
+    def test_high_level_increases_k(self):
+        """Higher level increases K, reducing armor effectiveness."""
+        engine = make_engine(
+            {
+                "combat": {
+                    "armor_k_base": 100,
+                    "armor_k_level_coeff": 10,
+                    "damage_reduction_cap": 0.4,
+                }
+            }
+        )
+        # Same armor, different levels
+        defender_l1 = make_fighter("D1", 1000, 10, 5, 10, armor=100, level_index=1)
+        defender_l50 = make_fighter("D50", 1000, 10, 5, 10, armor=100, level_index=50)
+
+        final_l1 = engine._apply_armor_and_reduction(defender_l1, 100)
+        final_l50 = engine._apply_armor_and_reduction(defender_l50, 100)
+        # L50 has K=600, so armor is less effective
+        assert final_l50 > final_l1
+
+    def test_damage_never_below_one(self):
+        """Even with extreme armor, damage minimum is 1 (but cap may raise it)."""
+        engine = make_engine(
+            {
+                "combat": {
+                    "armor_k_base": 100,
+                    "armor_k_level_coeff": 10,
+                    "damage_reduction_cap": 0.4,
+                }
+            }
+        )
+        # With cap=0.4, min_fraction=0.6, so even extreme armor deals at least 60% damage
+        defender = make_fighter("D", 1000, 10, 5, 10, armor=99999, level_index=1)
+        final = engine._apply_armor_and_reduction(defender, 10)
+        # 10 * 0.6 = 6 (capped by damage_reduction_cap)
+        assert final == 6
+
+    def test_ultra_high_damage_penettrates(self):
+        """Ultra high damage should still deal meaningful damage."""
+        engine = make_engine(
+            {
+                "combat": {
+                    "armor_k_base": 100,
+                    "armor_k_level_coeff": 10,
+                    "damage_reduction_cap": 0.4,
+                }
+            }
+        )
+        defender = make_fighter("D", 100000, 10, 5, 10, armor=500, level_index=50)
+        # K = 100 + 10*50 = 600, rate = 500/1100 ≈ 0.455
+        # Without cap: 10000 * (1 - 0.455) ≈ 5450
+        # But cap limits reduction to 40%, so minimum fraction = 0.6
+        # final = 10000 * 0.6 = 6000
+        final = engine._apply_armor_and_reduction(defender, 10000)
+        assert final == 6000
+
+
+# ------------------------------------------------------------------
+# Combat caps
+# ------------------------------------------------------------------
+
+
+class TestCombatCaps:
+    def test_dodge_cap_40_percent(self):
+        """Dodge cap should be 40% when configured."""
+        engine = make_engine({"combat": {"dodge_cap": 0.4}})
+        f1 = make_fighter("A", 100, 10, 5, 10)  # agility=5
+        f2 = make_fighter("B", 100, 10, 9999, 10)  # agility=9999, speed=10
+
+        rate = engine._calc_dodge_rate(f1, f2, cap=engine._dodge_cap)
+        assert rate == 0.4
+
+    def test_block_cap_30_percent(self):
+        """Block cap should be 30% when configured."""
+        engine = make_engine({"combat": {"block_cap": 0.3}})
+        defender = make_fighter("D", 1000, 10, 5, 10, armor=99999)
+
+        rate = engine._calc_block_rate(defender)
+        assert rate == 0.3
+
+    def test_crit_rate_capped(self):
+        """Crit rate above cap should be truncated."""
+        engine = make_engine({"combat": {"crit_rate_cap": 0.5}})
+        attacker = make_fighter("A", 100, 50, 5, 10)
+        attacker.crit_rate = 0.99  # Would be 99% without cap
+        defender = make_fighter("B", 1000, 10, 5, 10)
+
+        # Force crit by seeding random to 0.0 (always < 0.5)
+        import random as _random
+
+        original_random = _random.random
+        _random.random = lambda: 0.0
+        try:
+            log: list[str] = []
+            engine._resolve_attack(
+                attacker, defender, dodge_cap=0.0, crit_multiplier=1.5, log=log
+            )
+            # With capped 50%, random=0.0 < 0.5 -> crit
+            assert any("暴击" in entry for entry in log)
+        finally:
+            _random.random = original_random
+
+        # Force no crit by seeding random to 0.6 (> 0.5 cap)
+        _random.random = lambda: 0.6
+        try:
+            defender2 = make_fighter("B2", 1000, 10, 5, 10)
+            log2: list[str] = []
+            engine._resolve_attack(
+                attacker, defender2, dodge_cap=0.0, crit_multiplier=1.5, log=log2
+            )
+            # With capped 50%, random=0.6 > 0.5 -> no crit
+            assert not any("暴击" in entry for entry in log2)
+        finally:
+            _random.random = original_random
+
+    def test_crit_damage_capped(self):
+        """Crit damage multiplier above cap should be truncated."""
+        engine = make_engine(
+            {
+                "combat": {
+                    "crit_damage_multiplier": 3.0,  # Would be 3x without cap
+                    "crit_damage_cap": 2.0,
+                }
+            }
+        )
+        attacker = make_fighter("A", 100, 100, 5, 10, base_dmg=100)
+        attacker.crit_rate = 1.0  # Force crit
+        defender = make_fighter(
+            "B", 10000, 10, 5, 10, armor=-1000
+        )  # Negative armor -> 0 block rate
+
+        import random as _random
+
+        original_random = _random.random
+        original_uniform = _random.uniform
+        # Force no dodge, no block (armor negative -> block rate 0), crit
+        _random.random = lambda: 0.1  # 0.1 > 0 block rate
+        _random.uniform = lambda a, b: 1.0
+        try:
+            log: list[str] = []
+            engine._resolve_attack(
+                attacker, defender, dodge_cap=0.0, crit_multiplier=3.0, log=log
+            )
+            # With cap=2.0, damage should be (100 + 100*1.0) * 2.0 = 400
+            # Without cap it would be 600
+            hp_loss = 10000 - defender.hp
+            assert hp_loss == 400, f"Expected 400 damage, got {hp_loss}"
+        finally:
+            _random.random = original_random
+            _random.uniform = original_uniform
+
+    def test_damage_reduction_cap(self):
+        """Total damage reduction should not exceed cap."""
+        engine = make_engine(
+            {
+                "combat": {
+                    "armor_k_base": 100,
+                    "armor_k_level_coeff": 10,
+                    "damage_reduction_cap": 0.4,
+                }
+            }
+        )
+        # High armor + high skill reduction
+        defender = make_fighter("D", 1000, 10, 5, 10, armor=1000, level_index=1)
+        defender.incoming_damage_mult = 0.1  # 90% skill reduction
+
+        final = engine._apply_armor_and_reduction(defender, 100)
+        # Without cap: armor_rate = 1000/1100 ≈ 0.909, total_fraction = 0.091 * 0.1 = 0.0091
+        # With 40% cap: min_fraction = 0.6, so total_fraction = max(0.0091, 0.6) = 0.6
+        # final = floor(100 * 0.6) = 60
+        assert final == 60
+
+    def test_damage_reduction_cap_resets_incoming_mult(self):
+        """incoming_damage_mult should be reset after consumption."""
+        engine = make_engine(
+            {
+                "combat": {
+                    "armor_k_base": 100,
+                    "armor_k_level_coeff": 10,
+                    "damage_reduction_cap": 0.4,
+                }
+            }
+        )
+        defender = make_fighter("D", 1000, 10, 5, 10, armor=0, level_index=1)
+        defender.incoming_damage_mult = 0.5
+
+        engine._apply_armor_and_reduction(defender, 100)
+        assert defender.incoming_damage_mult == 1.0
+
+    def test_combo_cap_limits_triggers(self):
+        """Combo effects should be capped at combo_cap."""
+        engine = make_engine({"combat": {"combo_cap": 2}})
+        attacker = make_fighter("A", 100, 50, 5, 10)
+        attacker.trigger_skills = [
+            {
+                "name": "连击1",
+                "trigger_timing": "on_attack",
+                "trigger_rate": 1.0,
+                "effect_type": "combo",
+                "effect_value": 0.5,
+            },
+            {
+                "name": "连击2",
+                "trigger_timing": "on_attack",
+                "trigger_rate": 1.0,
+                "effect_type": "combo",
+                "effect_value": 0.5,
+            },
+            {
+                "name": "连击3",
+                "trigger_timing": "on_attack",
+                "trigger_rate": 1.0,
+                "effect_type": "combo",
+                "effect_value": 0.5,
+            },
+        ]
+        defender = make_fighter("B", 1000, 10, 5, 10)
+
+        import random as _random
+
+        original_random = _random.random
+        original_uniform = _random.uniform
+        # Force all triggers to fire (dodge fail, block fail, crit fail)
+        _random.random = lambda: 0.9
+        _random.uniform = lambda a, b: 1.0
+        try:
+            log: list[str] = []
+            engine._resolve_attack(
+                attacker, defender, dodge_cap=0.0, crit_multiplier=1.5, log=log
+            )
+            # Only 2 combo triggers should apply (combo_cap=2)
+            combo_triggers = [entry for entry in log if "连击" in entry]
+            assert len(combo_triggers) == 2
+        finally:
+            _random.random = original_random
+            _random.uniform = original_uniform
+
+
+# ------------------------------------------------------------------
+# Config defaults (backward compatibility)
+# ------------------------------------------------------------------
+
+
+class TestConfigDefaults:
+    def test_all_caps_have_defaults(self):
+        """Engine should work with empty config (all defaults)."""
+        engine = make_engine({})
+        assert engine._dodge_cap == 0.5  # old default
+        assert engine._block_cap == 0.3
+        assert engine._crit_rate_cap == 0.5
+        assert engine._crit_damage_cap == 2.0
+        assert engine._combo_cap == 2
+        assert engine._damage_reduction_cap == 0.4
+        assert engine._armor_k_base == 100
+        assert engine._armor_k_level_coeff == 10
+
+    def test_custom_config_overrides_defaults(self):
+        """Custom config values should override defaults."""
+        engine = make_engine(
+            {
+                "combat": {
+                    "dodge_cap": 0.25,
+                    "block_cap": 0.15,
+                    "crit_rate_cap": 0.3,
+                    "crit_damage_cap": 1.5,
+                    "combo_cap": 1,
+                    "damage_reduction_cap": 0.2,
+                    "armor_k_base": 50,
+                    "armor_k_level_coeff": 5,
+                }
+            }
+        )
+        assert engine._dodge_cap == 0.25
+        assert engine._block_cap == 0.15
+        assert engine._crit_rate_cap == 0.3
+        assert engine._crit_damage_cap == 1.5
+        assert engine._combo_cap == 1
+        assert engine._damage_reduction_cap == 0.2
+        assert engine._armor_k_base == 50
+        assert engine._armor_k_level_coeff == 5

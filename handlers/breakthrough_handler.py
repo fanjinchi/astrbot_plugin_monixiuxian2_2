@@ -104,6 +104,18 @@ class BreakthroughHandler:
         if death_reduce > 0:
             info_lines.append(f"突破死亡概率降低：{death_reduce:.1%}\n")
 
+        # 连败保底信息
+        skill_cfg = self.config_manager.game_config.get("skill_system", {})
+        pity_step = skill_cfg.get("breakthrough_pity_step", 0.05)
+        pity_guarantee = skill_cfg.get("breakthrough_pity_guarantee", 19)
+        streak = player.breakthrough_fail_streak
+        if streak > 0:
+            next_bonus = streak * pity_step
+            remaining = max(0, pity_guarantee - streak)
+            info_lines.append(
+                f"连败加成：+{next_bonus:.0%}（连败{streak}次，再败{remaining}次必成）\n"
+            )
+
         if available_pills:
             info_lines.append("\n【可用破境丹】\n")
             for pill in available_pills:

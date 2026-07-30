@@ -110,6 +110,24 @@ class BreakthroughManager:
                 logger.warning(f"无效的破境丹：{pill_name}")
 
         final_rate = max(0.0, min(final_rate, max_rate))
+
+        # 连败保底加成在丹药 cap 之后叠加（不受 max_rate 限制，上限 100%）
+        skill_cfg = self.config_manager.game_config.get("skill_system", {})
+        pity_step = skill_cfg.get("breakthrough_pity_step", 0.05)
+        pity_guarantee = skill_cfg.get("breakthrough_pity_guarantee", 19)
+
+        if player.breakthrough_fail_streak >= pity_guarantee:
+            final_rate = 1.0
+            info_lines.append(
+                f"连败保底：{player.breakthrough_fail_streak}次失败，天道酬勤，本次必成！"
+            )
+        elif player.breakthrough_fail_streak > 0:
+            pity_bonus = player.breakthrough_fail_streak * pity_step
+            final_rate = min(final_rate + pity_bonus, 1.0)
+            info_lines.append(
+                f"连败加成：+{pity_bonus:.1%}（连败{player.breakthrough_fail_streak}次）"
+            )
+
         info_lines.append(f"最终成功率：{final_rate:.1%}")
         info = "\n".join(info_lines)
 
@@ -154,29 +172,52 @@ class BreakthroughManager:
         next_level_name = next_level_data["level_name"]
 
         if breakthrough_success:
-            # 突破成功 - 提升境界并触发随机成长
+            # 突破成功 - 清零连败计数（先保存原连败数用于彩蛋文案）
+            prev_fail_streak = player.breakthrough_fail_streak
+            player.breakthrough_fail_streak = 0
+
+            # 提升境界并触发方案A成长
             player.level_index = next_level_index
 
-            growth_attr = random.choice(["damage", "agility", "speed", "hp"])
-            growth_step = self.config_manager.game_config.get("skill_system", {}).get(
-                "random_growth_step", 5
+            skill_cfg = self.config_manager.game_config.get("skill_system", {})
+            hp_step = skill_cfg.get("hp_growth_step", 15)
+            combat_points = skill_cfg.get("random_growth_step", 5)
+            weights = skill_cfg.get(
+                "growth_weights", {"damage": 0.6, "agility": 0.25, "speed": 0.15}
             )
-            growth_amount = growth_step
-            old_attr_value = getattr(player, growth_attr)
-            setattr(player, growth_attr, old_attr_value + growth_amount)
+
+            # HP 独立通道
+            player.hp += hp_step
+            hp_growth = hp_step
+
+            # 战斗属性点逐点随机
+            attrs = list(weights.keys())
+            probs = [weights[a] for a in attrs]
+            total_prob = sum(probs)
+            combat_growth: dict[str, int] = dict.fromkeys(attrs, 0)
+            for _ in range(combat_points):
+                r = random.random() * total_prob
+                cum = 0.0
+                for attr, p in zip(attrs, probs):
+                    cum += p
+                    if r < cum:
+                        combat_growth[attr] += 1
+                        setattr(
+                            player,
+                            attr,
+                            getattr(player, attr) + 1,
+                        )
+                        break
 
             await self.db.update_player(player)
 
             # 检查并处理突破贷款自动还款
             loan_msg = await self._handle_breakthrough_loan_repay(player)
 
-            attr_name_map = {
-                "damage": "伤害",
-                "agility": "身法",
-                "speed": "迅捷",
-                "hp": "气血",
-            }
-            growth_attr_name = attr_name_map.get(growth_attr, growth_attr)
+            # 高连败彩蛋文案
+            streak_bonus_msg = ""
+            if prev_fail_streak >= 3:
+                streak_bonus_msg = "\n💪 苦尽甘来，天道不负有心人！"
 
             # 领悟判定（成功 20%）
             learn_msgs = []
@@ -199,13 +240,16 @@ class BreakthroughManager:
                     )
 
             success_msg = (
-                f"✨ 突破成功！✨\n"
+                f"✨ 突破成功！✨{streak_bonus_msg}\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"{rate_info}\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"恭喜你从【{current_level_name}】突破至【{next_level_name}】！\n"
                 f"\n【属性增长】\n"
-                f"{growth_attr_name} +{growth_amount}\n"
+                f"气血 +{hp_growth}\n"
+                f"伤害 +{combat_growth.get('damage', 0)}\n"
+                f"身法 +{combat_growth.get('agility', 0)}\n"
+                f"迅捷 +{combat_growth.get('speed', 0)}\n"
                 f"\n【当前属性】\n"
                 f"伤害：{player.damage}\n"
                 f"身法：{player.agility}\n"
@@ -219,7 +263,10 @@ class BreakthroughManager:
             logger.info(
                 f"玩家 {player.user_id} 突破成功："
                 f"{current_level_name} -> {next_level_name}, "
-                f"成长 {growth_attr_name}+{growth_amount}"
+                f"成长 气血+{hp_growth} "
+                f"伤害+{combat_growth.get('damage', 0)} "
+                f"身法+{combat_growth.get('agility', 0)} "
+                f"迅捷+{combat_growth.get('speed', 0)}"
             )
 
             if loan_msg:
@@ -242,6 +289,10 @@ class BreakthroughManager:
             died = random.random() < death_rate
 
             if died:
+                # 走火入魔 - 清零连败计数
+                player.breakthrough_fail_streak = 0
+                await self.db.update_player(player)
+
                 # 检查是否有回生丹效果
                 from .pill_manager import PillManager
 
@@ -291,11 +342,25 @@ class BreakthroughManager:
                 return False, death_msg, True
 
             else:
-                # 突破失败但未死亡 - 扣除部分修为
+                # 突破失败但未死亡 - 增加连败计数并扣除修为
+                player.breakthrough_fail_streak += 1
                 exp_penalty = int(player.experience * 0.1)  # 扣除10%修为
                 player.experience = max(0, player.experience - exp_penalty)
 
                 await self.db.update_player(player)
+
+                # 计算连败保底提示
+                skill_cfg = self.config_manager.game_config.get("skill_system", {})
+                pity_step = skill_cfg.get("breakthrough_pity_step", 0.05)
+                pity_guarantee = skill_cfg.get("breakthrough_pity_guarantee", 19)
+                streak = player.breakthrough_fail_streak
+                next_bonus = streak * pity_step
+                remaining = max(0, pity_guarantee - streak)
+                pity_msg = (
+                    f"\n连败 {streak} 次，天道酬勤："
+                    f"下次成功率 +{next_bonus:.0%}"
+                    f"（再败 {remaining} 次必成）"
+                )
 
                 # 领悟判定（失败 10% 软保底）
                 learn_msgs = []
@@ -326,8 +391,8 @@ class BreakthroughManager:
                     f"━━━━━━━━━━━━━━━\n"
                     f"突破【{next_level_name}】失败，但幸运地保住了性命\n"
                     f"修为受损，损失了 {exp_penalty} 点修为\n"
-                    f"当前修为：{player.experience}\n"
-                    f"请继续修炼，再接再厉！"
+                    f"当前修为：{player.experience}"
+                    f"{pity_msg}"
                 )
                 if learn_msgs:
                     fail_msg += "\n\n" + "\n".join(learn_msgs)
@@ -335,7 +400,7 @@ class BreakthroughManager:
                 logger.info(
                     f"玩家 {player.user_id} 突破失败："
                     f"{current_level_name} -> {next_level_name}，"
-                    f"损失修为 {exp_penalty}"
+                    f"损失修为 {exp_penalty}，连败 {streak} 次"
                 )
 
                 return False, fail_msg, False

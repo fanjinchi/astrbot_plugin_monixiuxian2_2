@@ -12,9 +12,7 @@ from astrbot.api import logger
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = (
-    26  # v26: 传承系统重做：impart_info 改为 impart_value + claimed_tiers
-)
+LATEST_DB_VERSION = 27  # v27: Plan-A growth model + breakthrough fail-streak pity
 
 MIGRATION_TASKS: dict[
     int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]
@@ -811,6 +809,7 @@ async def _create_all_tables_v22(conn: aiosqlite.Connection):
             cultivation_start_time INTEGER NOT NULL DEFAULT 0,
             last_check_in_date TEXT NOT NULL DEFAULT '',
             level_up_rate INTEGER NOT NULL DEFAULT 0,
+            breakthrough_fail_streak INTEGER NOT NULL DEFAULT 0,
 
             damage INTEGER NOT NULL DEFAULT 10,
             agility INTEGER NOT NULL DEFAULT 5,
@@ -2049,3 +2048,59 @@ async def _migrate_to_v26(conn: aiosqlite.Connection, config_manager: ConfigMana
 
     await conn.commit()
     logger.info("v26迁移完成：传承表已重建为 impart_value + claimed_tiers")
+
+
+@migration(27)
+async def _migrate_to_v27(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """迁移到v27 - 方案A成长模型 + 突破连败保底。"""
+    logger.info("开始迁移到v27：方案A成长模型 + 突破连败保底")
+
+    # 1. 添加 breakthrough_fail_streak 字段
+    async with conn.execute("PRAGMA table_info(players)") as cursor:
+        columns = {row[1] for row in await cursor.fetchall()}
+
+    if not columns:
+        # players 表不存在（部分测试夹具只建相关表），跳过全部 v27 内容
+        logger.info("players 表不存在，跳过 v27 迁移内容")
+    else:
+        if "breakthrough_fail_streak" not in columns:
+            await conn.execute(
+                "ALTER TABLE players ADD COLUMN breakthrough_fail_streak INTEGER NOT NULL DEFAULT 0"
+            )
+            logger.info("已添加 breakthrough_fail_streak 字段")
+        else:
+            logger.info("breakthrough_fail_streak 字段已存在，跳过")
+
+        # 2. 非破坏式上调存量玩家 HP 至当前境界 base_hp（战斗属性不动）
+        # 测试桩可能未实现 get_level_data，旧版 players 表也可能缺列，此时跳过
+        get_level_data = getattr(config_manager, "get_level_data", None)
+        level_data = get_level_data("灵修") if callable(get_level_data) else []
+
+        if level_data and {"user_id", "level_index", "hp"} <= columns:
+            updated = 0
+            async with conn.execute(
+                "SELECT user_id, level_index, hp FROM players"
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+            for user_id, level_index, current_hp in rows:
+                if 0 <= level_index < len(level_data):
+                    base_hp = level_data[level_index].get("base_hp", 100)
+                else:
+                    base_hp = 100
+                if current_hp < base_hp:
+                    await conn.execute(
+                        "UPDATE players SET hp = ? WHERE user_id = ?",
+                        (base_hp, user_id),
+                    )
+                    updated += 1
+
+            if updated:
+                logger.info(f"已上调 {updated} 名玩家的气血至当前境界基准值")
+            else:
+                logger.info("所有玩家气血均不低于基准值，无需上调")
+        else:
+            logger.info("跳过存量玩家气血上调（配置缺失或 players 表结构不完整）")
+
+    await conn.commit()
+    logger.info("v27迁移完成：方案A成长模型 + 突破连败保底")

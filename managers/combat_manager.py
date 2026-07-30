@@ -71,6 +71,8 @@ class FighterState:
     agility: int
     speed: int
     armor_value: int
+    # Level index for armor K calculation (percent armor formula)
+    level_index: int = 1
     # Equipment
     weapon_k: float = 1.0
     base_damage: int = 0
@@ -84,6 +86,10 @@ class FighterState:
     # Multipliers for the next attack (set by round_start / on_defense effects)
     next_attack_mult: float = 1.0
     incoming_damage_mult: float = 1.0
+    # Crit rate (base 0.15, can be modified by skills, capped by config)
+    crit_rate: float = 0.15
+    # Combo stack counter for current action (resets each attack)
+    combo_stack: int = 0
 
 
 @dataclass
@@ -108,6 +114,17 @@ class CombatEngine:
         self.skill_manager = skill_manager
         self._combat_cfg = config_manager.game_config.get("combat", {})
         self._skill_cfg = config_manager.game_config.get("skill_system", {})
+
+        # Caps and formula parameters (all with defaults for backward compat)
+        self._dodge_cap = self._combat_cfg.get("dodge_cap", 0.5)
+        self._block_cap = self._combat_cfg.get("block_cap", 0.3)
+        self._crit_rate_cap = self._combat_cfg.get("crit_rate_cap", 0.5)
+        self._crit_damage_cap = self._combat_cfg.get("crit_damage_cap", 2.0)
+        self._combo_cap = self._combat_cfg.get("combo_cap", 2)
+        self._damage_reduction_cap = self._combat_cfg.get("damage_reduction_cap", 0.4)
+        self._armor_k_base = self._combat_cfg.get("armor_k_base", 100)
+        self._armor_k_level_coeff = self._combat_cfg.get("armor_k_level_coeff", 10)
+        self._base_crit_rate = self._combat_cfg.get("base_crit_rate", 0.15)
 
     # ------------------------------------------------------------------
     # Public API
@@ -135,7 +152,7 @@ class CombatEngine:
             merge_count = self._skill_cfg.get("battle_report_merge_count", 10)
 
         action_limit = self._combat_cfg.get("action_limit", 200)
-        dodge_cap = self._combat_cfg.get("dodge_cap", 0.5)
+        dodge_cap = self._dodge_cap
         crit_multiplier = self._combat_cfg.get("crit_damage_multiplier", 1.5)
 
         log: list[str] = []
@@ -231,6 +248,7 @@ class CombatEngine:
             agility=total_attrs["agility"],
             speed=total_attrs["speed"],
             armor_value=total_attrs["armor_value"],
+            level_index=player.level_index,
             weapon_k=loadout.get("weapon_coefficient_k", 1.0),
             base_damage=loadout.get("base_damage", 0),
             trigger_skills=loadout.get("trigger_skills", []),
@@ -351,7 +369,11 @@ class CombatEngine:
                 continue
             effect = skill.get("effect_type", "")
             value = skill.get("effect_value", 0)
+            if effect == "combo" and fighter.combo_stack >= self._combo_cap:
+                continue
             if effect in ("damage_bonus", "combo"):
+                if effect == "combo":
+                    fighter.combo_stack += 1
                 fighter.next_attack_mult += value
                 log.append(
                     f"{fighter.name} 触发【{skill.get('name', '未知')}】，"
@@ -385,6 +407,10 @@ class CombatEngine:
             skill_name = skill.get("name", "未知")
 
             if effect in ("damage_bonus", "combo"):
+                if effect == "combo" and actor.combo_stack >= self._combo_cap:
+                    continue
+                if effect == "combo":
+                    actor.combo_stack += 1
                 result["damage_mult"] += value
                 log.append(f"{actor.name} 触发【{skill_name}】，攻势更盛！")
             elif effect == "stun":
@@ -414,8 +440,14 @@ class CombatEngine:
         dodge_cap: float,
         crit_multiplier: float,
         log: list[str],
+        crit_damage_cap: float | None = None,
     ) -> None:
         """Resolve a single attack action through the full chain."""
+        if crit_damage_cap is None:
+            crit_damage_cap = self._crit_damage_cap
+        # Reset combo stack for this action
+        attacker.combo_stack = 0
+
         # Stun check: skip this action right
         if attacker.skip_next_action:
             attacker.skip_next_action = False
@@ -434,8 +466,9 @@ class CombatEngine:
         if blocked:
             log.append(f"{defender.name} 举盾格挡，化解了部分攻势！")
 
-        # 3. Crit
-        is_crit = random.random() < 0.15  # Base 15% crit chance
+        # 3. Crit (capped crit rate)
+        effective_crit_rate = min(attacker.crit_rate, self._crit_rate_cap)
+        is_crit = random.random() < effective_crit_rate
         if is_crit:
             log.append(f"{attacker.name} 目光如电，寻得破绽！")
 
@@ -474,25 +507,23 @@ class CombatEngine:
         attacker.next_attack_mult = 1.0
 
         # 7. Damage calculation (Muxxu formula)
+        # Cap crit multiplier
+        effective_crit_mult = min(crit_multiplier, crit_damage_cap)
         raw_damage = self._calc_damage(
             attacker.damage,
             attacker.weapon_k,
             attacker.base_damage,
             total_skill_mult,
             is_crit,
-            crit_multiplier,
+            effective_crit_mult,
         )
 
         # Apply block reduction
         if blocked:
             raw_damage = max(1, raw_damage // 2)
 
-        # Apply armor and incoming damage reduction
-        final_damage = max(
-            1,
-            int(raw_damage * defender.incoming_damage_mult) - defender.armor_value,
-        )
-        defender.incoming_damage_mult = 1.0
+        # Apply percent armor reduction + damage reduction cap
+        final_damage = self._apply_armor_and_reduction(defender, raw_damage)
 
         defender.hp -= final_damage
 
@@ -519,9 +550,9 @@ class CombatEngine:
         return min(max(rate, 0.0), cap)
 
     def _calc_block_rate(self, defender: FighterState) -> float:
-        """Calculate block rate from armor and skills."""
+        """Calculate block rate from armor and skills, capped by config."""
         # Base 5% + small bonus from armor
-        return min(0.05 + defender.armor_value * 0.001, 0.30)
+        return min(0.05 + defender.armor_value * 0.001, self._block_cap)
 
     def _calc_damage(
         self,
@@ -549,6 +580,35 @@ class CombatEngine:
             multiplied *= crit_multiplier
 
         return max(1, math.floor(multiplied))
+
+    def _apply_armor_and_reduction(
+        self, defender: FighterState, raw_damage: int
+    ) -> int:
+        """Apply percent armor reduction and capped damage reduction.
+
+        Formula: 减伤率 = 护甲 / (护甲 + K), K = armor_k_base + armor_k_level_coeff * 等级
+        Total damage fraction = (1 - armor_rate) * incoming_damage_mult
+        Capped by damage_reduction_cap (block halving already applied before this).
+        """
+        # Percent armor reduction
+        armor_k = self._armor_k_base + self._armor_k_level_coeff * defender.level_index
+        if armor_k <= 0 or defender.armor_value <= 0:
+            armor_rate = 0.0
+        else:
+            armor_rate = defender.armor_value / (defender.armor_value + armor_k)
+
+        # Skill damage reduction (already multiplicative in incoming_damage_mult)
+        skill_fraction = defender.incoming_damage_mult
+        defender.incoming_damage_mult = 1.0  # Reset after consumption
+
+        # Combined fraction: armor and skill reductions multiply
+        total_fraction = (1.0 - armor_rate) * skill_fraction
+
+        # Cap total reduction: total_fraction >= 1 - damage_reduction_cap
+        min_fraction = 1.0 - self._damage_reduction_cap
+        total_fraction = max(total_fraction, min_fraction)
+
+        return max(1, math.floor(raw_damage * total_fraction))
 
     def _merge_log(self, log: list[str], chunk_size: int) -> list[str]:
         """Merge log entries into chunks of approximately chunk_size lines."""
