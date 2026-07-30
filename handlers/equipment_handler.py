@@ -109,10 +109,14 @@ class EquipmentHandler:
 
         item_name = item_name.strip()
 
-        # 检查物品是否存在于配置中（先查items再查weapons）
+        # 检查物品是否存在于配置中（先查items、weapons，再查心法宝典）
         item_config = self.config_manager.items_data.get(item_name)
+        from_heart_method = False
         if not item_config:
             item_config = self.config_manager.weapons_data.get(item_name)
+        if not item_config:
+            item_config = self.config_manager.heart_methods_data.get(item_name)
+            from_heart_method = bool(item_config)
 
         if not item_config:
             yield event.plain_result(f"未找到物品：{item_name}")
@@ -120,7 +124,6 @@ class EquipmentHandler:
 
         # 检查物品类型是否可装备
         item_type = item_config.get("type", "")
-        equippable_types = ["weapon", "armor", "main_technique", "technique"]
 
         # 兼容旧格式
         if item_type == "法器":
@@ -131,6 +134,13 @@ class EquipmentHandler:
                 item_type = "armor"
         elif item_type == "功法":
             item_type = "technique"
+        elif from_heart_method or (
+            not item_type
+            and ("passive_bonus" in item_config or "skill_pool" in item_config)
+        ):
+            item_type = "main_technique"
+
+        equippable_types = ["weapon", "armor", "main_technique", "technique"]
 
         if item_type not in equippable_types:
             yield event.plain_result(f"【{item_name}】不是可装备的物品类型")

@@ -146,9 +146,6 @@ class CombatHandlers:
             yield event.plain_result("❌ 对方还未踏入修仙之路")
             return
 
-        # TODO: impart buff mapping to new attribute system (design pending)
-
-        # 战斗
         result = await self.combat_mgr.player_vs_player(p1, p2, combat_type=2)  # 2=决斗
 
         # 结算（写入最终气血）
@@ -206,10 +203,6 @@ class CombatHandlers:
         if not p1 or not p2:
             yield event.plain_result("❌ 双方都需要踏入修仙之路")
             return
-
-        # TODO: impart buff mapping to new attribute system (design pending)
-
-        result = await self.combat_mgr.player_vs_player(p1, p2, combat_type=1)  # 1=切磋
 
         # 写入最终气血（切磋原本不消耗，但统一引擎可能修正数值）
         p1.hp = result["player1_final_hp"]

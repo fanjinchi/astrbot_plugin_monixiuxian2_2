@@ -264,7 +264,7 @@ class XiuXianPlugin(Star):
 
         self.combat_mgr = CombatManager(self.config_manager, self.skill_manager)
         self.enemy_mgr = EnemyManager(config_manager=self.config_manager)
-        self.impart_mgr = ImpartManager(self.db)
+        self.impart_mgr = ImpartManager(self.db, self.config_manager)
         self.pve_combat_mgr = PVECombatManager(
             self.combat_mgr,
             self.enemy_mgr,
@@ -324,7 +324,7 @@ class XiuXianPlugin(Star):
         self.bounty_handlers = BountyHandlers(self.db, self.bounty_mgr)
 
         # Phase 3: 传承PK
-        self.impart_pk_mgr = ImpartPkManager(self.db, self.combat_mgr)
+        self.impart_pk_mgr = ImpartPkManager(self.db, self.combat_mgr, self.impart_mgr)
         self.impart_pk_handlers = ImpartPkHandlers(self.db, self.impart_pk_mgr)
 
         # Phase 4: 扩展功能

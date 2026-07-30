@@ -30,6 +30,7 @@ class ConfigManager:
         # Load new system configs
         self.skills_data: dict[str, dict] = {}  # Skill definitions
         self.heart_methods_data: dict[str, dict] = {}  # Heart method definitions
+        self.impart_config: dict[str, Any] = {}  # Impart tier rewards
 
         self._load_all()
 
@@ -169,6 +170,11 @@ class ConfigManager:
             config_dir / "alchemy_recipes.json"
         )
 
+        # Load impart tier reward config
+        self.impart_config = self._load_config_with_default(
+            config_dir / "impart_config.json", {}
+        )
+
         # 加载游戏配置（包含各系统的硬编码参数）
         self.game_config = self._load_config_with_default(
             config_dir / "game_config.json", {}
@@ -188,6 +194,7 @@ class ConfigManager:
             f"{len(self.body_level_data)} 个体修境界配置，"
             f"{len(self.skills_data)} 个技能配置，"
             f"{len(self.heart_methods_data)} 个心法配置，"
+            f"{len(self.impart_config.get('tiers', []))} 个传承等阶，"
             f"以及新系统配置 (宗门/Boss/秘境/炼丹)"
         )
 

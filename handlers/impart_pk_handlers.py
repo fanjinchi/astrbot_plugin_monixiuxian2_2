@@ -32,7 +32,7 @@ class ImpartPkHandlers:
                 "⚔️ 传承挑战\n"
                 "━━━━━━━━━━━━━━━\n"
                 "争夺对方的传承加成！\n"
-                "胜利：获得传承ATK加成\n"
+                "胜利：获得传承值\n"
                 "失败：损失1%修为\n"
                 "━━━━━━━━━━━━━━━\n"
                 "💡 用法：/传承挑战 @某人"
@@ -57,7 +57,7 @@ class ImpartPkHandlers:
                 f"🎉 传承挑战胜利！\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"对手：{target.user_name or target_id[:8]}\n"
-                f"获得ATK传承：+{rewards.get('impart_atk_gain', 0):.2%}\n"
+                f"获得传承值：+{rewards.get('impart_value_gain', 0)}\n"
             )
         else:
             result_msg = (
@@ -80,7 +80,7 @@ class ImpartPkHandlers:
 
         lines = ["🏆 传承排行榜\n━━━━━━━━━━━━━━━"]
         for i, r in enumerate(rankings, 1):
-            lines.append(f"{i}. {r['user_name']} - ATK+{r['atk_per']:.1%}")
+            lines.append(f"{i}. {r['user_name']} - 传承值{r['impart_value']}")
         lines.append("━━━━━━━━━━━━━━━")
 
         yield event.plain_result("\n".join(lines))
