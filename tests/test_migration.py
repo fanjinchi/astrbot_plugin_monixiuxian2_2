@@ -1,4 +1,4 @@
-"""Tests for database migrations (v25 player_skills)."""
+"""Tests for database migrations (v25 player_skills and v26 impart rework)."""
 
 import aiosqlite
 import pytest
@@ -63,6 +63,15 @@ async def test_fresh_install_reaches_latest_version():
         ) as cursor:
             row = await cursor.fetchone()
         assert row is not None, "player_skills table not found"
+
+        async with db_conn2.execute("PRAGMA table_info(impart_info)") as cursor:
+            impart_cols = {row[1] for row in await cursor.fetchall()}
+        assert impart_cols == {
+            "id",
+            "user_id",
+            "impart_value",
+            "claimed_tiers",
+        }, f"Unexpected impart_info columns: {impart_cols}"
 
 
 @pytest.mark.asyncio
@@ -155,6 +164,16 @@ async def test_v21_to_latest_migration_rebuilds_players():
             row = await cursor.fetchone()
         assert row is not None, "player_skills table not found"
 
+        # v26 should have rebuilt impart_info with the new columns
+        async with db_conn.execute("PRAGMA table_info(impart_info)") as cursor:
+            impart_cols = {row[1] for row in await cursor.fetchall()}
+        assert impart_cols == {
+            "id",
+            "user_id",
+            "impart_value",
+            "claimed_tiers",
+        }, f"Unexpected impart_info columns: {impart_cols}"
+
 
 @pytest.mark.asyncio
 async def test_v23_to_v24_adds_spiritual_root():
@@ -183,6 +202,58 @@ async def test_v23_to_v24_adds_spiritual_root():
         async with db_conn.execute("PRAGMA table_info(players)") as cursor:
             columns = {row[1] for row in await cursor.fetchall()}
         assert "spiritual_root" in columns
+
+
+@pytest.mark.asyncio
+async def test_v25_to_v26_rebuilds_impart_info():
+    """A v25 database with legacy impart columns is rebuilt to the new schema."""
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
+        await db_conn.execute("INSERT INTO db_info (version) VALUES (?)", (25,))
+        await db_conn.execute("""
+            CREATE TABLE impart_info (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL UNIQUE,
+                impart_hp_per REAL NOT NULL DEFAULT 0.0,
+                impart_mp_per REAL NOT NULL DEFAULT 0.0,
+                impart_atk_per REAL NOT NULL DEFAULT 0.0,
+                impart_know_per REAL NOT NULL DEFAULT 0.0,
+                impart_burst_per REAL NOT NULL DEFAULT 0.0
+            )
+        """)
+        await db_conn.execute(
+            "INSERT INTO impart_info (user_id, impart_hp_per, impart_atk_per) VALUES (?, 0.1, 0.5)",
+            ("u1",),
+        )
+        await db_conn.commit()
+
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        async with db_conn.execute("SELECT version FROM db_info") as cursor:
+            version = (await cursor.fetchone())[0]
+        assert version == LATEST_DB_VERSION
+
+        async with db_conn.execute("PRAGMA table_info(impart_info)") as cursor:
+            impart_cols = {row[1] for row in await cursor.fetchall()}
+        assert {
+            "impart_hp_per",
+            "impart_mp_per",
+            "impart_atk_per",
+            "impart_know_per",
+            "impart_burst_per",
+        }.isdisjoint(impart_cols), "Legacy impart columns still present"
+        assert impart_cols == {
+            "id",
+            "user_id",
+            "impart_value",
+            "claimed_tiers",
+        }, f"Unexpected impart_info columns: {impart_cols}"
+
+        async with db_conn.execute(
+            "SELECT COUNT(*) FROM impart_info WHERE user_id = ?", ("u1",)
+        ) as cursor:
+            count = (await cursor.fetchone())[0]
+        assert count == 0, "Legacy impart data should be discarded during v26 migration"
 
 
 @pytest.mark.asyncio
