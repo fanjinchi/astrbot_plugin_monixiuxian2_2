@@ -159,6 +159,36 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 5. `main.py` — 初始化 Manager/Handler、注册命令
 6. 如有数据库表 → `data/migration.py` 添加迁移
 
+### 14. 子代理（subagent）协作规范
+
+> 2026-07-30 并行派工事故教训。派发较大任务给 subagent 时必须遵守。
+
+**任务合同**
+- 写清：范围（可读写的文件清单）、约束、验证命令、停止规则（什么情况停下报告而不是猜）
+- **改动保持未提交**：禁止子代理 `git add/commit/push`（曾有子代理陷入 git 命令死循环，
+  626 轮空转烧 250k tokens），由父会话审查后统一提交
+- **所有 pytest/模拟等长命令必须套 `timeout`**（如 `timeout 120 uv run python -m pytest tests/ -q`），
+  且不要把输出管道给 `tail`——被中断的管道会让 python 进程永远阻塞在写管道上
+  （曾有两个子代理的全量 pytest 僵尸化挂起 40+ 分钟）
+- 并行任务之间**文件域不得重叠**：实测 `worktree: true` 并未创建独立 git worktree，
+  子代理共享主工作目录，同文件并发写会互相覆盖或读到半成品
+
+**监控与介入**
+- `subagent({action:"status", view:"fleet"})` 总览；`view:"transcript", index:N, lines:60` 看单个尾部
+- 同一命令反复出现 = 死循环 → `action:"steer", index:N, message:"..."` 纠正；
+  无效则 `interrupt` 暂停，`resume` 给新指令，或由父会话直接接手
+- 卡死排查：`ps aux | grep pytest` 找僵尸进程，`kill -9` 清理；
+  子代理被 interrupt **不会**自动杀死其 bash 子进程
+
+**集成（父会话职责，不可省略）**
+- 子代理产出必须人工审查后才提交：一次集成中从 3 个 worker 产出抓出 7 个真 bug
+  （保底逻辑被丹药 cap 夹紧、彩蛋永不触发、迁移对旧 schema 不健壮、模拟脚本参数错误等）
+- 审查重点：边界条件、迁移脚本对旧 schema/空 fixture 的健壮性、
+  **测试是否真测了生产代码**（有 worker 在测试文件里重新实现逻辑来自测，生产代码 bug 完全没测到）
+- 提交前必须跑：`uv run ruff format . && uv run ruff check .`、
+  `timeout 120 uv run python -m pytest tests/ -q`、
+  涉及战斗数值时跑 `design_docs/attribute-growth/sim_balance_regression.py`
+
 ## 测试
 
 - 测试文件在 `tests/` 目录，使用 **pytest**
