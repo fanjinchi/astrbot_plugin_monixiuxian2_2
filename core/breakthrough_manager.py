@@ -10,9 +10,13 @@ from astrbot.api import logger
 from ..config_manager import ConfigManager
 from ..data import DataBase
 from ..models import Player
+from .breakthrough_fortune import format_fortune_message, roll_breakthrough_fortune
 
 if TYPE_CHECKING:
     from ..core.skill_manager import SkillManager
+
+from .pill_manager import PillManager
+from .storage_ring_manager import StorageRingManager
 
 
 class BreakthroughManager:
@@ -24,11 +28,17 @@ class BreakthroughManager:
         config_manager: ConfigManager,
         config: dict,
         skill_manager: SkillManager | None = None,
+        storage_ring_manager: StorageRingManager | None = None,
+        pill_manager: PillManager | None = None,
     ):
         self.db = db
         self.config_manager = config_manager
         self.config = config
         self.skill_manager = skill_manager
+        self.storage_ring_manager = storage_ring_manager or StorageRingManager(
+            db, config_manager
+        )
+        self.pill_manager = pill_manager or PillManager(db, config_manager)
 
     def check_breakthrough_requirements(self, player: Player) -> tuple[bool, str]:
         """检查玩家是否满足突破条件
@@ -239,6 +249,13 @@ class BreakthroughManager:
                         f"🎁 破境感悟，领悟通用功法【{fallback.get('name', '未知')}】！"
                     )
 
+            # 突破机缘轮盘（方案 A 成长与领悟判定之后）
+            fortune_msg = await self._apply_breakthrough_fortune(
+                player, next_level_index
+            )
+            if fortune_msg:
+                learn_msgs.append(fortune_msg)
+
             success_msg = (
                 f"✨ 突破成功！✨{streak_bonus_msg}\n"
                 f"━━━━━━━━━━━━━━━\n"
@@ -404,6 +421,52 @@ class BreakthroughManager:
                 )
 
                 return False, fail_msg, False
+
+    async def _apply_breakthrough_fortune(
+        self, player: Player, new_level_index: int
+    ) -> str:
+        """突破成功后掷一次机缘掉落轮盘并应用到玩家背包/储物戒。
+
+        Args:
+            player: 突破成功后的玩家对象（会被本方法直接修改并持久化）。
+            new_level_index: 玩家突破后的新境界索引。
+
+        Returns:
+            用于追加到突破成功消息的中文文案；无掉落时返回空字符串。
+        """
+        result = roll_breakthrough_fortune(
+            random.Random(),
+            self.config_manager.game_config,
+            new_level_index,
+            list(self.config_manager.weapons_data.values()),
+            list(self.config_manager.heart_methods_data.values()),
+            list(self.config_manager.pills_data.values())
+            + list(self.config_manager.utility_pills_data.values()),
+        )
+        if result is None:
+            return ""
+
+        if result["type"] in ("weapon", "heart_method"):
+            item_name = result["items"][0]["name"]
+            items = player.get_storage_ring_items()
+            can_store = (
+                item_name in items
+                or self.storage_ring_manager.get_available_slots(player) > 0
+            )
+            if can_store:
+                items[item_name] = items.get(item_name, 0) + 1
+                player.set_storage_ring_items(items)
+                await self.db.update_player(player)
+            else:
+                return f"🎁 机缘天降，获得【{item_name}】，但储物戒已满无法存入。"
+
+        elif result["type"] == "pill":
+            for item in result["items"]:
+                await self.pill_manager.add_pill_to_inventory(
+                    player, item["name"], item["count"]
+                )
+
+        return format_fortune_message(result)
 
     async def _handle_breakthrough_loan_repay(self, player: Player) -> str:
         """处理突破贷款自动还款

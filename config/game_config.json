@@ -39,6 +39,15 @@
         "battle_report_merge_count": 10,
         "comment": "技能系统：领悟概率、通用池概率、成长步长、连败保底"
     },
+    "fortune": {
+        "weapon_rate": 0.12,
+        "heart_method_rate": 0.08,
+        "pill_rate": 0.20,
+        "level_window": 10,
+        "pill_count_min": 1,
+        "pill_count_max": 2,
+        "comment": "突破机缘轮盘：武器/心法/丹药掉率互斥，余为空；level_window 为可掉落物品的最低境界偏移"
+    },
     "pve": {
         "difficulty_multiplier": 1.0,
         "comment": "PvE难度系数"

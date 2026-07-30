@@ -10,10 +10,17 @@
         "hp_percent": 0.1
       },
       "skill_pool": [
-        {"skill_id": "common_001", "learn_coefficient": 1.0},
-        {"skill_id": "common_002", "learn_coefficient": 0.8}
+        {
+          "skill_id": "common_001",
+          "learn_coefficient": 1.0
+        },
+        {
+          "skill_id": "common_002",
+          "learn_coefficient": 0.8
+        }
       ],
-      "route": "通用"
+      "route": "通用",
+      "shop_weight": 100
     },
     {
       "id": "heart_002",
@@ -25,10 +32,17 @@
         "damage_percent": 0.15
       },
       "skill_pool": [
-        {"skill_id": "spirit_001", "learn_coefficient": 0.6},
-        {"skill_id": "common_001", "learn_coefficient": 0.9}
+        {
+          "skill_id": "spirit_001",
+          "learn_coefficient": 0.6
+        },
+        {
+          "skill_id": "common_001",
+          "learn_coefficient": 0.9
+        }
       ],
-      "route": "灵修"
+      "route": "灵修",
+      "shop_weight": 30
     },
     {
       "id": "heart_003",
@@ -40,10 +54,17 @@
         "armor_value": 20
       },
       "skill_pool": [
-        {"skill_id": "body_001", "learn_coefficient": 0.7},
-        {"skill_id": "common_002", "learn_coefficient": 1.0}
+        {
+          "skill_id": "body_001",
+          "learn_coefficient": 0.7
+        },
+        {
+          "skill_id": "common_002",
+          "learn_coefficient": 1.0
+        }
       ],
-      "route": "体修"
+      "route": "体修",
+      "shop_weight": 60
     },
     {
       "id": "heart_impart_001",
