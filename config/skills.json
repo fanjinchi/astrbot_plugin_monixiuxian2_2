@@ -74,5 +74,37 @@
       "route_multiplier": {"灵修": 0.6, "体修": 1.2},
       "learn_coefficient": 0.8
     }
+  ],
+  "传承功法池": [
+    {
+      "id": "impart_skill_001",
+      "name": "传承功法·护体",
+      "description": "传承奖励功法，危急时自动护体（数值占位，待策划调优）。",
+      "trigger_skill": {
+        "name": "传承护体",
+        "trigger_condition": "defend",
+        "trigger_rate": 0.15,
+        "effect": "damage_reduction",
+        "effect_value": 0.3
+      },
+      "ultimate": null,
+      "route_multiplier": {"灵修": 1.0, "体修": 1.0},
+      "learn_coefficient": 1.0
+    },
+    {
+      "id": "impart_skill_002",
+      "name": "传承功法·破敌",
+      "description": "传承奖励功法，攻敌破绽（数值占位，待策划调优）。",
+      "trigger_skill": {
+        "name": "传承破敌",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.15,
+        "effect": "damage_bonus",
+        "effect_value": 1.3
+      },
+      "ultimate": null,
+      "route_multiplier": {"灵修": 1.0, "体修": 1.0},
+      "learn_coefficient": 1.0
+    }
   ]
 }

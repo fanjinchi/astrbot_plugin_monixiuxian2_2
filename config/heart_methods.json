@@ -44,6 +44,30 @@
         {"skill_id": "common_002", "learn_coefficient": 1.0}
       ],
       "route": "体修"
+    },
+    {
+      "id": "heart_impart_001",
+      "name": "传承心法·吐纳",
+      "description": "传承奖励心法，固本培元（数值占位，待策划调优）。",
+      "rank": "圣品",
+      "required_level_index": 0,
+      "passive_bonus": {
+        "hp_percent": 0.05
+      },
+      "skill_pool": [],
+      "route": "通用"
+    },
+    {
+      "id": "heart_impart_002",
+      "name": "传承心法·归元",
+      "description": "传承奖励心法，气归丹田（数值占位，待策划调优）。",
+      "rank": "帝品",
+      "required_level_index": 5,
+      "passive_bonus": {
+        "damage_percent": 0.05
+      },
+      "skill_pool": [],
+      "route": "通用"
     }
   ]
 }
