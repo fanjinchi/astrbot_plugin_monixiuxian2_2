@@ -183,10 +183,32 @@ class BreakthroughHandler:
                 )
                 return
 
+            # 检查背包是否持有该破境丹
+            inventory = player.get_pills_inventory()
+            if inventory.get(pill_name, 0) <= 0:
+                yield event.plain_result(f"❌ 你的背包中没有【{pill_name}】！")
+                return
+
             yield event.plain_result(f"使用【{pill_name}】进行突破...")
         else:
             pill_name = None
             yield event.plain_result("开始尝试突破...")
+
+        # 使用破境丹时：预先检查突破条件（不满足则不消耗丹药），随后消耗一颗（无论成败）
+        if pill_name:
+            can_breakthrough, error_msg = (
+                self.breakthrough_manager.check_breakthrough_requirements(player)
+            )
+            if not can_breakthrough:
+                yield event.plain_result(error_msg)
+                return
+
+            inventory = player.get_pills_inventory()
+            inventory[pill_name] -= 1
+            if inventory[pill_name] <= 0:
+                del inventory[pill_name]
+            player.set_pills_inventory(inventory)
+            await self.db.update_player(player)
 
         # 执行突破
         success, message, died = await self.breakthrough_manager.execute_breakthrough(
