@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ..config_manager import ConfigManager
 
 LATEST_DB_VERSION = (
-    25  # v25: 技能领悟持久化到 player_skills，players 移除 learned_skills
+    26  # v26: 传承系统重做：impart_info 改为 impart_value + claimed_tiers
 )
 
 MIGRATION_TASKS: dict[
@@ -925,16 +925,13 @@ async def _create_all_tables_v22(conn: aiosqlite.Connection):
         )
     """)
 
-    # 传承信息表
+    # 传承信息表（v26：传承值 + 已领取等阶）
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS impart_info (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL UNIQUE,
-            impart_hp_per REAL NOT NULL DEFAULT 0.0,
-            impart_mp_per REAL NOT NULL DEFAULT 0.0,
-            impart_atk_per REAL NOT NULL DEFAULT 0.0,
-            impart_know_per REAL NOT NULL DEFAULT 0.0,
-            impart_burst_per REAL NOT NULL DEFAULT 0.0
+            impart_value INTEGER NOT NULL DEFAULT 0,
+            claimed_tiers TEXT NOT NULL DEFAULT '[]'
         )
     """)
     await conn.execute(
@@ -2029,3 +2026,26 @@ async def _migrate_to_v20(conn: aiosqlite.Connection, config_manager: ConfigMana
 
     await conn.commit()
     logger.info("v20迁移完成：用户CD表添加额外数据字段")
+
+
+@migration(26)
+async def _migrate_to_v26(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """迁移到v26 - 传承系统重做：impart_info 改为传承值与已领取等阶。"""
+    logger.info("开始迁移到v26：传承系统重做")
+
+    # 旧百分比数据废弃，直接重建表
+    await conn.execute("DROP TABLE IF EXISTS impart_info")
+    await conn.execute("""
+        CREATE TABLE impart_info (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL UNIQUE,
+            impart_value INTEGER NOT NULL DEFAULT 0,
+            claimed_tiers TEXT NOT NULL DEFAULT '[]'
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_impart_user ON impart_info(user_id)"
+    )
+
+    await conn.commit()
+    logger.info("v26迁移完成：传承表已重建为 impart_value + claimed_tiers")

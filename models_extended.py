@@ -137,15 +137,23 @@ class Rift:
 
 @dataclass
 class ImpartInfo:
-    """传承信息数据模型"""
+    """Impart (inheritance) info data model."""
 
-    id: int  # 主键
-    user_id: str  # 用户ID
-    impart_hp_per: float = 0.0  # HP加成百分比
-    impart_mp_per: float = 0.0  # MP加成百分比
-    impart_atk_per: float = 0.0  # ATK加成百分比
-    impart_know_per: float = 0.0  # 会心率加成百分比
-    impart_burst_per: float = 0.0  # 爆伤加成百分比
+    id: int  # Primary key
+    user_id: str  # User ID
+    impart_value: int = 0  # Accumulated impart value from PK wins
+    claimed_tiers: str = "[]"  # JSON list of claimed tier numbers
+
+    def get_claimed_tiers(self) -> list[int]:
+        """Return the list of claimed tier numbers."""
+        try:
+            return json.loads(self.claimed_tiers)
+        except json.JSONDecodeError:
+            return []
+
+    def set_claimed_tiers(self, tiers: list[int]):
+        """Store the list of claimed tier numbers as a JSON string."""
+        self.claimed_tiers = json.dumps(tiers, ensure_ascii=False)
 
 
 @dataclass

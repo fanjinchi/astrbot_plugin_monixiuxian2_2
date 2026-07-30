@@ -329,20 +329,18 @@ class DatabaseExtended:
     # ===== 传承系统 CRUD =====
 
     async def create_impart_info(self, user_id: str):
-        """初始化用户传承信息"""
+        """Initialize a user's impart info with zero value and no claimed tiers."""
         await self.conn.execute(
             """
-            INSERT INTO impart_info (
-                user_id, impart_hp_per, impart_mp_per, impart_atk_per,
-                impart_know_per, impart_burst_per
-            ) VALUES (?, 0.0, 0.0, 0.0, 0.0, 0.0)
+            INSERT INTO impart_info (user_id, impart_value, claimed_tiers)
+            VALUES (?, 0, '[]')
             """,
             (user_id,),
         )
         await self.conn.commit()
 
     async def get_impart_info(self, user_id: str) -> ImpartInfo | None:
-        """获取用户传承信息"""
+        """Get a user's impart info."""
         async with self.conn.execute(
             "SELECT * FROM impart_info WHERE user_id = ?", (user_id,)
         ) as cursor:
@@ -352,22 +350,14 @@ class DatabaseExtended:
             return None
 
     async def update_impart_info(self, impart: ImpartInfo):
-        """更新用户传承信息"""
+        """Update a user's impart value and claimed tiers."""
         await self.conn.execute(
             """
             UPDATE impart_info SET
-                impart_hp_per = ?, impart_mp_per = ?, impart_atk_per = ?,
-                impart_know_per = ?, impart_burst_per = ?
-            WHERE user_id = ?
+                impart_value = ?, claimed_tiers = ?
+            WHERE id = ?
             """,
-            (
-                impart.impart_hp_per,
-                impart.impart_mp_per,
-                impart.impart_atk_per,
-                impart.impart_know_per,
-                impart.impart_burst_per,
-                impart.user_id,
-            ),
+            (impart.impart_value, impart.claimed_tiers, impart.id),
         )
         await self.conn.commit()
 
