@@ -4,6 +4,7 @@ from astrbot.api.event import AstrMessageEvent
 
 from ..config_manager import ConfigManager
 from ..core import EquipmentManager, PillManager, SkillManager, StorageRingManager
+from ..core.equipment_manager import _json_str
 from ..data import DataBase
 from ..models import Player
 from .utils import player_required
@@ -208,11 +209,11 @@ class EquipmentHandler:
             armor_value=item_config.get("armor_value", 0),
             weapon_coefficient_k=item_config.get("weapon_coefficient_k", 1.0),
             base_damage=item_config.get("base_damage", 0),
-            route_multiplier=item_config.get("route_multiplier", "{}"),
-            trigger_skills=item_config.get("trigger_skills", "[]"),
+            route_multiplier=_json_str(item_config.get("route_multiplier", "{}")),
+            trigger_skills=_json_str(item_config.get("trigger_skills", "[]")),
             exp_multiplier=item_config.get("exp_multiplier", 0.0),
-            passive_bonus=item_config.get("passive_bonus", "{}"),
-            skill_pool=item_config.get("skill_pool", "[]"),
+            passive_bonus=_json_str(item_config.get("passive_bonus", "{}")),
+            skill_pool=_json_str(item_config.get("skill_pool", "[]")),
         )
 
         # 装备物品
