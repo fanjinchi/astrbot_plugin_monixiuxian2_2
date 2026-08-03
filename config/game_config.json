@@ -49,8 +49,13 @@
         "comment": "突破机缘轮盘：武器/心法/丹药掉率互斥，余为空；level_window 为可掉落物品的最低境界偏移"
     },
     "pve": {
+        "enabled": true,
         "difficulty_multiplier": 1.0,
-        "comment": "PvE难度系数"
+        "comment": "PvE难度系数与总开关；关闭时禁用世界Boss/秘境等PvE战斗入口，历练不受影响"
+    },
+    "boss": {
+        "enabled": true,
+        "comment": "世界Boss系统总开关；关闭时停止Boss生成定时任务与相关指令"
     },
     "bank": {
         "daily_interest_rate": 0.001,
@@ -65,9 +70,10 @@
     },
     "dual_cultivation": {
         "cooldown": 3600,
-        "exp_bonus": 0.1,
         "request_expire": 300,
-        "comment": "双修配置：冷却时间（秒）、修为加成比例、请求过期时间"
+        "k_hours": 2,
+        "realm_factor": "linear",
+        "comment": "双修配置：冷却时间（秒）、请求过期时间（秒）。k_hours为定额收益等效闭关小时数；realm_factor为境界系数模式，可选 linear / power1.5 / power2"
     },
     "spirit_eye": {
         "spawn_interval": 7200,

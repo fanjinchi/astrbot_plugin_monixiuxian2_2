@@ -128,6 +128,10 @@ class DummyConfigManager:
             ]
         }
 
+    def get_max_level(self, cultivation_type="灵修"):
+        """Return highest valid level index for the dummy route."""
+        return len(self.level_data) - 1
+
 
 class TestHelpers:
     """Shared fixtures for impart manager tests."""

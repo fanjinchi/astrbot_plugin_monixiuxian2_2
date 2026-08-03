@@ -14,6 +14,8 @@ import sys
 import time
 from typing import TYPE_CHECKING
 
+from astrbot.api import logger
+
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
     from ..core import StorageRingManager
@@ -238,6 +240,10 @@ class BossManager:
 
         # Fallback for configs that still lack the new base attribute keys.
         if base["damage"] == 0 and base["hp"] == 0:
+            logger.warning(
+                f"Boss stats are missing base_* data for level_index={level_index}; "
+                f"using exp_needed as a transitional fallback. Boss values are in a transitional state."
+            )
             exp_needed = self._get_level_base(level_index, "exp_needed")
             base["damage"] = max(1, exp_needed // 10)
             base["hp"] = max(1, exp_needed // 2)

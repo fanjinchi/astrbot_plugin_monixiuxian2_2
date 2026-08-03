@@ -297,18 +297,18 @@ class GMManager:
 
         realm_name = remaining.strip()
         if not realm_name:
-            return False, "❌ 请输入境界名称，例如：/修仙GM 设置境界 筑基期初期"
+            return False, "❌ 请输入境界名称，例如：/修仙GM 设置境界 筑基一阶"
 
-        level_data = self.config_manager.get_level_data(player.cultivation_type)
-        found_index = None
-        for idx, data in enumerate(level_data):
-            if data.get("level_name") == realm_name:
-                found_index = idx
-                break
+        found_index = self.config_manager.get_level_index_by_name(
+            realm_name, player.cultivation_type
+        )
 
         if found_index is None:
             valid_names = [
-                d.get("level_name", "") for d in level_data if d.get("level_name")
+                self.config_manager.get_level_name(level, player.cultivation_type)
+                for level in range(
+                    1, self.config_manager.get_max_level(player.cultivation_type) + 1
+                )
             ]
             return False, (
                 f"❌ 未找到境界「{realm_name}」。\n"

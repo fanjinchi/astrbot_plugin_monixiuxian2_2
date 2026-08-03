@@ -30,18 +30,63 @@ def plugin_data_dir():
 @pytest.fixture
 def mock_config_manager():
     cm = MagicMock()
+    spirit_names = [
+        "练气一阶",
+        "练气二阶",
+        "练气三阶",
+        "练气四阶",
+        "练气五阶",
+        "练气六阶",
+        "练气七阶",
+        "练气八阶",
+        "练气九阶",
+        "筑基初期",
+    ]
+    body_names = [
+        "锻体一阶",
+        "锻体二阶",
+        "锻体三阶",
+        "锻体四阶",
+        "锻体五阶",
+        "锻体六阶",
+        "锻体七阶",
+        "锻体八阶",
+        "锻体九阶",
+        "铜皮初期",
+    ]
     cm.level_data = [
-        {"level_name": "炼气期一层"},
-        {"level_name": "炼气期二层"},
-        {"level_name": "筑基期初期"},
+        {"level": i + 1, "level_name": name} for i, name in enumerate(spirit_names)
     ]
     cm.body_level_data = [
-        {"level_name": "炼体一层"},
-        {"level_name": "炼体二层"},
+        {"level": i + 1, "level_name": name} for i, name in enumerate(body_names)
     ]
     cm.items_data = {"灵草": {"name": "灵草"}, "青锋剑": {"name": "青锋剑"}}
     cm.weapons_data = {"青锋剑": {"name": "青锋剑"}}
+
+    def get_level_name(level_index, cultivation_type="灵修"):
+        data = cm.body_level_data if cultivation_type == "体修" else cm.level_data
+        if 1 <= level_index <= len(data):
+            return data[level_index - 1]["level_name"]
+        return f"境界{level_index}"
+
+    def get_level_index_by_name(name, cultivation_type="灵修"):
+        data = cm.body_level_data if cultivation_type == "体修" else cm.level_data
+        for i, entry in enumerate(data):
+            if entry.get("level_name") == name:
+                return i + 1
+        return None
+
+    def get_max_level(cultivation_type="灵修"):
+        return len(
+            cm.body_level_data if cultivation_type == "体修" else cm.level_data
+        )
+
+    cm.get_level_name = get_level_name
+    cm.get_level_index_by_name = get_level_index_by_name
+    cm.get_max_level = get_max_level
     cm.get_level_data = MagicMock(return_value=cm.level_data)
+    cm.get_exp_needed = MagicMock(return_value=1000)
+    cm.get_success_rate = MagicMock(return_value=0.5)
     return cm
 
 
@@ -164,11 +209,11 @@ class TestSetLevel:
         mock_db.get_player_by_id.return_value = player
 
         event = make_event(sender_id="gm_001")
-        success, msg = await gm_manager.cmd_set_level(event, "筑基期初期")
+        success, msg = await gm_manager.cmd_set_level(event, "筑基初期")
 
         assert success is True
-        assert player.level_index == 2
-        assert "筑基期初期" in msg
+        assert player.level_index == 10
+        assert "筑基初期" in msg
         mock_db.update_player.assert_awaited_once()
 
     @pytest.mark.asyncio

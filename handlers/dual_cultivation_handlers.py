@@ -30,8 +30,7 @@ class DualCultivationHandlers:
             yield event.plain_result(
                 "💕 双修系统\n"
                 "━━━━━━━━━━━━━━━\n"
-                "与他人双修可获得对方10%的修为！\n"
-                "冷却时间：1小时\n"
+                f"{self.mgr.get_help_text()}\n"
                 "━━━━━━━━━━━━━━━\n"
                 "💡 使用 /双修 @某人"
             )

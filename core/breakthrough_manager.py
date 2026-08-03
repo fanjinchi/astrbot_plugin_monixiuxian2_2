@@ -49,22 +49,24 @@ class BreakthroughManager:
         Returns:
             (是否满足, 错误消息)
         """
-        # 根据修炼类型获取对应的境界数据
-        level_data = self.config_manager.get_level_data(player.cultivation_type)
-
         # 检查是否已经是最高境界
-        if player.level_index >= len(level_data) - 1:
+        max_level = self.config_manager.get_max_level(player.cultivation_type)
+        if player.level_index >= max_level:
             return False, "你已经达到了最高境界，无法继续突破！"
 
         # 获取下一境界所需修为
-        next_level_index = player.level_index + 1
-        next_level_data = level_data[next_level_index]
-        required_exp = next_level_data.get("exp_needed", 0)
+        required_exp = self.config_manager.get_exp_needed(
+            player.level_index, player.cultivation_type
+        )
 
         # 检查修为是否满足
         if player.experience < required_exp:
-            current_level = level_data[player.level_index]["level_name"]
-            next_level = next_level_data["level_name"]
+            current_level = self.config_manager.get_level_name(
+                player.level_index, player.cultivation_type
+            )
+            next_level = self.config_manager.get_level_name(
+                player.level_index + 1, player.cultivation_type
+            )
             return False, (
                 f"修为不足！\n"
                 f"当前境界：{current_level}\n"
@@ -86,13 +88,11 @@ class BreakthroughManager:
         Returns:
             (成功率, 说明信息)
         """
-        # 根据修炼类型获取对应的境界数据
-        level_data = self.config_manager.get_level_data(player.cultivation_type)
-
-        # 获取基础成功率
+        # 获取基础成功率（按目标境界所在大境界查表）
         next_level_index = player.level_index + 1
-        next_level_data = level_data[next_level_index]
-        base_success_rate = next_level_data.get("success_rate", 0.5)
+        base_success_rate = self.config_manager.get_success_rate(
+            next_level_index, player.cultivation_type
+        )
 
         info_lines = [f"基础成功率：{base_success_rate:.1%}"]
 
@@ -169,17 +169,17 @@ class BreakthroughManager:
             player, pill_name, temp_bonus
         )
 
-        # 根据修炼类型获取对应的境界数据
-        level_data = self.config_manager.get_level_data(player.cultivation_type)
-
         # 判定突破结果
         random_value = random.random()
         breakthrough_success = random_value < success_rate
 
-        current_level_name = level_data[player.level_index]["level_name"]
+        current_level_name = self.config_manager.get_level_name(
+            player.level_index, player.cultivation_type
+        )
         next_level_index = player.level_index + 1
-        next_level_data = level_data[next_level_index]
-        next_level_name = next_level_data["level_name"]
+        next_level_name = self.config_manager.get_level_name(
+            next_level_index, player.cultivation_type
+        )
 
         if breakthrough_success:
             # 突破成功 - 清零连败计数（先保存原连败数用于彩蛋文案）
@@ -295,7 +295,7 @@ class BreakthroughManager:
             # 突破失败 - 判断是否死亡
             death_probability_range = self.config.get("VALUES", {}).get(
                 "BREAKTHROUGH_DEATH_PROBABILITY",
-                [0.01, 0.1],  # 默认1%-10%死亡概率
+                [0.005, 0.03],  # 默认0.5%-3%死亡概率
             )
 
             # 随机一个死亡概率
@@ -361,7 +361,13 @@ class BreakthroughManager:
             else:
                 # 突破失败但未死亡 - 增加连败计数并扣除修为
                 player.breakthrough_fail_streak += 1
-                exp_penalty = int(player.experience * 0.1)  # 扣除10%修为
+                failure_penalty_rate = self.config_manager.get_failure_penalty_rate(
+                    player.cultivation_type
+                )
+                required_exp = self.config_manager.get_exp_needed(
+                    player.level_index, player.cultivation_type
+                )
+                exp_penalty = int(required_exp * failure_penalty_rate)
                 player.experience = max(0, player.experience - exp_penalty)
 
                 await self.db.update_player(player)

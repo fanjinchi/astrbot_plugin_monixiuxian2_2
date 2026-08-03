@@ -332,7 +332,9 @@ class XiuXianPlugin(Star):
         self.blessed_land_handlers = BlessedLandHandlers(self.db, self.blessed_land_mgr)
         self.spirit_farm_mgr = SpiritFarmManager(self.db, self.storage_ring_mgr)
         self.spirit_farm_handlers = SpiritFarmHandlers(self.db, self.spirit_farm_mgr)
-        self.dual_cult_mgr = DualCultivationManager(self.db)
+        self.dual_cult_mgr = DualCultivationManager(
+            self.db, self.config, self.config_manager
+        )
         self.dual_cult_handlers = DualCultivationHandlers(self.db, self.dual_cult_mgr)
         self.spirit_eye_mgr = SpiritEyeManager(self.db)
         self.spirit_eye_handlers = SpiritEyeHandlers(self.db, self.spirit_eye_mgr)
@@ -386,6 +388,18 @@ class XiuXianPlugin(Star):
         sender_id = str(event.get_sender_id())
         return sender_id in self.gm_admins
 
+    def _is_boss_enabled(self) -> bool:
+        """Return whether the world-boss feature is enabled."""
+        if not self.config_manager:
+            return True
+        return self.config_manager.game_config.get("boss", {}).get("enabled", True)
+
+    def _is_pve_enabled(self) -> bool:
+        """Return whether the PvE rift feature is enabled."""
+        if not self.config_manager:
+            return True
+        return self.config_manager.game_config.get("pve", {}).get("enabled", True)
+
     async def _send_access_denied_message(self, event: AstrMessageEvent):
         """发送访问被拒绝的提示消息"""
         try:
@@ -400,7 +414,10 @@ class XiuXianPlugin(Star):
         await migration_manager.migrate()
 
         # 启动定时任务
-        self.boss_task = asyncio.create_task(self._schedule_boss_spawn())
+        if self._is_boss_enabled():
+            self.boss_task = asyncio.create_task(self._schedule_boss_spawn())
+        else:
+            logger.info("【修仙插件】世界Boss玩法已关闭，跳过Boss生成定时任务。")
         self.loan_check_task = asyncio.create_task(self._schedule_loan_check())
         self.spirit_eye_task = asyncio.create_task(self._schedule_spirit_eye_spawn())
         self.bounty_check_task = asyncio.create_task(self._schedule_bounty_check())
@@ -1074,12 +1091,18 @@ class XiuXianPlugin(Star):
     @filter.command(CMD_BOSS_INFO, "查看世界Boss状态")
     @require_whitelist
     async def handle_boss_info(self, event: AstrMessageEvent):
+        if not self._is_boss_enabled():
+            yield event.plain_result("🛠️ 世界Boss玩法正在维护中，敬请期待！")
+            return
         async for r in self.boss_handlers.handle_boss_info(event):
             yield r
 
     @filter.command(CMD_BOSS_FIGHT, "挑战世界Boss")
     @require_whitelist
     async def handle_boss_fight(self, event: AstrMessageEvent):
+        if not self._is_boss_enabled():
+            yield event.plain_result("🛠️ 世界Boss玩法正在维护中，敬请期待！")
+            return
         user_id = event.get_sender_id()
         success, msg, battle_result = await self.boss_handlers.handle_boss_fight(
             user_id
@@ -1098,6 +1121,9 @@ class XiuXianPlugin(Star):
     @filter.command(CMD_SPAWN_BOSS, "生成世界Boss(管理员)")
     @require_whitelist
     async def handle_spawn_boss(self, event: AstrMessageEvent):
+        if not self._is_boss_enabled():
+            yield event.plain_result("🛠️ 世界Boss玩法正在维护中，敬请期待！")
+            return
         if not self._check_boss_admin(event):
             yield event.plain_result("❌ 你没有权限生成Boss！此指令仅限管理员使用。")
             return
@@ -1170,6 +1196,9 @@ class XiuXianPlugin(Star):
     @filter.command(CMD_RIFT_EXPLORE, "探索秘境")
     @require_whitelist
     async def handle_rift_explore(self, event: AstrMessageEvent, rift_id: int = 0):
+        if not self._is_pve_enabled():
+            yield event.plain_result("🛠️ 秘境玩法正在维护中，敬请期待！")
+            return
         async for r in self.rift_handlers.handle_rift_explore(event, rift_id):
             yield r
 

@@ -58,12 +58,9 @@ class ImpartManager:
 
     def _max_level_index(self) -> int:
         """Return the highest valid level index across both routes."""
-        return (
-            max(
-                len(self.config_manager.level_data),
-                len(self.config_manager.body_level_data),
-            )
-            - 1
+        return max(
+            self.config_manager.get_max_level("灵修"),
+            self.config_manager.get_max_level("体修"),
         )
 
     def _build_panel(self, impart_info: ImpartInfo) -> str:

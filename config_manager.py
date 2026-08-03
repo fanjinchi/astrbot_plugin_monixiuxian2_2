@@ -6,14 +6,32 @@ from astrbot.api import logger
 
 from .data.default_configs import ALCHEMY_CONFIG, BOSS_CONFIG, RIFT_CONFIG, SECT_CONFIG
 
+_CHINESE_DIGITS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
+
+
+def _stage_to_chinese(stage: int) -> str:
+    """Convert a 1-based stage number to its Chinese digit name.
+
+    Args:
+        stage: Stage number, typically 1-9 for normal levels.
+
+    Returns:
+        Chinese digit string (e.g. 1 -> "一"), or the numeric string if out of range.
+    """
+    if 1 <= stage <= 9:
+        return _CHINESE_DIGITS[stage - 1]
+    return str(stage)
+
 
 class ConfigManager:
     """配置管理器，加载境界、物品、武器和丹药配置"""
 
     def __init__(self, base_dir: Path):
         self._base_dir = base_dir
-        self.level_data: list[dict] = []  # 灵修境界数据
-        self.body_level_data: list[dict] = []  # 体修境界数据
+        self._level_config: dict = {}  # 灵修新结构配置
+        self._body_level_config: dict = {}  # 体修新结构配置
+        self.level_data: list[dict] = []  # 灵修境界数据（运行时合成，兼容 shim）
+        self.body_level_data: list[dict] = []  # 体修境界数据（运行时合成，兼容 shim）
         self.items_data: dict[str, dict] = {}  # 物品数据，key为物品名称
         self.weapons_data: dict[str, dict] = {}  # 武器数据，key为武器名称
         self.pills_data: dict[str, dict] = {}  # 破境丹数据，key为丹药名称
@@ -39,6 +57,219 @@ class ConfigManager:
         if cultivation_type == "体修":
             return self.body_level_data
         return self.level_data
+
+    def _get_level_config(self, cultivation_type: str = "灵修") -> dict:
+        """Return the raw level configuration dict for the given route."""
+        if cultivation_type == "体修":
+            return self._body_level_config
+        return self._level_config
+
+    @staticmethod
+    def _derive_max_level(realms: list[str]) -> int:
+        """Derive the highest level from the realm list.
+
+        Each realm has 9 normal levels plus one "initial" level, so max level is
+        ``len(realms) * 10 - 1``.
+        """
+        return max(0, len(realms) * 10 - 1)
+
+    def get_max_level(self, cultivation_type: str = "灵修") -> int:
+        """Return the highest valid level index for the given route."""
+        config = self._get_level_config(cultivation_type)
+        return self._derive_max_level(config.get("realms", []))
+
+    def get_level_name(self, level_index: int, cultivation_type: str = "灵修") -> str:
+        """Calculate the display name for a 1-based level index.
+
+        Normal levels are named ``{realm}{stage}阶`` (e.g. 练气一阶). Every 10th
+        level is named ``{next realm}初期`` to keep the existing convention.
+        Out-of-range levels fall back to ``境界{level_index}``.
+
+        Args:
+            level_index: 1-based level number.
+            cultivation_type: "灵修" or "体修".
+
+        Returns:
+            The Chinese level name.
+        """
+        if level_index < 1:
+            return f"境界{level_index}"
+
+        config = self._get_level_config(cultivation_type)
+        realms = config.get("realms", [])
+        if not realms:
+            return f"境界{level_index}"
+
+        max_level = self._derive_max_level(realms)
+        if level_index > max_level:
+            return f"境界{level_index}"
+
+        realm_index = (level_index - 1) // 10
+        stage = (level_index - 1) % 10 + 1
+
+        if stage == 10:
+            if realm_index + 1 < len(realms):
+                return f"{realms[realm_index + 1]}初期"
+            return f"境界{level_index}"
+
+        return f"{realms[realm_index]}{_stage_to_chinese(stage)}阶"
+
+    def get_exp_needed(self, level_index: int, cultivation_type: str = "灵修") -> int:
+        """Calculate the EXP required to break through from ``level_index``.
+
+        Uses the three-segment formula from the design document:
+        - ``E(L) = early_a * L^early_exp`` for ``L <= 10``
+        - ``E(L) = pivot10 * (L / 10)`` for ``10 < L <= mid_end_level``
+        - ``E(L) = pivot50 * (L / mid_end_level)^late_exp`` for ``L > mid_end_level``
+
+        Args:
+            level_index: 1-based current level.
+            cultivation_type: "灵修" or "体修" (uses the same formula parameters).
+
+        Returns:
+            Integer EXP needed for the next level; 0 if the level is invalid.
+        """
+        if level_index < 1:
+            return 0
+
+        config = self._get_level_config(cultivation_type)
+        curve = config.get("exp_curve", {})
+        early_a = curve.get("early_a", 1800)
+        early_exp = curve.get("early_exp", 1.5)
+        mid_end_level = curve.get("mid_end_level", 50)
+        late_exp = curve.get("late_exp", 1.7)
+
+        if level_index <= 10:
+            return int(early_a * (level_index**early_exp))
+
+        pivot10 = int(early_a * (10**early_exp))
+        if level_index <= mid_end_level:
+            return int(pivot10 * (level_index / 10.0))
+
+        pivot50 = int(pivot10 * (mid_end_level / 10.0))
+        return int(pivot50 * ((level_index / mid_end_level) ** late_exp))
+
+    def get_success_rate(
+        self, level_index: int, cultivation_type: str = "灵修"
+    ) -> float:
+        """Return the base breakthrough success rate for a target level.
+
+        The rate is looked up by the realm index of the target level. If the
+        configured table is shorter than the realm index, the last value (floor)
+        is used.
+
+        Args:
+            level_index: 1-based target level.
+            cultivation_type: "灵修" or "体修".
+
+        Returns:
+            Base success rate as a float, clamped to ``[0.0, 1.0]``.
+        """
+        if level_index < 1:
+            return 0.0
+
+        config = self._get_level_config(cultivation_type)
+        rates = config.get("success_rates", [])
+        if not rates:
+            return 0.4
+
+        # Level 10 is the "initial" stage of the next realm, so it shares the
+        # next realm's success rate (e.g. levels 10-19 use realm index 1).
+        realm_index = level_index // 10
+        if realm_index >= len(rates):
+            realm_index = len(rates) - 1
+        return max(0.0, min(1.0, float(rates[realm_index])))
+
+    def get_failure_penalty_rate(self, cultivation_type: str = "灵修") -> float:
+        """Return the breakthrough failure penalty rate for the given route.
+
+        The penalty is expressed as a fraction of the current level's required
+        EXP (``E(L) * rate``), not of the player's total experience.
+        """
+        config = self._get_level_config(cultivation_type)
+        return float(config.get("failure_penalty_rate", 0.25))
+
+    def get_level_index_by_name(
+        self, level_name: str, cultivation_type: str | None = None
+    ) -> int | None:
+        """Reverse-lookup a 1-based level index from its display name.
+
+        Searches the specified route; if none is specified, both routes are
+        searched. "初期" names are included automatically.
+
+        Args:
+            level_name: The Chinese level name to resolve.
+            cultivation_type: Optional route filter ("灵修" or "体修").
+
+        Returns:
+            The 1-based level index, or ``None`` if not found.
+        """
+        routes = [cultivation_type] if cultivation_type else ["灵修", "体修"]
+        for route in routes:
+            config = self._get_level_config(route)
+            realms = config.get("realms", [])
+            max_level = self._derive_max_level(realms)
+            for level in range(1, max_level + 1):
+                if self.get_level_name(level, route) == level_name:
+                    return level
+        return None
+
+    def _load_level_config(self, file_path: Path) -> dict:
+        """Load a new-style level configuration (dict with realms and formula)."""
+        if not file_path.exists():
+            logger.warning(f"境界配置文件 {file_path} 不存在，将使用空配置。")
+            return {}
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                logger.info(f"成功加载境界配置 {file_path.name}（新结构）。")
+                return data
+            if isinstance(data, list):
+                logger.warning(
+                    f"境界配置 {file_path.name} 为旧版列表格式，请按新结构替换。"
+                )
+                return {}
+            logger.error(f"境界配置 {file_path.name} 格式错误。")
+            return {}
+        except Exception as e:
+            logger.error(f"加载境界配置 {file_path} 失败: {e}")
+            return {}
+
+    def _build_level_data(self, config: dict, cultivation_type: str) -> list[dict]:
+        """Synthesize the legacy per-level list from the new-style config.
+
+        This shim preserves compatibility with modules that still read
+        ``level_data`` directly (e.g. boss_manager). Generated entries contain
+        ``level``, ``level_name``, ``exp_needed`` and ``success_rate`` but no
+        ``base_*`` attributes.
+        """
+        realms = config.get("realms", [])
+        data: list[dict] = []
+        if not realms:
+            return data
+        max_level = self._derive_max_level(realms)
+        for level in range(1, max_level + 1):
+            data.append(
+                {
+                    "level": level,
+                    "level_name": self.get_level_name(level, cultivation_type),
+                    "exp_needed": self.get_exp_needed(level, cultivation_type),
+                    "success_rate": self.get_success_rate(level, cultivation_type),
+                }
+            )
+        return data
+
+    def _validate_level_configs(self):
+        """Warn if the two cultivation routes have inconsistent realm counts."""
+        spirit_count = len(self._level_config.get("realms", []))
+        body_count = len(self._body_level_config.get("realms", []))
+        if spirit_count and body_count and spirit_count != body_count:
+            logger.warning(
+                "灵修与体修的大境界数量不一致（灵修 %d，体修 %d），可能导致显示异常。",
+                spirit_count,
+                body_count,
+            )
 
     def _load_json_data(self, file_path: Path) -> list[dict]:
         """加载JSON配置文件（列表格式）"""
@@ -137,11 +368,16 @@ class ConfigManager:
         """加载所有配置文件"""
         config_dir = self._base_dir / "config"
 
-        # 加载基础配置
-        self.level_data = self._load_json_data(config_dir / "level_config.json")
-        self.body_level_data = self._load_json_data(
+        # 加载新结构境界配置并合成运行时逐級列表（兼容 shim）
+        self._level_config = self._load_level_config(config_dir / "level_config.json")
+        self._body_level_config = self._load_level_config(
             config_dir / "body_level_config.json"
         )
+        self.level_data = self._build_level_data(self._level_config, "灵修")
+        self.body_level_data = self._build_level_data(self._body_level_config, "体修")
+        self._validate_level_configs()
+
+        # 加载物品配置
         self.items_data = self._load_items_data(config_dir / "items.json")
         self.weapons_data = self._load_items_data(config_dir / "weapons.json")
         self.pills_data = self._load_items_data(config_dir / "pills.json")

@@ -190,16 +190,52 @@ def realm_stage(level: int) -> tuple[int, int]:
     return t, s
 
 
-def baseline_exp_needed(level: int) -> int:
-    """当前手写 level_config.json 中从 L 升到 L+1 所需经验。
+# ---------------------------------------------------------------------------
+# 从新版公式化配置中读取经验与成功率
+# ---------------------------------------------------------------------------
 
-    level_config 中第 1 条是初始等级（exp_needed=0），第 k 条对应升到 k 级所需。
-    因此 E(L) = level_config[L].exp_needed（0 索引）。
+
+def _config_exp_needed(level: int) -> int:
+    """根据新版 level_config.json 计算从 ``level`` 升到 ``level+1`` 所需经验。"""
+    curve = level_config.get("exp_curve", {})
+    early_a = curve.get("early_a", 1800)
+    early_exp = curve.get("early_exp", 1.5)
+    mid_end_level = curve.get("mid_end_level", 50)
+    late_exp = curve.get("late_exp", 1.7)
+
+    if level <= 10:
+        return int(early_a * (level**early_exp))
+
+    pivot10 = int(early_a * (10**early_exp))
+    if level <= mid_end_level:
+        return int(pivot10 * (level / 10.0))
+
+    pivot50 = int(pivot10 * (mid_end_level / 10.0))
+    return int(pivot50 * ((level / mid_end_level) ** late_exp))
+
+
+def _config_success_rate(level: int) -> float:
+    """根据新版 level_config.json 查询目标等级的突破基础成功率。"""
+    rates = level_config.get("success_rates", [])
+    if not rates:
+        return 0.4
+
+    # Level 10 is the "initial" stage of the next realm, so it shares the next
+    # realm's success rate (e.g. levels 10-19 use realm index 1).
+    realm_index = level // 10
+    if realm_index >= len(rates):
+        realm_index = len(rates) - 1
+    return max(0.0, min(1.0, float(rates[realm_index])))
+
+
+def baseline_exp_needed(level: int) -> int:
+    """当前公式化 level_config.json 中从 L 升到 L+1 所需经验。
+
     99 级为等级上限，无 100 级配置，沿用 99 级数值作为对比参考。
     """
     if level < 99:
-        return int(level_config[level]["exp_needed"])
-    return int(level_config[98]["exp_needed"])
+        return _config_exp_needed(level)
+    return _config_exp_needed(99)
 
 
 def formula_d(level: int) -> int:
@@ -243,13 +279,13 @@ FORMULAS: dict[str, Any] = {
 def success_rate_for_level(level: int, formula_name: str) -> float:
     """返回从 L 升到 L+1 的突破成功率。
 
-    - baseline：读取当前 level_config.json 中目标等级 L+1 的 success_rate。
+    - baseline：读取当前公式化 level_config.json 中目标等级 L+1 的 success_rate。
     - 候选公式：按目标等级所在大境界查 REALM_SUCCESS_RATES。
     """
     if formula_name == "baseline":
         if level < 99:
-            return float(level_config[level]["success_rate"])
-        return float(level_config[98]["success_rate"])
+            return _config_success_rate(level + 1)
+        return _config_success_rate(99)
     target_level = level + 1
     t = (target_level - 1) // 10 + 1
     t = max(1, min(t, 10))
@@ -385,7 +421,7 @@ def format_number(n: float) -> str:
 
 def dual_cultivation_exploit(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """量化双修漏洞：两位 50 级玩家互刷。"""
-    # 使用当前手写配置（现状）的 50 级累计修为
+    # 使用当前公式化配置（基线）的 50 级累计修为
     cum_exp_50 = cumulative_exp(50, baseline_exp_needed)
 
     # 现状：每小时互双修一次，每次获得对方总修为 10%
@@ -492,7 +528,7 @@ def write_report(rows: list[dict[str, Any]]) -> None:
     lines.append("## 二、现状基线")
     lines.append("")
     lines.append(
-        "当前手写 level_config.json：前期经验需求极低，30 级后元婴起开始急剧爬升，36 级后全部卡死在 600 亿，且成功率压到 0.01%。"
+        "当前公式化 level_config.json：使用分段幂律曲线，L1-10 按 E=1800·L^1.5，L11-50 线性衔接，L51-99 按 (L/50)^1.7 放大。"
     )
     lines.append("")
     lines.append(
@@ -510,7 +546,7 @@ def write_report(rows: list[dict[str, Any]]) -> None:
         )
     lines.append("")
     lines.append(
-        "**问题总结**：L1 只需几分钟，L10 约半天，L20 约 2.5 天，而 L30 后由于 600 亿硬墙，升级时间直接膨胀到数月，后期成就感被纯数字卡点取代。"
+        "**问题总结**：新基线将 L1 控制在约 0.6 小时，L10 约 17 小时，L50 约 2.7 天，L99 约 6.4 天，累计约 300 天；失败惩罚与成功率配套后满级约 380 天。"
     )
     lines.append("")
     lines.append("## 三、候选公式对比")
@@ -568,7 +604,7 @@ def write_report(rows: list[dict[str, Any]]) -> None:
         mid_flag = in_target(sum(mid_samples) / len(mid_samples), 24, 48)
         late_flag = in_target(sum(late_samples) / len(late_samples), 72, 168)
         comments = {
-            "baseline": "前期秒升，后期 600 亿硬墙，节奏崩塌",
+            "baseline": "当前公式化基线，分段幂律，节奏贴近三段目标",
             "D": "单公式太陡，前期过快、后期过慢，无法同时满足三段目标",
             "E": "平滑但后期仍偏慢，单公式无法完美覆盖",
             "Custom": "分段校准后最接近目标，L50 略超 2 天，后期基本落在 3-7 天",
@@ -602,7 +638,7 @@ def write_report(rows: list[dict[str, Any]]) -> None:
     lines.append("")
     exploit = dual_cultivation_exploit(rows)
     lines.append(
-        f"以两位等级 50 的玩家为例，当前手写配置下到达 L50 的累计修为约为 **{format_number(exploit['cum_exp_50'])}**（{exploit['cum_exp_50']:,}）。"
+        f"以两位等级 50 的玩家为例，当前公式化配置下到达 L50 的累计修为约为 **{format_number(exploit['cum_exp_50'])}**（{exploit['cum_exp_50']:,}）。"
     )
     lines.append("")
     lines.append("### 5.1 现状模式（10% 对方总修为）")

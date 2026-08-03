@@ -37,11 +37,9 @@ class BreakthroughHandler:
         """查看突破信息"""
         display_name = event.get_sender_name()
 
-        # 根据修炼类型获取对应的境界数据
-        level_data = self.config_manager.get_level_data(player.cultivation_type)
-
         # 检查是否已经是最高境界
-        if player.level_index >= len(level_data) - 1:
+        max_level = self.config_manager.get_max_level(player.cultivation_type)
+        if player.level_index >= max_level:
             yield event.plain_result("你已经达到了最高境界，无法继续突破！")
             return
 
@@ -49,13 +47,18 @@ class BreakthroughHandler:
         modifiers = self.pill_manager.get_breakthrough_modifiers(player)
 
         # 获取当前和下一境界信息
-        current_level_data = level_data[player.level_index]
-        next_level_data = level_data[player.level_index + 1]
-
-        current_level_name = current_level_data["level_name"]
-        next_level_name = next_level_data["level_name"]
-        required_exp = next_level_data.get("exp_needed", 0)
-        base_success_rate = next_level_data.get("success_rate", 0.5)
+        current_level_name = self.config_manager.get_level_name(
+            player.level_index, player.cultivation_type
+        )
+        next_level_name = self.config_manager.get_level_name(
+            player.level_index + 1, player.cultivation_type
+        )
+        required_exp = self.config_manager.get_exp_needed(
+            player.level_index, player.cultivation_type
+        )
+        base_success_rate = self.config_manager.get_success_rate(
+            player.level_index + 1, player.cultivation_type
+        )
         temp_bonus = modifiers["temp_bonus"]
 
         # 检查修为是否满足
@@ -164,9 +167,6 @@ class BreakthroughHandler:
         await self.pill_manager.update_temporary_effects(player)
         modifiers = self.pill_manager.get_breakthrough_modifiers(player)
 
-        # 根据修炼类型获取对应的境界数据
-        level_data = self.config_manager.get_level_data(player.cultivation_type)
-
         # 如果指定了破境丹，验证其有效性
         if pill_name and pill_name.strip():
             pill_name = pill_name.strip()
@@ -183,11 +183,15 @@ class BreakthroughHandler:
             # 检查是否适用于当前突破
             target_level = pill_data.get("target_level_index", -1)
             if target_level != player.level_index + 1:
-                current_level = level_data[player.level_index]["level_name"]
-                # 获取丹药目标境界名称
-                target_level_name = f"境界{target_level}"
-                if 0 <= target_level < len(level_data):
-                    target_level_name = level_data[target_level]["level_name"]
+                current_level = self.config_manager.get_level_name(
+                    player.level_index, player.cultivation_type
+                )
+                target_level_name = (
+                    self.config_manager.get_level_name(
+                        target_level, player.cultivation_type
+                    )
+                    or f"境界{target_level}"
+                )
                 yield event.plain_result(
                     f"❌ {pill_name} 不适用于当前突破\n"
                     f"当前境界：{current_level}\n"

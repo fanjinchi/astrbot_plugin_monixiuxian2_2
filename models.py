@@ -159,21 +159,12 @@ class Player:
     last_daily_reset: str = ""
 
     def get_level(self, config_manager: "ConfigManager") -> str:
-        """Get level name from config"""
-        level_data = config_manager.get_level_data(self.cultivation_type)
-        # Find level by level_index matching
-        for level_info in level_data:
-            if level_info.get("level") == self.level_index:
-                return level_info.get("level_name", "未知境界")
-        return "未知境界"
+        """Get level name via the central config API."""
+        return config_manager.get_level_name(self.level_index, self.cultivation_type)
 
     def get_required_exp(self, config_manager: "ConfigManager") -> int:
-        """Get required EXP for next level"""
-        level_data = config_manager.get_level_data(self.cultivation_type)
-        for level_info in level_data:
-            if level_info.get("level") == self.level_index + 1:
-                return level_info.get("exp_needed", 0)
-        return 0
+        """Get required EXP for the next level via the central config API."""
+        return config_manager.get_exp_needed(self.level_index, self.cultivation_type)
 
     def get_techniques_list(self) -> list[str]:
         """Get technique list"""

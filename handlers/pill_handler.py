@@ -24,21 +24,12 @@ class PillHandler:
         self.pill_manager = PillManager(db, config_manager)
 
     def _format_required_level(self, level_index: int) -> str:
-        """同时展示灵修/体修的需求境界名称"""
-        names = []
-        if 0 <= level_index < len(self.config_manager.level_data):
-            name = self.config_manager.level_data[level_index].get("level_name", "")
-            if name:
-                names.append(name)
-        if 0 <= level_index < len(self.config_manager.body_level_data):
-            name = self.config_manager.body_level_data[level_index].get(
-                "level_name", ""
-            )
-            if name and name not in names:
-                names.append(name)
-        if not names:
-            return "未知境界"
-        return " / ".join(names)
+        """展示灵修/体修的需求境界名称"""
+        spirit_name = self.config_manager.get_level_name(level_index, "灵修")
+        body_name = self.config_manager.get_level_name(level_index, "体修")
+        if spirit_name == body_name:
+            return spirit_name
+        return f"{spirit_name} / {body_name}"
 
     @player_required
     async def handle_use_pill(

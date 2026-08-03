@@ -114,33 +114,9 @@ class RiftManager:
         )
 
     def _get_level_name(self, level_index: int) -> str:
-        """获取境界名称"""
-        if self.config_manager and hasattr(self.config_manager, "level_data"):
-            if 0 <= level_index < len(self.config_manager.level_data):
-                return self.config_manager.level_data[level_index].get(
-                    "level_name", f"境界{level_index}"
-                )
-        # 默认境界名称
-        level_names = [
-            "炼气期一层",
-            "炼气期二层",
-            "炼气期三层",
-            "炼气期四层",
-            "炼气期五层",
-            "炼气期六层",
-            "炼气期七层",
-            "炼气期八层",
-            "炼气期九层",
-            "炼气期十层",
-            "筑基期初期",
-            "筑基期中期",
-            "筑基期后期",
-            "金丹期初期",
-            "金丹期中期",
-            "金丹期后期",
-        ]
-        if 0 <= level_index < len(level_names):
-            return level_names[level_index]
+        """获取境界名称，统一委托给 ConfigManager 中央 API。"""
+        if self.config_manager:
+            return self.config_manager.get_level_name(level_index, "灵修")
         return f"境界{level_index}"
 
     async def list_rifts(self) -> tuple[bool, str]:

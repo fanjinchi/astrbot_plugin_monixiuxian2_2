@@ -327,9 +327,9 @@ class PlayerHandler:
             return
 
         # 闭关时长上限根据境界调整（基础24小时，每提升一个大境界增加6小时）
-        # level_index: 0-8练气, 9-17筑基, 18-26金丹, 27-35元婴, 36-44化神, 45-53炼虚, 54-62合体, 63-71大乘, 72+渡劫
+        # level_index 为 1-based：1-10 练气，11-20 筑基，依此类推
         base_minutes = 1440  # 24小时
-        realm_bonus = (player.level_index // 9) * 360  # 每个大境界增加6小时
+        realm_bonus = ((player.level_index - 1) // 10) * 360  # 每个大境界增加6小时
         MAX_CULTIVATION_MINUTES = base_minutes + realm_bonus
         effective_minutes = min(duration_minutes, MAX_CULTIVATION_MINUTES)
         exceeded_time = duration_minutes > MAX_CULTIVATION_MINUTES

@@ -243,16 +243,12 @@ class StorageRingManager:
     def _format_required_level(self, level_index: int) -> str:
         """格式化需求境界名称（同时显示灵修/体修）"""
         names = []
-        if 0 <= level_index < len(self.config_manager.level_data):
-            name = self.config_manager.level_data[level_index].get("level_name", "")
-            if name:
-                names.append(name)
-        if 0 <= level_index < len(self.config_manager.body_level_data):
-            name = self.config_manager.body_level_data[level_index].get(
-                "level_name", ""
-            )
-            if name and name not in names:
-                names.append(name)
+        spirit_name = self.config_manager.get_level_name(level_index, "灵修")
+        body_name = self.config_manager.get_level_name(level_index, "体修")
+        if spirit_name:
+            names.append(spirit_name)
+        if body_name and body_name != spirit_name:
+            names.append(body_name)
 
         if not names:
             return f"境界{level_index}"

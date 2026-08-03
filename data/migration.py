@@ -2072,6 +2072,8 @@ async def _migrate_to_v27(conn: aiosqlite.Connection, config_manager: ConfigMana
             logger.info("breakthrough_fail_streak 字段已存在，跳过")
 
         # 2. 非破坏式上调存量玩家 HP 至当前境界 base_hp（战斗属性不动）
+        # 注意：level_config 已公式化并移除 base_hp 字段，此步骤在新配置下恒为 no-op
+        # （base_hp 读取永远得到默认值 100），保留仅为兼容旧库升级路径不报错。
         # 测试桩可能未实现 get_level_data，旧版 players 表也可能缺列，此时跳过
         get_level_data = getattr(config_manager, "get_level_data", None)
         level_data = get_level_data("灵修") if callable(get_level_data) else []
