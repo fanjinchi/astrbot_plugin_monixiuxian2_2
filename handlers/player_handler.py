@@ -175,9 +175,11 @@ class PlayerHandler:
         armor_name = player.armor if player.armor else "无"
         technique_name = player.main_technique if player.main_technique else "无"
 
-        # 获取突破状态
-        breakthrough_rate = (
-            f"+{player.level_up_rate}%" if player.level_up_rate > 0 else "0%"
+        # 永久突破加成（level_up_rate，整数百分点），仅在大于 0 时显示
+        breakthrough_line = (
+            f"  突破加成：+{player.level_up_rate}%\n"
+            if player.level_up_rate > 0
+            else ""
         )
 
         # 获取修习目标
@@ -211,7 +213,7 @@ class PlayerHandler:
             f"  灵石：{player.gold:,}\n"
             f"  战力：{combat_power:,}\n"
             f"  灵根：{player.spiritual_root}\n"
-            f"  突破加成：{breakthrough_rate}\n"
+            f"{breakthrough_line}"
             f"\n"
             f"【四主属性】\n"
             f"  伤害：{total_attrs['damage']}\n"

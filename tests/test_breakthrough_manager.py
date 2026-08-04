@@ -177,3 +177,49 @@ async def test_breakthrough_failure_penalty_uses_current_level_exp(
     assert not died
     assert player.experience == 10**7 - penalty
     assert str(penalty) in msg
+
+
+class TestLevelUpRatePermanentBonus:
+    """level_up_rate participates in breakthrough success rate (spec: level-progression)."""
+
+    def test_zero_level_up_rate_unchanged(self, breakthrough_manager, config_manager):
+        """level_up_rate=0 (current fleet-wide state) keeps the old behavior exactly."""
+        player = Player(
+            user_id="u1", level_index=41, cultivation_type="灵修", level_up_rate=0
+        )
+        base = config_manager.get_success_rate(42, "灵修")
+
+        rate, info = breakthrough_manager.calculate_breakthrough_success_rate(player)
+
+        assert rate == pytest.approx(base)
+        assert "永久加成" not in info
+
+    def test_positive_level_up_rate_added_to_base(
+        self, breakthrough_manager, config_manager
+    ):
+        """level_up_rate=5 adds +5% to the base rate and shows an info line."""
+        player = Player(
+            user_id="u1", level_index=41, cultivation_type="灵修", level_up_rate=5
+        )
+        base = config_manager.get_success_rate(42, "灵修")
+
+        rate, info = breakthrough_manager.calculate_breakthrough_success_rate(player)
+
+        assert rate == pytest.approx(base + 0.05)
+        assert "永久加成：+5.0%" in info
+
+    def test_permanent_bonus_subject_to_pill_cap(
+        self, breakthrough_manager, config_manager
+    ):
+        """Permanent bonus merges into the pre-cap sum, so the pill max rate still clamps."""
+        player = Player(
+            user_id="u1", level_index=41, cultivation_type="灵修", level_up_rate=5
+        )
+
+        rate, info = breakthrough_manager.calculate_breakthrough_success_rate(
+            player, pill_name="化神丹"
+        )
+
+        # base 0.50 + 0.05 permanent + 0.77 pill = 1.32 -> capped by 化神丹 max 0.95
+        assert rate == pytest.approx(0.95)
+        assert "永久加成：+5.0%" in info

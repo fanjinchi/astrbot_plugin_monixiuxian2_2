@@ -100,16 +100,6 @@ class EquipmentManager:
         passive_bonus = item_config.get("passive_bonus", {})
         skill_pool = item_config.get("skill_pool", [])
 
-        # Legacy five-dimension mapping for old config files
-        physical_damage = item_config.get("physical_damage", 0)
-        magic_damage = item_config.get("magic_damage", 0)
-        physical_defense = item_config.get("physical_defense", 0)
-        magic_defense = item_config.get("magic_defense", 0)
-        if physical_damage or magic_damage:
-            damage = max(damage, physical_damage + magic_damage)
-        if physical_defense or magic_defense:
-            armor_value = max(armor_value, physical_defense + magic_defense)
-
         # Legacy equip_effects mapping (items.json 法器)
         equip_effects = item_config.get("equip_effects", {})
         attack = equip_effects.get("attack", 0)

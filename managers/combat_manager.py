@@ -305,17 +305,8 @@ class CombatEngine:
             except (TypeError, ValueError):
                 return "{}" if isinstance(value, dict) else "[]"
 
-        # Legacy five-dimension mapping for old config files
         damage = cfg.get("damage", 0)
         armor_value = cfg.get("armor_value", 0)
-        physical_damage = cfg.get("physical_damage", 0)
-        magic_damage = cfg.get("magic_damage", 0)
-        physical_defense = cfg.get("physical_defense", 0)
-        magic_defense = cfg.get("magic_defense", 0)
-        if physical_damage or magic_damage:
-            damage = max(damage, physical_damage + magic_damage)
-        if physical_defense or magic_defense:
-            armor_value = max(armor_value, physical_defense + magic_defense)
         equip_effects = cfg.get("equip_effects", {})
         attack = equip_effects.get("attack", 0)
         defense = equip_effects.get("defense", 0)

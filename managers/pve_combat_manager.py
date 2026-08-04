@@ -50,44 +50,6 @@ RIFT_LEVEL_DIFFICULTY_MAP = {
 }
 
 
-def calculate_equipment_atk_bonus(player: Player, config_manager) -> int:
-    """
-    计算装备提供的攻击力加成（旧接口，保留兼容）。
-
-    与 handlers/combat_handlers.py:_calculate_equipment_bonus 对齐，
-    仅统计武器的 atk、physical_damage、magic_damage。
-    """
-    if not config_manager:
-        return 0
-
-    total_atk = 0
-    if player.weapon and player.weapon in config_manager.weapons_data:
-        data = config_manager.weapons_data[player.weapon]
-        total_atk += data.get("atk", 0)
-        total_atk += data.get("physical_damage", 0)
-        total_atk += data.get("magic_damage", 0)
-
-    return total_atk
-
-
-def calculate_equipment_defense(player: Player, config_manager) -> int:
-    """
-    计算装备提供的防御力（旧接口，保留兼容）。
-
-    仅统计防具的 physical_defense 和 magic_defense。
-    """
-    if not config_manager:
-        return 0
-
-    total_defense = 0
-    if player.armor and player.armor in config_manager.items_data:
-        data = config_manager.items_data[player.armor]
-        total_defense += data.get("physical_defense", 0)
-        total_defense += data.get("magic_defense", 0)
-
-    return total_defense
-
-
 class PVECombatManager:
     """PVE战斗管理器 - 处理战斗触发、敌人选择、奖励计算和结果格式化"""
 

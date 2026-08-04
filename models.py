@@ -107,7 +107,7 @@ class Player:
     state: str = "空闲"
     cultivation_start_time: int = 0  # Unix timestamp, 0 = not cultivating
     last_check_in_date: str = ""  # YYYY-MM-DD
-    level_up_rate: int = 0  # Breakthrough success rate bonus
+    level_up_rate: int = 0  # Permanent breakthrough success rate bonus in integer percentage points (5 = +5%); consumed by calculate_breakthrough_success_rate, currently no grant source
 
     # Breakthrough fail-streak pity counter
     breakthrough_fail_streak: int = 0  # Consecutive failures without death

@@ -1,5 +1,5 @@
 """Tests for PVECombatManager - encounter probability, enemy category distribution,
-reward calculation, equipment defense, and the full trigger_pve_combat flow.
+reward calculation, and the full trigger_pve_combat flow.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -11,8 +11,6 @@ from tests.helpers import load_module
 # Load modules via importlib.util, bypassing managers/__init__.py
 _pve_mod = load_module("pve_combat_manager", "managers/pve_combat_manager.py")
 PVECombatManager = _pve_mod.PVECombatManager
-calculate_equipment_defense = _pve_mod.calculate_equipment_defense
-calculate_equipment_atk_bonus = _pve_mod.calculate_equipment_atk_bonus
 RIFT_LEVEL_DIFFICULTY_MAP = _pve_mod.RIFT_LEVEL_DIFFICULTY_MAP
 
 _cm_mod = load_module("combat_manager", "managers/combat_manager.py")
@@ -353,123 +351,6 @@ class TestRewardCalculation:
     def calculate_rewards(pve_manager, result, base, enemy):
         """Helper to access private method in tests."""
         return pve_manager._calculate_rewards(result, base, enemy)
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Equipment defense helper
-# ──────────────────────────────────────────────────────────────────────
-
-
-class TestCalculateEquipmentDefense:
-    """calculate_equipment_defense standalone function."""
-
-    def test_no_config_manager(self, mock_player):
-        """Returns 0 when config_manager is None."""
-        assert calculate_equipment_defense(mock_player, None) == 0
-
-    def test_no_equipment(self, mock_player, mock_config_manager):
-        """Returns 0 when player has no weapon/armor."""
-        mock_player.weapon = ""
-        mock_player.armor = ""
-        assert calculate_equipment_defense(mock_player, mock_config_manager) == 0
-
-    def test_weapon_defense_not_counted(self, mock_player, mock_config_manager):
-        """Weapon physical/magic defense is not counted."""
-        mock_player.weapon = "玄铁剑"
-        mock_player.armor = ""
-        mock_config_manager.weapons_data = {
-            "玄铁剑": {"physical_defense": 15, "magic_defense": 5}
-        }
-        assert calculate_equipment_defense(mock_player, mock_config_manager) == 0
-
-    def test_armor_defense(self, mock_player, mock_config_manager):
-        """Armor with defenses contributes to total."""
-        mock_player.weapon = ""
-        mock_player.armor = "金蚕丝甲"
-        mock_config_manager.items_data = {
-            "金蚕丝甲": {"physical_defense": 30, "magic_defense": 10}
-        }
-        assert calculate_equipment_defense(mock_player, mock_config_manager) == 40
-
-    def test_weapon_and_armor(self, mock_player, mock_config_manager):
-        """Only armor defenses are summed; weapon defenses are ignored."""
-        mock_player.weapon = "玄铁剑"
-        mock_player.armor = "金蚕丝甲"
-        mock_config_manager.weapons_data = {
-            "玄铁剑": {"physical_defense": 15, "magic_defense": 5}
-        }
-        mock_config_manager.items_data = {
-            "金蚕丝甲": {"physical_defense": 30, "magic_defense": 10}
-        }
-        assert calculate_equipment_defense(mock_player, mock_config_manager) == 40
-
-    def test_missing_weapon_in_data(self, mock_player, mock_config_manager):
-        """When weapon name not in data, it is skipped without error."""
-        mock_player.weapon = "不存在之剑"
-        mock_player.armor = ""
-        assert calculate_equipment_defense(mock_player, mock_config_manager) == 0
-
-    def test_defense_fields_missing(self, mock_player, mock_config_manager):
-        """Weapon data without defense keys returns 0 for that item."""
-        mock_player.weapon = "木剑"
-        mock_player.armor = ""
-        mock_config_manager.weapons_data = {"木剑": {"atk": 5}}
-        assert calculate_equipment_defense(mock_player, mock_config_manager) == 0
-
-    def test_config_manager_none_with_equipment(self, mock_player):
-        """Returns 0 when config_manager is None even if player has equipment."""
-        mock_player.weapon = "玄铁剑"
-        mock_player.armor = "金蚕丝甲"
-        assert calculate_equipment_defense(mock_player, None) == 0
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Equipment attack bonus helper
-# ──────────────────────────────────────────────────────────────────────
-
-
-class TestCalculateEquipmentAtkBonus:
-    """calculate_equipment_atk_bonus standalone function."""
-
-    def test_no_config_manager(self, mock_player):
-        """Returns 0 when config_manager is None."""
-        assert calculate_equipment_atk_bonus(mock_player, None) == 0
-
-    def test_no_weapon(self, mock_player, mock_config_manager):
-        """Returns 0 when player has no weapon."""
-        mock_player.weapon = ""
-        assert calculate_equipment_atk_bonus(mock_player, mock_config_manager) == 0
-
-    def test_weapon_atk_bonus(self, mock_player, mock_config_manager):
-        """Weapon atk contributes to attack bonus."""
-        mock_player.weapon = "玄铁剑"
-        mock_config_manager.weapons_data = {"玄铁剑": {"atk": 25}}
-        assert calculate_equipment_atk_bonus(mock_player, mock_config_manager) == 25
-
-    def test_weapon_physical_damage_bonus(self, mock_player, mock_config_manager):
-        """Weapon physical_damage contributes to attack bonus."""
-        mock_player.weapon = "玄铁剑"
-        mock_config_manager.weapons_data = {"玄铁剑": {"physical_damage": 10}}
-        assert calculate_equipment_atk_bonus(mock_player, mock_config_manager) == 10
-
-    def test_weapon_magic_damage_bonus(self, mock_player, mock_config_manager):
-        """Weapon magic_damage contributes to attack bonus."""
-        mock_player.weapon = "玄铁剑"
-        mock_config_manager.weapons_data = {"玄铁剑": {"magic_damage": 12}}
-        assert calculate_equipment_atk_bonus(mock_player, mock_config_manager) == 12
-
-    def test_weapon_all_atk_fields_summed(self, mock_player, mock_config_manager):
-        """Weapon atk + physical_damage + magic_damage are summed."""
-        mock_player.weapon = "玄铁剑"
-        mock_config_manager.weapons_data = {
-            "玄铁剑": {"atk": 20, "physical_damage": 8, "magic_damage": 7}
-        }
-        assert calculate_equipment_atk_bonus(mock_player, mock_config_manager) == 35
-
-    def test_missing_weapon_in_data(self, mock_player, mock_config_manager):
-        """When weapon name not in data, it is skipped without error."""
-        mock_player.weapon = "不存在之剑"
-        assert calculate_equipment_atk_bonus(mock_player, mock_config_manager) == 0
 
 
 # ──────────────────────────────────────────────────────────────────────

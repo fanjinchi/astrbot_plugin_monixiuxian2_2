@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.7.0  
+> **版本:** v3.7.1  
 > **许可证:** AGPL-3.0  
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -308,6 +308,21 @@ astrbot_plugin_monixiuxian2/
 ---
 
 ## 📝 更新日志
+
+---
+
+### v3.7.1 - 遗留五维清理与死字段修复
+
+**🧹 清理**
+- 装备配置移除旧五维遗留字段（physical_damage/magic_damage/physical_defense/magic_defense/mental_power），解析值固化为显式 damage/armor_value，装备数值不变
+- 移除装备/战斗/商店三处五维回退映射代码，删除 PvE 遗留兼容死代码
+
+**🔧 修复**
+- `level_up_rate` 接入突破成功率计算（永久加成，并入基础成功率、受破境丹上限钳制）；玩家信息仅在加成大于 0 时显示该项
+
+**📝 文档**
+- 重写 current-design-report 为 CombatEngine 四主属性框架现状（v27 数据库 / 99 级十境界 / Muxxu 公式）
+- exp-curve-report 旧机制段落标注为历史背景（v3.7.0 已修复）
 
 ---
 

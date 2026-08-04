@@ -550,16 +550,6 @@ class ShopManager:
         hp = data.get("hp", 0)
         armor_value = data.get("armor_value", 0)
 
-        # Legacy five-dimension fallback
-        physical_damage = data.get("physical_damage", 0)
-        magic_damage = data.get("magic_damage", 0)
-        physical_defense = data.get("physical_defense", 0)
-        magic_defense = data.get("magic_defense", 0)
-        if physical_damage or magic_damage:
-            damage = max(damage, physical_damage + magic_damage)
-        if physical_defense or magic_defense:
-            armor_value = max(armor_value, physical_defense + magic_defense)
-
         # Legacy equip_effects fallback (items.json 法器)
         equip_effects = data.get("equip_effects", {})
         if isinstance(equip_effects, dict):
