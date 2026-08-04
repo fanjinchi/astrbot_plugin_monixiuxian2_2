@@ -1,0 +1,4 @@
+pool,id,name,trigger_name,trigger_condition,trigger_rate,effect,effect_value,route_mult_ling,route_mult_ti,learn_coefficient,ultimate_json,description,ref_source,design_note,status
+通用功法池,common_001,基础吐纳,气息流转,attack,0.15,damage_bonus,1.2,1.0,1.0,1.0,null,最基础的修炼法门,现有配置,期望增益 0.15×0.2=3% ≤30% ✓,legacy
+通用功法池,common_002,铁布衫,金刚护体,defend,0.2,damage_reduction,0.5,0.8,1.2,1.0,null,强化肉身的防御功法,现有配置,期望减伤 0.2×0.5=10%，受 40% 总 cap 约束 ✓,legacy
+通用功法池,draft_leiji,雷击诀,九霄神雷,attack,0.1,damage_bonus,2.0,1.2,0.8,1.0,null,引九天神雷劈击敌手,MB:Lightning/QPet:晴天霹雳(示意),高倍率低触发：期望 0.1×1.0=10% ≤30% ✓；灵修路线上浮,draft

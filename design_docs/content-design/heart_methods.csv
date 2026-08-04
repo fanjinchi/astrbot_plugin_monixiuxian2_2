@@ -1,0 +1,2 @@
+id,name,description,rank,required_level_index,passive_bonus_json,skill_pool_json,route,shop_weight,ref_source,design_note,status
+heart_001,长春功,基础心法，延年益寿,凡品,0,"{""hp_percent"": 0.1}","[{""skill_id"": ""common_001"", ""learn_coefficient"": 1.0}, {""skill_id"": ""common_002"", ""learn_coefficient"": 0.8}]",通用,100,现有配置,单条被动 10% ≤15% ✓,legacy

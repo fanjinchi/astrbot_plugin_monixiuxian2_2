@@ -1,0 +1,4 @@
+id,name,weapon_category,size_class,rank,required_level_index,base_damage,weapon_coefficient_k,bonus_damage,armor_value,price,shop_weight,route_mult_ling,route_mult_ti,trigger_skills_json,description,ref_source,design_note,status
+sword_001,青铜剑,剑,中,凡品,0,9,0.5,15,3,199,1000,1.0,1.0,[],普通的青铜剑，适合初学者,现有配置,旧框架数值，每击超新预算，待重做,legacy
+sword_003,碧水灵剑,剑,中,灵品,10,16,0.5,70,15,5670,200,1.0,1.0,[],蕴含水灵气的宝剑,现有配置,旧框架数值，bonus_damage 70 过高，待重做,legacy
+club_010,狼牙棒,棍,重,灵品,10,21,0.6,0,10,6000,200,1.0,1.0,[],沉重的铁棒，挥舞起来势大力沉,QPet:木槌/棒球棒,大型武器低频高伤适配：K=0.6、无 bonus_damage，每击取预算低段≈43 使 TTK≈5.4 落在 G1 区间,draft
