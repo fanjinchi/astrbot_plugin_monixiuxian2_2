@@ -31,5 +31,5 @@
 - [x] 5.1 运行 `uv run ruff format . && uv run ruff check .` 无错误
 - [x] 5.2 运行 `timeout 120 uv run python -m pytest tests/ -q` 全绿（注意使用 tests/helpers.py 的 load_module 模式）
 - [x] 5.3 更新 `metadata.yaml` 版本号、`README.md` 更新日志（末尾追加），按需同步 `handlers/misc_handler.py` 修仙帮助文本
-- [ ] 5.4 关闭 bd issue：gxo、nec、iae、rau（附本变更提交引用）
-- [ ] 5.5 `git pull --rebase && git push`，确认 `git status` 显示 up to date
+- [x] 5.4 关闭 bd issue：gxo、nec、iae、rau（附本变更提交引用）
+- [x] 5.5 `git pull --rebase && git push`，确认 `git status` 显示 up to date

@@ -102,7 +102,7 @@ class BreakthroughManager:
         max_rate = 1.0  # 默认最大100%
 
         if permanent_bonus:
-            info_lines.append(f"永久加成：+{permanent_bonus:.1%}")
+            info_lines.append(f"永久加成：{permanent_bonus:+.1%}")
 
         if temp_bonus:
             info_lines.append(f"临时丹药加成：{temp_bonus:+.1%}")

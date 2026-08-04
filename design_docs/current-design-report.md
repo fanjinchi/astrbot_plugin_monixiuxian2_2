@@ -38,6 +38,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 └── tests/             # pytest（用 tests/helpers.py 的 load_module 绕过相对导入）
 ```
 
+> 目录文件计数不含 `__init__.py`。
+
 **调用链**：用户指令 → `main.py` 的 `@filter.command` 方法 → `handlers/xxx_handler.py` → `managers/` 或 `core/` 管理器 → `data/` 数据库封装。
 
 ### 2.2 关键机制
@@ -94,7 +96,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | 闭关/签到 | cultivation_start_time、last_check_in_date |
 | 装备栏 | weapon、armor、main_technique、techniques（JSON 列表，最多 3 个功法） |
 | **四主属性** | **damage（伤害/攻击）、agility（身法/闪避命中）、speed（迅捷/出手频率）、hp（气血/生命上限）** |
-| 护甲 | armor_value（装备加法减伤，不作为主属性） |
+| 护甲 | armor_value（装备提供的百分比减伤来源，不作为主属性；减伤率 = 护甲/(护甲+K)） |
 | 技能修习 | study_target（修习目标）、battle_report_merge_count（战报合并条数偏好） |
 | 宗门 | sect_id、sect_position（0宗主/1长老/2亲传/3内门/4外门）、sect_contribution、sect_task、sect_elixir_get |
 | 洞天 | blessed_spot_flag、blessed_spot_name |
@@ -125,7 +127,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 - **修为公式**（:336-380）：
   `total_exp = int(BASE_EXP_PER_MINUTE(默认100) × minutes × 灵根倍率 × (1 + 心法exp_multiplier) × 丹药cultivation_speed倍率)`
-- **时长上限**：`1440 + (level_index // 9) × 360` 分钟（基础 24h，每个大境界 +6h）；不足 1 分钟无收益
+- **时长上限**（handlers/player_handler.py:331-336）：`1440 + ((level_index - 1) // 10) × 360` 分钟（基础 24h，每提升一个大境界 +6h，大境界按 10 级一档）；不足 1 分钟无收益
 - 机制：开始仅记录时间戳，出关时按实际分钟结算（即"离线收益"）
 - **新玩家初始属性**（:291-310，创角随机区间，不读境界配置）：
   - 灵修：伤害 8-18 / 身法 5-15 / 迅捷 5-15 / 气血 90-130
@@ -171,17 +173,18 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 - **全自动回合制**：战中零操作，胜负由战前配装与随机判定链决定
 - **出手权**（迅捷加权）：`P(甲出手) = 迅捷甲 / (迅捷甲 + 迅捷乙)`，每次出手一次攻击；总行动上限 `action_limit=200`（combat.action_limit），达限判平
-- **伤害公式**（Muxxu 式，:551-563）：
-  `伤害 = floor((武器基础伤害 + 伤害属性 × 武器系数K) × 技能倍率 × uniform(0.95, 1.05) − 护甲)`，下限 1；空手保底 base_damage=5
+- **伤害公式**（Muxxu 式，两步结算）：
+  1. 原始伤害 `_calc_damage`（:548）：`raw = floor((武器基础伤害 + 伤害属性 × 武器系数K) × 技能倍率 × uniform(0.95, 1.05))`，下限 1；空手保底 base_damage=5、K=0.5
+  2. 护甲减伤 `_apply_armor_and_reduction`（:575）：百分比减伤 `减伤率 = 护甲 / (护甲 + K)`，`K = armor_k_base(100) + armor_k_level_coeff(10) × 防守方等级`；`最终伤害 = floor(raw × (1 − 减伤率) × 技能减伤系数)`，总减伤率不超过 `damage_reduction_cap`（0.4），下限 1
 - **统一判定链**：出手权 → 闪避 → 格挡 → 暴击 → 触发技 → 大招 → 伤害结算
   - 闪避率由双方身法差决定，上限 `dodge_cap`（0.4）；格挡上限 `block_cap`（0.3）
-  - 暴击率基础 `base_crit_rate`（0.15）、上限 `crit_rate_cap`（0.5），暴击倍率 ×1.5（`crit_damage_multiplier`），减伤上限 `damage_reduction_cap`（0.4）
+  - 暴击率基础 `base_crit_rate`（0.15，仅代码默认值，combat 段未配置）、上限 `crit_rate_cap`（0.5），暴击倍率 ×1.5（`crit_damage_multiplier`），减伤上限 `damage_reduction_cap`（0.4）
 - **胜负**：一方气血 ≤ 0 即败；切磋无实质惩罚，决斗败者气血置 1
 - **战报**：叙事化判定记录按合并条数输出（玩家可配 `battle_report_merge_count`，默认 10）
 - **冷却**：切磋 60s / 决斗 300s（combat.spar_cooldown/duel_cooldown）
 - **战力公式**（ranking_manager.py:125-126）：`战力 = 伤害 + 身法 + 迅捷 + 气血 + 护甲//2`（含装备，不含临时丹药；玩家信息与排行榜同公式）
 
-### 4.6 技能系统（skill-system 规范，managers/skill_manager.py）
+### 4.6 技能系统（skill-system 规范，core/skill_manager.py）
 
 - **挂载规则**：技能仅通过装备挂载——心法携带属性被动（常驻）+ 配套功法池；功法携带随机触发技与大招；武器仅携带触发技。无独立技能栏
 - **触发技**：在判定链触发技环节按时机（攻击时/受击时/暴击时/回合开始等）与概率自动判定；效果覆盖伤害追加、连击、反击、控制、增益/减益
@@ -344,7 +347,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 | 系统 | 冷却 / 上限 |
 |---|---|
-| 闭关 | 上限 1440 + 360×(level_index//9) 分钟 |
+| 闭关 | 上限 1440 + 360×((level_index-1)//10) 分钟 |
 | 签到 | 每日 1 次（50~500 灵石） |
 | 弃道重修 | 7 天 |
 | 切磋 / 决斗 | 60s / 300s |
@@ -374,7 +377,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 突破失败   = E(L) × 25%（未死）；死亡 uniform(0.005, 0.03) × 死亡倍率
 突破成长   = hp +15；战斗属性 5 点逐点加权随机（伤害60%/身法25%/迅捷15%）
 出手权     = P(甲) = 迅捷甲 / (迅捷甲 + 迅捷乙)
-回合伤害   = floor((武器基础伤害 + 伤害 × 武器系数K) × 技能倍率 × uniform(0.95,1.05) − 护甲)，下限 1
+原始伤害   = floor((武器基础伤害 + 伤害 × 武器系数K) × 技能倍率 × uniform(0.95,1.05))，空手保底 5
+回合伤害   = floor(原始伤害 × (1 − 护甲/(护甲+100+10×等级)) × 技能减伤系数)，总减伤≤40%，下限 1
 判定链     = 出手权 → 闪避 → 格挡 → 暴击 → 触发技 → 大招 → 伤害结算
 战力       = 伤害 + 身法 + 迅捷 + 气血 + 护甲//2
 双修收益   = K(2)小时 × 100 × 60 × 自身灵根倍率 × f(大境界序号)   （定额，双向）

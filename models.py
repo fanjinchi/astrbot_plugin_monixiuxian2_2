@@ -226,7 +226,7 @@ class Player:
     ) -> dict:
         """Calculate total combat attributes from base, equipment, and pills.
 
-        The new framework uses four main attributes plus additive armor.
+        The new framework uses four main attributes plus armor (percent damage reduction).
 
         Args:
             equipped_items: List of equipped items

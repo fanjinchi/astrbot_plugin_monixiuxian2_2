@@ -353,15 +353,16 @@ def _print_legacy_field_report(weapons: list[dict[str, Any]]) -> None:
     print("-" * 80)
     print(
         "Fields physical_damage / magic_damage / physical_defense / mental_power "
-        "are still read by runtime code, so they are preserved in weapons.json."
+        "were removed from weapons.json in v3.7.1: their resolved values were baked "
+        "into explicit damage/armor_value and all runtime fallback readers were deleted."
     )
     read_locations = [
-        "core/equipment_manager.py:_parse_item_config (maps to damage/armor_value)",
-        "core/shop_manager.py:_parse_item_effects (maps to damage/armor_value)",
-        "managers/combat_manager.py:_parse_item_config (maps to damage/armor_value)",
-        "managers/pve_combat_manager.py:calculate_equipment_atk_bonus/defense (direct read)",
+        "core/equipment_manager.py:_parse_item_config (removed in v3.7.1)",
+        "core/shop_manager.py:_normalize_equipment_attributes (removed in v3.7.1)",
+        "managers/combat_manager.py:_parse_item_config (removed in v3.7.1)",
+        "managers/pve_combat_manager.py:calculate_equipment_atk_bonus/defense (deleted in v3.7.1)",
     ]
-    print("Known runtime read locations:")
+    print("Former runtime read locations (all removed):")
     for loc in read_locations:
         print(f"  - {loc}")
 

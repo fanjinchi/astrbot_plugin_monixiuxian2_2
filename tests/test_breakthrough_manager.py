@@ -223,3 +223,56 @@ class TestLevelUpRatePermanentBonus:
         # base 0.50 + 0.05 permanent + 0.77 pill = 1.32 -> capped by 化神丹 max 0.95
         assert rate == pytest.approx(0.95)
         assert "永久加成：+5.0%" in info
+
+    def test_permanent_bonus_stacks_with_temp_bonus(
+        self, breakthrough_manager, config_manager
+    ):
+        """level_up_rate and temp pill bonus both join the pre-cap sum."""
+        player = Player(
+            user_id="u1", level_index=41, cultivation_type="灵修", level_up_rate=5
+        )
+        base = config_manager.get_success_rate(42, "灵修")
+
+        rate, info = breakthrough_manager.calculate_breakthrough_success_rate(
+            player, temp_bonus=0.1
+        )
+
+        assert rate == pytest.approx(base + 0.05 + 0.10)
+        assert "永久加成：+5.0%" in info
+        assert "临时丹药加成：+10.0%" in info
+
+    def test_pity_stacks_after_permanent_bonus(
+        self, breakthrough_manager, config_manager
+    ):
+        """Fail-streak pity bonus applies after the permanent bonus (post pill cap)."""
+        player = Player(
+            user_id="u1",
+            level_index=41,
+            cultivation_type="灵修",
+            level_up_rate=5,
+            breakthrough_fail_streak=2,
+        )
+        base = config_manager.get_success_rate(42, "灵修")
+
+        rate, info = breakthrough_manager.calculate_breakthrough_success_rate(player)
+
+        # base + 0.05 permanent, then + 2 * 0.05 pity step
+        assert rate == pytest.approx(base + 0.05 + 0.10)
+        assert "连败加成：+10.0%" in info
+
+    def test_pity_guarantee_overrides_permanent_bonus(
+        self, breakthrough_manager, config_manager
+    ):
+        """19-loss guarantee forces 100% regardless of other bonuses."""
+        player = Player(
+            user_id="u1",
+            level_index=41,
+            cultivation_type="灵修",
+            level_up_rate=5,
+            breakthrough_fail_streak=19,
+        )
+
+        rate, info = breakthrough_manager.calculate_breakthrough_success_rate(player)
+
+        assert rate == pytest.approx(1.0)
+        assert "连败保底" in info
