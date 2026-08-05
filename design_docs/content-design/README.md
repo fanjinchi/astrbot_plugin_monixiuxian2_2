@@ -108,15 +108,16 @@
 - **武器**：120 件但数值为旧框架（legacy 行验算普遍超预算），且 L36-L99 无
   境界档位（bd issue `wxg`）—— 需要全量按新预算重做 + 补齐高档。
 
-## 7. 当前进度与下一步
+## 7. 当前进度
 
-> 2026-08-05 状态快照，供接续会话参考；总跟踪 issue：`bd show hz7`。
+> 2026-08-06 状态快照，供接续会话参考；总跟踪 issue：`bd show hz7`。
 
 - [x] 工作区搭建（CSV 骨架 + 验算脚本 `validate_budget.py`，已跑通）
 - [x] researcher 外部调研整合（`researcher-similar-games.md`）
-- [ ] **下一步：武器标杆件**——每品级先定 1 件（凡品 L0 → 混元先天 L99），按 §3
-  预算定 `base_damage`/`K`，`validate_budget.py` 全 PASS 后再批量扩展同品级变体；
-  同步补 L36-L99 境界档位（`wxg`）。注意：重武器取预算低段才能让 TTK≥5。
+- [x] **武器标杆件**：9 品级 × 1 件已定 draft 且 `validate_budget.py` 全 PASS
+  （决策记录见 `weapons.md`：品级门槛按大境界重排 0/11/21/…/81，同步解决
+  `wxg` 的 L36-L99 档位缺口；轻/中/重取预算高/中/低段的调参规则已定）
+- [ ] 武器变体扩展：以标杆件为锚，同品级同体量件用 bonus/armor/触发技/route_mult 做横向差异
 - [ ] 功法池扩充（现 6 个 → 每池 5-8 个，照搬 MB/QPet taxonomy 适配）
 - [ ] 心法成体系（现 5 个 → 按路线 × 品级矩阵补齐）
 - [ ] 定稿后写 CSV → config 转换脚本，跑 `design_docs/attribute-growth/sim_balance_regression.py` 回归
