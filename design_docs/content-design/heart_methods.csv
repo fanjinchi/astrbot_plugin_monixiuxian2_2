@@ -1,2 +1,19 @@
-id,name,description,rank,required_level_index,passive_bonus_json,skill_pool_json,route,shop_weight,ref_source,design_note,status
-heart_001,长春功,基础心法，延年益寿,凡品,0,"{""hp_percent"": 0.1}","[{""skill_id"": ""common_001"", ""learn_coefficient"": 1.0}, {""skill_id"": ""common_002"", ""learn_coefficient"": 0.8}]",通用,100,现有配置,单条被动 10% ≤15% ✓,legacy
+id,name,description,rank,required_level_index,passive_bonus_json,exp_multiplier,skill_pool_json,route,shop_weight,ref_source,design_note,status
+heart_001,长春功,基础心法，延年益寿,凡品,0,"{""hp_percent"": 0.1}",0.0,"[{""skill_id"": ""common_001"", ""learn_coefficient"": 1.0}, {""skill_id"": ""common_002"", ""learn_coefficient"": 0.8}]",通用,100,现有配置,新手默认；单条被动 10% ≤15% ✓,legacy
+heart_004,养气诀,吐纳养气，修为日进,凡品,0,"{""hp_percent"": 0.03}",0.08,[],通用,100,原创（v1 池）,修炼引入：3 点战斗 + 8% exp，第一个「快 vs 强」抉择,draft
+heart_101,烈火功,真气如烈火燎原，攻伐无匹,灵品,11,"{""damage_percent"": 0.12}",0.0,[],通用,60,原创（v1 池）,爆发流起点；12 点,draft
+heart_102,龟息功,气息绵长如龟寿，气血浑厚,灵品,11,"{""hp_percent"": 0.09}",0.06,[],通用,60,原创（v1 池）,坦克/微修炼混合；9 点,draft
+heart_201,金罡诀,金罡护体，攻守兼备,地品,21,"{""damage_percent"": 0.1, ""armor_value"": 15}",0.0,[],通用,35,原创（v1 池）,首个攻防复合；armor 门槛减伤≈4%，≈14 点,draft
+heart_202,云游诀,云游四方，心无挂碍，修为自增,地品,21,"{""agility_percent"": 0.08}",0.15,[],通用,35,原创（v1 池）,修炼+生存；5.6 点,draft
+heart_301,玄影功,身形如玄影飘忽，难以捉摸,天品,31,"{""agility_percent"": 0.15, ""hp_percent"": 0.05}",0.0,[],通用,20,原创（v1 池）,闪避流核心；15.5 点（agility 受闪避 cap 递减）,draft
+heart_302,紫府功,开辟紫府，修炼一日千里,天品,31,"{""hp_percent"": 0.05}",0.2,[],通用,20,原创（v1 池）,纯修炼；5 点,draft
+heart_401,战神诀,战神之诀，攻无不克,皇品,41,"{""damage_percent"": 0.15, ""armor_value"": 20}",0.0,[],通用,12,原创（v1 池）,单条顶 15% cap 的输出顶点；≈18.5 点,draft
+heart_402,不动明王功,不动如山，明王护体,皇品,41,"{""hp_percent"": 0.13, ""armor_value"": 30}",0.0,[],通用,12,原创（v1 池）,坦克顶点；≈18.4 点,draft
+heart_501,疾风迅雷功,疾风迅雷，先声夺人,帝品,51,"{""speed_percent"": 0.12, ""agility_percent"": 0.1}",0.0,[],通用,7,原创（v1 池）,先手流核心；19 点（speed 双端收益按主属性计）,draft
+heart_502,归一诀,万法归一，修为精进,帝品,51,"{""hp_percent"": 0.06}",0.3,[],通用,7,原创（v1 池）,高修炼；6 点,draft
+heart_601,太虚功,太虚无形，攻闪相生,道品,61,"{""damage_percent"": 0.12, ""agility_percent"": 0.13}",0.0,[],通用,4,原创（v1 池）,敏攻复合；≈21 点,draft
+heart_602,万寿诀,万寿无疆，气血与修为同增,道品,61,"{""hp_percent"": 0.08}",0.35,[],通用,4,原创（v1 池）,修炼顶档；8 点,draft
+heart_701,乾坤功,乾坤在握，攻防一体,仙品,71,"{""damage_percent"": 0.15, ""hp_percent"": 0.09}",0.0,[],通用,2,原创（v1 池）,双主属性复合；24 点,draft
+heart_702,无我功,无我无相，身法通神,仙品,71,"{""agility_percent"": 0.15, ""speed_percent"": 0.13}",0.0,[],通用,2,原创（v1 池）,身法顶点；23.5 点,draft
+heart_801,混元一气功,混元一气，万法归宗,混元先天,81,"{""damage_percent"": 0.13, ""hp_percent"": 0.13}",0.0,[],通用,1,原创（v1 池）,三围复合顶点；26 点,draft
+heart_802,大梦千秋诀,大梦千秋，一觉修为百年,混元先天,81,"{""agility_percent"": 0.08}",0.45,[],通用,1,原创（v1 池）,终极修炼心法；5.6 点 + 45% exp,draft

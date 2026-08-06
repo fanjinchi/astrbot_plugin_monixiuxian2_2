@@ -87,7 +87,7 @@ def check_skills(rows: list[dict]) -> list[str]:
     for r in rows:
         rate = float(r["trigger_rate"])
         value = float(r["effect_value"])
-        effect = r["effect"]
+        effect = r["effect_type"]
         if effect == "damage_bonus":
             expected = rate * (value - 1)
         elif effect == "damage_reduction":
