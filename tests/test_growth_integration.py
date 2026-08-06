@@ -56,7 +56,12 @@ class FakeDbExt:
         return entry["star_level"] if entry else 1
 
     async def learn_or_star_up(
-        self, user_id: str, skill_id: str, source: str = ""
+        self,
+        user_id: str,
+        skill_id: str,
+        source: str = "",
+        max_star: int = 3,
+        max_star_exp_compensation: int = 0,
     ) -> tuple[bool, int]:
         import time
 
@@ -69,7 +74,10 @@ class FakeDbExt:
                 "learned_at": now,
             }
             return True, 1
-        self.player_skills[key]["star_level"] += 1
+        current_star = self.player_skills[key]["star_level"]
+        if current_star >= max_star:
+            return False, max_star
+        self.player_skills[key]["star_level"] = current_star + 1
         self.player_skills[key]["source"] = source
         self.player_skills[key]["learned_at"] = now
         return False, self.player_skills[key]["star_level"]
@@ -120,7 +128,7 @@ class FakeConfigManager:
                     "name": "气息流转",
                     "trigger_condition": "attack",
                     "trigger_rate": 0.15,
-                    "effect": "damage_bonus",
+                    "effect_type": "damage_bonus",
                     "effect_value": 1.2,
                 },
                 "ultimate": None,
@@ -135,13 +143,13 @@ class FakeConfigManager:
                     "name": "剑气纵横",
                     "trigger_condition": "attack",
                     "trigger_rate": 0.25,
-                    "effect": "damage_bonus",
+                    "effect_type": "damage_bonus",
                     "effect_value": 1.5,
                 },
                 "ultimate": {
                     "name": "万剑归宗",
                     "trigger_condition": "once_per_battle",
-                    "effect": "massive_damage",
+                    "effect_type": "massive_damage",
                     "effect_value": 3.0,
                 },
                 "route_multiplier": {"灵修": 1.2, "体修": 0.6},

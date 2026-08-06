@@ -43,7 +43,9 @@ async def test_skill_manager_works_with_flattened_skills(config_manager):
         async def is_skill_learned(self, user_id, skill_id):
             return False
 
-        async def learn_or_star_up(self, user_id, skill_id, source=""):
+        async def learn_or_star_up(
+            self, user_id, skill_id, source="", max_star=3, max_star_exp_compensation=0
+        ):
             return True, 1
 
     class FakeDb:

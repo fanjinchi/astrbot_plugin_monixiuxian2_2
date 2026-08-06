@@ -11,13 +11,13 @@
     "shop_weight": 1000,
     "weapon_coefficient_k": 0.5,
     "base_damage": 9,
-    "armor_value": 3,
+    "armor_value": 15,
     "trigger_skills": [],
     "route_multiplier": {
       "灵修": 1.0,
       "体修": 1.0
     },
-    "damage": 15
+    "damage": 0
   },
   {
     "id": "sword_002",
@@ -105,19 +105,19 @@
     "type": "weapon",
     "weapon_category": "剑",
     "rank": "天品",
-    "required_level_index": 13,
+    "required_level_index": 31,
     "description": "承载天地灵气的宝剑",
     "price": 29100,
     "shop_weight": 30,
     "weapon_coefficient_k": 0.5,
-    "base_damage": 18,
+    "base_damage": 29,
     "armor_value": 60,
     "trigger_skills": [],
     "route_multiplier": {
       "灵修": 1.0,
       "体修": 1.0
     },
-    "damage": 280
+    "damage": 0
   },
   {
     "id": "sword_007",
@@ -425,19 +425,19 @@
     "type": "weapon",
     "weapon_category": "刀",
     "rank": "仙品",
-    "required_level_index": 32,
+    "required_level_index": 71,
     "description": "斩仙灭神的至尊宝刀",
     "price": 1196800,
     "shop_weight": 0.3,
     "weapon_coefficient_k": 0.5,
-    "base_damage": 30,
-    "armor_value": 1300,
+    "base_damage": 54,
+    "armor_value": 120,
     "trigger_skills": [],
     "route_multiplier": {
       "灵修": 1.0,
       "体修": 1.0
     },
-    "damage": 5200
+    "damage": 0
   },
   {
     "id": "blade_011",
@@ -605,19 +605,19 @@
     "type": "weapon",
     "weapon_category": "阔刀",
     "rank": "皇品",
-    "required_level_index": 16,
+    "required_level_index": 41,
     "description": "一刀可撼动大地",
     "price": 84960,
     "shop_weight": 10,
     "weapon_coefficient_k": 0.6,
-    "base_damage": 27,
-    "armor_value": 280,
+    "base_damage": 43,
+    "armor_value": 75,
     "trigger_skills": [],
     "route_multiplier": {
       "灵修": 1.0,
       "体修": 1.0
     },
-    "damage": 640
+    "damage": 0
   },
   {
     "id": "broadsword_008",
@@ -1045,19 +1045,19 @@
     "type": "weapon",
     "weapon_category": "匕首",
     "rank": "地品",
-    "required_level_index": 12,
+    "required_level_index": 21,
     "description": "染血的凶器",
     "price": 17675,
     "shop_weight": 80,
     "weapon_coefficient_k": 0.4,
-    "base_damage": 15,
-    "armor_value": 25,
+    "base_damage": 22,
+    "armor_value": 45,
     "trigger_skills": [],
     "route_multiplier": {
       "灵修": 1.0,
       "体修": 1.0
     },
-    "damage": 185
+    "damage": 0
   },
   {
     "id": "dagger_006",
@@ -1365,19 +1365,19 @@
     "type": "weapon",
     "weapon_category": "符箓",
     "rank": "道品",
-    "required_level_index": 28,
+    "required_level_index": 61,
     "description": "太一之道的符文",
     "price": 522000,
     "shop_weight": 1,
     "weapon_coefficient_k": 0.4,
-    "base_damage": 24,
-    "armor_value": 1200,
+    "base_damage": 49,
+    "armor_value": 105,
     "trigger_skills": [],
     "route_multiplier": {
       "灵修": 1.0,
       "体修": 1.0
     },
-    "damage": 1920
+    "damage": 0
   },
   {
     "id": "talisman_010",
@@ -1645,19 +1645,19 @@
     "type": "weapon",
     "weapon_category": "鼎",
     "rank": "混元先天",
-    "required_level_index": 35,
+    "required_level_index": 81,
     "description": "混元至宝神鼎",
     "price": 3059900,
     "shop_weight": 0.1,
     "weapon_coefficient_k": 0.6,
-    "base_damage": 45,
-    "armor_value": 5800,
+    "base_damage": 74,
+    "armor_value": 135,
     "trigger_skills": [],
     "route_multiplier": {
       "灵修": 1.0,
       "体修": 1.0
     },
-    "damage": 10000
+    "damage": 0
   },
   {
     "id": "cauldron_012",
@@ -2065,19 +2065,19 @@
     "type": "weapon",
     "weapon_category": "枪",
     "rank": "帝品",
-    "required_level_index": 22,
+    "required_level_index": 51,
     "description": "弑杀真龙的帝枪",
     "price": 225840,
     "shop_weight": 3,
     "weapon_coefficient_k": 0.5,
-    "base_damage": 23,
-    "armor_value": 340,
+    "base_damage": 41,
+    "armor_value": 90,
     "trigger_skills": [],
     "route_multiplier": {
       "灵修": 1.0,
       "体修": 1.0
     },
-    "damage": 1360
+    "damage": 0
   },
   {
     "id": "spear_009",
@@ -2398,5 +2398,25 @@
       "体修": 1.0
     },
     "damage": 9800
+  },
+  {
+    "id": "staff_101",
+    "name": "狼牙棒",
+    "type": "weapon",
+    "weapon_category": "棍",
+    "rank": "灵品",
+    "required_level_index": 11,
+    "description": "沉重的铁棒，挥舞起来势大力沉",
+    "price": 6000,
+    "shop_weight": 200,
+    "weapon_coefficient_k": 0.6,
+    "base_damage": 19,
+    "armor_value": 30,
+    "trigger_skills": [],
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "damage": 0
   }
 ]

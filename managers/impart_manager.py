@@ -203,12 +203,31 @@ class ImpartManager:
             if not skill_def:
                 logger.warning(f"[impart] unknown technique reward: {skill_id}")
                 return None
+            skill_cfg = self.config_manager.game_config.get("skill_system", {})
+            max_star = skill_cfg.get("max_star", 3)
+            compensation = int(
+                skill_cfg.get("star_compensation_base", 1000)
+                * skill_cfg.get("star_compensation_ratio", 0.5)
+            )
             is_new, star = await self.db.ext.learn_or_star_up(
-                player.user_id, skill_id, "impart"
+                player.user_id,
+                skill_id,
+                "impart",
+                max_star=max_star,
+                max_star_exp_compensation=compensation,
             )
             name = skill_def.get("name", skill_id)
             if is_new:
                 return f"领悟传承功法【{name}】"
+            if star >= max_star and compensation > 0:
+                # Keep the in-memory player in sync: _grant_pending_rewards
+                # persists the whole Player row afterwards via update_player,
+                # which would otherwise clobber the compensation grant.
+                player.experience += compensation
+                return (
+                    f"传承功法【{name}】已达{max_star}星圆满，"
+                    f"传承所得折算为 {compensation} 点修为"
+                )
             return f"传承功法【{name}】升星至{star}星"
 
         if reward_type == "level_up":

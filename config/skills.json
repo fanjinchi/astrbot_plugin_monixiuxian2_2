@@ -8,7 +8,7 @@
         "name": "气息流转",
         "trigger_condition": "attack",
         "trigger_rate": 0.15,
-        "effect": "damage_bonus",
+        "effect_type": "damage_bonus",
         "effect_value": 1.2
       },
       "ultimate": null,
@@ -23,7 +23,7 @@
         "name": "金刚护体",
         "trigger_condition": "defend",
         "trigger_rate": 0.2,
-        "effect": "damage_reduction",
+        "effect_type": "damage_reduction",
         "effect_value": 0.5
       },
       "ultimate": null,
@@ -40,14 +40,16 @@
         "name": "剑气纵横",
         "trigger_condition": "attack",
         "trigger_rate": 0.25,
-        "effect": "damage_bonus",
+        "effect_type": "damage_bonus",
         "effect_value": 1.5
       },
       "ultimate": {
         "name": "万剑归宗",
         "trigger_condition": "once_per_battle",
-        "effect": "massive_damage",
-        "effect_value": 3.0
+        "effect_type": "massive_damage",
+        "effect_value": 3.0,
+        "min_action_index": 3,
+        "trigger_opponent_hp_below": 0.4
       },
       "route_multiplier": {"灵修": 1.2, "体修": 0.6},
       "learn_coefficient": 0.8
@@ -62,14 +64,16 @@
         "name": "崩山击",
         "trigger_condition": "attack",
         "trigger_rate": 0.2,
-        "effect": "damage_bonus",
+        "effect_type": "damage_bonus",
         "effect_value": 1.8
       },
       "ultimate": {
         "name": "开天辟地",
         "trigger_condition": "once_per_battle",
-        "effect": "massive_damage",
-        "effect_value": 3.5
+        "effect_type": "massive_damage",
+        "effect_value": 3.5,
+        "min_action_index": 3,
+        "trigger_self_hp_below": 0.5
       },
       "route_multiplier": {"灵修": 0.6, "体修": 1.2},
       "learn_coefficient": 0.8
@@ -84,7 +88,7 @@
         "name": "传承护体",
         "trigger_condition": "defend",
         "trigger_rate": 0.15,
-        "effect": "damage_reduction",
+        "effect_type": "damage_reduction",
         "effect_value": 0.3
       },
       "ultimate": null,
@@ -99,7 +103,7 @@
         "name": "传承破敌",
         "trigger_condition": "attack",
         "trigger_rate": 0.15,
-        "effect": "damage_bonus",
+        "effect_type": "damage_bonus",
         "effect_value": 1.3
       },
       "ultimate": null,

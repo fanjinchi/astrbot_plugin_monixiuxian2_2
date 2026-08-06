@@ -89,6 +89,253 @@
       },
       "skill_pool": [],
       "route": "通用"
+    },
+    {
+      "id": "heart_004",
+      "name": "养气诀",
+      "description": "吐纳养气，修为日进",
+      "rank": "凡品",
+      "required_level_index": 0,
+      "passive_bonus": {
+        "hp_percent": 0.03
+      },
+      "exp_multiplier": 0.08,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 100
+    },
+    {
+      "id": "heart_101",
+      "name": "烈火功",
+      "description": "真气如烈火燎原，攻伐无匹",
+      "rank": "灵品",
+      "required_level_index": 11,
+      "passive_bonus": {
+        "damage_percent": 0.12
+      },
+      "exp_multiplier": 1.0,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 60
+    },
+    {
+      "id": "heart_102",
+      "name": "龟息功",
+      "description": "气息绵长如龟寿，气血浑厚",
+      "rank": "灵品",
+      "required_level_index": 11,
+      "passive_bonus": {
+        "hp_percent": 0.09
+      },
+      "exp_multiplier": 0.06,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 60
+    },
+    {
+      "id": "heart_201",
+      "name": "金罡诀",
+      "description": "金罡护体，攻守兼备",
+      "rank": "地品",
+      "required_level_index": 21,
+      "passive_bonus": {
+        "damage_percent": 0.1,
+        "armor_value": 15
+      },
+      "exp_multiplier": 1.0,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 35
+    },
+    {
+      "id": "heart_202",
+      "name": "云游诀",
+      "description": "云游四方，心无挂碍，修为自增",
+      "rank": "地品",
+      "required_level_index": 21,
+      "passive_bonus": {
+        "agility_percent": 0.08
+      },
+      "exp_multiplier": 0.15,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 35
+    },
+    {
+      "id": "heart_301",
+      "name": "玄影功",
+      "description": "身形如玄影飘忽，难以捉摸",
+      "rank": "天品",
+      "required_level_index": 31,
+      "passive_bonus": {
+        "agility_percent": 0.15,
+        "hp_percent": 0.05
+      },
+      "exp_multiplier": 1.0,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 20
+    },
+    {
+      "id": "heart_302",
+      "name": "紫府功",
+      "description": "开辟紫府，修炼一日千里",
+      "rank": "天品",
+      "required_level_index": 31,
+      "passive_bonus": {
+        "hp_percent": 0.05
+      },
+      "exp_multiplier": 0.2,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 20
+    },
+    {
+      "id": "heart_401",
+      "name": "战神诀",
+      "description": "战神之诀，攻无不克",
+      "rank": "皇品",
+      "required_level_index": 41,
+      "passive_bonus": {
+        "damage_percent": 0.15,
+        "armor_value": 20
+      },
+      "exp_multiplier": 1.0,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 12
+    },
+    {
+      "id": "heart_402",
+      "name": "不动明王功",
+      "description": "不动如山，明王护体",
+      "rank": "皇品",
+      "required_level_index": 41,
+      "passive_bonus": {
+        "hp_percent": 0.13,
+        "armor_value": 30
+      },
+      "exp_multiplier": 1.0,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 12
+    },
+    {
+      "id": "heart_501",
+      "name": "疾风迅雷功",
+      "description": "疾风迅雷，先声夺人",
+      "rank": "帝品",
+      "required_level_index": 51,
+      "passive_bonus": {
+        "speed_percent": 0.12,
+        "agility_percent": 0.1
+      },
+      "exp_multiplier": 1.0,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 7
+    },
+    {
+      "id": "heart_502",
+      "name": "归一诀",
+      "description": "万法归一，修为精进",
+      "rank": "帝品",
+      "required_level_index": 51,
+      "passive_bonus": {
+        "hp_percent": 0.06
+      },
+      "exp_multiplier": 0.3,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 7
+    },
+    {
+      "id": "heart_601",
+      "name": "太虚功",
+      "description": "太虚无形，攻闪相生",
+      "rank": "道品",
+      "required_level_index": 61,
+      "passive_bonus": {
+        "damage_percent": 0.12,
+        "agility_percent": 0.13
+      },
+      "exp_multiplier": 1.0,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 4
+    },
+    {
+      "id": "heart_602",
+      "name": "万寿诀",
+      "description": "万寿无疆，气血与修为同增",
+      "rank": "道品",
+      "required_level_index": 61,
+      "passive_bonus": {
+        "hp_percent": 0.08
+      },
+      "exp_multiplier": 0.35,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 4
+    },
+    {
+      "id": "heart_701",
+      "name": "乾坤功",
+      "description": "乾坤在握，攻防一体",
+      "rank": "仙品",
+      "required_level_index": 71,
+      "passive_bonus": {
+        "damage_percent": 0.15,
+        "hp_percent": 0.09
+      },
+      "exp_multiplier": 1.0,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 2
+    },
+    {
+      "id": "heart_702",
+      "name": "无我功",
+      "description": "无我无相，身法通神",
+      "rank": "仙品",
+      "required_level_index": 71,
+      "passive_bonus": {
+        "agility_percent": 0.15,
+        "speed_percent": 0.13
+      },
+      "exp_multiplier": 1.0,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 2
+    },
+    {
+      "id": "heart_801",
+      "name": "混元一气功",
+      "description": "混元一气，万法归宗",
+      "rank": "混元先天",
+      "required_level_index": 81,
+      "passive_bonus": {
+        "damage_percent": 0.13,
+        "hp_percent": 0.13
+      },
+      "exp_multiplier": 1.0,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 1
+    },
+    {
+      "id": "heart_802",
+      "name": "大梦千秋诀",
+      "description": "大梦千秋，一觉修为百年",
+      "rank": "混元先天",
+      "required_level_index": 81,
+      "passive_bonus": {
+        "agility_percent": 0.08
+      },
+      "exp_multiplier": 0.45,
+      "skill_pool": [],
+      "route": "通用",
+      "shop_weight": 1
     }
   ]
 }

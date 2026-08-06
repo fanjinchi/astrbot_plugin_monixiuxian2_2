@@ -27,8 +27,7 @@ class SkillManager:
     """Manages skill comprehension, star-up, and heart method passives."""
 
     # Star-up multiplier: each star level adds this percentage to trigger rate/effect.
-    STAR_UP_RATE_BONUS = 0.20
-    STAR_UP_EFFECT_BONUS = 0.20
+    STAR_UP_BONUS = 0.10
 
     def __init__(self, config_manager: ConfigManager, db: DataBase | None = None):
         self.config_manager = config_manager
@@ -283,18 +282,36 @@ class SkillManager:
         if skill_def is None:
             return None
 
+        max_star = self._skill_cfg.get("max_star", 3)
+        # Pre-compute the max-star duplicate compensation so the exp grant
+        # commits in the same transaction as the comprehension record.
+        compensation = self._calc_star_compensation(skill_def)
         is_new, star_level = await self.db.ext.learn_or_star_up(
-            player.user_id, skill_id, source
+            player.user_id,
+            skill_id,
+            source,
+            max_star=max_star,
+            max_star_exp_compensation=compensation,
         )
 
         # Clear study target if matched
         if player.study_target == skill_id:
             player.study_target = ""
 
-        # Provide a source hint in the returned definition for callers
+        # Build result with star-level multipliers
         result = self._apply_star_to_def(skill_def, star_level)
         result["learn_source"] = source
         result["is_new_learn"] = is_new
+
+        # Max-star duplicate compensation (spec D5). The exp grant was
+        # already committed atomically inside learn_or_star_up.
+        if not is_new and star_level >= max_star and compensation > 0:
+            result["max_star_compensation"] = compensation
+            result["compensation_message"] = (
+                f"【{result.get('name', skill_id)}】已达{max_star}星圆满，"
+                f"参悟所得折算为 {compensation} 点修为。"
+            )
+
         return result
 
     def _find_skill_definition(self, skill_id: str) -> dict | None:
@@ -307,7 +324,10 @@ class SkillManager:
     def _apply_star_to_def(self, skill_def: dict, star_level: int) -> dict:
         """Return a skill definition with star-level multipliers applied.
 
-        Trigger rate and effect value are boosted by star level.
+        Trigger rate and effect value are boosted by star level using
+        multiplicative scaling: base * (1 + STAR_UP_BONUS) ^ (star - 1).
+        Trigger rate is capped at 1.0. Ultimate trigger_rate defaults to 1.0
+        (must-release) if not explicitly set in config.
         A normalized ``trigger_timing`` key is injected so the combat engine
         can filter skills by phase (on_attack / on_defense / on_crit /
         round_start / ultimate).
@@ -317,10 +337,11 @@ class SkillManager:
         if trigger:
             rate = trigger.get("trigger_rate", 0.0)
             value = trigger.get("effect_value", 0.0)
-            bonus = (star_level - 1) * self.STAR_UP_RATE_BONUS
+            coeff = self._skill_cfg.get("star_up_bonus", self.STAR_UP_BONUS)
+            bonus = (1 + coeff) ** (star_level - 1)
             trigger = dict(trigger)
-            trigger["trigger_rate"] = min(rate * (1 + bonus), 1.0)
-            trigger["effect_value"] = value * (1 + bonus)
+            trigger["trigger_rate"] = min(rate * bonus, 1.0)
+            trigger["effect_value"] = value * bonus
             trigger["star_level"] = star_level
             # Normalize timing for the combat engine
             condition = trigger.get("trigger_condition", "")
@@ -337,10 +358,14 @@ class SkillManager:
         ultimate = result.get("ultimate")
         if ultimate:
             value = ultimate.get("effect_value", 0.0)
-            bonus = (star_level - 1) * self.STAR_UP_EFFECT_BONUS
+            coeff = self._skill_cfg.get("star_up_bonus", self.STAR_UP_BONUS)
+            bonus = (1 + coeff) ** (star_level - 1)
             ultimate = dict(ultimate)
-            ultimate["effect_value"] = value * (1 + bonus)
+            ultimate["effect_value"] = value * bonus
             ultimate["star_level"] = star_level
+            # Default trigger_rate to 1.0 for must-release ultimates (spec D2)
+            if "trigger_rate" not in ultimate:
+                ultimate["trigger_rate"] = 1.0
             condition = ultimate.get("trigger_condition", "once_per_battle")
             timing_map = {
                 "attack": "on_attack",
@@ -354,6 +379,28 @@ class SkillManager:
 
         result["current_star_level"] = star_level
         return result
+
+    # ------------------------------------------------------------------
+    # Star compensation for max-star duplicates
+    # ------------------------------------------------------------------
+
+    def _calc_star_compensation(self, skill_def: dict) -> int:
+        """Calculate experience compensation for max-star duplicate comprehension.
+
+        Flat compensation for now: config skills carry no rank field, so
+        rank-tiered compensation is deferred to the skill-pool redesign
+        (bd: dhh). Both base and ratio are config-tunable under
+        ``skill_system``.
+
+        Args:
+            skill_def: The skill definition dict (currently unused).
+
+        Returns:
+            Compensation experience amount.
+        """
+        base = self._skill_cfg.get("star_compensation_base", 1000)
+        ratio = self._skill_cfg.get("star_compensation_ratio", 0.5)
+        return int(base * ratio)
 
     # ------------------------------------------------------------------
     # Study target management

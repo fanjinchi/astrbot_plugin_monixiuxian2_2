@@ -30,9 +30,10 @@ def test_parse_weapon_from_real_config(config_manager, equipment_manager):
     )
     assert item is not None
     assert item.item_type == "weapon"
-    # Exact baked values from weapons.json (v3.7.1 legacy-field migration)
-    assert item.damage == 15
-    assert item.armor_value == 3
+    # Exact baked values from weapons.json (benchmark-piece rework:
+    # attribute entries zeroed, armor follows the def/(def+K) budget)
+    assert item.damage == 0
+    assert item.armor_value == 15
     assert item.base_damage == 9
     assert item.weapon_coefficient_k == pytest.approx(0.5)
 

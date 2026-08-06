@@ -14,9 +14,11 @@ Implements the spec-driven combat-core requirements:
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import random
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -38,6 +40,8 @@ if TYPE_CHECKING:
     from ..config_manager import ConfigManager
     from ..core.skill_manager import SkillManager
     from ..models import Player
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -90,6 +94,10 @@ class FighterState:
     crit_rate: float = 0.15
     # Combo stack counter for current action (resets each attack)
     combo_stack: int = 0
+    # Generic battle flags container (v2 effects, spec: combat-core)
+    battle_flags: dict = field(default_factory=dict)
+    # Number of actions this fighter has taken in the current battle
+    action_count: int = 0
 
 
 @dataclass
@@ -184,10 +192,12 @@ class CombatEngine:
                 self._resolve_attack(
                     fighter1, fighter2, dodge_cap, crit_multiplier, log
                 )
+                fighter1.action_count += 1
             else:
                 self._resolve_attack(
                     fighter2, fighter1, dodge_cap, crit_multiplier, log
                 )
+                fighter2.action_count += 1
             total_actions += 1
 
             # Add a blank line after each completed round (every two actions)
@@ -338,6 +348,78 @@ class CombatEngine:
         )
 
     # ------------------------------------------------------------------
+    # Effect registry (spec: combat-core delta, skill-engine-fit-and-content-sync)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _handler_damage_bonus(
+        actor: FighterState,
+        target: FighterState,
+        skill: dict,
+        state: dict,
+    ) -> float:
+        """Handle damage_bonus and combo effects.
+
+        Returns the damage multiplier increment.
+        """
+        value = skill.get("effect_value", 0)
+        effect = skill.get("effect_type", "")
+        if effect == "combo" and actor.combo_stack >= state.get("combo_cap", 2):
+            return 0.0
+        if effect == "combo":
+            actor.combo_stack += 1
+        return value
+
+    @staticmethod
+    def _handler_stun(
+        actor: FighterState,
+        target: FighterState,
+        skill: dict,
+        state: dict,
+    ) -> float:
+        """Handle stun effect: skip target's next action."""
+        target.skip_next_action = True
+        return 0.0
+
+    @staticmethod
+    def _handler_counter(
+        actor: FighterState,
+        target: FighterState,
+        skill: dict,
+        state: dict,
+    ) -> float:
+        """Handle counter effect on defense: deal immediate damage to attacker."""
+        value = skill.get("effect_value", 0)
+        counter_dmg = max(1, int(actor.damage * value))
+        target.hp -= counter_dmg
+        return 0.0
+
+    @staticmethod
+    def _handler_damage_reduction(
+        actor: FighterState,
+        target: FighterState,
+        skill: dict,
+        state: dict,
+    ) -> float:
+        """Handle damage_reduction: reduce next incoming attack damage."""
+        value = skill.get("effect_value", 0)
+        reduction = 1.0 - float(value)
+        # Applies to the skill owner (actor), not the opponent. on_defense
+        # processing passes (defender, attacker), so the defender's own next
+        # incoming hit is reduced. Consumed and reset in
+        # _apply_armor_and_reduction.
+        actor.incoming_damage_mult *= max(0.0, reduction)
+        return 0.0
+
+    EFFECT_HANDLERS: dict[str, Callable] = {
+        "damage_bonus": _handler_damage_bonus,
+        "combo": _handler_damage_bonus,
+        "stun": _handler_stun,
+        "counter": _handler_counter,
+        "damage_reduction": _handler_damage_reduction,
+    }
+
+    # ------------------------------------------------------------------
     # Internal resolution
     # ------------------------------------------------------------------
 
@@ -351,7 +433,13 @@ class CombatEngine:
     def _process_round_start_skills(
         self, fighter: FighterState, log: list[str]
     ) -> None:
-        """Resolve round_start trigger skills for a fighter."""
+        """Resolve round_start trigger skills for a fighter.
+
+        Dispatches through EFFECT_HANDLERS like _process_trigger_skills
+        (spec: combat-core delta) so unknown effect_types warn instead of
+        being silently ignored. Damage increments accumulate into
+        ``next_attack_mult``.
+        """
         for skill in fighter.trigger_skills:
             if skill.get("trigger_timing") != "round_start":
                 continue
@@ -359,17 +447,31 @@ class CombatEngine:
             if random.random() >= rate:
                 continue
             effect = skill.get("effect_type", "")
-            value = skill.get("effect_value", 0)
-            if effect == "combo" and fighter.combo_stack >= self._combo_cap:
-                continue
-            if effect in ("damage_bonus", "combo"):
-                if effect == "combo":
-                    fighter.combo_stack += 1
-                fighter.next_attack_mult += value
-                log.append(
-                    f"{fighter.name} 触发【{skill.get('name', '未知')}】，"
-                    f"下回合攻势更盛！"
+            skill_name = skill.get("name", "未知")
+            # round_start only supports self-buff effects; dispatching others
+            # (stun/counter/damage_reduction) with actor == target would
+            # produce unexpected self-targeting side effects.
+            if effect not in ("damage_bonus", "combo"):
+                logger.warning(
+                    "effect_type '%s' in round_start skill '%s' is not a "
+                    "self-buff effect; skipping.",
+                    effect,
+                    skill_name,
                 )
+                continue
+            handler = self.EFFECT_HANDLERS.get(effect)
+            if handler is None:
+                logger.warning(
+                    "Unknown effect_type '%s' in round_start skill '%s'; skipping.",
+                    effect,
+                    skill_name,
+                )
+                continue
+            state = {"combo_cap": self._combo_cap}
+            dmg_increment = handler(fighter, fighter, skill, state)
+            if dmg_increment:
+                fighter.next_attack_mult += dmg_increment
+                log.append(f"{fighter.name} 触发【{skill_name}】，下回合攻势更盛！")
 
     def _process_trigger_skills(
         self,
@@ -394,33 +496,44 @@ class CombatEngine:
                 continue
 
             effect = skill.get("effect_type", "")
-            value = skill.get("effect_value", 0)
             skill_name = skill.get("name", "未知")
 
-            if effect in ("damage_bonus", "combo"):
-                if effect == "combo" and actor.combo_stack >= self._combo_cap:
-                    continue
-                if effect == "combo":
-                    actor.combo_stack += 1
-                result["damage_mult"] += value
+            # counter is only meaningful on defense; outside on_defense it
+            # would deal damage with no log line (legacy if/elif only handled
+            # it at on_defense timing).
+            if effect == "counter" and timing != "on_defense":
+                logger.warning(
+                    "effect_type 'counter' in skill '%s' outside on_defense; "
+                    "skipping.",
+                    skill_name,
+                )
+                continue
+
+            handler = self.EFFECT_HANDLERS.get(effect)
+            if handler is None:
+                logger.warning(
+                    "Unknown effect_type '%s' in skill '%s'; skipping.",
+                    effect,
+                    skill_name,
+                )
+                continue
+
+            state = {"combo_cap": self._combo_cap}
+            dmg_increment = handler(actor, target, skill, state)
+            if dmg_increment:
+                result["damage_mult"] += dmg_increment
                 log.append(f"{actor.name} 触发【{skill_name}】，攻势更盛！")
             elif effect == "stun":
-                target.skip_next_action = True
                 log.append(
                     f"{actor.name} 触发【{skill_name}】，"
                     f"{target.name} 被眩晕，下回合无法出手！"
                 )
             elif effect == "counter" and timing == "on_defense":
-                counter_dmg = max(1, int(actor.damage * value))
-                target.hp -= counter_dmg
                 log.append(
                     f"{actor.name} 触发【{skill_name}】反击，"
-                    f"对 {target.name} 造成 {counter_dmg} 点伤害！"
+                    f"对 {target.name} 造成 {max(1, int(actor.damage * skill.get('effect_value', 0)))} 点伤害！"
                 )
             elif effect == "damage_reduction":
-                # Reduces the next incoming attack damage
-                reduction = 1.0 - float(value)
-                target.incoming_damage_mult *= max(0.0, reduction)
                 log.append(f"{actor.name} 触发【{skill_name}】，受到的伤害降低！")
         return result
 
@@ -479,10 +592,21 @@ class CombatEngine:
         skill_mult = attack_result["damage_mult"]
 
         # 6. Ultimate (once per battle per ultimate)
+        # Unlock check: min_action_index + optional HP thresholds (AND logic)
         ultimate_mult = 1.0
         for ult in attacker.ultimates:
             ult_id = ult.get("id", "")
             if ult_id in attacker.used_ultimates:
+                continue
+            # Unlock threshold checks
+            min_actions = ult.get("min_action_index", 0)
+            if attacker.action_count < min_actions:
+                continue
+            self_hp_threshold = ult.get("trigger_self_hp_below", 1.0)
+            if attacker.hp / max(1, attacker.max_hp) > self_hp_threshold:
+                continue
+            opp_hp_threshold = ult.get("trigger_opponent_hp_below", 1.0)
+            if defender.hp / max(1, defender.max_hp) > opp_hp_threshold:
                 continue
             rate = ult.get("trigger_rate", 0.0)
             if random.random() < rate:

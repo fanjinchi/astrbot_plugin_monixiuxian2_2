@@ -50,6 +50,13 @@ class DummyConfigManager:
     """Minimal config manager stub for impart tests."""
 
     def __init__(self):
+        self.game_config = {
+            "skill_system": {
+                "max_star": 3,
+                "star_compensation_base": 1000,
+                "star_compensation_ratio": 0.5,
+            }
+        }
         self.level_data = [{"level": i, "level_name": f"Level{i}"} for i in range(10)]
         self.body_level_data = self.level_data
         self.heart_methods_data = {
@@ -76,7 +83,7 @@ class DummyConfigManager:
                     "name": "传承护体",
                     "trigger_condition": "defend",
                     "trigger_rate": 0.15,
-                    "effect": "damage_reduction",
+                    "effect_type": "damage_reduction",
                     "effect_value": 0.3,
                 },
                 "ultimate": None,
@@ -90,7 +97,7 @@ class DummyConfigManager:
                     "name": "传承破敌",
                     "trigger_condition": "attack",
                     "trigger_rate": 0.15,
-                    "effect": "damage_bonus",
+                    "effect_type": "damage_bonus",
                     "effect_value": 1.3,
                 },
                 "ultimate": None,
@@ -348,6 +355,38 @@ async def test_technique_star_up_on_repeat_claim():
         assert skills[0]["skill_id"] == "impart_skill_001"
         assert skills[0]["star_level"] == 2
         assert "升星至2星" in msg
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_technique_max_star_compensation():
+    """Max-star technique reward grants exp compensation, not a fake star-up."""
+    db = await TestHelpers.setup_db()
+    try:
+        player = await TestHelpers.create_player(db)
+        mgr = ImpartManager(db, DummyConfigManager())
+
+        await db.ext.create_impart_info("u1")
+        # Reach tier 3 and star the technique up to max (3).
+        await mgr.add_impart_value("u1", 60)
+        await db.ext.learn_or_star_up("u1", "impart_skill_001", "impart")
+        await db.ext.learn_or_star_up("u1", "impart_skill_001", "impart")
+        before = (await db.get_player_by_id("u1")).experience
+
+        # Re-grant tier 3 while already at max star.
+        info = await db.ext.get_impart_info("u1")
+        info.set_claimed_tiers([1, 2])
+        await db.ext.update_impart_info(info)
+        ok, msg = await mgr.add_impart_value("u1", 1)
+        assert ok
+
+        skills = await db.ext.get_learned_skills("u1")
+        assert skills[0]["skill_id"] == "impart_skill_001"
+        assert skills[0]["star_level"] == 3  # unchanged at cap
+        after = (await db.get_player_by_id("u1")).experience
+        assert after - before == 500  # base 1000 x ratio 0.5
+        assert "圆满" in msg and "修为" in msg
     finally:
         await db.close()
 

@@ -479,7 +479,12 @@ class DatabaseExtended:
             return row[0] if row else 1
 
     async def learn_or_star_up(
-        self, user_id: str, skill_id: str, source: str = ""
+        self,
+        user_id: str,
+        skill_id: str,
+        source: str = "",
+        max_star: int = 3,
+        max_star_exp_compensation: int = 0,
     ) -> tuple[bool, int]:
         """Learn a new skill or increment the star level if already learned.
 
@@ -487,9 +492,13 @@ class DatabaseExtended:
             user_id: Player user ID.
             skill_id: Skill ID to learn or star up.
             source: Comprehension source (e.g. breakthrough_success).
+            max_star: Maximum star level (default 3).
+            max_star_exp_compensation: Experience granted atomically (inside
+                this transaction) when the skill is already at max_star.
 
         Returns:
-            (is_new_learn, new_star_level).
+            (is_new_learn, new_star_level). If already at max_star,
+            returns (False, max_star) without incrementing.
         """
         import time
 
@@ -513,7 +522,17 @@ class DatabaseExtended:
                 await self.conn.commit()
                 return True, 1
 
-            new_star = row[0] + 1
+            current_star = row[0]
+            if current_star >= max_star:
+                if max_star_exp_compensation > 0:
+                    await self.conn.execute(
+                        "UPDATE players SET experience = experience + ? WHERE user_id = ?",
+                        (max_star_exp_compensation, user_id),
+                    )
+                await self.conn.commit()
+                return False, max_star
+
+            new_star = current_star + 1
             await self.conn.execute(
                 """
                 UPDATE player_skills SET star_level = ?, source = ?, learned_at = ?
