@@ -554,6 +554,100 @@ async def test_max_star_compensation_message():
     assert "圆满" in result["compensation_message"]
 
 
+class TestWeaponMountedSkills:
+    """content-sync-pipeline: real weapons.json mounts must honor the
+    engine-key contract and trigger without warnings."""
+
+    TRIGGER_TIMINGS = ("on_attack", "on_defense", "on_crit", "round_start")
+    KNOWN_EFFECTS = {
+        "damage_bonus",
+        "combo",
+        "stun",
+        "counter",
+        "damage_reduction",
+    }
+
+    @staticmethod
+    def _mounted_skills() -> list[tuple[str, dict]]:
+        import json
+
+        weapons_path = (
+            Path(__file__).resolve().parent.parent / "config" / "weapons.json"
+        )
+        with open(weapons_path, encoding="utf-8") as f:
+            weapons = json.load(f)
+        mounted = []
+        for weapon in weapons:
+            for skill in weapon.get("trigger_skills") or []:
+                mounted.append((weapon.get("id", "?"), skill))
+        return mounted
+
+    def test_mounted_skills_have_engine_keys(self):
+        """Every mounted skill carries the 4 engine keys with valid values."""
+        mounted = self._mounted_skills()
+        assert mounted, "weapons.json should contain at least one mounted skill"
+        for weapon_id, skill in mounted:
+            missing = {
+                "trigger_timing",
+                "effect_type",
+                "trigger_rate",
+                "effect_value",
+            } - set(skill)
+            assert not missing, f"{weapon_id}: missing keys {missing}"
+            assert skill["trigger_timing"] in self.TRIGGER_TIMINGS, weapon_id
+            assert skill["effect_type"] in self.KNOWN_EFFECTS, weapon_id
+            assert 0 < skill["trigger_rate"] <= 1, weapon_id
+            if skill["effect_type"] == "stun":
+                assert skill["trigger_rate"] <= 0.10, f"{weapon_id}: stun rate too high"
+            else:
+                gain = skill["trigger_rate"] * skill["effect_value"]
+                assert gain <= 0.08, f"{weapon_id}: expected gain {gain:.1%} > 8% tax"
+
+    def test_mounted_skill_triggers_cleanly(self, caplog):
+        """Forcing a real mounted skill must apply its effect without warnings."""
+        engine = CombatEngine(FakeConfigManager(), None)
+        mounted = self._mounted_skills()
+        attacked = [s for _, s in mounted if s["trigger_timing"] == "on_attack"]
+        round_start = [s for _, s in mounted if s["trigger_timing"] == "round_start"]
+        assert attacked and round_start, "expected on_attack and round_start mounts"
+
+        f1 = FighterState(
+            user_id="A",
+            name="A",
+            hp=100,
+            max_hp=100,
+            damage=10,
+            agility=5,
+            speed=10,
+            armor_value=0,
+        )
+        f2 = FighterState(
+            user_id="B",
+            name="B",
+            hp=100,
+            max_hp=100,
+            damage=10,
+            agility=5,
+            speed=10,
+            armor_value=0,
+        )
+
+        with caplog.at_level("WARNING"):
+            attack_skill = dict(attacked[0], trigger_rate=1.0)
+            f1.trigger_skills = [attack_skill]
+            result = engine._process_trigger_skills("on_attack", f1, f2, [])
+            assert result["damage_mult"] == pytest.approx(
+                1 + attack_skill["effect_value"]
+            )
+
+            rs_skill = dict(round_start[0], trigger_rate=1.0)
+            f1.trigger_skills = [rs_skill]
+            engine._process_round_start_skills(f1, [])
+            assert f1.next_attack_mult == pytest.approx(1 + rs_skill["effect_value"])
+
+        assert not any("effect_type" in r.message for r in caplog.records)
+
+
 class TestUnknownEffectWarning:
     """combat-core: unknown effect_type must warn and skip, never crash."""
 

@@ -73,6 +73,8 @@ class Item:
     def get_attribute_display(self) -> str:
         """Get attribute bonus display text"""
         attrs = []
+        if self.base_damage > 0:
+            attrs.append(f"每击基础伤害+{self.base_damage}")
         if self.damage > 0:
             attrs.append(f"伤害+{self.damage}")
         if self.agility > 0:

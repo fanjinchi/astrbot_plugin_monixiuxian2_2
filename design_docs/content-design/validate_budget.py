@@ -38,6 +38,75 @@ def benchmark_damage(level: int) -> float:
 SIZE_BUDGET = {"轻": (1 / 10, 1 / 8), "中": (1 / 8, 1 / 6), "重": (1 / 6, 1 / 4)}
 SKILL_EXPECTED_GAIN_CAP = 0.30  # §4.2: trigger_rate x (effect_value - 1) per slot
 HEART_PASSIVE_CAP = 0.15  # §4.3: single passive percent bonus
+WEAPON_MOUNT_TAX_CAP = 0.08  # weapon-skills.md §2 rule 3: mounted skill expected gain
+TRIGGER_TIMINGS = ("on_attack", "on_defense", "on_crit", "round_start")
+STUN_RATE_CAP = 0.10  # weapon-skills.md §1: stun rates must stay low
+
+
+def check_weapon_mounts(rows: list[dict]) -> list[str]:
+    """Check mounted trigger skills on weapons (engine-key contract + tax cap).
+
+    Each mounted skill must use the engine key contract (trigger_timing /
+    effect_type / trigger_rate / effect_value) and stay within the mounted
+    tax budget (weapon-skills.md rule 3): expected gain = rate x value <= 8%,
+    and the tax-adjusted per-hit must not exceed the budget band high +5%.
+
+    Args:
+        rows: Parsed weapons.csv rows.
+
+    Returns:
+        Human-readable result lines, each prefixed PASS/WARN/FAIL.
+    """
+    results = []
+    for r in rows:
+        if not r.get("trigger_skills_json") or r["trigger_skills_json"] == "[]":
+            continue
+        try:
+            skills = json.loads(r["trigger_skills_json"])
+        except json.JSONDecodeError as e:
+            results.append(f"FAIL {r['id']:<12} trigger_skills_json 不是合法 JSON: {e}")
+            continue
+        level = max(1, int(r["required_level_index"]))
+        size = r["size_class"]
+        per_hit = float(r["base_damage"]) + (
+            benchmark_damage(level) + float(r["bonus_damage"])
+        ) * float(r["weapon_coefficient_k"])
+        hp = benchmark_hp(level)
+        lo, hi = SIZE_BUDGET.get(size, (0, 0))
+        for i, s in enumerate(skills):
+            where = f"{r['id']} trigger_skills[{i}]"
+            if not isinstance(s, dict):
+                results.append(f"FAIL {where:<16} 必须是对象")
+                continue
+            missing = {"trigger_timing", "effect_type", "trigger_rate", "effect_value"} - s.keys()
+            if missing:
+                results.append(f"FAIL {where:<16} 缺引擎键 {sorted(missing)}")
+                continue
+            timing = s["trigger_timing"]
+            rate = float(s["trigger_rate"])
+            value = float(s["effect_value"])
+            if timing not in TRIGGER_TIMINGS:
+                results.append(f"FAIL {where:<16} 未知 timing {timing}")
+            if not 0 < rate <= 1:
+                results.append(f"FAIL {where:<16} trigger_rate 需在 (0,1]，得 {rate}")
+            gain = rate * value
+            if s["effect_type"] == "stun":
+                if rate > STUN_RATE_CAP:
+                    results.append(f"FAIL {where:<16} stun 概率 {rate} 超上限 {STUN_RATE_CAP}")
+            elif gain > WEAPON_MOUNT_TAX_CAP:
+                results.append(
+                    f"FAIL {where:<16} 期望增幅 {gain:.1%} 超税上限 {WEAPON_MOUNT_TAX_CAP:.0%}"
+                )
+            taxed = per_hit * (1 + gain)
+            if taxed > hp * hi * 1.05:
+                results.append(
+                    f"FAIL {where:<16} 含税每击 {taxed:.1f} 越带上限 {hp * hi * 1.05:.1f}"
+                )
+            results.append(
+                f"PASS {where:<16} {s['name']} {timing} {s['effect_type']} "
+                f"rate={rate} value={value} 期望增幅={gain:.1%}"
+            )
+    return results
 MIRROR_TTK_RANGE = (5, 10)  # G1: armed mirror-match TTK target
 
 
@@ -129,6 +198,7 @@ def main() -> int:
     all_lines: list[str] = []
     for filename, checker in (
         ("weapons.csv", check_weapons),
+        ("weapons.csv", check_weapon_mounts),
         ("skills.csv", check_skills),
         ("heart_methods.csv", check_heart_methods),
     ):

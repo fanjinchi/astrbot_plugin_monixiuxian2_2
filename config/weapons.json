@@ -106,13 +106,21 @@
     "weapon_category": "剑",
     "rank": "天品",
     "required_level_index": 31,
-    "description": "承载天地灵气的宝剑",
+    "description": "承载天地灵气的宝剑，剑锋偶现裂空之痕",
     "price": 29100,
     "shop_weight": 30,
     "weapon_coefficient_k": 0.5,
     "base_damage": 29,
     "armor_value": 60,
-    "trigger_skills": [],
+    "trigger_skills": [
+      {
+        "name": "裂空斩",
+        "trigger_timing": "on_attack",
+        "trigger_rate": 0.15,
+        "effect_type": "damage_bonus",
+        "effect_value": 0.4
+      }
+    ],
     "route_multiplier": {
       "灵修": 1.0,
       "体修": 1.0
@@ -606,13 +614,21 @@
     "weapon_category": "阔刀",
     "rank": "皇品",
     "required_level_index": 41,
-    "description": "一刀可撼动大地",
+    "description": "一刀可撼动大地，挥动间隐现崩山之声",
     "price": 84960,
     "shop_weight": 10,
     "weapon_coefficient_k": 0.6,
     "base_damage": 43,
     "armor_value": 75,
-    "trigger_skills": [],
+    "trigger_skills": [
+      {
+        "name": "崩山击",
+        "trigger_timing": "on_attack",
+        "trigger_rate": 0.12,
+        "effect_type": "damage_bonus",
+        "effect_value": 0.6
+      }
+    ],
     "route_multiplier": {
       "灵修": 1.0,
       "体修": 1.0
@@ -1646,13 +1662,21 @@
     "weapon_category": "鼎",
     "rank": "混元先天",
     "required_level_index": 81,
-    "description": "混元至宝神鼎",
+    "description": "混元至宝神鼎，重击震魂摄魄",
     "price": 3059900,
     "shop_weight": 0.1,
     "weapon_coefficient_k": 0.6,
     "base_damage": 74,
     "armor_value": 135,
-    "trigger_skills": [],
+    "trigger_skills": [
+      {
+        "name": "震魂槌",
+        "trigger_timing": "on_attack",
+        "trigger_rate": 0.08,
+        "effect_type": "stun",
+        "effect_value": 0
+      }
+    ],
     "route_multiplier": {
       "灵修": 1.0,
       "体修": 1.0
@@ -2066,13 +2090,21 @@
     "weapon_category": "枪",
     "rank": "帝品",
     "required_level_index": 51,
-    "description": "弑杀真龙的帝枪",
+    "description": "弑杀真龙的帝枪，蓄势时隐有龙吟",
     "price": 225840,
     "shop_weight": 3,
     "weapon_coefficient_k": 0.5,
     "base_damage": 41,
     "armor_value": 90,
-    "trigger_skills": [],
+    "trigger_skills": [
+      {
+        "name": "蓄锐式",
+        "trigger_timing": "round_start",
+        "trigger_rate": 0.12,
+        "effect_type": "damage_bonus",
+        "effect_value": 0.6
+      }
+    ],
     "route_multiplier": {
       "灵修": 1.0,
       "体修": 1.0

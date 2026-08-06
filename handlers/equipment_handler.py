@@ -79,7 +79,13 @@ class EquipmentHandler:
             hp_bonus = total_attrs["hp"] - player.hp
             armor_bonus = total_attrs["armor_value"] - player.armor_value
             exp_multiplier = total_attrs["exp_multiplier"]
+            # base_damage 是武器每击基础伤害（不经过属性词条通道），单独汇总展示
+            base_damage_total = sum(
+                item.base_damage for item in equipped_items if item.base_damage > 0
+            )
 
+            if base_damage_total > 0:
+                equipment_lines.append(f"🗡️ 每击基础伤害 +{base_damage_total}\n")
             if damage_bonus > 0:
                 equipment_lines.append(f"⚔️ 伤害 +{damage_bonus}\n")
             if agility_bonus > 0:
