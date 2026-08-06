@@ -159,41 +159,6 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 5. `main.py` — 初始化 Manager/Handler、注册命令
 6. 如有数据库表 → `data/migration.py` 添加迁移
 
-### 14. 子代理（subagent）协作规范
-
-> 2026-07-30 并行派工事故教训 + subagent-loop-watchdog 插件配套说明。
-> 本环境已加载 `subagent-loop-watchdog`（配置位于 `~/.pi/agent/extensions/subagent-loop-watchdog/config.json`），
-> 父会话会自动轮询子代理 run，检测到**高频轮次（turn_rate）**、**工具停滞（stalled_tool）**、
-> **同命令/短周期循环**、**总轮次超限**时通过 UI 与消息告警。默认只告警不自动中断；
-> 可开启 `autoInterrupt` / `childBlock` 更严格处理，但当前按告警后人工介入配置。
-
-**任务合同（仍由父会话明确写入）**
-- 写清：范围（可读写的文件清单）、约束、验证命令、停止规则（什么情况停下报告而不是猜）
-- **改动保持未提交**：禁止子代理 `git add/commit/push`（曾有子代理陷入 git 命令死循环，
-  626 轮空转烧 250k tokens），由父会话审查后统一提交
-- **所有 pytest/模拟等长命令必须套 `timeout`**（如 `timeout 120 uv run python -m pytest tests/ -q`）。
-  watch-dog 的 `stalled_tool` 检测也要 10 分钟后才告警，命令本身带 timeout 才能把损失压到分钟级
-- **不要把输出管道给 `tail`/`head`**：被中断的管道会让 python 进程永远阻塞在写管道上
-  （曾有两个子代理的全量 pytest 僵尸化挂起 40+ 分钟）
-- 并行任务之间**文件域不得重叠**：实测 `worktree: true` 并未创建独立 git worktree，
-  子代理共享主工作目录，同文件并发写会互相覆盖或读到半成品
-
-**监控与介入（watchdog 告警后的人工动作）**
-- 收到告警后立刻 `subagent({action:"status", id:"run-id", view:"transcript", index:N, lines:60})` 看尾部，
-  判断是重复循环、工具停滞还是轮次过高
-- 同一命令/短周期重复：优先 `action:"steer"` 给一条明确指令让其跳出；无效或停滞时 `interrupt` 暂停
-- 工具停滞（如 pytest 僵尸）：`interrupt` 后子进程**不会自动死亡**，需 `ps aux | grep pytest` 找到后用 `kill -9` 清理；
-  然后 `resume` 让子代理继续，或父会话直接接手
-
-**集成（父会话职责，不可省略）**
-- 子代理产出必须人工审查后才提交：一次集成中从 3 个 worker 产出抓出 7 个真 bug
-  （保底逻辑被丹药 cap 夹紧、彩蛋永不触发、迁移对旧 schema 不健壮、模拟脚本参数错误等）
-- 审查重点：边界条件、迁移脚本对旧 schema/空 fixture 的健壮性、
-  **测试是否真测了生产代码**（有 worker 在测试文件里重新实现逻辑来自测，生产代码 bug 完全没测到）
-- 提交前必须跑：`uv run ruff format . && uv run ruff check .`、
-  `timeout 120 uv run python -m pytest tests/ -q`、
-  涉及战斗数值时跑 `design_docs/attribute-growth/sim_balance_regression.py`
-
 ## 测试
 
 - 测试文件在 `tests/` 目录，使用 **pytest**
