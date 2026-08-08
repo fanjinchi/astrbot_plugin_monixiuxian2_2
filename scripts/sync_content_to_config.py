@@ -365,9 +365,19 @@ def _build_skill(row: dict, errors: list[str]) -> dict | None:
         ):
             cell = row.get(key, "")
             if (cell or "").strip():
-                trigger_skill[key] = _num(cell)
-        if (row.get("vampire") or "").strip().lower() in ("1", "true", "yes"):
+                # A malformed cell must not crash the whole sync; collect it
+                # into the per-row error gate instead (review fix).
+                try:
+                    trigger_skill[key] = _num(cell)
+                except ValueError:
+                    errors.append(f"{ctx}: {key} must be numeric, got {cell!r}")
+        vampire = (row.get("vampire") or "").strip().lower()
+        if vampire in ("1", "true", "yes"):
             trigger_skill["vampire"] = True
+        elif vampire and vampire not in ("0", "false", "no"):
+            errors.append(
+                f"{ctx}: vampire must be 1/true/yes or 0/false/no, got {vampire!r}"
+            )
         _validate_optional_keys(trigger_skill, f"{ctx} trigger_skill", errors)
     # Persist None when the row omits the keys so the merge overwrites any
     # stale trigger/ultimate left in config by an earlier sync (review fix).

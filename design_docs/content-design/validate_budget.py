@@ -187,8 +187,25 @@ def check_skills(rows: list[dict]) -> list[str]:
         elif effect == "heal":
             expected = rate * value * 7  # restores value x max_hp, TTK ~= 7
         elif effect == "dot":
-            duration = int(r["duration"]) if r.get("duration") else 1
-            tick = float(r["tick_rate"]) if r.get("tick_rate") else 1.0
+            # Guard malformed cells: a bad duration/tick_rate must surface as
+            # FAIL, not crash the whole validation run (review fix).
+            try:
+                duration = (
+                    int(r["duration"]) if (r.get("duration") or "").strip() else 1
+                )
+                tick = (
+                    float(r["tick_rate"]) if (r.get("tick_rate") or "").strip() else 1.0
+                )
+            except ValueError:
+                results.append(
+                    f"FAIL {r['id']:<14} dot 的 duration/tick_rate 必须为数字 {r['name']}"
+                )
+                continue
+            if duration < 1 or not (0 <= tick <= 1):
+                results.append(
+                    f"FAIL {r['id']:<14} dot 的 duration 须 >=1、tick_rate 须在 [0,1]（sync 契约） {r['name']}"
+                )
+                continue
             expected = rate * value * duration * tick
         elif effect == "pierce":
             expected = rate * value * 1.5  # bypasses ~half of mitigation

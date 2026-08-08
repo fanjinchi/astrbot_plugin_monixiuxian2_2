@@ -219,10 +219,16 @@ class CombatEngine:
             if total_actions % 2 == 0:
                 rounds += 1
                 log.append(f"-- 第 {rounds} 回合 --")
-                self._process_round_start_skills(fighter1, log)
-                self._process_round_start_skills(fighter2, log)
+                # Tick existing effects first so round-start skills applied this
+                # round get their full duration (review fix: tick ordering).
                 self._tick_status_effects(fighter1, log)
                 self._tick_status_effects(fighter2, log)
+                # A dot can be lethal; stop when a fighter died from it
+                # (survive charges were already consumed inside the tick).
+                if fighter1.hp <= 0 or fighter2.hp <= 0:
+                    break
+                self._process_round_start_skills(fighter1, log)
+                self._process_round_start_skills(fighter2, log)
 
             # Determine who acts this action (speed-weighted, independent each action)
             if self._roll_initiative(fighter1, fighter2):
@@ -425,10 +431,15 @@ class CombatEngine:
         skill: dict,
         state: dict,
     ) -> float:
-        """Handle counter effect on defense: deal immediate damage to attacker."""
+        """Handle counter effect on defense: deal immediate damage to attacker.
+
+        Lethal counters consume the attacker's survive (免死) charges like any
+        other damage source (review fix: funnel through _try_survive).
+        """
         value = skill.get("effect_value", 0)
         counter_dmg = max(1, int(actor.damage * value))
         target.hp -= counter_dmg
+        state["engine"]._try_survive(target, state["log"])
         return 0.0
 
     @staticmethod
@@ -482,7 +493,9 @@ class CombatEngine:
         """Handle dot: attach a per-round damage status to the target.
 
         The base damage is snapshotted from the triggering attack's expected
-        damage (base + damage×K, times the accumulated damage multiplier).
+        damage (base + buffed damage × K, times the accumulated damage
+        multiplier) so it matches the actual attack even under damage
+        buffs/debuffs (review fix).
         """
         value = skill.get("effect_value", 0)
         # Mirror _calc_damage's unarmed fallback so the snapshot matches the
@@ -492,8 +505,11 @@ class CombatEngine:
             k = actor.weapon_k
         else:
             base, k = 5, 0.5
+        buffed_damage = int(
+            actor.damage * state["engine"]._buff_multiplier(actor, "damage")
+        )
         snapshot = max(
-            1, int((base + actor.damage * k) * state.get("damage_mult", 1.0))
+            1, int((base + buffed_damage * k) * state.get("damage_mult", 1.0))
         )
         effect = StatusEffect(
             source_name=skill.get("name", "dot"),
@@ -524,6 +540,7 @@ class CombatEngine:
         )
         return 0.0
 
+    @staticmethod
     def _handler_debuff(
         actor: FighterState,
         target: FighterState,
@@ -536,6 +553,7 @@ class CombatEngine:
         )
         return 0.0
 
+    @staticmethod
     def _handler_fatigue(
         actor: FighterState,
         target: FighterState,
@@ -566,8 +584,16 @@ class CombatEngine:
             remaining=skill.get("duration", 1),
             params={"stat": skill.get("stat", "damage")},
         )
-        self._apply_status_effect(who, effect)
-        log.append(f"{actor.name} 的【{effect.source_name}】作用于 {who.name}")
+        applied = self._apply_status_effect(who, effect)
+        if applied:
+            log.append(f"{actor.name} 的【{effect.source_name}】作用于 {who.name}")
+        else:
+            # Cap rejection must not be logged as a successful application
+            # (review fix: truthful battle log).
+            log.append(
+                f"{actor.name} 的【{effect.source_name}】未生效："
+                f"同类效果已达叠加上限（{self._status_stack_cap}）"
+            )
 
     @staticmethod
     def _handler_pierce(
@@ -726,6 +752,9 @@ class CombatEngine:
                 log.append(
                     f"{fighter.name} 受【{effect.source_name}】侵蚀，损失 {dmg} 气血！"
                 )
+                # Lethal dots consume survive charges like any damage source
+                # (review fix: funnel through _try_survive).
+                self._try_survive(fighter, log)
             effect.remaining -= 1
             if effect.remaining > 0:
                 alive.append(effect)

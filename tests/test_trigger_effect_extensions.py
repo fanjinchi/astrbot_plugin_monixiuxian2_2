@@ -25,6 +25,7 @@ _cm = load_module("combat_manager", "managers/combat_manager.py")
 CombatEngine = _cm.CombatEngine
 CombatManager = _cm.CombatManager
 FighterState = _cm.FighterState
+StatusEffect = _cm.StatusEffect
 
 _sync = load_module("sync_content_to_config", "scripts/sync_content_to_config.py")
 _vb = load_module("validate_budget", "design_docs/content-design/validate_budget.py")
@@ -357,9 +358,10 @@ class TestStatusLifecycle:
         assert any("侵蚀" in line for line in result.combat_log)
 
     def test_battle_end_cleanup_no_persistence(self):
-        """FighterState status/one-shot fields die with the object: the engine
-        has no persistence path (resolve_combat takes no db handle)."""
-        engine = make_engine({"combat": {"action_limit": 20}})
+        """A battle always ends with a loser at 0 HP: FighterState fields are
+        per-battle objects with no persistence path (resolve_combat takes no
+        db handle), so status/one-shot state cannot leak across battles."""
+        engine = make_engine()  # no action limit: battle settles naturally
         actor = make_fighter("A", 1000, 100, 5, 10)
         actor.trigger_skills = [
             trigger_skill("战意", "buff", 0.5, duration=3),
@@ -369,9 +371,76 @@ class TestStatusLifecycle:
         # Runs without any database reference
         result = engine.resolve_combat(actor, target, "spar", merge_count=10)
         assert result.winner in ("A", "B", "draw")
-        # Battle ends when a fighter drops to 0: no residual survival
-        assert result.fighter1_final_hp >= 0
-        assert result.fighter2_final_hp >= 0
+        # Exactly one side is dead (or both in a draw) — no zombie outcomes,
+        # and the survivor is above 0 HP (real settlement, not clamping).
+        assert result.fighter1_final_hp == 0 or result.fighter2_final_hp == 0
+        if result.winner != "draw":
+            winner_hp = (
+                result.fighter1_final_hp
+                if result.winner == "A"
+                else result.fighter2_final_hp
+            )
+            assert winner_hp > 0
+
+
+# ------------------------------------------------------------------
+# Review-fix regression tests (ocr findings on 8e61524)
+# ------------------------------------------------------------------
+
+
+class TestReviewFixes:
+    def test_dot_lethal_consumes_survive(self):
+        """Lethal dot damage consumes a survive charge (tick funnels through
+        _try_survive) instead of killing past it."""
+        engine = make_engine()
+        fighter = make_fighter("A", 1000, 100, 5, 10, armor=0, max_hp=1000)
+        fighter.hp = 5
+        fighter.survive_charges = 1
+        fighter.status_effects = [
+            StatusEffect(
+                source_name="蚀骨",
+                kind="dot",
+                effect_value=1.0,
+                tick_rate=1.0,
+                duration=1,
+                remaining=1,
+                snapshot_damage=100,
+            )
+        ]
+        engine._tick_status_effects(fighter, [])
+        assert fighter.hp == 1  # saved by the survive charge
+        assert fighter.survive_charges == 0
+
+    def test_counter_lethal_consumes_survive(self):
+        """A lethal counter consumes the attacker's survive charge."""
+        engine = make_engine()
+        attacker = make_fighter("A", 1000, 100, 5, 10, armor=0, max_hp=1000)
+        attacker.hp = 10
+        attacker.survive_charges = 1
+        defender = make_fighter("B", 1000, 100, 5, 10, armor=0)
+        defender.trigger_skills = [
+            trigger_skill("反震", "counter", 1.0, trigger_timing="on_defense")
+        ]
+        log: list[str] = []
+        engine._process_trigger_skills("on_defense", defender, attacker, log)
+        assert attacker.hp == 1  # saved by the survive charge
+        assert attacker.survive_charges == 0
+
+    def test_round_start_buff_keeps_full_duration(self):
+        """A buff applied by a round_start skill in this round is not ticked
+        away in the same phase (tick runs before round-start skills)."""
+        engine = make_engine()
+        actor = make_fighter("A", 1000, 100, 5, 10)
+        actor.trigger_skills = [
+            trigger_skill(
+                "战意", "buff", 0.5, duration=1, trigger_timing="round_start"
+            )
+        ]
+        log: list[str] = []
+        engine._process_round_start_skills(actor, log)
+        assert len(actor.status_effects) == 1  # duration=1 survives its own round
+        engine._tick_status_effects(actor, log)
+        assert actor.status_effects == []  # expired at the next round's tick
 
 
 # ------------------------------------------------------------------
