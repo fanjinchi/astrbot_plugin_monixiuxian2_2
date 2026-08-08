@@ -343,6 +343,8 @@ class SkillManager:
             trigger["trigger_rate"] = min(rate * bonus, 1.0)
             trigger["effect_value"] = value * bonus
             trigger["star_level"] = star_level
+            # Default effect_type for configs predating the registry (spec 6.1)
+            trigger.setdefault("effect_type", "damage_bonus")
             # Normalize timing for the combat engine
             condition = trigger.get("trigger_condition", "")
             timing_map = {
@@ -363,6 +365,8 @@ class SkillManager:
             ultimate = dict(ultimate)
             ultimate["effect_value"] = value * bonus
             ultimate["star_level"] = star_level
+            # Default effect_type for legacy ultimates (spec 5.2)
+            ultimate.setdefault("effect_type", "damage_bonus")
             # Default trigger_rate to 1.0 for must-release ultimates (spec D2)
             if "trigger_rate" not in ultimate:
                 ultimate["trigger_rate"] = 1.0

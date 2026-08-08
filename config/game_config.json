@@ -17,7 +17,8 @@
     "damage_reduction_cap": 0.4,
     "armor_k_base": 100,
     "armor_k_level_coeff": 10,
-    "comment": "战斗冷却（秒）、暴击配置、概率上限与护甲公式参数。护甲公式：减伤率=护甲/(护甲+K)，K=armor_k_base+armor_k_level_coeff*等级"
+    "comment": "战斗冷却（秒）、暴击配置、概率上限与护甲公式参数。护甲公式：减伤率=护甲/(护甲+K)，K=armor_k_base+armor_k_level_coeff*等级",
+    "status_stack_cap": 3
   },
   "skill_system": {
     "breakthrough_success_learn_rate": 0.2,

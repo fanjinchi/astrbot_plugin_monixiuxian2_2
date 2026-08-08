@@ -161,9 +161,16 @@ def check_skills(rows: list[dict]) -> list[str]:
     semantics: effect_value 0.4 = that hit x1.4, schema-and-engine-fit §3):
     - damage_bonus / combo / damage_reduction / counter: rate x effect_value
     - stun: 2 x rate / mirror_TTK (self action window + enemy stall), TTK ~= 7
-    Rows without a trigger skill (pure-ultimate skills) are PASS. Unknown effect
-    types are reported as WARN (numeric check skipped). The 40% total reduction
-    cap (§3.2) is enforced at combat resolution, not here.
+    - heal: rate x value x TTK (restores value x max_hp, TTK ~= 7)
+    - dot: rate x value x duration x tick_rate
+    - pierce: rate x value x 1.5 (armor ~50% of mitigation, spec D11)
+    - fatigue: excluded (self-nerf trade-off, spec D11)
+    - buff/debuff/reflect/survive/unavoidable: value-based utility, WARN only
+    Rows without a trigger skill (pure-ultimate skills) are PASS. Effect types
+    outside the engine vocabulary (EFFECT_HANDLERS) are hard FAIL, since the
+    registry is the single source of truth (sync SKILL_EFFECT_TYPES asserts
+    equality). The 40% total reduction cap (§3.2) is enforced at combat
+    resolution, not here.
     """
     results = []
     for r in rows:
@@ -177,10 +184,25 @@ def check_skills(rows: list[dict]) -> list[str]:
             expected = rate * value
         elif effect == "stun":
             expected = 2 * rate / 7  # mirror TTK ~= 7 rounds
+        elif effect == "heal":
+            expected = rate * value * 7  # restores value x max_hp, TTK ~= 7
+        elif effect == "dot":
+            duration = int(r["duration"]) if r.get("duration") else 1
+            tick = float(r["tick_rate"]) if r.get("tick_rate") else 1.0
+            expected = rate * value * duration * tick
+        elif effect == "pierce":
+            expected = rate * value * 1.5  # bypasses ~half of mitigation
+        elif effect == "fatigue":
+            expected = 0.0  # self-nerf: excluded from budget (spec D11)
+        elif effect in ("buff", "debuff", "reflect", "survive", "unavoidable"):
+            expected = None  # value-based utility: numeric check skipped
         else:
-            expected = None  # unknown effect type: skip numeric check
+            results.append(
+                f"FAIL {r['id']:<14} 未注册 effect_type={effect}（引擎词表外） {r['name']}"
+            )
+            continue
         if expected is None:
-            verdict, detail = "WARN", f"未识别 effect={effect}，跳过数值校验"
+            verdict, detail = "WARN", f"utility effect={effect}，跳过数值校验"
         else:
             ok = expected <= SKILL_EXPECTED_GAIN_CAP
             verdict = "PASS" if ok else "FAIL"

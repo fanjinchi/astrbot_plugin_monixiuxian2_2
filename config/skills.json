@@ -50,7 +50,8 @@
       "route_multiplier": {
         "灵修": 1.2,
         "体修": 0.8
-      }
+      },
+      "ultimate": null
     },
     {
       "id": "draft_kuangfeng",
@@ -66,7 +67,8 @@
       "route_multiplier": {
         "灵修": 1.0,
         "体修": 1.0
-      }
+      },
+      "ultimate": null
     },
     {
       "id": "draft_yiyahuan",
@@ -82,7 +84,8 @@
       "route_multiplier": {
         "灵修": 1.0,
         "体修": 1.2
-      }
+      },
+      "ultimate": null
     },
     {
       "id": "draft_zhenshan",
@@ -98,7 +101,8 @@
       "route_multiplier": {
         "灵修": 0.8,
         "体修": 1.2
-      }
+      },
+      "ultimate": null
     },
     {
       "id": "draft_juxing",
@@ -114,7 +118,8 @@
       "route_multiplier": {
         "灵修": 1.2,
         "体修": 0.8
-      }
+      },
+      "ultimate": null
     },
     {
       "id": "draft_zhanyi",
@@ -126,6 +131,59 @@
         "trigger_rate": 0.25,
         "effect_type": "damage_bonus",
         "effect_value": 0.4
+      },
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      },
+      "ultimate": null
+    },
+    {
+      "id": "verify_heal_001",
+      "name": "回春诀",
+      "description": "引灵入体回复气血",
+      "trigger_skill": {
+        "name": "回春吐纳",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.15,
+        "effect_type": "heal",
+        "effect_value": 0.25
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
+    },
+    {
+      "id": "verify_dot_001",
+      "name": "蚀骨咒",
+      "description": "阴毒入体持续侵蚀",
+      "trigger_skill": {
+        "name": "蚀骨",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.25,
+        "effect_type": "dot",
+        "effect_value": 0.15
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
+    },
+    {
+      "id": "verify_survive_001",
+      "name": "涅槃诀",
+      "description": "绝境涅槃留下一线生机",
+      "trigger_skill": null,
+      "ultimate": {
+        "name": "涅槃重生",
+        "trigger_condition": "once_per_battle",
+        "effect_type": "survive",
+        "effect_value": 0,
+        "survive_count": 1,
+        "min_action_index": 5
       },
       "route_multiplier": {
         "灵修": 1.0,
@@ -148,7 +206,8 @@
       "route_multiplier": {
         "灵修": 1.2,
         "体修": 0.8
-      }
+      },
+      "ultimate": null
     },
     {
       "id": "draft_qingfeng",
@@ -164,7 +223,8 @@
       "route_multiplier": {
         "灵修": 1.2,
         "体修": 0.8
-      }
+      },
+      "ultimate": null
     },
     {
       "id": "spirit_001",
@@ -180,6 +240,42 @@
       },
       "route_multiplier": {
         "灵修": 1.2,
+        "体修": 0.8
+      },
+      "trigger_skill": null
+    },
+    {
+      "id": "verify_vampire_001",
+      "name": "噬血剑意",
+      "description": "以战养战吸取敌血",
+      "trigger_skill": {
+        "name": "噬血",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.15,
+        "effect_type": "heal",
+        "effect_value": 0.2,
+        "vampire": true
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 0.8
+      }
+    },
+    {
+      "id": "verify_unavoidable_001",
+      "name": "破风剑意",
+      "description": "剑意锁定必中一击",
+      "trigger_skill": {
+        "name": "破风",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.2,
+        "effect_type": "unavoidable",
+        "effect_value": 0
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.0,
         "体修": 0.8
       }
     }
@@ -199,7 +295,8 @@
       "route_multiplier": {
         "灵修": 0.8,
         "体修": 1.2
-      }
+      },
+      "ultimate": null
     },
     {
       "id": "draft_baxia",
@@ -215,7 +312,8 @@
       "route_multiplier": {
         "灵修": 0.8,
         "体修": 1.2
-      }
+      },
+      "ultimate": null
     },
     {
       "id": "draft_hunyan",
@@ -231,7 +329,8 @@
       "route_multiplier": {
         "灵修": 0.8,
         "体修": 1.2
-      }
+      },
+      "ultimate": null
     },
     {
       "id": "draft_jinshen",
@@ -248,7 +347,8 @@
       "route_multiplier": {
         "灵修": 0.8,
         "体修": 1.2
-      }
+      },
+      "trigger_skill": null
     }
   ],
   "传承功法池": [
@@ -267,7 +367,8 @@
       "route_multiplier": {
         "灵修": 1.0,
         "体修": 1.0
-      }
+      },
+      "trigger_skill": null
     },
     {
       "id": "draft_jiujian",
@@ -283,7 +384,8 @@
       "route_multiplier": {
         "灵修": 1.0,
         "体修": 1.0
-      }
+      },
+      "trigger_skill": null
     },
     {
       "id": "draft_xiuluo",
@@ -322,7 +424,8 @@
       "route_multiplier": {
         "灵修": 0.8,
         "体修": 1.2
-      }
+      },
+      "trigger_skill": null
     },
     {
       "id": "draft_zhonghun",
@@ -338,7 +441,8 @@
       "route_multiplier": {
         "灵修": 1.0,
         "体修": 1.0
-      }
+      },
+      "ultimate": null
     }
   ]
 }

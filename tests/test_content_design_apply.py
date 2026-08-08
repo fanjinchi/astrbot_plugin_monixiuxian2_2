@@ -184,9 +184,11 @@ def test_build_skill_rejects_bad_contracts():
     assert _build_skill(_skill_row(trigger_rate="0"), errors) is None
     assert _build_skill(_skill_row(trigger_rate="1.5"), errors) is None
     assert _build_skill(_skill_row(trigger_condition="ambush"), errors) is None
-    assert _build_skill(_skill_row(effect_type="heal"), errors) is None
-    assert _build_skill(_skill_row(effect_value=""), errors) is None
-    assert len(errors) == 5
+    assert _build_skill(_skill_row(effect_type="teleport"), errors) is None
+    # optional-key contract violations are collected as errors, not fatal
+    assert _build_skill(_skill_row(duration="0"), errors) is not None
+    assert _build_skill(_skill_row(pierce_rate="1.5"), errors) is not None
+    assert len(errors) == 6
 
 
 def test_validate_ultimate_forbids_trigger_rate_and_requires_effect():

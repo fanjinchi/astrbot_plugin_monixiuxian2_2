@@ -58,12 +58,23 @@ SKILL_TIMING_MAP = {
 }
 
 # Effect vocabulary consumed by the combat engine (EFFECT_HANDLERS registry).
+# Keep in sync with managers/combat_manager.py EFFECT_HANDLERS (asserted by
+# tests/test_sync_effect_vocabulary.py).
 SKILL_EFFECT_TYPES = {
     "damage_bonus",
     "combo",
     "stun",
     "counter",
     "damage_reduction",
+    "heal",
+    "dot",
+    "buff",
+    "debuff",
+    "pierce",
+    "unavoidable",
+    "reflect",
+    "survive",
+    "fatigue",
 }
 
 # Passive bonus vocabulary consumed by models.get_total_attributes for
@@ -219,6 +230,36 @@ def _build_heart(row: dict, errors: list[str]) -> dict | None:
     }
 
 
+def _validate_optional_keys(item: dict, ctx: str, errors: list[str]) -> None:
+    """Contract-check the optional effect keys (spec: skill-system delta).
+
+    Args:
+        item: The trigger skill or ultimate dict.
+        ctx: Context label for error messages.
+        errors: Error list to append to.
+    """
+    if "duration" in item:
+        d = item["duration"]
+        if not isinstance(d, int) or d < 1:
+            errors.append(f"{ctx}: duration must be an int >= 1, got {d!r}")
+    for key, lo, hi in (
+        ("tick_rate", 0.0, 1.0),
+        ("heal_percent", 0.0, 1.0),
+        ("pierce_rate", 0.0, 1.0),
+        ("reflect_rate", 0.0, 1.0),
+    ):
+        if key in item:
+            v = item[key]
+            if not isinstance(v, (int, float)) or not lo <= v <= hi:
+                errors.append(
+                    f"{ctx}: {key} must be numeric in [{lo}, {hi}], got {v!r}"
+                )
+    if "survive_count" in item:
+        c = item["survive_count"]
+        if not isinstance(c, int) or c < 1:
+            errors.append(f"{ctx}: survive_count must be an int >= 1, got {c!r}")
+
+
 def _validate_ultimate(raw_json: str, ctx: str, errors: list[str]) -> dict | None:
     """Parse and contract-check an ultimate_json cell (mandatory-cast ultimates).
 
@@ -261,6 +302,7 @@ def _validate_ultimate(raw_json: str, ctx: str, errors: list[str]) -> dict | Non
         if key in ult and not isinstance(ult[key], (int, float)):
             errors.append(f"{ctx}: ultimate {key} must be numeric")
             return None
+    _validate_optional_keys(ult, ctx, errors)
     return ult
 
 
@@ -313,6 +355,20 @@ def _build_skill(row: dict, errors: list[str]) -> dict | None:
             "effect_type": effect_type,
             "effect_value": value,
         }
+        for key in (
+            "duration",
+            "tick_rate",
+            "heal_percent",
+            "pierce_rate",
+            "reflect_rate",
+            "survive_count",
+        ):
+            cell = row.get(key, "")
+            if (cell or "").strip():
+                trigger_skill[key] = _num(cell)
+        if (row.get("vampire") or "").strip().lower() in ("1", "true", "yes"):
+            trigger_skill["vampire"] = True
+        _validate_optional_keys(trigger_skill, f"{ctx} trigger_skill", errors)
     # Persist None when the row omits the keys so the merge overwrites any
     # stale trigger/ultimate left in config by an earlier sync (review fix).
     entry["trigger_skill"] = trigger_skill

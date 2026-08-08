@@ -93,16 +93,22 @@ config 的 `trigger_condition` 经 `core/skill_manager.py`（timing_map, ~L326-3
 | **受击减伤** | MB Armour / Extra-thick Skin 减伤 10–50%；QPet 皮糙肉厚 −20%、霸气护体 2 次格挡 50% | `defend` / 15–25% / `damage_reduction` 0.3–0.5 | 铁布衫先例（20%/0.5，体修 1.2 加成）；减伤 cap 40% 已在框架内 |
 | **反击** | QPet 第六感 30%、双截棍 10% 被击反击、宽刃剑 15% 闪避反击；乱斗堂 17%×144%；MB Pugnacious +30% Reversal | `defend` / 10–20% / `counter` 0.5–1.0 | 反击伤害 = 自身面板×value，期望增幅 ≈ rate×value（每回合至多一次受击窗口） |
 
-### 2.2 未支持（needs_code，落代码后才可入池）
+### 2.2 已实现（2026-08-08 `trigger-effect-extensions`，效果引擎化 bd `tt3` 已闭环）
+
+> 以下效果原为 needs_code；引擎已通过 EFFECT_HANDLERS 注册表扩展全部实现
+> （managers/combat_manager.py），**现可直接入池**。同步契约词表与
+> validate_budget 折算已随扩展更新。真伤/破甲、秒杀、多段连发仍未实现（见 §6 表）。
 
 | 效果 | 原型（出处·数值） | 适配设想 | 说明 |
 |---|---|---|---|
-| **治疗/吸血** | QPet 矿泉水 回复 25%（至少 25）；Tragic Potion 12–500；想不想修真 吸血+10%；researcher 吸血 10–30% | `attack`/`defend` / `heal` | 续航维度空白，优先级高；按 HP(L) 百分比定 value |
-| **属性 Buff/Debuff** | QPet 残影 速度+50% 2–3 回合；龙蛇弓 力量−50% 3 回合；修仙家族 +20–200% 持续 2–4 回合 | `buff`/`debuff` 带持续回合 | 需引入"持续状态"结构，工程量中等 |
-| **持续伤害 DOT** | 真·青龙戟 带毒；企鹅挠痒 5+敏捷×0.2×6 回合 | `dot` | 依赖持续状态结构；researcher 建议设叠加上限 |
-| **必中 / 不可反击** | 狂魔镰 必中不可反击；判官笔 必中；幻影枪 不可反击 | 武器特效 / 攻击标记位 | 克制闪避/反击流的关键反制件；需 dodge/counter 豁免标记 |
-| **真实伤害 / 破甲** | 想不想修真 混沌真伤（10% 触发）；一念逍遥破防按百分比削防 | `true_damage` / `armor_pen` | 高境界防拖节奏的阀门（researcher 建议 §3）；新护甲公式下可做"无视 X% 护甲" |
-| **免死（装死）** | QPet 装死「第一神技」致死留 1 血；MB Survival 同效果 | `survive_lethal` | 强传播性；建议做**奥义**而非触发技（每场一次），避免触发版反复生效 |
+| **治疗/吸血** | QPet 矿泉水 回复 25%（至少 25）；Tragic Potion 12–500；想不想修真 吸血+10%；researcher 吸血 10–30% | `attack`/`defend` / `heal`（heal_percent 默认 effect_value；`vampire: true` 吸血模式） | 已实现；续航维度空白，优先级高；按 HP(L) 百分比定 value |
+| **属性 Buff/Debuff** | QPet 残影 速度+50% 2–3 回合；龙蛇弓 力量−50% 3 回合；修仙家族 +20–200% 持续 2–4 回合 | `buff`/`debuff` 带持续回合（duration；buff 施加自身、debuff 施加目标） | 已实现：持续状态结构（StatusEffect，叠加 cap=3）；round_start 白名单放行 |
+| **持续伤害 DOT** | 真·青龙戟 带毒；企鹅挠痒 5+敏捷×0.2×6 回合 | `dot`（effect_value×tick_rate 每回合，duration 回合数，快照=触发攻击预期伤害） | 已实现；同源刷新、异源 cap=3；叠加上限=status_stack_cap |
+| **必中 / 不可反击** | 狂魔镰 必中不可反击；判官笔 必中；幻影枪 不可反击 | `unavoidable`（一次性标记：跳过 dodge/block/counter） | 已实现；克制闪避/反击流的关键反制件 |
+| **真实伤害 / 破甲** | 想不想修真 混沌真伤（10% 触发）；一念逍遥破防按百分比削防 | `pierce`（无视 X% 护甲减伤） | **已实现（pierce）**：新护甲公式下按 pierce_rate 绕过减伤；真伤（无视全部减伤）未单独实现 |
+| **免死（装死）** | QPet 装死「第一神技」致死留 1 血；MB Survival 同效果 | `survive`（survive_count 层数 + survive_recovery 恢复比例） | 已实现；建议做**奥义**而非触发技（每场一次），避免触发版反复生效 |
+| **反弹** | QPet 大海无量 100% | `reflect`（reflect_rate × 实际伤害，每回合至多 1 次、不反射反射） | 已实现；可入池但需单独评估强度 |
+| **副作用/疲劳** | 乱斗堂爆裂一击 250%+疲劳 | `fatigue`（自我 debuff，×max(0,1−value)） | 已实现；天魔解体可选配，value 已降 1.8 贴线（§6） |
 | **闪避/命中提升** | MB Untouchable；QPet 凌波微步 +7%、铁铲 20%、青龙戟 10% | 常驻属性 → **走心法**，不做触发技 | 闪避 cap 40% 已设；触发版闪避收益不稳定，不建议 |
 
 ### 2.3 不适用（本插件无对应系统，明确排除）
@@ -158,9 +164,9 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
 
 - [x] 两大招 trigger_rate 核对 → 已定案：**必放制**（§1.3），config 不填概率；3.0/3.5 超预算降档随 bd `dhh`
 - [x] `combo` 语义 → 已接受现状：倍率叠加+栈上限，不做「额外打一回合」（§1.2 备注）
+- [x] 非伤害型奥义分发 → 已实现（2026-08-08 `trigger-effect-extensions`：大招统一走 EFFECT_HANDLERS，非伤害效果经 gate+限次后分发；legacy 无 effect_type 默认 damage_bonus 兼容）
+- [x] 副作用/疲劳机制 → 已实现（`fatigue` effect_type，自我 debuff）；天魔解体（§6）已降 value 至 1.8 闭环，疲劳副作用可选配
 - [ ] G2 的 30% 按 0 星 / 满星核算？（v1 池暂按 0 星录入，见 §6）
-- [ ] 非伤害型奥义（heal/stun/survive/斩杀）需要 ultimate 分支加 effect 分发 → bd `tt3`，排期随功法池扩充
-- [ ] 副作用/疲劳机制（乱斗堂爆裂一击式代价）→ bd `tt3`；天魔解体（§6）已降 value 至 1.8 闭环，副作用机制仍留待 `tt3`
 
 ---
 
@@ -179,20 +185,37 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
   （斩杀型 opp_hp_below / 逆袭型 self_hp_below / 延迟型 min_action_index）
 - 万剑归宗重做：3.0 → 2.0（bd `dhh` 降档）；已于 2026-08-08 同步 config（name 覆盖 + id 保留 `spirit_001`，player_skills 引用不中断）
 
-**待实现部分（needs_code，未入 CSV 或已入但需引擎扩展；归口 bd `tt3` / `dhh`）**：
+**待实现部分（needs_code，未入 CSV 或已入但需引擎扩展；归口 bd `dhh`）**：
+
+> 2026-08-08 `trigger-effect-extensions` 后：heal/吸血、持续 BUFF/DEBUFF、DOT、必中、
+> 免死、反弹、疲劳均已引擎实现（EFFECT_HANDLERS 14 族），**可入池**；
+> 以下为仍未实现项。
 
 | 原型效果 | 出处 | 去向 | 阻塞 |
 |---|---|---|---|
-| 治疗/吸血（矿泉水 25%、吸血+10%） | QPet/想不想修真 | 未入 CSV（§2.2 优先项） | tt3 heal |
-| 持续 BUFF/DEBUFF（残影 速度+50%、降攻、BUFF 20–100%） | QPet/无极仙途 | 未入 CSV | tt3 持续状态结构 |
-| DOT（企鹅挠痒、真·青龙戟带毒） | QPet | 未入 CSV | tt3 |
-| 必中/不可反击（判官笔、狂魔镰、天使之翼） | QPet | 未入 CSV | tt3 dodge/counter 豁免标记 |
-| 真伤/破甲（混沌真伤、破防） | 想不想修真/一念逍遥 | 未入 CSV（§4.6 高境界防拖） | tt3 |
-| 免死（装死、Survival） | QPet/MB | 未入 CSV（建议大招位） | tt3 survive_lethal |
-| 反弹（大海无量 100%） | QPet | 未入 CSV | 新机制，未列入 tt3，需单独评估 |
-| 副作用/疲劳（爆裂一击 250%+疲劳） | 乱斗堂 | 天魔解体已入 CSV 且已降 value 至 1.8（贴线缓解） | tt3 副作用机制 |
-| 多段连发（势如暴雨、真·铅球） | QPet | 用 combo 近似入池 | multi_hit 可选（tt3） |
+| 治疗/吸血（矿泉水 25%、吸血+10%） | QPet/想不想修真 | **已实现**（heal/vampire），未入 CSV，验证技能见 §6.1 | — |
+| 持续 BUFF/DEBUFF（残影 速度+50%、降攻、BUFF 20–100%） | QPet/无极仙途 | **已实现**（buff/debuff+StatusEffect），未入 CSV | — |
+| DOT（企鹅挠痒、真·青龙戟带毒） | QPet | **已实现**（dot+snapshot），未入 CSV | — |
+| 必中/不可反击（判官笔、狂魔镰、天使之翼） | QPet | **已实现**（unavoidable 一次性标记），未入 CSV | — |
+| 真伤/破甲（混沌真伤、破防） | 想不想修真/一念逍遥 | 破甲已实现（pierce，无视 X% 减伤）；**真伤（无视全部减伤）未实现** | dhh 高境界防拖 |
+| 免死（装死、Survival） | QPet/MB | **已实现**（survive 层数+recovery），建议大招位，验证技能见 §6.1 | — |
+| 反弹（大海无量 100%） | QPet | **已实现**（reflect，1/回合、不反射反射）；强度需单独评估 | — |
+| 副作用/疲劳（爆裂一击 250%+疲劳） | 乱斗堂 | **已实现**（fatigue）；天魔解体已入 CSV 且已降 value 至 1.8（贴线缓解） | 可选配 |
+| 多段连发（势如暴雨、真·铅球） | QPet | 用 combo 近似入池 | multi_hit 可选 |
 | 秒杀（神来一击 5–8% 降至 1 血） | QPet | 排除（§2.3）；以真龙诀斩杀替代 | 需 hp_execute 才可做 |
 
-> 跟踪：总进度 bd `hz7`；数值配平/降档 bd `dhh`；效果引擎化 bd `tt3`。
+> 跟踪：总进度 bd `hz7`；数值配平/降档 bd `dhh`；效果引擎化 bd `tt3`（2026-08-08 已闭环）。
 > 入库：skills.csv → config 已同步（2026-08-08 `implement-content-design`：reconcile 全量重导 20 行、`spirit_001` 万剑归宗、天魔解体 1.8；schema-and-engine-fit.md §4 已更新）。
+> 验证技能：§6.1 新增 5 行（治疗/吸血/DOT/免死大招/必中），2026-08-08 随 `trigger-effect-extensions` 同步入库。
+
+### 6.1 验证技能（2026-08-08 `trigger-effect-extensions`）
+
+为验证新效果引擎而加入的少量技能（0.x 加性值、单行预算内），非完整玩法扩充：
+
+| id | name | 池 | 触发 | effect | value | 说明 |
+|---|---|---|---|---|---|---|
+| verify_heal_001 | 回春诀 | 通用 | attack 20% | heal | 0.25 | 治疗 25% 最大气血 |
+| verify_vampire_001 | 噬血剑意 | 灵修 | attack 20% | heal (vampire) | 0.20 | 吸血 20% 实际伤害 |
+| verify_dot_001 | 蚀骨咒 | 通用 | attack 25% | dot | 0.15（duration 3） | 每回合 15% 快照伤害 |
+| verify_survive_001 | 涅槃诀 | 通用 | 大招（必放，门槛 5） | survive | 0 | survive_count 1 |
+| verify_unavoidable_001 | 破风剑意 | 灵修 | attack 20% | unavoidable | 0 | 必中一击 |

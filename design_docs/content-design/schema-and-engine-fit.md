@@ -95,6 +95,6 @@
 | P1 | bug#2 `iup` | 修复 + 数值 | ✅ 已修（必放制 + 解锁门槛）；3.0/3.5 降档随 bd `dhh` |
 | P2 | 功法 `route_multiplier` 消费（loadout 按 `player.cultivation_type` 乘 rate/value） | 小开发/清理 | ✅ 已做（`get_battle_loadout` 导出时应用：触发技乘 rate min(1.0,·)、大招乘 value；升星后复合，2026-08-08） |
 | P2 | CSV → config 转换脚本（name 键控、bonus_damage→damage、status 过滤） | 工具开发 | ✅ 已落地 `scripts/sync_content_to_config.py` 并升级为 **reconcile 全量重导**：weapons/heart_methods/**skills** 三类同规则（导入 draft/final 后删除表外条目；legacy 不导入即删除；dry-run 输出 DELETE 清单；原子写 3 文件）；技能行契约：trigger_condition 持久化键 + 大招禁 trigger_rate + 0.x 加性 effect_value；exp_multiplier 零值保留（修复 or 1.0 bug）；validate_budget 闸门含技能 0.x 校验 |
-| P3 | needs_code 效果（heal/必中/真伤/DOT/免死走大招） | v2 引擎扩展 | ⬜ bd `tt3` |
+| P3 | needs_code 效果（heal/必中/真伤/DOT/免死走大招） | v2 引擎扩展 | ✅ 已做（2026-08-08 `trigger-effect-extensions`：EFFECT_HANDLERS 扩至 14 族——heal/vampire/dot/buff/debuff/fatigue/pierce/unavoidable/reflect/survive + 持续状态生命周期 + 大招非伤害分发；真伤/秒杀/多段连发仍未实现，归口 bd `dhh`；验证技能 5 行已入池）。**反弹决定**：reflect 已实现（reflect_rate×实际伤害、每回合至多 1 次、不反射反射），强度待单独评估 |
 | P3 | `validate_budget.py` 支持挂载技「含税期望」校验 | 工具增强 | ✅ 已做（武器挂载技期望增幅 + skills.csv 20 行 0.x 期望增益校验，2026-08-08） |
 | P4 | 心法 `route` 装备校验（路线专属心法） | 可选开发 | ✅ 已做（equip 时 route≠通用 且 ≠cultivation_type 拒绝，不卸当前心法；CSV route 列同步修正 5 件专属，2026-08-08） |
