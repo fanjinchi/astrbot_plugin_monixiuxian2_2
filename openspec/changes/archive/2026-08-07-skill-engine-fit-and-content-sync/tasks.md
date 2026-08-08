@@ -49,5 +49,5 @@
 
 - [x] 8.1 `uv run ruff format . && uv run ruff check .` 通过
 - [x] 8.2 metadata.yaml 版本号 v3.8.0 + README.md 更新日志 + handlers/misc_handler.py 修仙帮助文本（功法/大招生效、升星 3 星封顶说明）
-- [x] 8.3 关闭 bd：lvb / iup / 711 / plt / riw / arx（**dhh 保留**，随功法池重做）；wxg 在武器入库后关闭 —— **待独立代码审查通过后执行**（subagent 基建已删，审查由用户/恢复后的 reviewer 进行）
-- [ ] 8.4 `openspec archive` 本 change（合并并验证后）—— 同待审查
+- [x] 8.3 关闭 bd：lvb / iup / 711 / plt / riw / arx（**dhh 保留**，随功法池重做）；wxg 已在武器入库后关闭（2026-08-07 验证）
+- [x] 8.4 `openspec archive` 本 change（2026-08-07 用户确认归档；delta specs 已同步至主 specs：combat-core / skill-system / content-sync-pipeline）

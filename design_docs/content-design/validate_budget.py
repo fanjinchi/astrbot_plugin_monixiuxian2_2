@@ -78,7 +78,12 @@ def check_weapon_mounts(rows: list[dict]) -> list[str]:
             if not isinstance(s, dict):
                 results.append(f"FAIL {where:<16} 必须是对象")
                 continue
-            missing = {"trigger_timing", "effect_type", "trigger_rate", "effect_value"} - s.keys()
+            missing = {
+                "trigger_timing",
+                "effect_type",
+                "trigger_rate",
+                "effect_value",
+            } - s.keys()
             if missing:
                 results.append(f"FAIL {where:<16} 缺引擎键 {sorted(missing)}")
                 continue
@@ -92,7 +97,9 @@ def check_weapon_mounts(rows: list[dict]) -> list[str]:
             gain = rate * value
             if s["effect_type"] == "stun":
                 if rate > STUN_RATE_CAP:
-                    results.append(f"FAIL {where:<16} stun 概率 {rate} 超上限 {STUN_RATE_CAP}")
+                    results.append(
+                        f"FAIL {where:<16} stun 概率 {rate} 超上限 {STUN_RATE_CAP}"
+                    )
             elif gain > WEAPON_MOUNT_TAX_CAP:
                 results.append(
                     f"FAIL {where:<16} 期望增幅 {gain:.1%} 超税上限 {WEAPON_MOUNT_TAX_CAP:.0%}"
@@ -107,6 +114,8 @@ def check_weapon_mounts(rows: list[dict]) -> list[str]:
                 f"rate={rate} value={value} 期望增幅={gain:.1%}"
             )
     return results
+
+
 MIRROR_TTK_RANGE = (5, 10)  # G1: armed mirror-match TTK target
 
 

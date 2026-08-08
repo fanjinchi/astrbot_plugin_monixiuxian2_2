@@ -503,8 +503,7 @@ class CombatEngine:
             # it at on_defense timing).
             if effect == "counter" and timing != "on_defense":
                 logger.warning(
-                    "effect_type 'counter' in skill '%s' outside on_defense; "
-                    "skipping.",
+                    "effect_type 'counter' in skill '%s' outside on_defense; skipping.",
                     skill_name,
                 )
                 continue
