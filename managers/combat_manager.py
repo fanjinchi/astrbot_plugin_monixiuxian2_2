@@ -2,7 +2,8 @@
 
 Implements the spec-driven combat-core requirements:
 - Speed-weighted initiative: P(A acts) = speed_A / (speed_A + speed_B)
-- Muxxu damage formula: floor((base_dmg + dmg_attr * K) * skill_mult * random - armor)
+- Muxxu damage formula: floor((base_dmg + dmg_attr * K) * skill_mult * random)
+  with percent armor reduction (armor/(armor+K), K = 100 + 10*level, total reduction capped)
 - Unified resolution chain: dodge -> block -> crit -> trigger -> ultimate -> damage
 - Trigger skill timings: on_attack, on_defense, on_crit, round_start
 - Control effects: stun skips the next action right

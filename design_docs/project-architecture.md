@@ -79,7 +79,9 @@
 | `content-sync-pipeline` | CSV→config 同步：name 键控合并、status 过滤、键名映射、引擎契约校验（大招禁 trigger_rate）、预算验算闸门 |
 | `gm-commands` | 修仙GM 统一入口；GM_ADMINS 权限；目标解析优先级（@提及→数字 id→发送者）；属性修改/物品发放/强制结算/清除CD（需确认）/审计日志 500MB 滚动 |
 
-> ⚠️ **已知 spec 滞后点**：attribute-numerics / combat-core 的护甲描述仍是旧「加法减伤 −护甲」，代码实际为**百分比** `armor/(armor+K)`（bd `qtk` 落地后未回写 spec）——设计时以代码与 `current-design-report.md` §4.5 为准，待后续修正 spec。
+> ✅ **spec 滞后已回写（2026-08-07）**：attribute-numerics / combat-core 的护甲描述已改为
+> 百分比减伤 `armor/(armor+K)`（与代码一致，bd `qtk` 的实现），含伤害下限场景修正。
+> 注：`openspec/changes/archive/` 归档提案中的旧描述是历史快照，不代表现状。
 
 ## 5. 关键节点时间线（重设计以来的里程碑）
 
@@ -93,6 +95,7 @@
 | 2026-08-06 | content-design 工作区建立 | weapons/skills/heart_methods CSV + validate_budget.py 验算 + researcher 外部调研整合（hz7 跟踪） |
 | 2026-08-07 | `add-gm-commands` 归档 | GM 命令系统落地补归档；delta specs 全部同步至主 specs |
 | 2026-08-07 | design_docs 同步治理 | README 标注资料归属（本项目/外部参考/混合）；本文档建立 |
+| 2026-08-07 | specs 护甲回写 | attribute-numerics / combat-core 护甲描述由加法减伤改为百分比 `armor/(armor+K)`（bd qtk 实现回写，直接改主 spec，未走提案流程） |
 
 **数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底（当前最新）。
 
