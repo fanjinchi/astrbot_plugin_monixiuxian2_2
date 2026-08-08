@@ -672,80 +672,106 @@
     "name": "长春功残篇",
     "type": "功法",
     "rank": "凡品",
-    "description": "一部基础的吐纳法门，修炼后可延年益寿。",
+    "description": "一部基础的吐纳法门，修炼后可延年益寿。（已废弃：旧版功法物品，无对应技能，不可作为领悟凭据）",
     "price": 1000,
-    "shop_weight": 1000
+    "shop_weight": 0,
+    "legacy": true
   },
   "4002": {
     "name": "焚天诀上卷",
     "type": "功法",
     "rank": "圣品",
-    "description": "传说中可焚尽万物的无上功法，此为上卷。",
+    "description": "传说中可焚尽万物的无上功法，此为上卷。（已废弃：旧版功法物品，无对应技能，不可作为领悟凭据）",
     "price": 888888,
-    "shop_weight": 100
+    "shop_weight": 0,
+    "legacy": true
   },
   "4003": {
     "name": "他化自在大法",
     "type": "功法",
     "rank": "帝品",
-    "description": "无上秘法，可演化万物，神秘莫测。",
+    "description": "无上秘法，可演化万物，神秘莫测。（已废弃：旧版功法物品，无对应技能，不可作为领悟凭据）",
     "price": 9999999,
-    "shop_weight": 20
+    "shop_weight": 0,
+    "legacy": true
   },
   "4004": {
     "name": "不动明王经",
     "type": "功法",
     "rank": "珍品",
-    "description": "佛门无上炼体功法，修炼后肉身坚不可摧。",
+    "description": "佛门无上炼体功法，修炼后肉身坚不可摧。（已废弃：旧版功法物品，无对应技能，不可作为领悟凭据）",
     "price": 10000,
-    "shop_weight": 100
+    "shop_weight": 0,
+    "legacy": true
   },
   "4005": {
     "name": "御风诀",
     "type": "功法",
     "rank": "凡品",
-    "description": "修炼后身轻如燕，提升移动速度（暂无实际效果）。",
+    "description": "修炼后身轻如燕，提升移动速度（暂无实际效果）。（已废弃：旧版功法物品，无对应技能，不可作为领悟凭据）",
     "price": 1200,
-    "shop_weight": 1000
+    "shop_weight": 0,
+    "legacy": true
   },
   "4006": {
     "name": "龟息功",
     "type": "功法",
     "rank": "凡品",
-    "description": "模拟玄龟呼吸，修炼后气息绵长，提升耐力（暂无实际效果）。",
+    "description": "模拟玄龟呼吸，修炼后气息绵长，提升耐力（暂无实际效果）。（已废弃：旧版功法物品，无对应技能，不可作为领悟凭据）",
     "price": 900,
-    "shop_weight": 1000
+    "shop_weight": 0,
+    "legacy": true
   },
   "4007": {
     "name": "北冥神功",
     "type": "功法",
     "rank": "珍品",
-    "description": "能吸取他人修为化为己用，霸道无比（暂无实际效果）。",
+    "description": "能吸取他人修为化为己用，霸道无比（暂无实际效果）。（已废弃：旧版功法物品，无对应技能，不可作为领悟凭据）",
     "price": 25000,
-    "shop_weight": 100
+    "shop_weight": 0,
+    "legacy": true
   },
   "4008": {
     "name": "九阳神功",
     "type": "功法",
     "rank": "珍品",
-    "description": "至刚至阳的内功心法，百毒不侵。",
+    "description": "至刚至阳的内功心法，百毒不侵。（已废弃：旧版功法物品，无对应技能，不可作为领悟凭据）",
     "price": 22000,
-    "shop_weight": 100
+    "shop_weight": 0,
+    "legacy": true
   },
   "4009": {
     "name": "道经",
     "type": "功法",
     "rank": "帝品",
-    "description": "阐述了天地至理的无上经文，为万法之源。",
+    "description": "阐述了天地至理的无上经文，为万法之源。（已废弃：旧版功法物品，无对应技能，不可作为领悟凭据）",
     "price": 7777777,
-    "shop_weight": 20
+    "shop_weight": 0,
+    "legacy": true
   },
   "4010": {
     "name": "吞天魔功",
     "type": "功法",
     "rank": "帝品",
-    "description": "魔道无上功法，吞噬万物本源，禁忌的存在。",
+    "description": "魔道无上功法，吞噬万物本源，禁忌的存在。（已废弃：旧版功法物品，无对应技能，不可作为领悟凭据）",
     "price": 6666666,
-    "shop_weight": 20
+    "shop_weight": 0,
+    "legacy": true
+  },
+  "4011": {
+    "name": "基础吐纳",
+    "type": "功法",
+    "rank": "凡品",
+    "description": "最基础的修炼法门秘籍。持有后可设为修习目标进行领悟。",
+    "price": 800,
+    "shop_weight": 800
+  },
+  "4012": {
+    "name": "铁布衫",
+    "type": "功法",
+    "rank": "凡品",
+    "description": "强化肉身的防御功法秘籍。持有后可设为修习目标进行领悟。",
+    "price": 2000,
+    "shop_weight": 400
   }
 }

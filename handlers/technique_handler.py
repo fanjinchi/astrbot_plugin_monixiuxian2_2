@@ -167,7 +167,7 @@ class TechniqueHandler:
         if not await self.skill_manager._is_skill_learned(player, skill_id):
             yield event.plain_result(
                 f"❌ 功法【{skill_name}】尚未领悟，无法激活\n"
-                f"💡 可先将功法物品设为修习目标进行领悟"
+                f"💡 需先拥有该功法秘籍并设为修习目标进行领悟，或通过闭关/突破领悟"
             )
             return
 

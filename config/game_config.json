@@ -1,138 +1,259 @@
 {
-    "cultivation": {
-        "max_cultivation_minutes": 1440,
-        "comment": "闭关时长上限（分钟），24小时=1440分钟"
+  "cultivation": {
+    "max_cultivation_minutes": 1440,
+    "comment": "闭关时长上限（分钟），24小时=1440分钟"
+  },
+  "combat": {
+    "duel_cooldown": 300,
+    "spar_cooldown": 60,
+    "boss_crit_rate": 30,
+    "crit_damage_multiplier": 1.5,
+    "action_limit": 200,
+    "dodge_cap": 0.4,
+    "block_cap": 0.3,
+    "crit_rate_cap": 0.5,
+    "crit_damage_cap": 2.0,
+    "combo_cap": 2,
+    "damage_reduction_cap": 0.4,
+    "armor_k_base": 100,
+    "armor_k_level_coeff": 10,
+    "comment": "战斗冷却（秒）、暴击配置、概率上限与护甲公式参数。护甲公式：减伤率=护甲/(护甲+K)，K=armor_k_base+armor_k_level_coeff*等级"
+  },
+  "skill_system": {
+    "breakthrough_success_learn_rate": 0.2,
+    "breakthrough_fail_learn_rate": 0.1,
+    "cultivation_learn_rate": 0.15,
+    "cultivation_learn_interval_hours": 2,
+    "universal_pool_rate": 0.05,
+    "universal_pool_no_heart_rate": 0.03,
+    "random_growth_step": 5,
+    "hp_growth_step": 15,
+    "growth_weights": {
+      "damage": 0.6,
+      "agility": 0.25,
+      "speed": 0.15
     },
-    "combat": {
-        "duel_cooldown": 300,
-        "spar_cooldown": 60,
-        "boss_crit_rate": 30,
-        "crit_damage_multiplier": 1.5,
-        "action_limit": 200,
-        "dodge_cap": 0.4,
-        "block_cap": 0.3,
-        "crit_rate_cap": 0.5,
-        "crit_damage_cap": 2.0,
-        "combo_cap": 2,
-        "damage_reduction_cap": 0.4,
-        "armor_k_base": 100,
-        "armor_k_level_coeff": 10,
-        "comment": "战斗冷却（秒）、暴击配置、概率上限与护甲公式参数。护甲公式：减伤率=护甲/(护甲+K)，K=armor_k_base+armor_k_level_coeff*等级"
+    "breakthrough_pity_step": 0.05,
+    "breakthrough_pity_guarantee": 19,
+    "max_technique_slots": 4,
+    "max_star": 3,
+    "star_up_bonus": 0.1,
+    "star_compensation_base": 1000,
+    "star_compensation_ratio": 0.5,
+    "battle_report_merge_count": 10,
+    "comment": "技能系统：领悟概率、通用池概率、成长步长、连败保底"
+  },
+  "fortune": {
+    "weapon_rate": 0.12,
+    "heart_method_rate": 0.08,
+    "pill_rate": 0.2,
+    "level_window": 10,
+    "pill_count_min": 1,
+    "pill_count_max": 2,
+    "comment": "突破机缘轮盘：武器/心法/丹药掉率互斥，余为空；level_window 为可掉落物品的最低境界偏移"
+  },
+  "pve": {
+    "enabled": true,
+    "difficulty_multiplier": 1.0,
+    "comment": "PvE难度系数与总开关；关闭时禁用世界Boss/秘境等PvE战斗入口，历练不受影响"
+  },
+  "boss": {
+    "enabled": true,
+    "comment": "世界Boss系统总开关；关闭时停止Boss生成定时任务与相关指令"
+  },
+  "bank": {
+    "daily_interest_rate": 0.001,
+    "max_deposit": 10000000,
+    "loan_interest_rate": 0.005,
+    "loan_duration_days": 7,
+    "max_loan_amount": 1000000,
+    "min_loan_amount": 1000,
+    "breakthrough_loan_rate": 0.008,
+    "breakthrough_loan_duration": 3,
+    "comment": "银行配置：日利率、存款上限、贷款配置"
+  },
+  "dual_cultivation": {
+    "cooldown": 3600,
+    "request_expire": 300,
+    "k_hours": 2,
+    "realm_factor": "linear",
+    "comment": "双修配置：冷却时间（秒）、请求过期时间（秒）。k_hours为定额收益等效闭关小时数；realm_factor为境界系数模式，可选 linear / power1.5 / power2"
+  },
+  "spirit_eye": {
+    "spawn_interval": 7200,
+    "types": {
+      "1": {
+        "name": "下品灵眼",
+        "exp_per_hour": 500,
+        "spawn_rate": 50
+      },
+      "2": {
+        "name": "中品灵眼",
+        "exp_per_hour": 2000,
+        "spawn_rate": 30
+      },
+      "3": {
+        "name": "上品灵眼",
+        "exp_per_hour": 8000,
+        "spawn_rate": 15
+      },
+      "4": {
+        "name": "极品灵眼",
+        "exp_per_hour": 30000,
+        "spawn_rate": 5
+      }
     },
-    "skill_system": {
-        "breakthrough_success_learn_rate": 0.2,
-        "breakthrough_fail_learn_rate": 0.1,
-        "cultivation_learn_rate": 0.15,
-        "cultivation_learn_interval_hours": 2,
-        "universal_pool_rate": 0.05,
-        "universal_pool_no_heart_rate": 0.03,
-        "random_growth_step": 5,
-        "hp_growth_step": 15,
-        "growth_weights": {
-            "damage": 0.6,
-            "agility": 0.25,
-            "speed": 0.15
+    "comment": "灵眼配置：生成间隔（秒）、类型配置"
+  },
+  "rift": {
+    "default_duration": 1800,
+    "drop_tables": {
+      "1": [
+        {
+          "name": "灵草",
+          "weight": 40,
+          "min": 2,
+          "max": 5
         },
-        "breakthrough_pity_step": 0.05,
-        "breakthrough_pity_guarantee": 19,
-        "max_technique_slots": 4,
-        "max_star": 3,
-        "star_up_bonus": 0.1,
-        "star_compensation_base": 1000,
-        "star_compensation_ratio": 0.5,
-        "battle_report_merge_count": 10,
-        "comment": "技能系统：领悟概率、通用池概率、成长步长、连败保底"
-    },
-    "fortune": {
-        "weapon_rate": 0.12,
-        "heart_method_rate": 0.08,
-        "pill_rate": 0.20,
-        "level_window": 10,
-        "pill_count_min": 1,
-        "pill_count_max": 2,
-        "comment": "突破机缘轮盘：武器/心法/丹药掉率互斥，余为空；level_window 为可掉落物品的最低境界偏移"
-    },
-    "pve": {
-        "enabled": true,
-        "difficulty_multiplier": 1.0,
-        "comment": "PvE难度系数与总开关；关闭时禁用世界Boss/秘境等PvE战斗入口，历练不受影响"
-    },
-    "boss": {
-        "enabled": true,
-        "comment": "世界Boss系统总开关；关闭时停止Boss生成定时任务与相关指令"
-    },
-    "bank": {
-        "daily_interest_rate": 0.001,
-        "max_deposit": 10000000,
-        "loan_interest_rate": 0.005,
-        "loan_duration_days": 7,
-        "max_loan_amount": 1000000,
-        "min_loan_amount": 1000,
-        "breakthrough_loan_rate": 0.008,
-        "breakthrough_loan_duration": 3,
-        "comment": "银行配置：日利率、存款上限、贷款配置"
-    },
-    "dual_cultivation": {
-        "cooldown": 3600,
-        "request_expire": 300,
-        "k_hours": 2,
-        "realm_factor": "linear",
-        "comment": "双修配置：冷却时间（秒）、请求过期时间（秒）。k_hours为定额收益等效闭关小时数；realm_factor为境界系数模式，可选 linear / power1.5 / power2"
-    },
-    "spirit_eye": {
-        "spawn_interval": 7200,
-        "types": {
-            "1": {"name": "下品灵眼", "exp_per_hour": 500, "spawn_rate": 50},
-            "2": {"name": "中品灵眼", "exp_per_hour": 2000, "spawn_rate": 30},
-            "3": {"name": "上品灵眼", "exp_per_hour": 8000, "spawn_rate": 15},
-            "4": {"name": "极品灵眼", "exp_per_hour": 30000, "spawn_rate": 5}
+        {
+          "name": "精铁",
+          "weight": 30,
+          "min": 1,
+          "max": 3
         },
-        "comment": "灵眼配置：生成间隔（秒）、类型配置"
+        {
+          "name": "灵石碎片",
+          "weight": 30,
+          "min": 3,
+          "max": 8
+        }
+      ],
+      "2": [
+        {
+          "name": "灵草",
+          "weight": 30,
+          "min": 3,
+          "max": 7
+        },
+        {
+          "name": "玄铁",
+          "weight": 25,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "name": "灵兽毛皮",
+          "weight": 20,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "name": "基础吐纳",
+          "weight": 15,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "name": "秘境精华",
+          "weight": 10,
+          "min": 1,
+          "max": 2
+        }
+      ],
+      "3": [
+        {
+          "name": "玄铁",
+          "weight": 25,
+          "min": 3,
+          "max": 6
+        },
+        {
+          "name": "星辰石",
+          "weight": 20,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "name": "灵兽内丹",
+          "weight": 20,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "name": "铁布衫",
+          "weight": 20,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "name": "天材地宝",
+          "weight": 15,
+          "min": 1,
+          "max": 1
+        }
+      ]
     },
-    "rift": {
-        "default_duration": 1800,
-        "drop_tables": {
-            "1": [
-                {"name": "灵草", "weight": 40, "min": 2, "max": 5},
-                {"name": "精铁", "weight": 30, "min": 1, "max": 3},
-                {"name": "灵石碎片", "weight": 30, "min": 3, "max": 8}
-            ],
-            "2": [
-                {"name": "灵草", "weight": 30, "min": 3, "max": 7},
-                {"name": "玄铁", "weight": 25, "min": 2, "max": 4},
-                {"name": "灵兽毛皮", "weight": 20, "min": 1, "max": 3},
-                {"name": "功法残页", "weight": 15, "min": 1, "max": 1},
-                {"name": "秘境精华", "weight": 10, "min": 1, "max": 2}
-            ],
-            "3": [
-                {"name": "玄铁", "weight": 25, "min": 3, "max": 6},
-                {"name": "星辰石", "weight": 20, "min": 2, "max": 4},
-                {"name": "灵兽内丹", "weight": 20, "min": 1, "max": 2},
-                {"name": "功法残页", "weight": 20, "min": 1, "max": 2},
-                {"name": "天材地宝", "weight": 15, "min": 1, "max": 1}
-            ]
+    "pill_drop_tables": {
+      "1": [
+        {
+          "name": "三品凝神增益丹",
+          "weight": 100,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "2": [
+        {
+          "name": "三品凝神增益丹",
+          "weight": 50,
+          "min": 1,
+          "max": 1
         },
-        "pill_drop_tables": {
-            "1": [
-                {"name": "三品凝神增益丹", "weight": 100, "min": 1, "max": 1}
-            ],
-            "2": [
-                {"name": "三品凝神增益丹", "weight": 50, "min": 1, "max": 1},
-                {"name": "四品破境增益丹", "weight": 40, "min": 1, "max": 1},
-                {"name": "五品渡劫增益丹", "weight": 10, "min": 1, "max": 1}
-            ],
-            "3": [
-                {"name": "四品破境增益丹", "weight": 40, "min": 1, "max": 1},
-                {"name": "五品渡劫增益丹", "weight": 30, "min": 1, "max": 1},
-                {"name": "六品破境增益丹", "weight": 20, "min": 1, "max": 1},
-                {"name": "七品化神增益丹", "weight": 10, "min": 1, "max": 1}
-            ]
+        {
+          "name": "四品破境增益丹",
+          "weight": 40,
+          "min": 1,
+          "max": 1
         },
-        "pill_drop_chance": {
-            "1": 3,
-            "2": 5,
-            "3": 10
+        {
+          "name": "五品渡劫增益丹",
+          "weight": 10,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "3": [
+        {
+          "name": "四品破境增益丹",
+          "weight": 40,
+          "min": 1,
+          "max": 1
         },
-        "comment": "秘境配置：探索时长（秒）、掉落表、丹药掉落概率"
-    }
+        {
+          "name": "五品渡劫增益丹",
+          "weight": 30,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "name": "六品破境增益丹",
+          "weight": 20,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "name": "七品化神增益丹",
+          "weight": 10,
+          "min": 1,
+          "max": 1
+        }
+      ]
+    },
+    "pill_drop_chance": {
+      "1": 3,
+      "2": 5,
+      "3": 10
+    },
+    "comment": "秘境配置：探索时长（秒）、掉落表、丹药掉落概率"
+  }
 }
