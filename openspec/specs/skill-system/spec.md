@@ -26,7 +26,7 @@
 
 随机触发技能 SHALL 在战斗判定链的触发技环节按各自触发时机（攻击时/受击时/暴击时/回合开始等）与触发概率自动判定；触发概率 MUST 为 config 可调。触发技配置（功法 `trigger_skill` 与武器 `trigger_skills`）MUST 统一使用引擎契约键名 `trigger_timing` / `effect_type` / `trigger_rate` / `effect_value`；系统 MUST NOT 维护第二套同义键名（如 `effect`），功法归一化层 SHALL 负责将 `trigger_condition` 映射为 `trigger_timing`，其余契约键 MUST 由配置原样提供。
 
-`effect_type` 词表 SHALL 覆盖：`damage_bonus`、`combo`、`stun`、`counter`、`damage_reduction`、`heal`、`dot`、`buff`、`debuff`、`pierce`、`unavoidable`、`survive`、`reflect`、`fatigue`。数值语义 SHALL 延续 0.x 加性契约：`effect_value = x` 表示当次结算 ×(1+x)（如 heal 0.25 = 回复最大气血的 25%；dot 0.1 = 每回合造成当次伤害 10% 的持续伤害）。持续类与保命类效果的附加参数 SHALL 为可选契约键：`duration`（持续回合数，缺省 1）、`tick_rate`（dot 每回合伤害系数，缺省取 effect_value）、`heal_percent`（heal 回复比例，缺省取 effect_value）、`pierce_rate`（破甲穿透比例，0-1）、`reflect_rate`（反弹比例）、`survive_count`（免死次数，缺省 1）；可选键 MUST 经契约校验（类型与值域）后方可入库，非法值 SHALL 报错中止。
+`effect_type` 词表 SHALL 覆盖：`damage_bonus`、`combo`、`stun`、`counter`、`damage_reduction`、`heal`、`dot`、`buff`、`debuff`、`pierce`、`unavoidable`、`survive`、`reflect`、`fatigue`。数值语义 SHALL 延续 0.x 加性契约：`effect_value = x` 表示当次结算 ×(1+x)（如 heal 0.25 = 回复最大气血的 25%；dot 0.1 = 每回合造成当次伤害 10% 的持续伤害）。持续类与保命类效果的附加参数 SHALL 为可选契约键：`duration`（持续回合数，缺省 1）、`tick_rate`（dot 每回合伤害系数，缺省取 effect_value）、`heal_percent`（heal 回复比例，缺省取 effect_value）、`pierce_rate`（破甲穿透比例，0-1）、`reflect_rate`（反弹比例）、`survive_count`（免死次数，缺省 1）；`stat`（buff/debuff 作用属性：`damage`/`armor`/`speed`，缺省 `damage`）；可选键 MUST 经契约校验（类型与值域）后方可入库，非法值 SHALL 报错中止。
 
 #### Scenario: 受击触发反击
 

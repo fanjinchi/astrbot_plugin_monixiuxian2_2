@@ -371,6 +371,10 @@ def _build_skill(row: dict, errors: list[str]) -> dict | None:
                     trigger_skill[key] = _num(cell)
                 except ValueError:
                     errors.append(f"{ctx}: {key} must be numeric, got {cell!r}")
+        # stat is a string key selecting which stat buff/debuff modifies
+        # (damage | armor | speed); engine defaults to damage when absent.
+        if (row.get("stat") or "").strip():
+            trigger_skill["stat"] = row["stat"].strip()
         vampire = (row.get("vampire") or "").strip().lower()
         if vampire in ("1", "true", "yes"):
             trigger_skill["vampire"] = True

@@ -164,7 +164,8 @@
         "trigger_condition": "attack",
         "trigger_rate": 0.25,
         "effect_type": "dot",
-        "effect_value": 0.15
+        "effect_value": 0.15,
+        "duration": 3
       },
       "ultimate": null,
       "route_multiplier": {
@@ -185,6 +186,42 @@
         "survive_count": 1,
         "min_action_index": 5
       },
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
+    },
+    {
+      "id": "draft_wandu",
+      "name": "万毒掌",
+      "description": "掌蕴剧毒侵蚀敌体",
+      "trigger_skill": {
+        "name": "毒掌噬骨",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.2,
+        "effect_type": "dot",
+        "effect_value": 0.1,
+        "duration": 3
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
+    },
+    {
+      "id": "draft_ningshen",
+      "name": "凝神诀",
+      "description": "凝神聚气身法更迅捷",
+      "trigger_skill": {
+        "name": "凝神蓄锐",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.15,
+        "effect_type": "buff",
+        "effect_value": 0.3,
+        "stat": "speed"
+      },
+      "ultimate": null,
       "route_multiplier": {
         "灵修": 1.0,
         "体修": 1.0
@@ -278,6 +315,59 @@
         "灵修": 1.0,
         "体修": 0.8
       }
+    },
+    {
+      "id": "draft_yingji",
+      "name": "鹰击诀",
+      "description": "锁定敌影一击必中",
+      "trigger_skill": {
+        "name": "鹰击长空",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.15,
+        "effect_type": "unavoidable",
+        "effect_value": 0
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.2,
+        "体修": 0.8
+      }
+    },
+    {
+      "id": "draft_qingming",
+      "name": "青冥剑诀",
+      "description": "剑气灌注剑意更盛",
+      "trigger_skill": {
+        "name": "青冥剑意",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.2,
+        "effect_type": "buff",
+        "effect_value": 0.3,
+        "stat": "damage"
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.2,
+        "体修": 0.8
+      }
+    },
+    {
+      "id": "draft_lingshe",
+      "name": "灵蛇缠身",
+      "description": "蛇影缠绕削弱敌力",
+      "trigger_skill": {
+        "name": "灵蛇缚",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.15,
+        "effect_type": "debuff",
+        "effect_value": 0.2,
+        "stat": "damage"
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.2,
+        "体修": 0.8
+      }
     }
   ],
   "体修专属": [
@@ -349,6 +439,58 @@
         "体修": 1.2
       },
       "trigger_skill": null
+    },
+    {
+      "id": "draft_tieji",
+      "name": "铁棘功",
+      "description": "体生铁棘反震敌击",
+      "trigger_skill": {
+        "name": "铁棘反震",
+        "trigger_condition": "defend",
+        "trigger_rate": 0.1,
+        "effect_type": "reflect",
+        "effect_value": 0.3
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 0.8,
+        "体修": 1.2
+      }
+    },
+    {
+      "id": "draft_xuanwu",
+      "name": "玄武诀",
+      "description": "玄武罡气护体卸力",
+      "trigger_skill": {
+        "name": "玄武护体",
+        "trigger_condition": "defend",
+        "trigger_rate": 0.15,
+        "effect_type": "buff",
+        "effect_value": 0.25,
+        "stat": "armor"
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 0.8,
+        "体修": 1.2
+      }
+    },
+    {
+      "id": "draft_liaoshang",
+      "name": "疗伤诀",
+      "description": "受击时运功疗伤",
+      "trigger_skill": {
+        "name": "疗伤吐纳",
+        "trigger_condition": "defend",
+        "trigger_rate": 0.15,
+        "effect_type": "heal",
+        "effect_value": 0.25
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 0.8,
+        "体修": 1.2
+      }
     }
   ],
   "传承功法池": [
@@ -443,6 +585,76 @@
         "体修": 1.0
       },
       "ultimate": null
+    },
+    {
+      "id": "draft_jiuyou",
+      "name": "九幽噬魂咒",
+      "description": "九幽之毒噬魂蚀骨",
+      "trigger_skill": null,
+      "ultimate": {
+        "name": "九幽噬魂",
+        "trigger_condition": "once_per_battle",
+        "effect_type": "dot",
+        "effect_value": 0.25,
+        "duration": 4,
+        "min_action_index": 4
+      },
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
+    },
+    {
+      "id": "draft_huitian",
+      "name": "回天圣手",
+      "description": "圣手回春逆转乾坤",
+      "trigger_skill": null,
+      "ultimate": {
+        "name": "回天圣手",
+        "trigger_condition": "once_per_battle",
+        "effect_type": "heal",
+        "effect_value": 0.25,
+        "min_action_index": 3
+      },
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
+    },
+    {
+      "id": "draft_shiling",
+      "name": "噬灵魔功",
+      "description": "噬敌精血以战养战",
+      "trigger_skill": {
+        "name": "噬灵",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.14,
+        "effect_type": "heal",
+        "effect_value": 0.3,
+        "vampire": true
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
+    },
+    {
+      "id": "draft_pojun",
+      "name": "破军诀",
+      "description": "破甲穿防直取要害",
+      "trigger_skill": {
+        "name": "破军一击",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.15,
+        "effect_type": "pierce",
+        "effect_value": 0.5
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     }
   ]
 }

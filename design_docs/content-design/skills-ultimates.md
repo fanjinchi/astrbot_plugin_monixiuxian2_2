@@ -218,4 +218,30 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
 | verify_vampire_001 | 噬血剑意 | 灵修 | attack 20% | heal (vampire) | 0.20 | 吸血 20% 实际伤害 |
 | verify_dot_001 | 蚀骨咒 | 通用 | attack 25% | dot | 0.15（duration 3） | 每回合 15% 快照伤害 |
 | verify_survive_001 | 涅槃诀 | 通用 | 大招（必放，门槛 5） | survive | 0 | survive_count 1 |
+
+### 6.2 新效果入池扩充（2026-08-08 v2，`trigger-effect-extensions` 后）
+
+效果引擎化闭环后，按文件头三大素材来源 + researcher taxonomy 新增 **12 行**正式技能
+（skills.csv 25 → 37 行；config 同步 25 → 37），新效果族首次入池：
+
+| id | name | 池 | 触发 | effect（value） | 参考原型 | 预算 |
+|---|---|---|---|---|---|---|
+| draft_wandu | 万毒掌 | 通用 | attack 20% | dot 0.10（duration 3） | QPet 真·青龙戟带毒 | 6.0% ✓ |
+| draft_ningshen | 凝神诀 | 通用 | attack 15% | buff 0.30 stat=speed（2回合） | QPet 残影 速度+50% | ≈9% WARN |
+| draft_yingji | 鹰击诀 | 灵修 | attack 15% | unavoidable | QPet 判官笔/幻影枪 | WARN |
+| draft_qingming | 青冥剑诀 | 灵修 | attack 20% | buff 0.30 stat=damage（3回合） | 修仙家族 BUFF 20–100% | ≈18% WARN |
+| draft_lingshe | 灵蛇缠身 | 灵修 | attack 15% | debuff 0.20 stat=damage（3回合） | QPet 龙蛇弓 −50%×3 | ≈9% WARN |
+| draft_tieji | 铁棘功 | 体修 | defend 10% | reflect 0.30 | QPet 大海无量 100% | WARN |
+| draft_xuanwu | 玄武诀 | 体修 | defend 15% | buff 0.25 stat=armor（3回合） | 修仙家族 免伤 20–100% | ≈11% WARN |
+| draft_liaoshang | 疗伤诀 | 体修 | defend 15% | heal 0.25 | QPet 矿泉水 25% | 26.2% ✓ |
+| draft_jiuyou | 九幽噬魂咒 | 传承 | 大招（门槛4） | dot 0.25（4回合） | QPet 企鹅挠痒 6回合 | ≈14% ✓ |
+| draft_huitian | 回天圣手 | 传承 | 大招（门槛3） | heal 0.25 | QPet 矿泉水/师傅驾到 | ≈25% ✓ |
+| draft_shiling | 噬灵魔功 | 传承 | attack 14% | heal 0.30（vampire） | 想不想修真 吸血+10% | 29.4% ✓ 贴线 |
+| draft_pojun | 破军诀 | 传承 | attack 15% | pierce 0.5 | 一念逍遥破防 | 11.2% ✓ |
+
+**分配**：DOT/速度 BUFF → 通用；必中/增伤/降攻 → 灵修（route 1.2/0.8）；反弹/护甲/受击治疗 → 体修（0.8/1.2）；DOT 大招/治疗大招/吸血/破甲 → 传承（learn 0.3–0.5）。
+
+**契约列补充**：skills.csv 新增 `duration/tick_rate/heal_percent/pierce_rate/reflect_rate/survive_count` 与 `stat` 列
+（sync 契约扩展：`stat` 为 buff/debuff 作用属性 `damage/armor/speed`，缺省 damage，引擎 skill.get("stat","damage")）；
+**修正遗留 bug**：verify_dot_001 蚀骨咒设计 duration=3 此前无列未入库（引擎按缺省 1 生效），已补列后生效 3 回合。
 | verify_unavoidable_001 | 破风剑意 | 灵修 | attack 20% | unavoidable | 0 | 必中一击 |

@@ -581,6 +581,18 @@ class TestSyncContract:
         assert trigger["reflect_rate"] == 0.5
         assert trigger["survive_count"] == 2
 
+    def test_build_skill_passes_stat_for_buff_debuff(self):
+        """stat selects which stat buff/debuff modifies; passed through as a
+        string key, defaulting to damage when absent."""
+        errors: list[str] = []
+        skill = _sync._build_skill(self._skill_row(stat="speed"), errors)
+        assert errors == []
+        assert skill["trigger_skill"]["stat"] == "speed"
+        errors2: list[str] = []
+        skill2 = _sync._build_skill(self._skill_row(stat=""), errors2)
+        assert errors2 == []
+        assert "stat" not in skill2["trigger_skill"]
+
     def test_validate_ultimate_rejects_bad_new_keys(self):
         errors: list[str] = []
         ult = _sync._validate_ultimate(
