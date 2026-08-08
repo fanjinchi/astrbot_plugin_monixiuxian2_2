@@ -1,5 +1,13 @@
 # AstrBot 修仙插件（astrbot_plugin_monixiuxian2_2）架构与数值报告
 
+> **文档状态**：
+> - 创建：**2026-07-29**（重设计起点，与 `redesign-combat-skills` 变更同批，commit 8fa47f7）
+> - 最近更新：**2026-08-08**（commit 6014857，spec 同步 + §4.19 GM / §4.20 内容同步管道）
+> - 定位：**数值细节基线（活文档，非归档）**——架构总览见 `project-architecture.md`，行为契约见
+>   `openspec/specs/`；本文是数值/公式/数据库的权威基线，被 `project-architecture.md` §1/§3 引用。
+> - 维护义务：内容必须与代码同步（插件根 `AGENTS.md` §14，影响玩法的修改须同步修正本文）；
+>   若未来被新报告取代，移入 archive 并更新本标注。
+>
 > 生成方式：基于源码静态分析（含 `file:line` 引用），数据库结构以 `data/migration.py` 最新版本 **v27** 为准。
 > 战斗与属性体系为 **CombatEngine 四主属性框架**（伤害/身法/迅捷/气血 + 护甲），规范见 `openspec/specs/`（attribute-numerics / combat-core / level-progression / skill-system）。
 
