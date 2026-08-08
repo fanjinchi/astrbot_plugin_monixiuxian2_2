@@ -104,7 +104,8 @@
 
 ## 6. 现状缺口（本次设计要补的量）
 
-- **功法**：现仅 6 个（通用 2 / 灵修 1 / 体修 1 / 传承 2）—— 极度缺内容；
+- **功法**：config 现 6 个（通用 2 / 灵修 1 / 体修 1 / 传承 2）；CSV 设计池已扩至 **20 行**
+  （2 legacy + 18 draft，2026-08-07，扩充记录与待实现清单见 `skills-ultimates.md` §6）—— 待定稿后同步 config；
 - **心法**：现仅 5 个 —— 需要按路线/品级成体系；
 - **武器**：120 件但数值为旧框架（legacy 行验算普遍超预算），且 L36-L99 无
   境界档位（bd issue `wxg`）—— 需要全量按新预算重做 + 补齐高档。
@@ -119,6 +120,9 @@
   （决策记录见 `weapons.md`：品级门槛按大境界重排 0/11/21/…/81，同步解决
   `wxg` 的 L36-L99 档位缺口；轻/中/重取预算高/中/低段的调参规则已定）
 - [ ] 武器变体扩展：以标杆件为锚，同品级同体量件用 bonus/armor/触发技/route_mult 做横向差异
-- [ ] 功法池扩充（现 6 个 → 每池 5-8 个，照搬 MB/QPet taxonomy 适配）
+- [x] **功法池扩充 v1**：3 → 20 行 draft（新增通用 5 / 灵修 3 / 体修 4 / 传承 5，照搬
+  MB/QPet/researcher taxonomy 适配，`validate_budget.py` 全 PASS；分配规则与待实现
+  效果清单（needs_code → bd `tt3`）见 `skills-ultimates.md` §6；升星倒推公式同步
+  修正为乘法 0.10；`validate_budget.py` check_skills 扩展支持 combo/counter/stun/纯大招）
 - [ ] 心法成体系（现 5 个 → 按路线 × 品级矩阵补齐）
 - [ ] 定稿后写 CSV → config 转换脚本，跑 `design_docs/attribute-growth/sim_balance_regression.py` 回归

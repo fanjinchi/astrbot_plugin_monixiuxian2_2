@@ -148,14 +148,51 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
 4. **体量/路线绑定**（QPet 三角：小连击、中均衡、大高伤）：
    连击/必中 → 轻、中体量与灵修；高倍率/蓄力 → 重体量与体修；减伤/反击/免死 → 体修；
    控制 → 中体量通用。路线差异用 `route_mult`（±20%，铁布衫 体修1.2/灵修0.8 先例）。
-5. **升星倒推**：每星 +20% rate 与 value，基础值按目标星级 ÷(1+0.2×星) 倒推；
-   G2 预算按 0 星还是满星核算为开放问题（倾向满星，偏保守）。
+5. **升星倒推**：升星为乘法 `(1 + STAR_UP_BONUS)^(星级−1)`（STAR_UP_BONUS = 0.10，
+   见 §1.4，3 星 = 1.21×），基础值按目标星级 ÷(1.1)^(星级−1) 倒推；
+   G2 预算按 0 星还是满星核算仍为开放问题（倾向满星，偏保守；v1 池暂按 0 星录入，见 §6）。
 6. **高境界防拖**（researcher §3）：元婴以上池子优先考虑真伤/破甲/百分比类，
    避免固定值被境界属性稀释。
 
 ## 5. 开放问题
 
-- [ ] 现有两大招（3.0/3.5）的 `trigger_rate` 待核对；按 rate=100% 估算超 G2，需定下调或维持方案。
-- [ ] `combo` 语义（倍率叠加+栈上限）与原型「额外打一回合」不同，接受还是改引擎？
-- [ ] G2 的 30% 按 0 星 / 满星核算？
-- [ ] 非伤害型奥义（heal/stun/survive）需要 ultimate 分支加 effect 分发，排期随功法池扩充一起定。
+- [x] 两大招 trigger_rate 核对 → 已定案：**必放制**（§1.3），config 不填概率；3.0/3.5 超预算降档随 bd `dhh`
+- [x] `combo` 语义 → 已接受现状：倍率叠加+栈上限，不做「额外打一回合」（§1.2 备注）
+- [ ] G2 的 30% 按 0 星 / 满星核算？（v1 池暂按 0 星录入，见 §6）
+- [ ] 非伤害型奥义（heal/stun/survive/斩杀）需要 ultimate 分支加 effect 分发 → bd `tt3`，排期随功法池扩充
+- [ ] 副作用/疲劳机制（乱斗堂爆裂一击式代价）→ bd `tt3`；天魔解体（§6）当前无代价贴线，上线前必须闭环
+
+---
+
+## 6. v1 功法池扩充记录（2026-08-07）
+
+按文件头三大素材来源（MB / QPet / researcher）照搬适配，`skills.csv` 由 3 行扩至 **20 行**
+（2 legacy + 18 draft；新增 17 行：通用 5 / 灵修 3 / 体修 4 / 传承 5）。
+`validate_budget.py` 全 PASS（校验公式统一为加性语义 `rate × effect_value`，与武器挂载技
+及 schema-and-engine-fit §3 契约一致；check_skills 已支持 combo/counter/stun/纯大招行）。
+
+**分配规则**：
+- 连击/蓄力/暴击增伤 → 通用 + 灵修（draft_kuangfeng / juxing / zhanyi / qingfeng / leizhen）
+- 反击/减伤/眩晕/逆袭 → 体修（draft_yiyahuan / zhenshan / tieshan / baxia / hunyan / jinshen）
+- 斩杀/延迟/复合大招 → 传承池，learn_coefficient 0.3–0.5 稀有（draft_zhenlong / jiujian / xiuluo / tianmo / zhonghun）
+- 大招全为伤害型（加性 value 1.5–2.1 = 当次 ×2.5–3.1），必放制不填概率，全部带解锁门槛
+  （斩杀型 opp_hp_below / 逆袭型 self_hp_below / 延迟型 min_action_index）
+- 万剑归宗重做：3.0 → 2.0（bd `dhh` 降档）；同步时按 name 覆盖 config
+
+**待实现部分（needs_code，未入 CSV 或已入但需引擎扩展；归口 bd `tt3` / `dhh`）**：
+
+| 原型效果 | 出处 | 去向 | 阻塞 |
+|---|---|---|---|
+| 治疗/吸血（矿泉水 25%、吸血+10%） | QPet/想不想修真 | 未入 CSV（§2.2 优先项） | tt3 heal |
+| 持续 BUFF/DEBUFF（残影 速度+50%、降攻、BUFF 20–100%） | QPet/无极仙途 | 未入 CSV | tt3 持续状态结构 |
+| DOT（企鹅挠痒、真·青龙戟带毒） | QPet | 未入 CSV | tt3 |
+| 必中/不可反击（判官笔、狂魔镰、天使之翼） | QPet | 未入 CSV | tt3 dodge/counter 豁免标记 |
+| 真伤/破甲（混沌真伤、破防） | 想不想修真/一念逍遥 | 未入 CSV（§4.6 高境界防拖） | tt3 |
+| 免死（装死、Survival） | QPet/MB | 未入 CSV（建议大招位） | tt3 survive_lethal |
+| 反弹（大海无量 100%） | QPet | 未入 CSV | 新机制，未列入 tt3，需单独评估 |
+| 副作用/疲劳（爆裂一击 250%+疲劳） | 乱斗堂 | 天魔解体已入 CSV 但无代价 | tt3 或降 value 至 1.8 |
+| 多段连发（势如暴雨、真·铅球） | QPet | 用 combo 近似入池 | multi_hit 可选（tt3） |
+| 秒杀（神来一击 5–8% 降至 1 血） | QPet | 排除（§2.3）；以真龙诀斩杀替代 | 需 hp_execute 才可做 |
+
+> 跟踪：总进度 bd `hz7`；数值配平/降档 bd `dhh`；效果引擎化 bd `tt3`。
+> 入库：skills.csv → config 同步随功法池重做落地（schema-and-engine-fit.md §4，bd `dhh` 闭环后）。

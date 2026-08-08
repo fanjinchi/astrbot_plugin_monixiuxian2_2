@@ -157,19 +157,26 @@ def check_weapons(rows: list[dict]) -> list[str]:
 def check_skills(rows: list[dict]) -> list[str]:
     """Check trigger-skill expected gain: rate x (effect_value - 1) <= 30% (§4.2).
 
-    For damage_reduction, expected reduction is rate x effect_value and is
-    checked against the same cap; the 40% total reduction cap (§3.2) is
-    enforced at combat resolution, not here.
+    Per-effect expected-gain formulas (skills-ultimates.md §4.1, additive
+    semantics: effect_value 0.4 = that hit x1.4, schema-and-engine-fit §3):
+    - damage_bonus / combo / damage_reduction / counter: rate x effect_value
+    - stun: 2 x rate / mirror_TTK (self action window + enemy stall), TTK ~= 7
+    Rows without a trigger skill (pure-ultimate skills) are PASS. Unknown effect
+    types are reported as WARN (numeric check skipped). The 40% total reduction
+    cap (§3.2) is enforced at combat resolution, not here.
     """
     results = []
     for r in rows:
+        effect = r["effect_type"]
+        if not effect:
+            results.append(f"PASS {r['id']:<14} 纯大招功法（无触发技） {r['name']}")
+            continue
         rate = float(r["trigger_rate"])
         value = float(r["effect_value"])
-        effect = r["effect_type"]
-        if effect == "damage_bonus":
-            expected = rate * (value - 1)
-        elif effect == "damage_reduction":
+        if effect in ("damage_bonus", "combo", "damage_reduction", "counter"):
             expected = rate * value
+        elif effect == "stun":
+            expected = 2 * rate / 7  # mirror TTK ~= 7 rounds
         else:
             expected = None  # unknown effect type: skip numeric check
         if expected is None:
