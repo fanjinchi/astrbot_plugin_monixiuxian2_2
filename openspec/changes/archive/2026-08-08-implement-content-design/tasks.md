@@ -50,7 +50,7 @@
 - [x] 7.2 创建 bd issue 跟踪未来项：平衡完成后将最终配置固化进 data/default_configs.py（供未来使用者开箱即用）
 - [x] 7.3 更新 design_docs/content-design/schema-and-engine-fit.md：技能同步落地状态（P 项勾选）、exp_multiplier 修复、reconcile 全量重导说明
 - [x] 7.4 更新 design_docs/content-design/README.md（技能表已启用同步、重导语义）与 skills-ultimates.md §5/§6（天魔解体降值、legacy→draft）
-- [ ] 7.5 ruff format + ruff check 通过；按 AGENTS.md 会话收尾规则 commit + push
+- [x] 7.5 ruff format + ruff check 通过；按 AGENTS.md 会话收尾规则 commit + push（提交 68e6f12，2026-08-08 已推送）
 
 ## 8. OpenSpec 归档
 

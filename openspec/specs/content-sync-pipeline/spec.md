@@ -67,7 +67,7 @@
 
 ### Requirement: 技能表同步
 
-同步脚本 SHALL 支持 skills.csv → config/skills.json 的合并同步，语义与武器/心法一致：仅处理 draft/final 行，按 `name` 键合并，不触碰 CSV 之外的既有条目。技能条目 SHALL 经引擎契约校验：触发技四键齐全且值域合法（复用武器挂载技校验）；大招数据 MUST NOT 含 `trigger_rate`；`trigger_condition` 设计列 SHALL 由脚本映射为引擎契约键 `trigger_timing`（归一化层同源规则，见 skill-system）。**同名覆盖时 SHALL 保留既有 config 条目的 `id`**（`player_skills` 已学记录按 skill_id 关联，id 变更会断裂已学状态）；CSV 的 `id` 仅在新增条目时生效。CSV 中与既有条目同名但 id 不同的行（如「万剑归宗（重做）」对应既有 `spirit_001/万剑归宗`）SHALL 在写入前将 CSV 行名修正为既有名（本变更直接修正设计表）。
+同步脚本 SHALL 支持 skills.csv → config/skills.json 的合并同步，语义与武器/心法一致：仅处理 draft/final 行，按 `name` 键合并，不触碰 CSV 之外的既有条目。技能条目 SHALL 经引擎契约校验：触发技四键齐全且值域合法（复用武器挂载技校验）；大招数据 MUST NOT 含 `trigger_rate`；`trigger_condition` 设计列 SHALL 原样持久化（config 条目持久化键为 `trigger_condition`，引擎归一化层在加载时注入契约键 `trigger_timing`，见 skill-system）。**同名覆盖时 SHALL 保留既有 config 条目的 `id`**（`player_skills` 已学记录按 skill_id 关联，id 变更会断裂已学状态）；CSV 的 `id` 仅在新增条目时生效。CSV 中与既有条目同名但 id 不同的行（如「万剑归宗（重做）」对应既有 `spirit_001/万剑归宗`）SHALL 在写入前将 CSV 行名修正为既有名（本变更直接修正设计表）。同名条目在 CSV 中删除触发技/大招声明（触发列留空）时，脚本 SHALL 将既有条目的 `trigger_skill`/`ultimate` 置空，不得残留旧块；`pool` 列变更时 SHALL 将条目迁移至新分组。
 
 #### Scenario: 同名技能覆盖保留 id
 
@@ -77,7 +77,7 @@
 #### Scenario: 技能列映射
 
 - **WHEN** 技能行 `trigger_condition` 值为 `attack`
-- **THEN** 入库后的 config 条目使用契约键 `trigger_timing: "on_attack"`，其余契约键原样保留
+- **THEN** 入库后的 config 条目持久化 `trigger_condition: "attack"`，引擎归一化层加载时注入 `trigger_timing: "on_attack"`，其余契约键原样保留
 
 ### Requirement: 技能数值 0.x 加性契约
 

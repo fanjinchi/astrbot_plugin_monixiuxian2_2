@@ -111,16 +111,6 @@ class FakePlayer:
             return {}
 
 
-def run(coro):
-    """Run an async coroutine synchronously."""
-    return asyncio.run(coro)
-
-
-# ---------------------------------------------------------------------------
-# 6.1 sync fixes: exp_multiplier zero preservation
-# ---------------------------------------------------------------------------
-
-
 def test_build_heart_keeps_zero_exp_multiplier():
     """exp_multiplier 0.0 must survive sync (double-exp regression, review m3)."""
     row = {
@@ -292,6 +282,129 @@ def test_reconcile_filters_config_to_imported_names():
     assert deleted == ["B", "C"]
     assert [e["name"] for e in groups["通用"]] == ["A"]
     assert groups["体修专属"] == []
+
+
+def test_merge_skill_clears_stale_trigger_and_ultimate():
+    """A row without trigger/ultimate keys must clear stale ones in config.
+
+    Review fix (ocr medium): previously the merge only overwrote keys present
+    in the payload, so removing a trigger/ultimate from the CSV left the old
+    block live in config/skills.json while sync reported "no field changes".
+    """
+    groups = {
+        "通用功法池": [
+            {
+                "id": "s1",
+                "name": "旧技能",
+                "trigger_skill": {
+                    "name": "旧触发",
+                    "trigger_condition": "on_attack",
+                    "trigger_rate": 0.3,
+                    "effect_type": "damage_bonus",
+                    "effect_value": 0.5,
+                },
+                "ultimate": {"effect_value": 2.0},
+                "route_multiplier": {"灵修": 1.0, "体修": 1.0},
+            }
+        ]
+    }
+    row = {
+        "pool": "通用功法池",
+        "id": "s1",
+        "name": "旧技能",
+        "trigger_name": "",
+        "trigger_condition": "",
+        "trigger_rate": "",
+        "effect_type": "",
+        "effect_value": "",
+        "route_mult_ling": "1.0",
+        "route_mult_ti": "1.0",
+        "learn_coefficient": "",
+        "ultimate_json": "",
+        "description": "d",
+        "ref_source": "t",
+        "design_note": "",
+        "status": "draft",
+    }
+    payload = _build_skill(row, [])
+    assert payload["trigger_skill"] is None
+    assert payload["ultimate"] is None
+    action, diffs = _merge_skill(groups, payload)
+    assert action == "UPDATE"
+    existing = groups["通用功法池"][0]
+    assert existing["trigger_skill"] is None
+    assert existing["ultimate"] is None
+    assert any("trigger_skill" in d and "-> null" in d for d in diffs)
+    assert any("ultimate" in d and "-> null" in d for d in diffs)
+
+
+def test_merge_skill_moves_pool_group():
+    """Changing the pool column must relocate the entry between groups.
+
+    Review fix (ocr medium): the UPDATE branch previously kept the entry in
+    its old group, so a skill moved out of 通用功法池 stayed selectable as a
+    universal skill by the runtime pool filter.
+    """
+    groups = {
+        "通用功法池": [
+            {
+                "id": "s2",
+                "name": "移池技能",
+                "route_multiplier": {"灵修": 1.0, "体修": 1.0},
+            }
+        ]
+    }
+    payload = {
+        "id": "s2",
+        "name": "移池技能",
+        "route_multiplier": {"灵修": 1.0, "体修": 1.0},
+        "_pool": "体修专属",
+    }
+    action, diffs = _merge_skill(groups, payload)
+    assert action == "UPDATE"
+    assert groups["通用功法池"] == []
+    moved = groups["体修专属"][0]
+    assert moved["name"] == "移池技能"
+    assert moved["id"] == "s2"
+    assert any("_pool" in d for d in diffs)
+
+
+def test_empty_import_aborts_without_writing(monkeypatch, tmp_path):
+    """Zero draft/final rows in one CSV must abort a non-dry-run write.
+
+    Review fix (ocr low): an empty import set would otherwise make reconcile
+    delete every entry of that table while the budget gate passes trivially.
+    """
+    import shutil
+
+    design_dir = tmp_path / "design"
+    config_dir = tmp_path / "config"
+    design_dir.mkdir()
+    config_dir.mkdir()
+    # heart/skills tables stay valid; weapons.csv carries only a legacy row.
+    for fname in ("heart_methods.csv", "skills.csv"):
+        shutil.copy(
+            PLUGIN_ROOT / "design_docs" / "content-design" / fname, design_dir / fname
+        )
+    (design_dir / "weapons.csv").write_text(
+        "id,name,weapon_category,size_class,rank,required_level_index,base_damage,"
+        "weapon_coefficient_k,bonus_damage,armor_value,price,shop_weight,route_mult_ling,"
+        "route_mult_ti,trigger_skills_json,description,ref_source,design_note,status\n"
+        "legacy_w,旧武器,剑,单手,凡品,0,9,0.5,0,15,199,1000,1.0,1.0,[],desc,ref,,legacy\n",
+        encoding="utf-8",
+    )
+    original = {
+        fname: (PLUGIN_ROOT / "config" / fname).read_text(encoding="utf-8")
+        for fname in ("weapons.json", "heart_methods.json", "skills.json")
+    }
+    for fname, text in original.items():
+        (config_dir / fname).write_text(text, encoding="utf-8")
+    monkeypatch.setattr(_sync_mod, "DESIGN_DIR", design_dir)
+    monkeypatch.setattr(_sync_mod, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr("sys.argv", ["sync_content_to_config.py"])
+    assert _sync_mod.main() == 1
+    for fname, text in original.items():
+        assert (config_dir / fname).read_text(encoding="utf-8") == text
 
 
 # ---------------------------------------------------------------------------

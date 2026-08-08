@@ -285,6 +285,7 @@ def _build_skill(row: dict, errors: list[str]) -> dict | None:
     }
     condition = (row.get("trigger_condition") or "").strip()
     trigger_name = (row.get("trigger_name") or "").strip()
+    trigger_skill: dict | None = None
     if trigger_name or condition:
         if condition not in SKILL_TIMING_MAP:
             errors.append(
@@ -305,16 +306,18 @@ def _build_skill(row: dict, errors: list[str]) -> dict | None:
         if value is None:
             errors.append(f"{ctx}: effect_value is required for trigger skills")
             return None
-        entry["trigger_skill"] = {
+        trigger_skill = {
             "name": trigger_name,
             "trigger_condition": condition,
             "trigger_rate": rate,
             "effect_type": effect_type,
             "effect_value": value,
         }
+    # Persist None when the row omits the keys so the merge overwrites any
+    # stale trigger/ultimate left in config by an earlier sync (review fix).
+    entry["trigger_skill"] = trigger_skill
     ult = _validate_ultimate(row.get("ultimate_json", ""), ctx, errors)
-    if ult is not None:
-        entry["ultimate"] = ult
+    entry["ultimate"] = ult  # null when absent, so merge clears stale ultimate
     ling = _num(row.get("route_mult_ling", ""))
     ti = _num(row.get("route_mult_ti", ""))
     entry["route_multiplier"] = {
@@ -356,12 +359,13 @@ def _merge_skill(groups: dict, payload: dict) -> tuple[str, list[str]]:
         (action, field diff lines) with action in {"UPDATE", "ADD"}.
     """
     name = payload["name"]
-    for entries in groups.values():
+    pool = payload.pop("_pool")
+    for group_key, entries in groups.items():
         for existing in entries:
             if existing.get("name") == name:
                 diffs = []
                 for key, value in payload.items():
-                    if key in ("id", "_pool"):
+                    if key == "id":
                         continue
                     old = existing.get(key, "<absent>")
                     if old != value:
@@ -369,8 +373,12 @@ def _merge_skill(groups: dict, payload: dict) -> tuple[str, list[str]]:
                             f"    {key}: {json.dumps(old, ensure_ascii=False)} -> {json.dumps(value, ensure_ascii=False)}"
                         )
                     existing[key] = value
+                if group_key != pool:
+                    entries.remove(existing)
+                    groups.setdefault(pool, []).append(existing)
+                    diffs.append(f"    _pool: {group_key!r} -> {pool!r}")
                 return ("UPDATE", diffs)
-    group = groups.setdefault(payload.pop("_pool"), [])
+    group = groups.setdefault(pool, [])
     group.append(payload)
     return ("ADD", [])
 
@@ -437,6 +445,24 @@ def main() -> int:
         for e in errors:
             print(f"  ERROR {e}")
         return 1
+
+    # Empty-import guard: an import set that is empty would make reconcile
+    # delete every entry of that table. Refuse to write (dry-run may still
+    # inspect the would-be DELETE list); transient mid-edit CSVs are the
+    # usual cause (review fix).
+    if not args.dry_run:
+        for label, items in (
+            ("weapons", weapons),
+            ("heart_methods", hearts),
+            ("skills", skills),
+        ):
+            if not items:
+                print(
+                    f"{label}: zero draft/final rows imported; refusing to write "
+                    "(an empty import would reconcile-delete all entries). "
+                    "Run with --dry-run to inspect the would-be deletions."
+                )
+                return 1
 
     weapons_cfg_path = CONFIG_DIR / "weapons.json"
     hearts_cfg_path = CONFIG_DIR / "heart_methods.json"
