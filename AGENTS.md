@@ -117,6 +117,7 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 2. `README.md` 的更新日志（末尾追加）
 3. `handlers/misc_handler.py` 中的 `/修仙帮助` 文本
 4. 若涉及数据库变更，在 `data/migration.py` 添加迁移版本
+5. 若影响游戏玩法，同步 `design_docs/` 中涉及的设计资料（见 §14）
 
 ### 8. 代码风格
 
@@ -158,6 +159,18 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 4. `handlers/__init__.py` — 导出 Handler
 5. `main.py` — 初始化 Manager/Handler、注册命令
 6. 如有数据库表 → `data/migration.py` 添加迁移
+
+### 14. 玩法变更必须同步 design_docs（必做）
+
+**任何修改或新增功能，只要影响游戏玩法（数值、机制、平衡、战斗、技能、成长曲线、掉落/概率等），即便改动很小，都必须在 `design_docs/` 中记录或修正涉及的部分**，使设计资料与代码实现保持一致：
+
+- 改动生效后同步检查并更新对应资料：
+  - 内容设计（武器/功法/心法数值、品级、触发技等）→ `design_docs/content-design/` 对应 CSV/MD
+  - 数值框架（属性成长、镜像战 TTK、加成、经验曲线）→ `design_docs/attribute-growth/`、`design_docs/level-exp-curve/`
+  - 整体架构/数值基线 → `design_docs/current-design-report.md`
+- 相关描述已过时则直接修正；新增资料须登记到 `design_docs/README.md` 资料清单。
+- **纯 bug 修复**（行为与数值设计意图不变）不要求；拿不准是否影响玩法时，按"影响玩法"处理。
+- 正式变更提案仍走 OpenSpec 流程（`openspec/changes/`），design_docs 负责保持"设计事实"与实现同步。
 
 ## 测试
 
