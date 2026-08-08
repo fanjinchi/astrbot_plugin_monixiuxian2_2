@@ -103,7 +103,7 @@ config 的 `trigger_condition` 经 `core/skill_manager.py`（timing_map, ~L326-3
 |---|---|---|---|
 | **治疗/吸血** | QPet 矿泉水 回复 25%（至少 25）；Tragic Potion 12–500；想不想修真 吸血+10%；researcher 吸血 10–30% | `attack`/`defend` / `heal`（heal_percent 默认 effect_value；`vampire: true` 吸血模式） | 已实现；续航维度空白，优先级高；按 HP(L) 百分比定 value |
 | **属性 Buff/Debuff** | QPet 残影 速度+50% 2–3 回合；龙蛇弓 力量−50% 3 回合；修仙家族 +20–200% 持续 2–4 回合 | `buff`/`debuff` 带持续回合（duration；buff 施加自身、debuff 施加目标） | 已实现：持续状态结构（StatusEffect，叠加 cap=3）；round_start 白名单放行 |
-| **持续伤害 DOT** | 真·青龙戟 带毒；企鹅挠痒 5+敏捷×0.2×6 回合 | `dot`（effect_value×tick_rate 每回合，duration 回合数，快照=触发攻击预期伤害） | 已实现；同源刷新、异源 cap=3；叠加上限=status_stack_cap |
+| **持续伤害 DOT** | 真·青龙戟 带毒；企鹅挠痒 5+敏捷×0.2×6 回合 | `dot`（effect_value×tick_rate 每回合，duration 回合数，快照=触发攻击预期伤害） | 已实现；同源刷新、异源 cap=3；叠加上限=status_stack_cap。注：快照取触发时刻的累计倍率，同轮后续 damage_bonus 技能不并入快照 |
 | **必中 / 不可反击** | 狂魔镰 必中不可反击；判官笔 必中；幻影枪 不可反击 | `unavoidable`（一次性标记：跳过 dodge/block/counter） | 已实现；克制闪避/反击流的关键反制件 |
 | **真实伤害 / 破甲** | 想不想修真 混沌真伤（10% 触发）；一念逍遥破防按百分比削防 | `pierce`（无视 X% 护甲减伤） | **已实现（pierce）**：新护甲公式下按 pierce_rate 绕过减伤；真伤（无视全部减伤）未单独实现 |
 | **免死（装死）** | QPet 装死「第一神技」致死留 1 血；MB Survival 同效果 | `survive`（survive_count 层数 + survive_recovery 恢复比例） | 已实现；建议做**奥义**而非触发技（每场一次），避免触发版反复生效 |

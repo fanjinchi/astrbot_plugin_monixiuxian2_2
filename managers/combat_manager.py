@@ -433,12 +433,17 @@ class CombatEngine:
     ) -> float:
         """Handle counter effect on defense: deal immediate damage to attacker.
 
-        Lethal counters consume the attacker's survive (免死) charges like any
-        other damage source (review fix: funnel through _try_survive).
+        The damage log is emitted here, before survive (免死) resolution, so a
+        lethal counter reads "反击…造成 N 点伤害" followed by the 免死 line
+        (review fix: log ordering).
         """
         value = skill.get("effect_value", 0)
         counter_dmg = max(1, int(actor.damage * value))
         target.hp -= counter_dmg
+        state["log"].append(
+            f"{actor.name} 触发【{skill.get('name', '反击')}】反击，"
+            f"对 {target.name} 造成 {counter_dmg} 点伤害！"
+        )
         state["engine"]._try_survive(target, state["log"])
         return 0.0
 
@@ -495,7 +500,10 @@ class CombatEngine:
         The base damage is snapshotted from the triggering attack's expected
         damage (base + buffed damage × K, times the accumulated damage
         multiplier) so it matches the actual attack even under damage
-        buffs/debuffs (review fix).
+        buffs/debuffs (review fix). Note: the snapshot uses
+        ``state["damage_mult"]`` at this skill's position in the trigger
+        loop, so a ``damage_bonus`` skill processed later in the same attack
+        phase does not fold into the snapshot (documented limitation).
         """
         value = skill.get("effect_value", 0)
         # Mirror _calc_damage's unarmed fallback so the snapshot matches the
@@ -865,11 +873,6 @@ class CombatEngine:
                 log.append(
                     f"{actor.name} 触发【{skill_name}】，"
                     f"{target.name} 被眩晕，下回合无法出手！"
-                )
-            elif effect == "counter" and timing == "on_defense":
-                log.append(
-                    f"{actor.name} 触发【{skill_name}】反击，"
-                    f"对 {target.name} 造成 {max(1, int(actor.damage * skill.get('effect_value', 0)))} 点伤害！"
                 )
             elif effect == "damage_reduction":
                 log.append(f"{actor.name} 触发【{skill_name}】，受到的伤害降低！")

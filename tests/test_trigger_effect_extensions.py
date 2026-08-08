@@ -615,6 +615,23 @@ class TestValidateBudgetConversions:
         results = _vb.check_skills(rows)
         assert results[0].startswith("PASS"), results[0]
 
+    def test_dot_malformed_cells_fail(self):
+        """Non-numeric duration/tick_rate must surface as FAIL lines instead
+        of crashing the whole validation run (review fix)."""
+        rows = self._rows(
+            "id,name,status,trigger_rate,effect_type,effect_value,duration,tick_rate\n"
+            "d1,坏时长,draft,0.3,dot,0.05,abc,1.0\n"
+            "d2,坏频率,draft,0.3,dot,0.05,3,fast\n"
+            "d3,零时长,draft,0.3,dot,0.05,0,1.0\n"        # sync 契约要求 >=1
+        )
+        results = _vb.check_skills(rows)
+        assert results[0].startswith("FAIL"), results[0]
+        assert "必须为数字" in results[0]
+        assert results[1].startswith("FAIL"), results[1]
+        assert "必须为数字" in results[1]
+        assert results[2].startswith("FAIL"), results[2]
+        assert "duration 须 >=1" in results[2]
+
     def test_pierce_conversion(self):
         rows = self._rows(
             "id,name,status,trigger_rate,effect_type,effect_value,duration,tick_rate\n"

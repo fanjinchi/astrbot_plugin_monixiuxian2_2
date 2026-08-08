@@ -191,6 +191,32 @@ def test_build_skill_rejects_bad_contracts():
     assert len(errors) == 6
 
 
+def test_build_skill_collects_malformed_optional_keys():
+    """Malformed optional skill keys must be collected as errors, not crash
+    the sync (review fix: try/except around _num)."""
+    errors = []
+    entry = _build_skill(_skill_row(duration="abc", tick_rate="fast"), errors)
+    assert entry is not None
+    assert any("duration must be numeric, got 'abc'" in e for e in errors)
+    assert any("tick_rate must be numeric, got 'fast'" in e for e in errors)
+
+
+def test_build_skill_rejects_unknown_vampire():
+    """vampire only accepts 1/true/yes or 0/false/no; anything else is an
+    error, and explicit falsy spellings pass without setting the key."""
+    errors = []
+    entry = _build_skill(_skill_row(vampire="maybe"), errors)
+    assert entry is not None
+    assert any(
+        "vampire must be 1/true/yes or 0/false/no, got 'maybe'" in e for e in errors
+    )
+    errors2 = []
+    entry2 = _build_skill(_skill_row(vampire="0"), errors2)
+    assert entry2 is not None
+    assert errors2 == []
+    assert "vampire" not in entry2["trigger_skill"]
+
+
 def test_validate_ultimate_forbids_trigger_rate_and_requires_effect():
     errors = []
     assert _validate_ultimate("null", "ctx", errors) is None
