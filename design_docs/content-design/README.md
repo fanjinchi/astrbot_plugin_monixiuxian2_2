@@ -48,13 +48,14 @@
 
 ### skills.csv
 
-`pool,id,name,trigger_name,trigger_condition,trigger_rate,effect,effect_value,`
+`pool,id,name,trigger_name,trigger_condition,trigger_rate,effect_type,effect_value,`
 `route_mult_ling,route_mult_ti,learn_coefficient,ultimate_json,description,ref_source,design_note,status`
 
 - `pool`：通用功法池 / 灵修专属 / 体修专属 / 传承功法池（对应 skills.json 的 4 个键）
-- 触发技字段平铺为列；`ultimate_json` 为奥义（once_per_battle），无则 `null`
-- effect 词表以 `combat_manager.py` 实际支持的为准（设计中遇到的未知效果先记
+- 触发技字段平铺为列；`ultimate_json` 为大招（必放制：引擎注入 `trigger_rate=1.0`，不填概率，可配解锁门槛 `min_action_index`/血量阈值），无则 `null`
+- `effect_type` 词表以 `combat_manager.py` 的 `EFFECT_HANDLERS` 注册表为准（damage_bonus/combo/stun/counter/damage_reduction；未知效果记 warning 跳过，设计中遇到的未知效果先记
   `design_note`，定稿前必须核对）
+- 注：`trigger_condition`/`trigger_rate` 为设计列，入库时经 `sync_content_to_config.py` 归一化映射为引擎键 `trigger_timing`/`trigger_rate`（skills.csv 同步随功法池重做一起落地，见 `schema-and-engine-fit.md` §4）
 
 ### heart_methods.csv
 

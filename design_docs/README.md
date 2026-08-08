@@ -12,7 +12,8 @@
 
 | 文件 | 类型 | 说明 |
 |---|---|---|
-| `current-design-report.md` | 本项目 | 现有系统架构与数值设计报告（基于源码静态分析，含 `file:line` 引用，数据库以 migration v21 为准）。作为数值/战斗/技能重设计的初始基线资料。 |
+| `current-design-report.md` | 本项目 | 现有系统架构与数值设计报告（基于源码静态分析，含 `file:line` 引用，数据库以 migration v27 为准）。作为数值/战斗/技能重设计的初始基线资料。 |
+| `project-architecture.md` | 本项目 | **架构与系统功能设计总览**（2026-08-07 建立）：分层架构与关键机制、20 个子系统功能设计表（入口/核心数值/冷却）、openspec 契约摘要与滞后点、重设计里程碑时间线、进行中工作（bd）对照、资料导航与维护约定。新增/修改功能前建议先读。 |
 | `mybrute/` | 外部参考 | My Brute（Motion-Twin 自动战斗页游）设计调研：wiki 资料整理 + 网络调研笔记。 |
 | `qpet-daledou/` | 外部参考 | Q宠大乐斗（早期版本，约 2010-2012）设计调研笔记。 |
 | `attribute-growth/` | 混合 | 属性成长与镜像战 TTK 调研：`xiuxian-*`、`worker-xiuxian-report.md` 为本插件蒙特卡洛模拟；`mybrute-*`、`qpet-*` 为竞品模拟；另含业界自动战斗游戏平衡方案网络调研（`auto-battle-balance-web-research.md`）。汇总分析入口 `attribute-growth-analysis.md`，本项目成长/加成平衡设计方案 `growth-balance-proposals.md`。 |

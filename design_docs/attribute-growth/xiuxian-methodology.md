@@ -1,5 +1,11 @@
 # 修仙插件同属性对战回合数模拟：方法与结果
 
+> **⏱️ 状态（2026-08-07 标注）**：本文与 `sim_xiuxian_turns.py` 基于 **2026-07-30 旧引擎快照**，
+> 仅作历史基线：场景 A 引用的 `level_config.json` `base_*` 字段**已移除**（公式化曲线）；
+> 场景 C 的武器解析 `physical_damage + magic_damage` 五维字段**已废弃**（v22 四主属性）；
+> 战斗规则（减法护甲、无 caps）已被 `def/(def+K)` + 战斗 caps 取代（bd `qtk`）。
+> **脚本不可直接重跑**；当前口径见 `current-design-report.md` 与 `sim_balance_regression.py`。
+
 ## 1. 目标
 定量测算两个**完全相同**的修士（同境界、同属性、同装备）在当前战斗引擎下的平均消耗回合数。
 

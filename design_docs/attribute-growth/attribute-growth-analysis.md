@@ -3,6 +3,13 @@
 > 生成日期：2026-07-30。本文件是 design_docs/attribute-growth/ 目录的总览与结论，
 > 供后续数值/成长体系重设计查阅。支撑材料：本目录 3 份 CSV、3 份假设/方法论文档、
 > 1 份网络调研简报、3 个可复现模拟脚本。
+>
+> **⏱️ 状态（2026-08-07 标注）**：本文为**重设计前基线调研**（旧引擎快照）。其中暴露的
+> 问题已逐项处理：① 成长塌缩 → 方案A 已落地（v27，突破随机成长，见 current-design-report §4.2）；
+> ② 同级一击必杀 → 武器按预算重做中（`design_docs/content-design/`）；③ 减法护甲失效 →
+> 已改 `def/(def+K)` 百分比减伤（bd `qtk` 已关，见 current-design-report §4.5）。
+> 本文 TTK 数字为历史基线，**当前回归请用 `sim_balance_regression.py`**（走真实 CombatEngine
+> + 方案A + 预算武器，内置 G1/G2 验收检查）。
 
 ---
 

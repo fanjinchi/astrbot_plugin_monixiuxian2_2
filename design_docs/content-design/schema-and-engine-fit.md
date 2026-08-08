@@ -9,7 +9,7 @@
 ## 0. 数据流总览
 
 ```
-设计 CSV ──(转换脚本,未写)──> config/*.json ──> config_manager._load_items_data
+设计 CSV ──(转换脚本 scripts/sync_content_to_config.py,已落地)──> config/*.json ──> config_manager._load_items_data
      │                                        （按 name 键控，注入 _group）
      │                                        ↓
      └── ref_source/design_note/status        skill_manager.get_battle_loadout
@@ -17,12 +17,12 @@
                                               shop / 装备校验 / 闭关悟道
 ```
 
-**两个已确认的引擎 bug（功法落地的前置阻塞）**：
+**两个引擎 bug 均已修复（change `skill-engine-fit-and-content-sync`，2026-08-06 落地、08-07 归档）**：
 
-| # | bd | 症状 | 根因 |
-|---|---|---|---|
-| 1 | `lvb` | 6 个 config 功法触发技**全部静默不触发** | config 用 `effect` 键，引擎只读 `effect_type`，归一化不改名 |
-| 2 | `iup` | 两个大招**从不触发** | config ultimate 无 `trigger_rate`，引擎默认 0.0，`random < 0` 永假 |
+| # | bd | 原症状 | 根因 | 修复方式 |
+|---|---|---|---|---|
+| 1 | `lvb`（已关） | 6 个 config 功法触发技**静默不触发** | config 用 `effect` 键，引擎只读 `effect_type`，归一化不改名 | config 全量改名 `effect`→`effect_type`（设计表同步）；`EFFECT_HANDLERS` 注册表分发，功法/武器共用入口 |
+| 2 | `iup`（已关） | 两个大招**从不触发** | config ultimate 无 `trigger_rate`，引擎默认 0.0，`random < 0` 永假 | **必放制**：归一化层注入 `trigger_rate=1.0`，config 不得填概率；加解锁门槛 `min_action_index` + 血量阈值（skills-ultimates.md §1.3） |
 
 ## 1. weapons.csv（19 列）
 
@@ -72,11 +72,11 @@
 | `learn_coefficient` | 参悟系数 | skill_manager 参悟判定消费 | ✅ |
 | `trigger_condition` | 触发时机 | `skill_manager` timing_map 注入 `trigger_timing`（attack/defend/crit/round_start/once_per_battle 五值已验证） | ✅ |
 | `trigger_rate` | 触发率 | 引擎逐次 `random < rate` 判定 | ✅ |
-| `effect` | 效果类型 | **bug#1（lvb）：引擎读 `effect_type`，此键死路**；修复前 config 触发技全灭 | ❌ |
+| `effect_type`（原 effect 列） | 效果类型 | **原 bug#1（lvb）已修**：config 与设计表统一用引擎键 `effect_type`，经 `EFFECT_HANDLERS` 注册表分发 | ✅ |
 | `effect_value` | 效果值 | 加性倍率语义（0.4 = 该击 ×1.4）；combo 受 `_combo_cap` 栈限；counter 只吃 damage 属性 | ✅（语义需设计者知悉） |
-| `ultimate_name` | 大招名 | **bug#2（iup）：无 trigger_rate 永不触发** | ❌ |
+| `ultimate_json`（原 ultimate_name 列） | 大招 | **原 bug#2（iup）已修**：必放制下引擎注入 `trigger_rate=1.0`，config 不填概率；门槛 `min_action_index`/血量阈值已支持 | ✅ |
 | `ultimate_effect` | 大招效果类型 | **引擎不读**——ultimate 分支一律 `ultimate_mult += effect_value`，此列仅描述性 | ⚠️ |
-| `ultimate_effect_value` | 大招倍率 | ×(1+value)；修复 bug#2 后现有 3.0/3.5 超 G2 预算，需下调 | ⚠️ |
+| `ultimate_effect_value` | 大招倍率 | ×(1+value)；3.0/3.5 超 G2 预算，降档至 2.0 档随 bd `dhh` | ⚠️ |
 | `route_mult_ling/ti` | 功法路线系数 | config `route_multiplier` 存在（御剑术 灵修1.2/体修0.6），但 **grep 全库无消费点**（skill loadout 不按路线乘算）——需开发或删除字段 | ❌ |
 | `ref_source` / `design_note` / `status` | 设计层 | 🚫 | 🚫 |
 
@@ -89,12 +89,12 @@
 **可直接入库（零开发）**：武器 v1 标杆件与变体（含挂载技）、心法 v1 池 18 个。
 **被阻塞**：功法池落地，前置是 P1 双 bug。
 
-| 优先级 | 事项 | 性质 |
-|---|---|---|
-| P1 | bug#1 `lvb`：引擎 `effect_type` 一行兜底 | 修复（1 行 × 2 处） |
-| P1 | bug#2 `iup`：大招 trigger_rate 补字段 + 概率语义决策；修后 3.0/3.5 降档 | 修复 + 数值 |
-| P2 | 功法 `route_multiplier` 消费（loadout 按 `player.cultivation_type` 乘 rate/value）或删字段 | 小开发/清理 |
-| P2 | CSV → config 转换脚本（name 键控、bonus_damage→damage、status 过滤） | 工具开发 |
-| P3 | needs_code 效果（heal/必中/真伤/DOT/免死走奥义） | v2 引擎扩展 |
-| P3 | `validate_budget.py` 支持挂载技「含税期望」校验 | 工具增强 |
-| P4 | 心法 `route` 装备校验（若做路线专属心法） | 可选开发 |
+| 优先级 | 事项 | 性质 | 状态 |
+|---|---|---|---|
+| P1 | bug#1 `lvb` | 修复 | ✅ 已修（键名统一 + `EFFECT_HANDLERS` 注册表，2026-08-06） |
+| P1 | bug#2 `iup` | 修复 + 数值 | ✅ 已修（必放制 + 解锁门槛）；3.0/3.5 降档随 bd `dhh` |
+| P2 | 功法 `route_multiplier` 消费（loadout 按 `player.cultivation_type` 乘 rate/value）或删字段 | 小开发/清理 | ⬜ 未做（bd `f4t` 跟踪心法 route_mult，功法侧同源） |
+| P2 | CSV → config 转换脚本（name 键控、bonus_damage→damage、status 过滤） | 工具开发 | ✅ 已落地 `scripts/sync_content_to_config.py`（weapons/heart_methods 已入库；skills 同步随功法池重做，脚本 docstring 注明） |
+| P3 | needs_code 效果（heal/必中/真伤/DOT/免死走大招） | v2 引擎扩展 | ⬜ bd `tt3` |
+| P3 | `validate_budget.py` 支持挂载技「含税期望」校验 | 工具增强 | ⬜ 未做 |
+| P4 | 心法 `route` 装备校验（若做路线专属心法） | 可选开发 | ⬜ 未做 |

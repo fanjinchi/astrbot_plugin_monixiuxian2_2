@@ -94,7 +94,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | 修为/经济 | experience、gold、level_up_rate（永久突破加成，整数百分点，接入突破成功率计算） |
 | 突破 | breakthrough_fail_streak（连败计数，保底机制用） |
 | 闭关/签到 | cultivation_start_time、last_check_in_date |
-| 装备栏 | weapon、armor、main_technique、techniques（JSON 列表，最多 3 个功法） |
+| 装备栏 | weapon、armor、main_technique、techniques（JSON 列表，最多 4 个功法，`game_config.max_technique_slots`） |
 | **四主属性** | **damage（伤害/攻击）、agility（身法/闪避命中）、speed（迅捷/出手频率）、hp（气血/生命上限）** |
 | 护甲 | armor_value（装备提供的百分比减伤来源，不作为主属性；减伤率 = 护甲/(护甲+K)） |
 | 技能修习 | study_target（修习目标）、battle_report_merge_count（战报合并条数偏好） |
@@ -187,10 +187,11 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 ### 4.6 技能系统（skill-system 规范，core/skill_manager.py）
 
 - **挂载规则**：技能仅通过装备挂载——心法携带属性被动（常驻）+ 配套功法池；功法携带随机触发技与大招；武器仅携带触发技。无独立技能栏
-- **触发技**：在判定链触发技环节按时机（攻击时/受击时/暴击时/回合开始等）与概率自动判定；效果覆盖伤害追加、连击、反击、控制、增益/减益
-- **大招**：每本功法每场战斗最多触发一次，多本功法相互独立
+- **触发技（引擎契约键）**：配置统一使用 `trigger_timing` / `effect_type` / `trigger_rate` / `effect_value` 四键（功法归一化层将 `trigger_condition` 映射为 `trigger_timing`，无第二套同义键）；`combat_manager` 经 `EFFECT_HANDLERS` 注册表按 `effect_type` 分发（damage_bonus/combo/stun/counter/damage_reduction 五类），功法触发技与武器挂载技共用同一入口，未知 effect_type 记 warning 并跳过、不中断战斗
+- **大招（必放制）**：每本功法每场战斗最多触发一次，多本功法相互独立；归一化层为未声明概率的大招注入 `trigger_rate = 1.0`（必放），config 不得填写概率字段；触发前 MUST 过解锁门槛：自身已行动数 ≥ `min_action_index` 且满足全部血量条件（`trigger_self_hp_below` / `trigger_opponent_hp_below`），未达门槛保留限次资格（斩杀型/逆袭型/延迟型时机风格）
+- **升星**：3 星封顶（`max_star`）；升星加成按乘法 `(1 + STAR_UP_BONUS)^(星级-1)` 缩放触发率与效果值，`STAR_UP_BONUS = 0.10`（config 可调），触发率截断至 1.0；满星重复参悟不再升星，按品级修为基数 × 折算比例（默认 50%）补偿修为并提示
 - **领悟**：拥有与领悟分离，未领悟功法不可装备；领悟池 = 心法配套列表（按系数加权）+ 修习目标 +（仅突破渠道）通用池；三渠道概率见 §4.1/§4.2
-- **槽位与升星**：最多同时装备 4 本功法；重复获得同名功法自动升星强化
+- **槽位与升星**：最多同时装备 4 本功法；重复获得同名功法自动升星强化（细节见上「升星」）
 - **路线装备池**：灵修/体修同属性池、各自专属心法/功法/武器池，通用功法对两路线应用不同倍率
 
 ### 4.7 PvE 与世界 Boss（过渡期状态）
@@ -283,6 +284,19 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 - **成功率**：`rate = min(95, 配方success_rate(默认50) + (level_index - 配方要求等级) × 2)`，roll 1-100 ≤ rate 成功
 - 失败材料全损
+
+### 4.19 GM 命令（core/gm_manager.py + handlers/gm_handler.py）
+
+- 统一入口 `修仙GM <子命令> [目标玩家] [参数]` + `修仙GM帮助`；权限独立于 BOSS_ADMINS，由 `_conf_schema.json` 的 `GM_ADMINS` 配置（main.py `_check_gm_admin`）
+- 目标解析优先级：@提及 → 数字 user_id → 省略时作用于命令发送者自身
+- 子命令：设置境界（境界名 → 1-based level_index，两种修炼路线通用）/设置修为/灵石/气血/真元/攻击/精神力、给予装备/给予物品（进储物戒）、卸下装备（入戒）、清除CD（需 `确认` 参数，同步 user_cd 与 player.state）、触发历练/秘境结算（推进 scheduled_time 后调正常结算）、生成Boss（委托 BossManager）
+- **审计日志**：每次调用写一行 JSON 到插件数据目录 `gm_operations.log`（时间戳/GM id/目标 id/子命令/参数/成功与否），达 500MB 滚动改名保留
+
+### 4.20 设计表→config 同步管道（scripts/sync_content_to_config.py）
+
+- 读 `design_docs/content-design/` 下 weapons.csv / heart_methods.csv（skills.csv 同步推迟），按 `name` 键控 merge（同名更新/新名新增/表外不动），仅处理 status=draft/final，legacy 跳过
+- 键名映射：weapons.csv `bonus_damage` → config `damage`；引擎契约校验（trigger 四键齐全、trigger_timing 词表、rate 值域、passive_bonus 词表防静默忽略）；写盘前跑 validate_budget.py，FAIL 中止不写盘；--dry-run 输出变更摘要
+- 已用本脚本入库：武器 v1（9 标杆件 + 狼牙棒）、心法 v1（17 draft）
 
 ---
 

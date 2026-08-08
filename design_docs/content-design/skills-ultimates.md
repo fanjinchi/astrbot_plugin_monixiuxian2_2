@@ -40,31 +40,40 @@ config 的 `trigger_condition` 经 `core/skill_manager.py`（timing_map, ~L326-3
 | `counter` | 仅 `on_defense`：立即反击 `int(自身伤害 × value)` | 反击不吃当次攻击倍率 |
 | `damage_reduction` | 下一次受击 `incoming_damage_mult ×= (1 − value)` | 一次性减伤 |
 
-> ⚠️ **键名 bug（2026-08-06 发现，未修）**：引擎只读 `effect_type`，但
-> config/skills.json 的 trigger_skill 用的是 `effect` 键，而
-> `skill_manager._apply_star_to_def` 只注入 `trigger_timing`、不改名 →
-> **现有 6 个 config 功法的触发技在战斗中全部静默不触发**。测试没抓到是因为
-> tests/test_combat_engine.py 直接注入引擎格式 dict，绕过了 config 路径。
-> 修法建议：`_process_trigger_skills` 与 `_process_round_start_skills` 的取值改
-> `skill.get("effect_type") or skill.get("effect", "")` 一行兜底。
-> 注意修复生效后现有功法将**超 G2 预算**（御剑术 25%×1.5=+37.5%、
-> 撼山劲 20%×1.8=+36%），需随功法池重做一并下调。
+> ✅ **键名 bug 已修复（2026-08-06 change `skill-engine-fit-and-content-sync` 落地，已归档）**：
+> 原问题——引擎只读 `effect_type`，但 config 功法用 `effect` 键、归一化不改名，导致
+> 6 个 config 功法触发技静默不触发。修复方式：config/skills.json 全部改名
+> `effect` → `effect_type`（设计表 skills.csv 同步改为 `effect_type` 列），
+> `combat_manager` 重构为 `EFFECT_HANDLERS` 注册表分发，功法与武器挂载技共用入口，
+> 未知 effect_type 记 warning 并跳过、不中断战斗。
+> **遗留：修复生效后现有功法超 G2 预算**（御剑术 25%×1.5=+37.5%、撼山劲 20%×1.8=+36%），
+> 由 bd `dhh` 跟踪，随功法池重做一并下调（未上线可接受）。
 > 武器挂载技（绕过归一化）必须直接用引擎键，见 `weapon-skills.md` §0。
 
-### 1.3 奥义机制（~L481-495）
+### 1.3 大招机制（必放制，change `skill-engine-fit-and-content-sync` 落地）
 
-- 每个奥义**每场战斗限一次**（`used_ultimates` 集合）；一次行动最多触发一个（`break`）。
-- 触发本身**带概率**：`random < trigger_rate` 才生效——config 里奥义的
-  `trigger_rate` 待逐个核对（决定期望强度）。
+- 每个大招**每场战斗限一次**（`used_ultimates` 集合）；一次行动最多触发一个；
+  多本功法的大招相互独立。
+- **必放制**：`_apply_star_to_def` 为未显式声明概率的大招注入 `trigger_rate = 1.0`，
+  config 大招数据 **不得** 填写 `trigger_rate` 字段（同步脚本会校验拒绝）。
+- **解锁门槛**（config 可调，AND 语义）：自身已行动数 ≥ `min_action_index`，且满足
+  全部已声明血量条件（`trigger_self_hp_below` 自身 HP% ≤ 阈值 / `trigger_opponent_hp_below`
+  敌方 HP% ≤ 阈值）；未达门槛时跳过且**不消耗**限次资格。支持斩杀型（敌方低血）、
+  逆袭型（自身低血）、延迟型（纯行动数）。
 - **当前实现不读 `effect` 类型**：一律 `ultimate_mult += effect_value`，即当次伤害
   **×(1 + effect_value)**。config 里的 `massive_damage` 只是描述性标签。
-  → 万剑归宗 3.0 = 当次 ×4.0；开天辟地 3.5 = 当次 ×4.5。
-- 要做非伤害型奥义（治疗/控制/免死）需要先在 ultimate 分支加 effect 分发。
+  → 万剑归宗 3.0 = 当次 ×4.0；开天辟地 3.5 = 当次 ×4.5（降档至 2.0 档 ×3.0 随 bd `dhh`）。
+- 要做非伤害型大招（治疗/控制/免死）需要先在 ultimate 分支加 effect 分发（bd `tt3`）。
 
-### 1.4 升星（`core/skill_manager.py` L27-29）
+### 1.4 升星（`core/skill_manager.py`，change `skill-engine-fit-and-content-sync` 落地）
 
-每星 `STAR_UP_RATE_BONUS = 0.20`、`STAR_UP_EFFECT_BONUS = 0.20`（触发率与效果值
-各 +20%/星，乘算）。设计基础值时要按目标星级倒推。
+- 星级上限 `max_star = 3`（读 config）；重复获得同名功法自动升星，满星后不再 +1。
+- 升星系数单一 config 值 `STAR_UP_BONUS = 0.10`（替代旧的双系数
+  STAR_UP_RATE_BONUS/STAR_UP_EFFECT_BONUS 0.20）；触发率与效果值均按
+  **乘法** `(1 + 0.10)^(星级-1)` 缩放（3 星 = 1.21×），触发率截断至 1.0。
+- **满星重复参悟**：不再升星，按品级修为基数 × 折算比例（默认 50%，config 可调）
+  补偿修为并提示。
+- 设计基础值时要按目标星级倒推（除以对应乘数）。
 
 ---
 
