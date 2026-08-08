@@ -20,75 +20,8 @@
         }
       ],
       "route": "通用",
-      "shop_weight": 100
-    },
-    {
-      "id": "heart_002",
-      "name": "焚天诀",
-      "description": "火系心法，攻击凌厉",
-      "rank": "圣品",
-      "required_level_index": 10,
-      "passive_bonus": {
-        "damage_percent": 0.15
-      },
-      "skill_pool": [
-        {
-          "skill_id": "spirit_001",
-          "learn_coefficient": 0.6
-        },
-        {
-          "skill_id": "common_001",
-          "learn_coefficient": 0.9
-        }
-      ],
-      "route": "灵修",
-      "shop_weight": 30
-    },
-    {
-      "id": "heart_003",
-      "name": "不动明王经",
-      "description": "佛门炼体心法",
-      "rank": "珍品",
-      "required_level_index": 5,
-      "passive_bonus": {
-        "armor_value": 20
-      },
-      "skill_pool": [
-        {
-          "skill_id": "body_001",
-          "learn_coefficient": 0.7
-        },
-        {
-          "skill_id": "common_002",
-          "learn_coefficient": 1.0
-        }
-      ],
-      "route": "体修",
-      "shop_weight": 60
-    },
-    {
-      "id": "heart_impart_001",
-      "name": "传承心法·吐纳",
-      "description": "传承奖励心法，固本培元（数值占位，待策划调优）。",
-      "rank": "圣品",
-      "required_level_index": 0,
-      "passive_bonus": {
-        "hp_percent": 0.05
-      },
-      "skill_pool": [],
-      "route": "通用"
-    },
-    {
-      "id": "heart_impart_002",
-      "name": "传承心法·归元",
-      "description": "传承奖励心法，气归丹田（数值占位，待策划调优）。",
-      "rank": "帝品",
-      "required_level_index": 5,
-      "passive_bonus": {
-        "damage_percent": 0.05
-      },
-      "skill_pool": [],
-      "route": "通用"
+      "shop_weight": 100,
+      "exp_multiplier": 0.0
     },
     {
       "id": "heart_004",
@@ -100,7 +33,12 @@
         "hp_percent": 0.03
       },
       "exp_multiplier": 0.08,
-      "skill_pool": [],
+      "skill_pool": [
+        {
+          "skill_id": "draft_kuangfeng",
+          "learn_coefficient": 1.0
+        }
+      ],
       "route": "通用",
       "shop_weight": 100
     },
@@ -113,9 +51,14 @@
       "passive_bonus": {
         "damage_percent": 0.12
       },
-      "exp_multiplier": 1.0,
-      "skill_pool": [],
-      "route": "通用",
+      "exp_multiplier": 0.0,
+      "skill_pool": [
+        {
+          "skill_id": "draft_leizhen",
+          "learn_coefficient": 0.8
+        }
+      ],
+      "route": "灵修",
       "shop_weight": 60
     },
     {
@@ -128,8 +71,13 @@
         "hp_percent": 0.09
       },
       "exp_multiplier": 0.06,
-      "skill_pool": [],
-      "route": "通用",
+      "skill_pool": [
+        {
+          "skill_id": "draft_hunyan",
+          "learn_coefficient": 0.8
+        }
+      ],
+      "route": "体修",
       "shop_weight": 60
     },
     {
@@ -142,8 +90,17 @@
         "damage_percent": 0.1,
         "armor_value": 15
       },
-      "exp_multiplier": 1.0,
-      "skill_pool": [],
+      "exp_multiplier": 0.0,
+      "skill_pool": [
+        {
+          "skill_id": "common_001",
+          "learn_coefficient": 1.0
+        },
+        {
+          "skill_id": "draft_zhenshan",
+          "learn_coefficient": 0.6
+        }
+      ],
       "route": "通用",
       "shop_weight": 35
     },
@@ -157,7 +114,12 @@
         "agility_percent": 0.08
       },
       "exp_multiplier": 0.15,
-      "skill_pool": [],
+      "skill_pool": [
+        {
+          "skill_id": "draft_yiyahuan",
+          "learn_coefficient": 0.6
+        }
+      ],
       "route": "通用",
       "shop_weight": 35
     },
@@ -171,9 +133,18 @@
         "agility_percent": 0.15,
         "hp_percent": 0.05
       },
-      "exp_multiplier": 1.0,
-      "skill_pool": [],
-      "route": "通用",
+      "exp_multiplier": 0.0,
+      "skill_pool": [
+        {
+          "skill_id": "common_002",
+          "learn_coefficient": 1.0
+        },
+        {
+          "skill_id": "draft_jinshen",
+          "learn_coefficient": 0.5
+        }
+      ],
+      "route": "体修",
       "shop_weight": 20
     },
     {
@@ -200,9 +171,18 @@
         "damage_percent": 0.15,
         "armor_value": 20
       },
-      "exp_multiplier": 1.0,
-      "skill_pool": [],
-      "route": "通用",
+      "exp_multiplier": 0.0,
+      "skill_pool": [
+        {
+          "skill_id": "draft_zhanyi",
+          "learn_coefficient": 1.0
+        },
+        {
+          "skill_id": "draft_baxia",
+          "learn_coefficient": 0.6
+        }
+      ],
+      "route": "体修",
       "shop_weight": 12
     },
     {
@@ -215,7 +195,7 @@
         "hp_percent": 0.13,
         "armor_value": 30
       },
-      "exp_multiplier": 1.0,
+      "exp_multiplier": 0.0,
       "skill_pool": [],
       "route": "通用",
       "shop_weight": 12
@@ -230,8 +210,13 @@
         "speed_percent": 0.12,
         "agility_percent": 0.1
       },
-      "exp_multiplier": 1.0,
-      "skill_pool": [],
+      "exp_multiplier": 0.0,
+      "skill_pool": [
+        {
+          "skill_id": "draft_juxing",
+          "learn_coefficient": 0.8
+        }
+      ],
       "route": "通用",
       "shop_weight": 7
     },
@@ -259,9 +244,14 @@
         "damage_percent": 0.12,
         "agility_percent": 0.13
       },
-      "exp_multiplier": 1.0,
-      "skill_pool": [],
-      "route": "通用",
+      "exp_multiplier": 0.0,
+      "skill_pool": [
+        {
+          "skill_id": "draft_qingfeng",
+          "learn_coefficient": 0.6
+        }
+      ],
+      "route": "灵修",
       "shop_weight": 4
     },
     {
@@ -288,8 +278,13 @@
         "damage_percent": 0.15,
         "hp_percent": 0.09
       },
-      "exp_multiplier": 1.0,
-      "skill_pool": [],
+      "exp_multiplier": 0.0,
+      "skill_pool": [
+        {
+          "skill_id": "draft_zhenlong",
+          "learn_coefficient": 0.3
+        }
+      ],
       "route": "通用",
       "shop_weight": 2
     },
@@ -303,7 +298,7 @@
         "agility_percent": 0.15,
         "speed_percent": 0.13
       },
-      "exp_multiplier": 1.0,
+      "exp_multiplier": 0.0,
       "skill_pool": [],
       "route": "通用",
       "shop_weight": 2
@@ -318,8 +313,17 @@
         "damage_percent": 0.13,
         "hp_percent": 0.13
       },
-      "exp_multiplier": 1.0,
-      "skill_pool": [],
+      "exp_multiplier": 0.0,
+      "skill_pool": [
+        {
+          "skill_id": "draft_jiujian",
+          "learn_coefficient": 0.5
+        },
+        {
+          "skill_id": "draft_tianmo",
+          "learn_coefficient": 0.3
+        }
+      ],
       "route": "通用",
       "shop_weight": 1
     },

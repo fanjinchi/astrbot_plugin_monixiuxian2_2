@@ -153,6 +153,17 @@ class EquipmentHandler:
             yield event.plain_result(f"【{item_name}】不是可装备的物品类型")
             return
 
+        # 心法路线匹配校验：route 非通用且与玩家修炼路线不符时拒绝装备
+        # （不卸下当前心法；换装/替换主修心法走同一路径，同样被拦截）
+        if item_type == "main_technique":
+            route = item_config.get("route", "通用")
+            if route != "通用" and route != player.cultivation_type:
+                yield event.plain_result(
+                    f"❌ 该心法适用于【{route}】路线（你当前为【{player.cultivation_type}】）\n"
+                    f"请换用通用心法或其他匹配路线的选择"
+                )
+                return
+
         # 功法类物品改为设为修习目标（不消耗物品，不直接装备）
         if item_type == "technique" and self.skill_manager is not None:
             skill_id = self.skill_manager._find_skill_id_by_name(item_name)

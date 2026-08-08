@@ -529,6 +529,12 @@ class SkillManager:
         - weapon_coefficient_k: K value of equipped weapon
         - base_damage: base damage of equipped weapon
         - armor_value: total armor from all equipment
+
+        Technique skills are exported with the route multiplier applied
+        (per player.cultivation_type): trigger rate is scaled by the route
+        multiplier and capped at 1.0; ultimate effect_value is scaled by it
+        (mandatory-cast ultimates keep rate at 1.0). Star-level bonuses are
+        applied before the route multiplier.
         """
         loadout = {
             "trigger_skills": [],
@@ -576,12 +582,28 @@ class SkillManager:
             star_level = await self._get_skill_star_level(player, skill_id)
             skill_def = self._apply_star_to_def(skill_def, star_level)
 
+            # Route multiplier (route_mult_ling/ti): scales the expected gain
+            # of trigger skills (rate) and ultimates (effect_value, rate is
+            # fixed at 1.0 by the mandatory-cast rule). Copies are exported so
+            # the shared config definitions are never mutated.
+            route_mult = skill_def.get("route_multiplier", {}).get(
+                player.cultivation_type, 1.0
+            )
+
             trigger = skill_def.get("trigger_skill")
             if trigger:
+                trigger = dict(trigger)
+                trigger["trigger_rate"] = min(
+                    1.0, trigger.get("trigger_rate", 0.0) * route_mult
+                )
                 loadout["trigger_skills"].append(trigger)
 
             ultimate = skill_def.get("ultimate")
             if ultimate:
+                ultimate = dict(ultimate)
+                ultimate["effect_value"] = (
+                    ultimate.get("effect_value", 0.0) * route_mult
+                )
                 loadout["ultimates"].append(ultimate)
 
         return loadout

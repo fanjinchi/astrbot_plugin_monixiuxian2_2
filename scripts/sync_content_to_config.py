@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""Sync content-design CSVs into runtime config JSONs (merge mode).
+"""Sync content-design CSVs into runtime config JSONs (reconcile mode).
 
-Reads ``design_docs/content-design/weapons.csv`` and ``heart_methods.csv``,
-merges rows with status ``draft``/``final`` into ``config/weapons.json`` and
-``config/heart_methods.json`` (keyed by item ``name``), and runs the budget
-gate (``design_docs/content-design/validate_budget.py``) before writing.
+Reads ``design_docs/content-design/weapons.csv``, ``heart_methods.csv`` and
+``skills.csv``, reconciles rows with status ``draft``/``final`` into
+``config/weapons.json``, ``config/heart_methods.json`` and
+``config/skills.json`` (keyed by item ``name``), and runs the budget gate
+(``design_docs/content-design/validate_budget.py``) before writing.
 
-Merge semantics: existing config entries with the same name are updated
-field-by-field (unmapped fields are preserved); new names are appended;
-config entries absent from the CSVs are never touched. Rows with status
-``legacy`` are reference-only and always skipped.
+Reconcile semantics: imported draft/final rows update same-name entries and
+append new names; config entries absent from the CSVs are deleted. Rows with
+status ``legacy`` are reference-only and always skipped (their config
+counterparts are therefore deleted by reconcile).
 
-skills.csv sync is intentionally deferred: skill values are frozen until the
-skill-pool redesign (openspec change skill-engine-fit-and-content-sync, D8
-scope adjustment; bd issue dhh).
+skills.csv sync: trigger skills keep the persisted ``trigger_condition`` key
+(the skill_manager normalization layer maps it to the engine contract key
+``trigger_timing`` at load); ultimates are mandatory-cast (``trigger_rate``
+MUST NOT be declared); effect values follow the 0.x additive contract
+(``effect_value = x`` means ``x(1+x)`` on the effect base).
 
 Usage:
     uv run python scripts/sync_content_to_config.py [--dry-run]
@@ -44,6 +47,24 @@ TRIGGER_REQUIRED_KEYS = {
     "effect_value",
 }
 TRIGGER_TIMINGS = {"on_attack", "on_defense", "on_crit", "round_start"}
+
+# skills.csv trigger_condition values (persisted key; the skill_manager
+# normalization layer injects the engine contract key trigger_timing at load).
+SKILL_TIMING_MAP = {
+    "attack": "on_attack",
+    "defend": "on_defense",
+    "crit": "on_crit",
+    "round_start": "round_start",
+}
+
+# Effect vocabulary consumed by the combat engine (EFFECT_HANDLERS registry).
+SKILL_EFFECT_TYPES = {
+    "damage_bonus",
+    "combo",
+    "stun",
+    "counter",
+    "damage_reduction",
+}
 
 # Passive bonus vocabulary consumed by models.get_total_attributes for
 # main_technique items. Unknown keys would be silently ignored, so reject.
@@ -179,6 +200,11 @@ def _build_heart(row: dict, errors: list[str]) -> dict | None:
     if not name:
         errors.append(f"{ctx}: name is required")
         return None
+    exp_mult = _num(row.get("exp_multiplier", ""))
+    if exp_mult is None:
+        # Default matches equipment_manager.Item.exp_multiplier (0.0): an
+        # absent cell means no cultivation bonus, never 1.0. Preserve 0.0.
+        exp_mult = 0.0
     return {
         "id": (row.get("id") or "").strip(),
         "name": name,
@@ -186,11 +212,116 @@ def _build_heart(row: dict, errors: list[str]) -> dict | None:
         "rank": (row.get("rank") or "").strip(),
         "required_level_index": _num(row.get("required_level_index", "")) or 0,
         "passive_bonus": passive,
-        "exp_multiplier": _num(row.get("exp_multiplier", "")) or 1.0,
+        "exp_multiplier": exp_mult,
         "skill_pool": pool,
         "route": (row.get("route") or "").strip() or "通用",
         "shop_weight": _num(row.get("shop_weight", "")) or 0,
     }
+
+
+def _validate_ultimate(raw_json: str, ctx: str, errors: list[str]) -> dict | None:
+    """Parse and contract-check an ultimate_json cell (mandatory-cast ultimates).
+
+    Args:
+        raw_json: The CSV cell text ("null" or empty means no ultimate).
+        ctx: Context label for error messages.
+        errors: Error list to append to.
+
+    Returns:
+        The parsed ultimate dict, or None when absent or invalid.
+    """
+    raw_json = (raw_json or "").strip()
+    if not raw_json or raw_json == "null":
+        return None
+    try:
+        ult = json.loads(raw_json)
+    except json.JSONDecodeError as e:
+        errors.append(f"{ctx}: ultimate_json is not valid JSON: {e}")
+        return None
+    if not isinstance(ult, dict):
+        errors.append(f"{ctx}: ultimate_json must be a JSON object")
+        return None
+    if "trigger_rate" in ult:
+        errors.append(
+            f"{ctx}: ultimate MUST NOT declare trigger_rate (mandatory-cast, engine defaults to 1.0)"
+        )
+        return None
+    for key in ("effect_type", "effect_value"):
+        if key not in ult:
+            errors.append(f"{ctx}: ultimate missing key {key!r}")
+            return None
+    if not isinstance(ult["effect_value"], (int, float)):
+        errors.append(f"{ctx}: ultimate effect_value must be numeric")
+        return None
+    for key in (
+        "min_action_index",
+        "trigger_self_hp_below",
+        "trigger_opponent_hp_below",
+    ):
+        if key in ult and not isinstance(ult[key], (int, float)):
+            errors.append(f"{ctx}: ultimate {key} must be numeric")
+            return None
+    return ult
+
+
+def _build_skill(row: dict, errors: list[str]) -> dict | None:
+    """Map a skills.csv row to a config/skills.json entry (grouped format).
+
+    Trigger skills keep the persisted ``trigger_condition`` key; the combat
+    engine consumes the normalized ``trigger_timing`` key injected by the
+    skill_manager normalization layer at load time. ``_pool`` is a merge-only
+    marker (group key) and is never persisted.
+    """
+    name = (row.get("name") or "").strip()
+    ctx = f"skills.csv[{name or row.get('id', '?')}]"
+    if not name:
+        errors.append(f"{ctx}: name is required")
+        return None
+    entry: dict[str, Any] = {
+        "id": (row.get("id") or "").strip(),
+        "name": name,
+        "description": (row.get("description") or "").strip(),
+        "_pool": (row.get("pool") or "").strip() or "通用功法池",
+    }
+    condition = (row.get("trigger_condition") or "").strip()
+    trigger_name = (row.get("trigger_name") or "").strip()
+    if trigger_name or condition:
+        if condition not in SKILL_TIMING_MAP:
+            errors.append(
+                f"{ctx}: unknown trigger_condition {condition!r} (allowed: {sorted(SKILL_TIMING_MAP)})"
+            )
+            return None
+        rate = _num(row.get("trigger_rate", ""))
+        if rate is None or not 0 < rate <= 1:
+            errors.append(f"{ctx}: trigger_rate must be in (0, 1], got {rate!r}")
+            return None
+        effect_type = (row.get("effect_type") or "").strip()
+        if effect_type not in SKILL_EFFECT_TYPES:
+            errors.append(
+                f"{ctx}: unknown effect_type {effect_type!r} (allowed: {sorted(SKILL_EFFECT_TYPES)})"
+            )
+            return None
+        value = _num(row.get("effect_value", ""))
+        if value is None:
+            errors.append(f"{ctx}: effect_value is required for trigger skills")
+            return None
+        entry["trigger_skill"] = {
+            "name": trigger_name,
+            "trigger_condition": condition,
+            "trigger_rate": rate,
+            "effect_type": effect_type,
+            "effect_value": value,
+        }
+    ult = _validate_ultimate(row.get("ultimate_json", ""), ctx, errors)
+    if ult is not None:
+        entry["ultimate"] = ult
+    ling = _num(row.get("route_mult_ling", ""))
+    ti = _num(row.get("route_mult_ti", ""))
+    entry["route_multiplier"] = {
+        "灵修": ling if ling is not None else 1.0,
+        "体修": ti if ti is not None else 1.0,
+    }
+    return entry
 
 
 def _merge(entries: list[dict], payload: dict) -> tuple[str, list[str]]:
@@ -210,6 +341,66 @@ def _merge(entries: list[dict], payload: dict) -> tuple[str, list[str]]:
     return ("ADD", [])
 
 
+def _merge_skill(groups: dict, payload: dict) -> tuple[str, list[str]]:
+    """Merge a skills.csv row into the grouped skills config (dict-of-list).
+
+    Same-name entries are updated field-by-field with their ``id`` preserved
+    (player_skills references skill ids); new names are appended to the group
+    named by the ``_pool`` marker.
+
+    Args:
+        groups: The loaded config/skills.json dict (group name -> list).
+        payload: The built skill entry (may carry the ``_pool`` marker).
+
+    Returns:
+        (action, field diff lines) with action in {"UPDATE", "ADD"}.
+    """
+    name = payload["name"]
+    for entries in groups.values():
+        for existing in entries:
+            if existing.get("name") == name:
+                diffs = []
+                for key, value in payload.items():
+                    if key in ("id", "_pool"):
+                        continue
+                    old = existing.get(key, "<absent>")
+                    if old != value:
+                        diffs.append(
+                            f"    {key}: {json.dumps(old, ensure_ascii=False)} -> {json.dumps(value, ensure_ascii=False)}"
+                        )
+                    existing[key] = value
+                return ("UPDATE", diffs)
+    group = groups.setdefault(payload.pop("_pool"), [])
+    group.append(payload)
+    return ("ADD", [])
+
+
+def _reconcile_list(entries: list[dict], imported_names: set[str]) -> list[str]:
+    """Drop config entries absent from the imported design rows (reconcile).
+
+    Args:
+        entries: The config list to filter in place.
+        imported_names: Names imported from the CSVs this run.
+
+    Returns:
+        The names of deleted entries.
+    """
+    deleted = [e["name"] for e in entries if e.get("name") not in imported_names]
+    entries[:] = [e for e in entries if e.get("name") in imported_names]
+    return deleted
+
+
+def _reconcile_groups(groups: dict, imported_names: set[str]) -> list[str]:
+    """Reconcile the grouped (dict-of-list) config format like _reconcile_list."""
+    deleted = []
+    for entries in groups.values():
+        deleted.extend(
+            e["name"] for e in entries if e.get("name") not in imported_names
+        )
+        entries[:] = [e for e in entries if e.get("name") in imported_names]
+    return deleted
+
+
 def main() -> int:
     """Run the sync. Returns process exit code."""
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
@@ -223,12 +414,18 @@ def main() -> int:
     errors: list[str] = []
     weapon_rows, weapon_skipped = _load_rows("weapons.csv")
     heart_rows, heart_skipped = _load_rows("heart_methods.csv")
+    skill_rows, skill_skipped = _load_rows("skills.csv")
 
     weapons = [w for r in weapon_rows if (w := _build_weapon(r, errors)) is not None]
     hearts = [h for r in heart_rows if (h := _build_heart(r, errors)) is not None]
+    skills = [s for r in skill_rows if (s := _build_skill(r, errors)) is not None]
 
     # Names must be unique within each CSV (config is keyed by name).
-    for label, items in (("weapons", weapons), ("heart_methods", hearts)):
+    for label, items in (
+        ("weapons", weapons),
+        ("heart_methods", hearts),
+        ("skills", skills),
+    ):
         seen: set[str] = set()
         for item in items:
             if item["name"] in seen:
@@ -243,8 +440,10 @@ def main() -> int:
 
     weapons_cfg_path = CONFIG_DIR / "weapons.json"
     hearts_cfg_path = CONFIG_DIR / "heart_methods.json"
+    skills_cfg_path = CONFIG_DIR / "skills.json"
     weapons_cfg = json.loads(weapons_cfg_path.read_text(encoding="utf-8"))
     hearts_cfg = json.loads(hearts_cfg_path.read_text(encoding="utf-8"))
+    skills_cfg = json.loads(skills_cfg_path.read_text(encoding="utf-8"))
     heart_list = hearts_cfg["心法列表"]
 
     print(
@@ -261,6 +460,25 @@ def main() -> int:
         action, diffs = _merge(heart_list, h)
         print(f"  {action} {h['name']} [{h['rank']}]")
         print("\n".join(diffs) if diffs else "    (no field changes)")
+    print(
+        f"skills.csv: {len(skill_rows)} draft/final rows ({len(skill_skipped)} legacy skipped)"
+    )
+    for s in skills:
+        action, diffs = _merge_skill(skills_cfg, s)
+        print(f"  {action} {s['name']}")
+        print("\n".join(diffs) if diffs else "    (no field changes)")
+
+    # Reconcile: drop config entries absent from the imported design rows.
+    for label, entries, imported in (
+        ("weapons.json", weapons_cfg, weapons),
+        ("heart_methods.json", heart_list, hearts),
+    ):
+        deleted = _reconcile_list(entries, {x["name"] for x in imported})
+        for name in deleted:
+            print(f"  DELETE {name} ({label}, absent from CSV)")
+    deleted = _reconcile_groups(skills_cfg, {s["name"] for s in skills})
+    for name in deleted:
+        print(f"  DELETE {name} (skills.json, absent from CSV)")
 
     # Budget gate: every draft/final design row must pass before any write.
     print("\nRunning budget gate (validate_budget.py)...")
@@ -279,13 +497,17 @@ def main() -> int:
 
     # Atomic per-file writes: serialize to a sibling temp file, then replace,
     # so a crash mid-write cannot leave a truncated config (review m5).
-    for path, cfg in ((weapons_cfg_path, weapons_cfg), (hearts_cfg_path, hearts_cfg)):
+    for path, cfg in (
+        (weapons_cfg_path, weapons_cfg),
+        (hearts_cfg_path, hearts_cfg),
+        (skills_cfg_path, skills_cfg),
+    ):
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(
             json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
         tmp.replace(path)
-    print(f"\nWrote {weapons_cfg_path} and {hearts_cfg_path}.")
+    print(f"\nWrote {weapons_cfg_path}, {hearts_cfg_path} and {skills_cfg_path}.")
     return 0
 
 

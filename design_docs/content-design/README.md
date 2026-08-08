@@ -55,7 +55,7 @@
 - 触发技字段平铺为列；`ultimate_json` 为大招（必放制：引擎注入 `trigger_rate=1.0`，不填概率，可配解锁门槛 `min_action_index`/血量阈值），无则 `null`
 - `effect_type` 词表以 `combat_manager.py` 的 `EFFECT_HANDLERS` 注册表为准（damage_bonus/combo/stun/counter/damage_reduction；未知效果记 warning 跳过，设计中遇到的未知效果先记
   `design_note`，定稿前必须核对）
-- 注：`trigger_condition`/`trigger_rate` 为设计列，入库时经 `sync_content_to_config.py` 归一化映射为引擎键 `trigger_timing`/`trigger_rate`（skills.csv 同步随功法池重做一起落地，见 `schema-and-engine-fit.md` §4）
+- 注：`trigger_condition`/`trigger_rate` 为设计列，入库时经 `sync_content_to_config.py` 归一化映射为引擎键 `trigger_timing`/`trigger_rate`（skills.csv 同步已于 2026-08-08 随 `implement-content-design` 落地，见 `schema-and-engine-fit.md` §4）
 
 ### heart_methods.csv
 
@@ -125,4 +125,5 @@
   效果清单（needs_code → bd `tt3`）见 `skills-ultimates.md` §6；升星倒推公式同步
   修正为乘法 0.10；`validate_budget.py` check_skills 扩展支持 combo/counter/stun/纯大招）
 - [ ] 心法成体系（现 5 个 → 按路线 × 品级矩阵补齐）
-- [ ] 定稿后写 CSV → config 转换脚本，跑 `design_docs/attribute-growth/sim_balance_regression.py` 回归
+- [x] **设计实现落地（implement-content-design，2026-08-08）**：`sync_content_to_config.py` 升级为 **reconcile 全量重导**（weapons/heart_methods/skills 三类同规则：导入 draft/final 后删除表外条目；legacy 不导入即删除；dry-run DELETE 清单；原子写）；技能行契约（trigger_condition 持久化键、大招禁 trigger_rate、0.x 加性 effect_value）；exp_multiplier 零值保留修复；**route_multiplier 功法侧消费**（loadout 触发技乘 rate/大招乘 value）；**心法 route 装备校验**（5 件专属化：烈火功/太虚功→灵修、龟息功/玄影功/战神诀→体修）；sim 回归 PASS；20 新增测试 + 全量 360 通过
+- [x] 定稿后写 CSV → config 转换脚本，跑 `design_docs/attribute-growth/sim_balance_regression.py` 回归

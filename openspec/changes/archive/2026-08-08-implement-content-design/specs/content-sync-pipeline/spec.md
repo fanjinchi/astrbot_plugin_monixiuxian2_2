@@ -1,9 +1,5 @@
-# content-sync-pipeline Specification
+## MODIFIED Requirements
 
-## Purpose
-
-设计表（design_docs/content-design/*.csv）到运行时配置（config/*.json）的同步管道：让设计内容可入库、可校验、可测试，并防止契约断裂与预算超标内容进入线上配置。
-## Requirements
 ### Requirement: 设计表合并同步
 
 （本变更将主 spec 的 merge-only 语义替换为 reconcile 全量重导）系统 SHALL 提供设计 CSV → config JSON 的同步脚本，以设计表为唯一来源进行全量重导：脚本 SHALL 导入 status 为 draft/final 的设计行（按 `name` 键合并：同名更新字段、新名新增），并 SHALL 删除 config 中不在导入范围内的既有条目（legacy 参照行不导入即删除）。legacy 行中的设计有效条目（如新手默认心法长春功）由设计表修正为 draft 后纳入导入。
@@ -28,28 +24,7 @@
 - **WHEN** CSV 行的 status=legacy
 - **THEN** 该行不参与同步导入，reconcile 删除阶段中 config 对应旧条目被一并删除（设计有效且需保留的 legacy 条目应由设计表修正为 draft 后纳入导入）
 
-### Requirement: 键名映射与引擎契约校验
-
-同步脚本 SHALL 执行设计列名到 config 键名的映射（如 weapons.csv 的 `bonus_damage` 映射为 weapons.json 的 `damage` 键）。触发技数据 MUST 通过引擎契约校验：`trigger_timing` / `effect_type` / `trigger_rate` / `effect_value` 四键齐全且值域合法，否则脚本 MUST 报错中止且不写盘。大招数据 MUST NOT 含 `trigger_rate` 字段（必放制由引擎默认提供）；发现时脚本 MUST 报错中止。
-
-#### Scenario: 挂载技缺键拒绝
-
-- **WHEN** 武器 trigger_skills 中某技能缺少 `effect_type`
-- **THEN** 脚本报错指出条目与字段，中止执行，config 文件不被修改
-
-#### Scenario: 大招概率字段拒绝
-
-- **WHEN** 功法 ultimate 数据含 `trigger_rate`
-- **THEN** 脚本报错并中止，提示必放制下该字段由引擎默认提供
-
-### Requirement: 预算验算闸门
-
-同步脚本 SHALL 在写盘前运行 validate_budget.py 对全部 draft/final 设计行进行预算验算；存在 FAIL 行时脚本 MUST 中止且不写盘，legacy 行产生的 WARN MUST NOT 阻塞同步。
-
-#### Scenario: 预算超标拒绝入库
-
-- **WHEN** 某 draft 武器的每击伤害超出其体量/品级预算带
-- **THEN** 脚本输出该行的验算明细并中止，config 文件不被修改
+## ADDED Requirements
 
 ### Requirement: 数值字段零值保留
 
@@ -87,4 +62,3 @@
 
 - **WHEN** config 中【基础吐纳】`effect_value = 1.2`（旧值=×2.2）而设计表为 `0.2`（=×1.2）
 - **THEN** 同步后 config 写入 0.2，战斗结算按 ×1.2 执行；玩家已学技能的强度变化在变更说明中标注为玩法变更
-

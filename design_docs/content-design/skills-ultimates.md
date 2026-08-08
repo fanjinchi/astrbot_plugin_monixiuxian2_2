@@ -160,7 +160,7 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
 - [x] `combo` 语义 → 已接受现状：倍率叠加+栈上限，不做「额外打一回合」（§1.2 备注）
 - [ ] G2 的 30% 按 0 星 / 满星核算？（v1 池暂按 0 星录入，见 §6）
 - [ ] 非伤害型奥义（heal/stun/survive/斩杀）需要 ultimate 分支加 effect 分发 → bd `tt3`，排期随功法池扩充
-- [ ] 副作用/疲劳机制（乱斗堂爆裂一击式代价）→ bd `tt3`；天魔解体（§6）当前无代价贴线，上线前必须闭环
+- [ ] 副作用/疲劳机制（乱斗堂爆裂一击式代价）→ bd `tt3`；天魔解体（§6）已降 value 至 1.8 闭环，副作用机制仍留待 `tt3`
 
 ---
 
@@ -175,9 +175,9 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
 - 连击/蓄力/暴击增伤 → 通用 + 灵修（draft_kuangfeng / juxing / zhanyi / qingfeng / leizhen）
 - 反击/减伤/眩晕/逆袭 → 体修（draft_yiyahuan / zhenshan / tieshan / baxia / hunyan / jinshen）
 - 斩杀/延迟/复合大招 → 传承池，learn_coefficient 0.3–0.5 稀有（draft_zhenlong / jiujian / xiuluo / tianmo / zhonghun）
-- 大招全为伤害型（加性 value 1.5–2.1 = 当次 ×2.5–3.1），必放制不填概率，全部带解锁门槛
+- 大招全为伤害型（加性 value 1.5–2.0 = 当次 ×2.5–3.0），必放制不填概率，全部带解锁门槛
   （斩杀型 opp_hp_below / 逆袭型 self_hp_below / 延迟型 min_action_index）
-- 万剑归宗重做：3.0 → 2.0（bd `dhh` 降档）；同步时按 name 覆盖 config
+- 万剑归宗重做：3.0 → 2.0（bd `dhh` 降档）；已于 2026-08-08 同步 config（name 覆盖 + id 保留 `spirit_001`，player_skills 引用不中断）
 
 **待实现部分（needs_code，未入 CSV 或已入但需引擎扩展；归口 bd `tt3` / `dhh`）**：
 
@@ -190,9 +190,9 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
 | 真伤/破甲（混沌真伤、破防） | 想不想修真/一念逍遥 | 未入 CSV（§4.6 高境界防拖） | tt3 |
 | 免死（装死、Survival） | QPet/MB | 未入 CSV（建议大招位） | tt3 survive_lethal |
 | 反弹（大海无量 100%） | QPet | 未入 CSV | 新机制，未列入 tt3，需单独评估 |
-| 副作用/疲劳（爆裂一击 250%+疲劳） | 乱斗堂 | 天魔解体已入 CSV 但无代价 | tt3 或降 value 至 1.8 |
+| 副作用/疲劳（爆裂一击 250%+疲劳） | 乱斗堂 | 天魔解体已入 CSV 且已降 value 至 1.8（贴线缓解） | tt3 副作用机制 |
 | 多段连发（势如暴雨、真·铅球） | QPet | 用 combo 近似入池 | multi_hit 可选（tt3） |
 | 秒杀（神来一击 5–8% 降至 1 血） | QPet | 排除（§2.3）；以真龙诀斩杀替代 | 需 hp_execute 才可做 |
 
 > 跟踪：总进度 bd `hz7`；数值配平/降档 bd `dhh`；效果引擎化 bd `tt3`。
-> 入库：skills.csv → config 同步随功法池重做落地（schema-and-engine-fit.md §4，bd `dhh` 闭环后）。
+> 入库：skills.csv → config 已同步（2026-08-08 `implement-content-design`：reconcile 全量重导 20 行、`spirit_001` 万剑归宗、天魔解体 1.8；schema-and-engine-fit.md §4 已更新）。
