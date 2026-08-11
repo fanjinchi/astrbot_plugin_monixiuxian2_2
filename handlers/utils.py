@@ -74,7 +74,7 @@ def player_required(
 
     @wraps(func)
     async def wrapper(self, event: AstrMessageEvent, *args, **kwargs):
-        """Look up the player, gate busy-state commands via the whitelist, surface loan warnings, then run the handler."""
+        """Look up the player, abort on overdue-loan death, gate busy-state commands via the whitelist, run the handler, then yield any loan warning."""
         # self 是 Handler 类的实例 (e.g., PlayerHandler)
         player = await self.db.get_player_by_id(event.get_sender_id())
 

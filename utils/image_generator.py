@@ -30,6 +30,7 @@ class ImageGenerator:
             )
 
     def _get_font(self, size: int):
+        """Load the bundled font at the given size, falling back to the PIL default."""
         if not FONT_PATH.exists():
             # 尝试使用系统字体或默认
             return ImageFont.load_default()
@@ -65,6 +66,7 @@ class ImageGenerator:
             return None
 
     def _draw_info_card_sync(self, user_id: str, detail_map: dict) -> BytesIO:
+        """Render the player info card image (sync; run via asyncio.to_thread)."""
         # 画布基础尺寸
         width = 1100
         height = 2250
@@ -141,6 +143,7 @@ class ImageGenerator:
         return output
 
     def _draw_status_line(self, img, key, value, x, y, font, color):
+        """Draw one key/value status line (narrow background strip line3.png)."""
         path = IMG_PATH / "line3.png"
         text = f"{key}:{value}"
         if path.exists():
@@ -159,6 +162,7 @@ class ImageGenerator:
             d.text((x, y), text, fill=color, font=font)
 
     def _draw_wide_line(self, img, key, value, x, y, font, color):
+        """Draw one key/value line on a wide background strip (line4.png)."""
         path = IMG_PATH / "line4.png"
         text = f"{key}:{value}"
         if path.exists():
@@ -171,6 +175,7 @@ class ImageGenerator:
             d.text((x, y), text, fill=color, font=font)
 
     def _draw_section_header(self, img, text, y, font, color):
+        """Draw a section header banner (line2.png) with centered text."""
         path = IMG_PATH / "line2.png"
         if path.exists():
             line = Image.open(path).convert("RGBA").resize((900, 100))

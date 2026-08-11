@@ -64,7 +64,7 @@ flowchart TD
 | 装备 | 「装备/卸下」 | 槽位=武器+防具+主心法+功法×4（max_technique_slots）；词条：四主属性 + base_damage/weapon_coefficient_k + armor_value + route_multiplier（路线倍率，仅乘属性词条）+ trigger_skills + passive_bonus + skill_pool |
 | 商店/储物戒 | 「商店/储物戒」 | 6h 刷新、折扣 0.8~1.2、权重加权不放回；储物戒 20 格、每物品占 1 格、丹药不可入 |
 | 战斗引擎 | 「切磋/决斗/传承PK/历练/秘境/Boss」 | CombatEngine 统一结算：出手权=迅捷加权，行动上限 200；判定链=出手权→闪避→格挡→暴击→触发技→大招→伤害；伤害=floor((base_damage+伤害×K)×倍率×U(0.95,1.05))；护甲**百分比**减伤 `armor/(armor+100+10×L)`，总减伤 ≤40%；caps：闪避 0.4/格挡 0.3/暴击率 0.5/暴击倍率 1.5；战报按合并条数输出（默认 10） |
-| 技能/领悟 | 「领悟/修习」 | 挂载制（无独立技能栏）；触发技引擎契约四键 `trigger_timing/effect_type/trigger_rate/effect_value`，EFFECT_HANDLERS 注册表分发 13 种效果（damage_bonus/combo/stun/counter/damage_reduction + heal/dot/buff/debuff/pierce/unavoidable/survive/reflect/fatigue），功法武器共用；持续状态机制：同名同源刷新、异源同型叠加上限默认 3 层（config 可调）、战斗结束全清（battle-status-effects spec）；大招**必放制**（注入 rate=1.0，config 不填概率）+ 解锁门槛（min_action_index + 血量阈值）；升星 3 星封顶、×(1.1)^(星级-1) 乘法、满星补偿 50% 修为；领悟池=配套池（系数加权）+修习目标+（仅突破）通用池 5%；**装备=已领悟表（player_skills）唯一依据**，储物戒秘籍仅作领悟凭据（物品名=技能名，商店 4011/4012 可购，掉落掉具体秘籍；旧 4001-4010 已 legacy 下架） |
+| 技能/领悟 | 「领悟/修习」 | 挂载制（无独立技能栏）；触发技引擎契约四键 `trigger_timing/effect_type/trigger_rate/effect_value`，EFFECT_HANDLERS 注册表分发 14 种效果键（13 个处理函数，combo 复用 damage_bonus 处理器；damage_bonus/combo/stun/counter/damage_reduction + heal/dot/buff/debuff/pierce/unavoidable/survive/reflect/fatigue），功法武器共用；持续状态机制：同名同源刷新、异源同型叠加上限默认 3 层（config 可调）、战斗结束全清（battle-status-effects spec）；大招**必放制**（注入 rate=1.0，config 不填概率）+ 解锁门槛（min_action_index + 血量阈值）；升星 3 星封顶、×(1.1)^(星级-1) 乘法、满星补偿 50% 修为；领悟池=配套池（系数加权）+修习目标+（仅突破）通用池 5%；**装备=已领悟表（player_skills）唯一依据**，储物戒秘籍仅作领悟凭据（物品名=技能名，商店 4011/4012 可购，掉落掉具体秘籍；旧 4001-4010 已 legacy 下架） |
 | PvE 敌人 | 历练/秘境遭遇 | 过渡方案：level_data shim 合成 exp_needed 派生属性（damage≈exp//10、hp≈exp//2）× 模板系数（0.85/1.0/1.2）× 难度系数 ±10%；**待重做**：独立境界基准表（bd 9u2） |
 | 世界 Boss | 「世界Boss」 | 8 档境界 hp_mult 1.0→6.0，数值同走 level_data 派生；Boss 会心 30%；败者安慰奖=经验×总伤害/max_hp；自动刷 base_exp=全服平均×1.2 |
 | 宗门 | 「宗门」 | 创建 1万灵石+L3；捐献 1灵石→+1贡献+10建设度；任务 3600s；宗主死亡自动传位 |
@@ -114,8 +114,8 @@ flowchart TD
 | 2026-08-07 | design_docs 同步治理 | README 标注资料归属（本项目/外部参考/混合）；本文档建立 |
 | 2026-08-07 | specs 护甲回写 | attribute-numerics / combat-core 护甲描述由加法减伤改为百分比 `armor/(armor+K)`（bd qtk 实现回写，直接改主 spec，未走提案流程） |
 | 2026-08-08 | `equip-from-learned-skills` 落地 | 装备唯一依据改为已领悟表（player_skills），储物戒秘籍仅作领悟凭据（单向机制，不可反向装备） |
-| 2026-08-08 | v2 效果引擎化（bd tt3 关闭） | EFFECT_HANDLERS 扩至 13 种（+heal/dot/buff/debuff/pierce/unavoidable/survive/reflect/fatigue）；持续状态机制 + 大招分发；新增 `battle-status-effects` spec |
-| 2026-08-08~09 | content-design sync pipeline 落地 | CSV→config 同步实装（route_multiplier、心法路线校验）；ocr 评审后 reconcile 加固 |
+| 2026-08-08 | v2 效果引擎化（bd tt3 关闭） | EFFECT_HANDLERS 扩至 14 键（13 个处理函数，combo 复用 damage_bonus）；持续状态机制 + 大招分发；新增 `battle-status-effects` spec |
+| 2026-08-08 | content-design sync pipeline 落地 | CSV→config 同步实装（route_multiplier、心法路线校验）；ocr 评审后 reconcile 加固 |
 | 2026-08-09 | 技能池 v2 扩展 | 12 个新效果族技能入库（content-design → config） |
 | 2026-08-11 | `novel-reading-extraction` 归档 | 小说内容提取资料库建立 + spec 归档 |
 

@@ -1273,7 +1273,7 @@ class XiuXianPlugin(Star):
     @filter.command(CMD_RIFT_COMPLETE, "完成秘境探索")
     @require_whitelist
     async def handle_rift_complete(self, event: AstrMessageEvent):
-        """Command 「完成探索」- 完成秘境探索."""
+        """Command 「完成探索」- 完成秘境探索; routes to rift_mgr.finish_exploration (with bounty progress updates)."""
         user_id = event.get_sender_id()
         success, msg, reward_data = await self.rift_mgr.finish_exploration(user_id)
 
@@ -1307,7 +1307,7 @@ class XiuXianPlugin(Star):
     @filter.command(CMD_ADVENTURE_COMPLETE, "完成历练")
     @require_whitelist
     async def handle_adventure_complete(self, event: AstrMessageEvent):
-        """Command 「完成历练」- 完成历练."""
+        """Command 「完成历练」- 完成历练; routes to adventure_mgr.finish_adventure (with bounty progress updates)."""
         user_id = event.get_sender_id()
         success, msg, reward_data = await self.adventure_mgr.finish_adventure(user_id)
 

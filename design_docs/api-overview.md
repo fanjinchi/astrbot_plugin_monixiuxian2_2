@@ -28,7 +28,7 @@
 | `require_whitelist(func)` | 群聊白名单装饰器，非白名单群直接拒绝 |
 | `XiuXianPlugin.initialize()` | 启动钩子：连库 → `MigrationManager.migrate()` → 启动 4 个定时任务（Boss 生成/贷款逾期/灵眼生成/悬赏过期，Boss 可配置关闭） |
 | `XiuXianPlugin.terminate()` | 关闭钩子：取消全部后台任务 |
-| `handle_xxx(self, event, ...)` ×103 | 纯路由壳：docstring 标注指令名与下游 handler，无业务逻辑 |
+| `handle_xxx(self, event, ...)` ×103 | 绝大多数为纯路由壳：docstring 标注指令名与下游 handler。例外（含少量逻辑）：`handle_boss_fight`/`handle_spawn_boss`（开关+权限检查、悬赏联动）、`handle_rift_complete`/`handle_adventure_complete`（悬赏进度联动）、`handle_gm`（管理员门槛） |
 
 ## 2. 横切工具（handlers/utils.py）
 
@@ -74,7 +74,7 @@
 
 | Manager | 关键公开方法 | 作用 |
 |---|---|---|
-| `CombatEngine`（combat_manager.py） | `resolve_combat(attacker, defender, config)` / `build_fighter_from_player(player, ...)` | **统一战斗引擎**：回合制 PvP/PvE 共用；触发技 `EFFECT_HANDLERS` 注册表分发 13 种效果、持续状态（dot/buff/debuff/fatigue）生命周期、大招必放。配 `FighterState/StatusEffect/CombatResult` |
+| `CombatEngine`（combat_manager.py） | `resolve_combat(fighter1, fighter2, combat_type="spar", merge_count=None)` / `build_fighter_from_player(player, ...)` | **统一战斗引擎**：回合制 PvP/PvE 共用；触发技 `EFFECT_HANDLERS` 注册表分发 14 种效果键（13 个处理函数，combo 复用 damage_bonus）、持续状态（dot/buff/debuff/fatigue）生命周期、大招必放。配 `FighterState/StatusEffect/CombatResult` |
 | `CombatManager`（同文件） | `player_vs_player` / `player_vs_boss` | 旧接口适配器，全部委托 `CombatEngine`；`calculate_*` 系列为 deprecated 兼容保留 |
 | `BossManager` | `spawn_boss` / `challenge_boss` / `get_boss_info` / `auto_spawn_boss` | 世界 Boss 生成（`auto_spawn_boss` 供定时任务）、挑战、奖励 |
 | `BountyManager` | `get_bounty_list` / `accept_bounty` / `complete_bounty` / `abandon_bounty` / `add_bounty_progress` / `check_and_expire_bounties` | 悬赏列表按境界分难度、10 分钟缓存；接取/结算均 `BEGIN IMMEDIATE` 事务；`add_bounty_progress` 由历练/秘境回调推进进度 |
@@ -111,7 +111,7 @@
 | 位置 | 关键方法 | 作用 |
 |---|---|---|
 | `DataBase`（data_manager.py） | `connect/ensure_connection/reconnect` / `create_player` / `get_player_by_id` / `update_player` / `delete_player_cascade` / `get_shop_data` / `decrement_shop_item_stock` | 连接管理（定时任务前先 `ensure_connection`）；玩家 CRUD 字段从 `Player` dataclass 动态生成；商店库存**原子扣减/回滚** |
-| `DatabaseExtended`（database_extended.py，`db.ext`） | 按域分组：宗门 `*_sect*`、Boss `*_boss`、秘境 `*_rift`、状态 `get/set_user_cd`+`set_user_busy/free`、技能 `learn_or_star_up`/`get_learned_skills`/`is_skill_learned`、悬赏 `*_bounty`、银行/贷款 `*_loan*`/`add_bank_transaction`、赠予 `*_pending_gift*`、系统配置 `get/set_system_config`（KV 表，悬赏放弃冷却等都用它） | 全部扩展表 SQL |
+| `DatabaseExtended`（database_extended.py，`db.ext`） | 按域分组：宗门 `*_sect*`、Boss `*_boss`、秘境 `*_rift`、状态 `create/get/update_user_cd`+`set_user_busy/free`、技能 `learn_or_star_up`/`get_learned_skills`/`is_skill_learned`、悬赏 `*_bounty`、银行/贷款 `*_loan*`/`add_bank_transaction`、赠予 `*_pending_gift*`、系统配置 `get/set_system_config`（KV 表，悬赏放弃冷却等都用它） | 全部扩展表 SQL |
 | `MigrationManager`（migration.py） | `migrate()` | 版本化迁移：新装直接建最新 schema（v27），旧库按版本升序逐个事务执行 `@migration(version)` 注册的任务 |
 
 并发敏感操作惯例：`await db.conn.execute("BEGIN IMMEDIATE")` + try/commit/rollback（参照 `BountyManager.accept_bounty`）。
@@ -120,8 +120,8 @@
 
 | 文件 | 作用 |
 |---|---|
-| `models.py` | `Player` dataclass（四主属性框架；废弃字段 atk/mental_power/mp 仅兼容保留）、`Item`/`StorageRing` |
-| `models_extended.py` | `UserStatus` 枚举（IDLE/CULTIVATING/ADVENTURING/RIFT_EXPLORING…忙碌状态真源之一）、`Sect/Boss/Rift` 等扩展模型 |
+| `models.py` | `Player` dataclass（四主属性：damage/agility/speed/hp + armor_value）、`Item`/`StorageRing`（`atk` 等旧字段仅存于 `Boss` 模型） |
+| `models_extended.py` | `UserStatus` 枚举（IDLE/CULTIVATING/ADVENTURING/EXPLORING/SECT_TASK，忙碌状态真源之一）、`Sect/Boss/Rift` 等扩展模型 |
 | `config_manager.py` | 加载 `config/*.json`（缺失时从 `data/default_configs.py` 建默认）；静态配置改后需重启 |
 | `data/default_configs.py` | 全部 JSON 配置的默认值（平衡数值真源之一） |
 

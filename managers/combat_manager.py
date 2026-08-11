@@ -657,6 +657,9 @@ class CombatEngine:
         return 0.0
 
     EFFECT_HANDLERS: dict[str, Callable] = {
+        # Effect-type dispatch table for trigger skills: 14 effect keys map to
+        # 13 handler functions — "combo" reuses _handler_damage_bonus
+        # (multi-hit variants stay coefficient-driven).
         "damage_bonus": _handler_damage_bonus,
         "combo": _handler_damage_bonus,
         "stun": _handler_stun,
