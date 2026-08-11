@@ -351,6 +351,7 @@ class CombatEngine:
             item_type = "technique"
 
         def _json_str(value) -> str:
+            """Serialize a value to a JSON string (passes strings through; falls back to an empty dict/array literal)."""
             if isinstance(value, str):
                 return value
             try:

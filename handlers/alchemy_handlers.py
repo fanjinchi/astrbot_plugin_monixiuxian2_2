@@ -7,6 +7,8 @@ from ..models_extended import UserStatus
 
 
 class AlchemyHandlers:
+    """Handlers for alchemy (炼丹) commands: recipe list and pill crafting."""
+
     def __init__(self, db: DataBase, alchemy_mgr: AlchemyManager):
         self.db = db
         self.alchemy_mgr = alchemy_mgr

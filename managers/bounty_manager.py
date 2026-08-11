@@ -77,6 +77,7 @@ class BountyManager:
     # -------- 配置 --------
 
     def reload_config(self):
+        """Reload bounty templates, difficulty scaling, and item tables from config/bounty_templates.json."""
         config = self._load_config_file()
         self.difficulties = config.get(
             "difficulties", self.DEFAULT_CONFIG["difficulties"]
@@ -97,6 +98,7 @@ class BountyManager:
         self._load_adventure_meta()
 
     def _load_config_file(self) -> dict:
+        """Read the bounty config JSON, falling back to DEFAULT_CONFIG when missing or invalid."""
         if self.CONFIG_FILE.exists():
             try:
                 with open(self.CONFIG_FILE, encoding="utf-8") as f:
@@ -106,6 +108,7 @@ class BountyManager:
         return self.DEFAULT_CONFIG
 
     def _load_adventure_meta(self):
+        """Load adventure route durations/fatigue used to calibrate bounty time limits."""
         self.adventure_tag_meta = {}
         if not self.ADVENTURE_CONFIG_FILE.exists():
             return
@@ -127,12 +130,14 @@ class BountyManager:
     # -------- 列表 & 缓存 --------
 
     def _get_cached_bounties(self, user_id: str) -> list[dict] | None:
+        """Return the user's cached bounty list while still within BOUNTY_CACHE_DURATION."""
         cache = self._bounty_cache.get(user_id)
         if cache and cache["expire_time"] > int(time.time()):
             return cache["bounties"]
         return None
 
     def _set_cached_bounties(self, user_id: str, bounties: list[dict]):
+        """Cache a user's generated bounty list with an expiry timestamp."""
         self._bounty_cache[user_id] = {
             "bounties": bounties,
             "expire_time": int(time.time()) + self.BOUNTY_CACHE_DURATION,
@@ -155,6 +160,7 @@ class BountyManager:
         return bounties
 
     def _get_difficulty_plan(self, level_index: int) -> list[str]:
+        """Pick available difficulty tiers for the player level (easy+normal; +hard at >=7; +elite at >=12)."""
         plan = ["easy", "normal"]
         if level_index >= 7:
             plan.append("hard")
@@ -163,6 +169,7 @@ class BountyManager:
         return [diff for diff in plan if diff in self.difficulties]
 
     def _pick_template(self, difficulty: str) -> dict | None:
+        """Weighted-random pick of a bounty template within a difficulty tier."""
         templates = self.templates_by_diff.get(difficulty)
         if not templates:
             return None
@@ -176,6 +183,7 @@ class BountyManager:
         return templates[0]
 
     def _build_bounty_entry(self, difficulty: str, player: Player) -> dict | None:
+        """Build one bounty list entry: rolled target count, scaled reward, calibrated time limit, progress tags."""
         template = self._pick_template(difficulty)
         if not template:
             return None
@@ -203,6 +211,7 @@ class BountyManager:
     def _calculate_reward(
         self, template: dict, diff_cfg: dict, player: Player, target: int
     ) -> dict[str, int]:
+        """Scale template stone/exp rewards by difficulty scale, rolled-progress factor, and level bonus."""
         base_reward = template.get("reward", {"stone": 200, "exp": 2000})
         stone = base_reward.get("stone", 0)
         exp = base_reward.get("exp", 0)
@@ -215,6 +224,7 @@ class BountyManager:
         return {"stone": final_stone, "exp": final_exp}
 
     def _calculate_time_limit(self, template: dict, target: int) -> int:
+        """Derive the time limit from adventure route unit time x target plus a fatigue/queue buffer."""
         base_limit = template.get("time_limit", 3600)
         unit = self._get_adventure_unit_time(template)
         if not unit:
@@ -226,6 +236,7 @@ class BountyManager:
         return max(base_limit, expected + buffer)
 
     def _get_adventure_unit_time(self, template: dict) -> int | None:
+        """Estimate per-progress duration from adventure route metadata (duration + fatigue); None if unknown."""
         durations = []
         for tag in template.get("progress_tags", []):
             meta = self.adventure_tag_meta.get(tag.lower())
@@ -239,6 +250,7 @@ class BountyManager:
     # -------- 接取与状态 --------
 
     async def accept_bounty(self, player: Player, bounty_id: int) -> tuple[bool, str]:
+        """Accept a bounty from the player's cached list (transactional; one active bounty at a time, enforces the post-abandon cooldown)."""
         if bounty_id <= 0:
             return False, "无效的悬赏编号。"
 
@@ -327,6 +339,7 @@ class BountyManager:
         )
 
     async def check_bounty_status(self, player: Player) -> tuple[bool, str]:
+        """Format the player's active bounty progress and remaining time for display."""
         active = await self.db.ext.get_active_bounty(player.user_id)
         if not active:
             return (
@@ -355,6 +368,7 @@ class BountyManager:
         )
 
     async def complete_bounty(self, player: Player) -> tuple[bool, str]:
+        """Settle a finished bounty transactionally (stone/exp into players, status -> done), then roll item drops into the storage ring (best-effort)."""
         await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
             active = await self.db.ext.get_active_bounty(player.user_id)
@@ -439,6 +453,7 @@ class BountyManager:
         )
 
     async def abandon_bounty(self, player: Player) -> tuple[bool, str]:
+        """Cancel the active bounty and set a 30-minute re-accept cooldown in system_config."""
         active = await self.db.ext.get_active_bounty(player.user_id)
         if not active:
             return False, "你当前没有进行中的悬赏任务。"
@@ -455,6 +470,7 @@ class BountyManager:
     async def _roll_bounty_items(
         self, player: Player, table_name: str
     ) -> list[tuple[str, int]]:
+        """70% chance weighted roll of one item stack from the bounty's item table."""
         dropped_items: list[tuple[str, int]] = []
         drop_table = self.item_tables.get(
             table_name, self.item_tables.get("gather", [])
@@ -540,6 +556,7 @@ class BountyManager:
             raise
 
     async def check_and_expire_bounties(self) -> int:
+        """Mark overdue active bounties as expired (status 3). Entry point of the scheduled expiry task."""
         now = int(time.time())
         cursor = await self.db.conn.execute(
             "UPDATE bounty_tasks SET status = 3 WHERE status = 1 AND expire_time < ?",

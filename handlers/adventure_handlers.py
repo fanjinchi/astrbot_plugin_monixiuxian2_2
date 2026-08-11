@@ -6,6 +6,8 @@ from ..managers.adventure_manager import AdventureManager
 
 
 class AdventureHandlers:
+    """Handlers for adventure (历练) commands: route overview, start, finish, and settle."""
+
     def __init__(self, db: DataBase, adv_mgr: AdventureManager):
         self.db = db
         self.adv_mgr = adv_mgr

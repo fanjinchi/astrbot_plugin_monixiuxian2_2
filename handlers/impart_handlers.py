@@ -6,6 +6,8 @@ from ..managers.impart_manager import ImpartManager
 
 
 class ImpartHandlers:
+    """Handlers for the impart (传承) system commands: legacy info and inheritance actions."""
+
     def __init__(self, db: DataBase, impart_mgr: ImpartManager):
         self.db = db
         self.impart_mgr = impart_mgr

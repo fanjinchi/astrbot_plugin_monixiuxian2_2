@@ -139,6 +139,7 @@ class DataBase:
         """级联删除玩家及所有关联数据"""
 
         async def safe_execute(sql: str, params: tuple):
+            """Run one cascade statement, logging and swallowing errors so a missing table does not abort the rest."""
             try:
                 await self.conn.execute(sql, params)
             except Exception as e:

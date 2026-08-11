@@ -6,6 +6,8 @@ from ..managers.ranking_manager import RankingManager
 
 
 class RankingHandlers:
+    """Handlers for leaderboard commands: level, power, and wealth rankings."""
+
     def __init__(self, db: DataBase, rank_mgr: RankingManager):
         self.db = db
         self.rank_mgr = rank_mgr

@@ -22,6 +22,7 @@ try:
 except ImportError:
     # 独立运行（测试）时降级加载依赖
     def _load_module(name, rel_path):
+        """Import a plugin module by file path so this file can run standalone under tests."""
         plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         path = os.path.join(plugin_root, rel_path)
         spec = importlib.util.spec_from_file_location(name, path)

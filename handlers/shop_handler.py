@@ -142,6 +142,7 @@ class ShopHandler:
         item_part = normalized
 
         def parse_qty(text: str):
+            """Split a trailing quantity from the item text ('物品 x5' or '物品 5'); defaults to 1."""
             text = re.sub(r"\s+", " ", text)
             m = re.match(r"^(.*?)(?:\s+(\d+)|[xX＊*]\s*(\d+))$", text)
             if m:

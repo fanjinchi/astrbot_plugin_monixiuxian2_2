@@ -8,6 +8,8 @@ from ..models_extended import UserStatus
 
 
 class SectHandlers:
+    """Handlers for sect (宗门) commands: create, join, leave, donate, and sect info."""
+
     def __init__(self, db: DataBase, sect_mgr: SectManager):
         self.db = db
         self.sect_mgr = sect_mgr

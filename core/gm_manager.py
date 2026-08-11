@@ -20,6 +20,7 @@ except ImportError:
     import importlib.util
 
     def _load_module(name, rel_path):
+        """Import a plugin module by file path so this file can run standalone under tests."""
         plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         path = os.path.join(plugin_root, rel_path)
         spec = importlib.util.spec_from_file_location(name, path)
@@ -144,6 +145,7 @@ class GMManager:
         return sender_id, args
 
     async def _get_player(self, user_id: str) -> Player | None:
+        """Fetch a Player by id, returning None for empty or unknown ids."""
         if not user_id:
             return None
         return await self.db.get_player_by_id(user_id)
@@ -207,6 +209,7 @@ class GMManager:
         return False, args
 
     def _parse_int(self, value: str) -> int | None:
+        """Parse an int from raw user input; return None when invalid."""
         try:
             return int(value)
         except (ValueError, TypeError):
@@ -353,44 +356,52 @@ class GMManager:
     async def cmd_set_experience(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
+        """GM command: set the target player's experience."""
         return await self._set_numeric_attr(event, args, "修为", "experience", "修为")
 
     async def cmd_set_gold(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
+        """GM command: set the target player's gold (spirit stones)."""
         return await self._set_numeric_attr(event, args, "灵石", "gold", "灵石")
 
     async def cmd_set_hp(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
+        """GM command: set the target player's hp."""
         return await self._set_numeric_attr(event, args, "气血", "hp", "气血")
 
     async def cmd_set_mp(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
+        """GM command: legacy 真元 alias, mapped to speed after the attribute rework."""
         # 真元字段已废弃，映射到迅捷以保持 GM 工具可用。
         return await self._set_numeric_attr(event, args, "真元", "speed", "真元")
 
     async def cmd_set_atk(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
+        """GM command: legacy 攻击 alias, mapped to damage after the attribute rework."""
         # 攻击字段已废弃，映射到伤害。
         return await self._set_numeric_attr(event, args, "攻击", "damage", "攻击")
 
     async def cmd_set_mental_power(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
+        """GM command: legacy 精神力 alias, mapped to agility after the attribute rework."""
         # 精神力字段已废弃，映射到身法。
         return await self._set_numeric_attr(event, args, "精神力", "agility", "精神力")
 
     async def cmd_give_equipment(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
+        """GM command: give an equipment item into the target player's storage ring."""
         return await self._give_item(event, args, "装备")
 
     async def cmd_give_item(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
+        """GM command: give a consumable item into the target player's storage ring."""
         return await self._give_item(event, args, "物品")
 
     async def _give_item(

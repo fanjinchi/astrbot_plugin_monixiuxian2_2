@@ -25,6 +25,7 @@ def migration(version: int):
     def decorator(
         func: Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]],
     ):
+        """Register func as the migration task for the given schema version."""
         MIGRATION_TASKS[version] = func
         return func
 
@@ -39,6 +40,12 @@ class MigrationManager:
         self.config_manager = config_manager
 
     async def migrate(self):
+        """Bring the database up to LATEST_DB_VERSION.
+
+        Fresh installs create all tables at the latest schema directly; existing
+        databases apply each pending migration in ascending version order, one
+        transaction per version, updating db_info after every successful step.
+        """
         await self.conn.execute("PRAGMA foreign_keys = ON")
         async with self.conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='db_info'"

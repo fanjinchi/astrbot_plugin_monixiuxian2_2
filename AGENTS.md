@@ -187,6 +187,24 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 - 运行测试：在插件目录执行 `uv run python -m pytest tests/ -v`
 - 注意：插件没有独立的 Python 解释器，`python` 命令可能不存在，请始终使用 `uv run python` 调用 AstrBot 的虚拟环境
 
+## 文档地图（必读与维护）
+
+开始任何任务前，先按下表选读对应文档快速定位；完成任务后，按“维护责任”同步文档：
+
+| 文档 | 内容 | 何时读 | 维护责任（何时必须更新） |
+|---|---|---|---|
+| `design_docs/api-overview.md` | 关键 API 速查：指令→main.py 路由→handlers→managers→core→data 全链路索引与检索路径 | 定位代码、理解调用链 | 新增/重命名公开方法、新增子系统 |
+| `design_docs/project-architecture.md` | 架构与系统功能设计总览（分层架构+mermaid 图、20 子系统设计表、openspec 契约、里程碑时间线、bd 对照） | 新增/修改功能、理解系统边界 | 新增子系统、架构变更、openspec spec 增删、里程碑节点 |
+| `design_docs/current-design-report.md` | 数值/机制设计活基线（含 `file:line` 引用） | 改数值、改战斗/技能/成长 | 任何影响玩法的修改（同 §关键开发规范-14） |
+| `design_docs/README.md` | design_docs 全部资料清单与类型标注 | 找专题资料（成长/曲线/内容设计/竞品） | 新增 design_docs 资料时登记 |
+| `openspec/specs/` | 行为契约（8 篇，What/Why 与 Accept 公式） | 改技能/战斗/装备/数值前 | 走 OpenSpec 提案流程（见 §关键开发规范-14） |
+
+**注释约定**：
+
+- 全项目非 dunder 函数/类均有 docstring；**新代码一律用英文 Google 风格 docstring**（存量中文 docstring 保留，不强制改写），用户可见输出仍为中文。
+- main.py 的 103 个路由方法 docstring 遵循固定格式：`"""Command 「指令名」; routes to xxx_handler.handle_yyy."""`——新指令照此格式写，它是 AI 定位的第一跳。
+- 修改函数行为时同步更新其 docstring；docstring 与实现不一致视为 bug。
+
 ## Issue Tracking with bd (beads)
 
 **IMPORTANT**: This project uses **bd (beads)** for ALL issue tracking. Do NOT use markdown TODOs.

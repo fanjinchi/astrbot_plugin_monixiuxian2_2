@@ -22,6 +22,7 @@ try:
 except ImportError:
     # 独立运行（测试）时降级加载依赖
     def _load_module(name, rel_path):
+        """Import a plugin module by file path so this file can run standalone under tests."""
         plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         path = os.path.join(plugin_root, rel_path)
         spec = importlib.util.spec_from_file_location(name, path)
@@ -395,12 +396,14 @@ class AdventureManager:
     # -------- 内部工具 --------
 
     def _resolve_route(self, token: str) -> str:
+        """Map a user token (route key, name, or alias) to a route key, falling back to the default route."""
         if not token:
             return self.default_route_key
         normalized = token.strip().lower()
         return self.route_alias_index.get(normalized, self.default_route_key)
 
     def _trigger_route_event(self, route: dict) -> dict:
+        """Weighted-random pick an event group for the route, then uniformly pick one event from it."""
         weights = route.get("event_weights", {})
         if not weights:
             group_key = "standard"
@@ -425,6 +428,7 @@ class AdventureManager:
     def _calculate_rewards(
         self, player: Player, route: dict, duration: int, event: dict
     ) -> dict[str, int]:
+        """Compute exp/gold from route per-minute rates, level bonus, completion bonus, and the event multiplier."""
         duration_minutes = max(1, duration // 60)
         base_exp = duration_minutes * route.get("base_exp_per_min", 40)
         base_gold = duration_minutes * route.get("base_gold_per_min", 10)
@@ -443,6 +447,7 @@ class AdventureManager:
     async def _handle_drops(
         self, player: Player, route: dict, event: dict
     ) -> tuple[list[tuple[str, int]], str]:
+        """Roll an item drop (event item_chance) from the tier drop table and store it in the storage ring."""
         dropped_items: list[tuple[str, int]] = []
         if not self.storage_ring_manager:
             return dropped_items, ""

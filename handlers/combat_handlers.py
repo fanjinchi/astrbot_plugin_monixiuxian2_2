@@ -16,6 +16,8 @@ SPAR_COOLDOWN = 60  # 切磋冷却1分钟
 
 
 class CombatHandlers:
+    """Handlers for PvP commands: spar (切磋) and duel (决斗) with per-user cooldowns."""
+
     def __init__(self, db: DataBase, combat_mgr: CombatManager, config_manager=None):
         self.db = db
         self.combat_mgr = combat_mgr
@@ -66,6 +68,7 @@ class CombatHandlers:
             logger.warning(f"更新战斗冷却失败: {e}")
 
     async def _get_target_id(self, event: AstrMessageEvent, arg: str) -> str:
+        """Resolve a target user id from an @-mention component, a numeric argument, or the raw message text."""
         message_chain = []
         if hasattr(event, "message_obj") and event.message_obj:
             message_chain = getattr(event.message_obj, "message", []) or []

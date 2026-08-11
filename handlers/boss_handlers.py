@@ -8,6 +8,8 @@ from ..managers.boss_manager import BossManager
 
 
 class BossHandlers:
+    """Handlers for world Boss commands: Boss info query and challenge entry."""
+
     def __init__(self, db: DataBase, boss_mgr: BossManager):
         self.db = db
         self.boss_mgr = boss_mgr

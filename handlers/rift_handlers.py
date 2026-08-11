@@ -6,6 +6,8 @@ from ..managers.rift_manager import RiftManager
 
 
 class RiftHandlers:
+    """Handlers for secret realm (秘境) commands: list, explore, and settle."""
+
     def __init__(self, db: DataBase, rift_mgr: RiftManager):
         self.db = db
         self.rift_mgr = rift_mgr
