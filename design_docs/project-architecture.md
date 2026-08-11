@@ -1,6 +1,7 @@
 # 项目架构与系统功能设计总览
 
-> 生成：2026-08-07。本文是**本项目（AstrBot 修仙插件）**的架构与功能设计总览，
+> 生成：2026-08-07；复核更新：2026-08-11（效果引擎 v2、新增 2 篇 spec、时间线与 bd 清单回写）。
+> 本文是**本项目（AstrBot 修仙插件）**的架构与功能设计总览，
 > 供开发者与 AI 助手在修改/新增功能时快速定位系统、理解设计意图、保持设计文档同步。
 > 详细数值以 `current-design-report.md` 为准，行为契约以 `openspec/specs/` 为准。
 
@@ -28,6 +29,20 @@
   → models.py / models_extended.py（Player、UserStatus、Sect、Boss、Rift…）
 ```
 
+```mermaid
+flowchart TD
+    U["群聊用户指令（中文，如 闭关/突破/切磋）"] --> M["main.py · XiuXianPlugin（Star 子类）<br/>103 个 @filter.command · @require_whitelist"]
+    M --> H["handlers/ 指令处理层（26 文件）<br/>utils.py @player_required 双层状态检查 + 忙碌白名单"]
+    H --> MG["managers/ 业务逻辑层（17 管理器）<br/>战斗 · 宗门 · Boss · 银行 · 悬赏 · 秘境 · 历练 · 双修 · 传承 · 炼丹 · 灵田/灵眼/洞天"]
+    MG --> C["core/ 通用系统层（9 模块）<br/>修炼 · 突破 · 丹药 · 装备 · 商店 · 储物戒 · 技能 · GM"]
+    C --> D["data/ 数据层<br/>data_manager · database_extended · migration（v27）· default_configs"]
+    D --> DB[("SQLite xiuxian_data_lite.db<br/>AstrBot data/plugin_data/ 下")]
+    CFG["config/*.json ×20<br/>config_manager.py（缺失自动建默认）"] -.-> C
+    MD["models.py / models_extended.py<br/>Player · UserStatus · Sect · Boss · Rift"] -.-> MG
+    T["定时任务 initialize()（指数退避重试）<br/>Boss 生成 · 贷款逾期 · 灵眼生成 · 悬赏过期"] -.-> MG
+    SPEC["openspec/specs/ 行为契约（8 篇）<br/>design_docs/ 设计基线"] -.-> MG
+```
+
 **关键机制**（踩坑高发区）：
 
 1. **状态双层维护**：`player.state`（字符串）与 `user_cd` 表 `type` 字段（`UserStatus` 枚举）必须同步；新增"进行中"状态要同时改 `models_extended.py`、`BUSY_STATE_ALLOWED_COMMANDS`（handlers/utils.py）、写入/清除 user_cd。
@@ -49,7 +64,7 @@
 | 装备 | 「装备/卸下」 | 槽位=武器+防具+主心法+功法×4（max_technique_slots）；词条：四主属性 + base_damage/weapon_coefficient_k + armor_value + route_multiplier（路线倍率，仅乘属性词条）+ trigger_skills + passive_bonus + skill_pool |
 | 商店/储物戒 | 「商店/储物戒」 | 6h 刷新、折扣 0.8~1.2、权重加权不放回；储物戒 20 格、每物品占 1 格、丹药不可入 |
 | 战斗引擎 | 「切磋/决斗/传承PK/历练/秘境/Boss」 | CombatEngine 统一结算：出手权=迅捷加权，行动上限 200；判定链=出手权→闪避→格挡→暴击→触发技→大招→伤害；伤害=floor((base_damage+伤害×K)×倍率×U(0.95,1.05))；护甲**百分比**减伤 `armor/(armor+100+10×L)`，总减伤 ≤40%；caps：闪避 0.4/格挡 0.3/暴击率 0.5/暴击倍率 1.5；战报按合并条数输出（默认 10） |
-| 技能/领悟 | 「领悟/修习」 | 挂载制（无独立技能栏）；触发技引擎契约四键 `trigger_timing/effect_type/trigger_rate/effect_value`，EFFECT_HANDLERS 注册表分发（damage_bonus/combo/stun/counter/damage_reduction），功法武器共用；大招**必放制**（注入 rate=1.0，config 不填概率）+ 解锁门槛（min_action_index + 血量阈值）；升星 3 星封顶、×(1.1)^(星级-1) 乘法、满星补偿 50% 修为；领悟池=配套池（系数加权）+修习目标+（仅突破）通用池 5%；**装备=已领悟表（player_skills）唯一依据**，储物戒秘籍仅作领悟凭据（物品名=技能名，商店 4011/4012 可购，掉落掉具体秘籍；旧 4001-4010 已 legacy 下架） |
+| 技能/领悟 | 「领悟/修习」 | 挂载制（无独立技能栏）；触发技引擎契约四键 `trigger_timing/effect_type/trigger_rate/effect_value`，EFFECT_HANDLERS 注册表分发 13 种效果（damage_bonus/combo/stun/counter/damage_reduction + heal/dot/buff/debuff/pierce/unavoidable/survive/reflect/fatigue），功法武器共用；持续状态机制：同名同源刷新、异源同型叠加上限默认 3 层（config 可调）、战斗结束全清（battle-status-effects spec）；大招**必放制**（注入 rate=1.0，config 不填概率）+ 解锁门槛（min_action_index + 血量阈值）；升星 3 星封顶、×(1.1)^(星级-1) 乘法、满星补偿 50% 修为；领悟池=配套池（系数加权）+修习目标+（仅突破）通用池 5%；**装备=已领悟表（player_skills）唯一依据**，储物戒秘籍仅作领悟凭据（物品名=技能名，商店 4011/4012 可购，掉落掉具体秘籍；旧 4001-4010 已 legacy 下架） |
 | PvE 敌人 | 历练/秘境遭遇 | 过渡方案：level_data shim 合成 exp_needed 派生属性（damage≈exp//10、hp≈exp//2）× 模板系数（0.85/1.0/1.2）× 难度系数 ±10%；**待重做**：独立境界基准表（bd 9u2） |
 | 世界 Boss | 「世界Boss」 | 8 档境界 hp_mult 1.0→6.0，数值同走 level_data 派生；Boss 会心 30%；败者安慰奖=经验×总伤害/max_hp；自动刷 base_exp=全服平均×1.2 |
 | 宗门 | 「宗门」 | 创建 1万灵石+L3；捐献 1灵石→+1贡献+10建设度；任务 3600s；宗主死亡自动传位 |
@@ -78,6 +93,8 @@
 | `level-progression` | 境界配置结构（realms+公式参数，无逐級字段）；get_level_name 统一入口；分段幂律曲线；成功率按大境界+连败保底+level_up_rate；失败惩罚 E(L)×25%；死亡率 [0.005,0.03]；双修定额；level_index 1-based |
 | `content-sync-pipeline` | CSV→config 同步：name 键控合并、status 过滤、键名映射、引擎契约校验（大招禁 trigger_rate）、预算验算闸门 |
 | `gm-commands` | 修仙GM 统一入口；GM_ADMINS 权限；目标解析优先级（@提及→数字 id→发送者）；属性修改/物品发放/强制结算/清除CD（需确认）/审计日志 500MB 滚动 |
+| `battle-status-effects` | 战斗持续状态（dot/buff/debuff/fatigue）回合级生命周期：回合开始计数衰减、到期移除、战斗结束全清不跨场；同名同源刷新（数值取新）、异源同型叠加上限默认 3 层（config 可调） |
+| `novel-reading-extraction` | 从修仙小说原文提取内容素材（宗门剧情/法宝/功法/突破事件）的工作流契约：免费可获取全文、来源失效可替换、按玩法维度组织、产出可直接喂给内容设定与文案 |
 
 > ✅ **spec 滞后已回写（2026-08-07）**：attribute-numerics / combat-core 的护甲描述已改为
 > 百分比减伤 `armor/(armor+K)`（与代码一致，bd `qtk` 的实现），含伤害下限场景修正。
@@ -96,6 +113,11 @@
 | 2026-08-07 | `add-gm-commands` 归档 | GM 命令系统落地补归档；delta specs 全部同步至主 specs |
 | 2026-08-07 | design_docs 同步治理 | README 标注资料归属（本项目/外部参考/混合）；本文档建立 |
 | 2026-08-07 | specs 护甲回写 | attribute-numerics / combat-core 护甲描述由加法减伤改为百分比 `armor/(armor+K)`（bd qtk 实现回写，直接改主 spec，未走提案流程） |
+| 2026-08-08 | `equip-from-learned-skills` 落地 | 装备唯一依据改为已领悟表（player_skills），储物戒秘籍仅作领悟凭据（单向机制，不可反向装备） |
+| 2026-08-08 | v2 效果引擎化（bd tt3 关闭） | EFFECT_HANDLERS 扩至 13 种（+heal/dot/buff/debuff/pierce/unavoidable/survive/reflect/fatigue）；持续状态机制 + 大招分发；新增 `battle-status-effects` spec |
+| 2026-08-08~09 | content-design sync pipeline 落地 | CSV→config 同步实装（route_multiplier、心法路线校验）；ocr 评审后 reconcile 加固 |
+| 2026-08-09 | 技能池 v2 扩展 | 12 个新效果族技能入库（content-design → config） |
+| 2026-08-11 | `novel-reading-extraction` 归档 | 小说内容提取资料库建立 + spec 归档 |
 
 **数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底（当前最新）。
 
@@ -106,10 +128,10 @@
 | `hz7` | 武器/功法/心法内容设计（照搬 MB/QPet 适配） | 主战场：`content-design/` 工作区 |
 | `dhh` | 功法修复后数值配平（触发技/大招拉到 G2 预算；大招 3.0/3.5 降档 2.0） | 依据 `content-design/skills-ultimates.md` §6 折算公式 |
 | `9u2` | Boss/PvE 模块重做（独立境界基准表落地 attribute-numerics PvE 需求） | 待玩家侧定稿后锚定 |
-| `tt3` | v2 效果引擎化（heal/必中/真伤/DOT/免死走大招） | 需扩展 EFFECT_HANDLERS + ultimate 分支 |
 | `f4t` | 心法 route_mult 机制（被动按路线乘算） | 涉及 passive_bonus 消费点 |
 | `56y` | 固定收益类修为来源平衡（修为丹/商店/灵眼/福地/灵田/悬赏/秘境） | 依据 `level-exp-curve/balance-recommendations.md` |
 | `cqt` | 突破保命道具设计（占位） | — |
+| `cti` / `ehd` | 冻结平衡配置到 default_configs.py（两条同名，疑似重复建单，待去重） | 涉及 config 与 default_configs 的一致性 |
 
 ## 7. 设计资料导航与维护约定
 
