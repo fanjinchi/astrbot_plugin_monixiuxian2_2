@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>修仙插件 · 网页测试平台</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header id="topbar">
+    <h1>修仙插件 · 网页测试平台</h1>
+    <nav id="tabs">
+      <button class="tab active" data-tab="chat">会话</button>
+      <button class="tab" data-tab="cases">测试用例</button>
+    </nav>
+    <div id="conn-status" class="off">未连接</div>
+  </header>
+
+  <main>
+    <!-- 会话面板 -->
+    <section id="chat-panel" class="panel active">
+      <aside id="conv-list">
+        <div id="conv-list-head">
+          <span>会话</span>
+          <button id="new-conv" title="新建私聊会话">＋</button>
+        </div>
+        <ul id="conversations"></ul>
+      </aside>
+      <div id="chat-main">
+        <div id="chat-header"></div>
+        <div id="messages"></div>
+        <form id="send-form">
+          <select id="sender-select" title="发送者"></select>
+          <input id="text-input" type="text" placeholder="输入玩家消息…" autocomplete="off">
+          <button type="submit">发送</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 用例面板 -->
+    <section id="cases-panel" class="panel">
+      <aside id="case-list">
+        <div id="case-list-head">
+          <span>用例</span>
+          <input id="case-filter" type="text" placeholder="按标签筛选…">
+          <button id="new-case">＋</button>
+        </div>
+        <ul id="cases"></ul>
+      </aside>
+      <div id="case-main">
+        <div id="case-detail-empty">选择或新建一个测试用例</div>
+        <div id="case-detail" hidden>
+          <h2 id="case-name"></h2>
+          <p id="case-desc"></p>
+          <div id="case-meta"></div>
+          <div class="btn-row">
+            <button id="case-run-btn">运行</button>
+            <button id="case-edit-btn">编辑 JSON</button>
+            <button id="case-delete-btn" class="danger">删除</button>
+          </div>
+          <h3>运行记录</h3>
+          <ul id="runs-list"></ul>
+          <div id="run-detail"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 批注弹层 -->
+  <div id="annotation-modal" class="modal" hidden>
+    <div class="modal-box">
+      <h3>批注消息</h3>
+      <p id="annotation-msg-ref" class="muted"></p>
+      <textarea id="annotation-input" rows="4" placeholder="写下批注，供 AI 按反馈修改…"></textarea>
+      <div class="btn-row">
+        <button id="annotation-save">保存</button>
+        <button id="annotation-cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 用例 JSON 编辑器 -->
+  <div id="case-editor-modal" class="modal" hidden>
+    <div class="modal-box wide">
+      <h3 id="case-editor-title">用例 JSON</h3>
+      <textarea id="case-editor-input" rows="18" spellcheck="false"></textarea>
+      <div class="btn-row">
+        <button id="case-editor-save">保存</button>
+        <button id="case-editor-cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

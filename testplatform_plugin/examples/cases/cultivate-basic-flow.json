@@ -1,0 +1,17 @@
+{
+  "name": "cultivate-basic-flow",
+  "description": "验证新玩家修仙开局与闭关状态机：创建角色→闭关→重复闭关被拒→出关（不足1分钟）",
+  "scenario": "新玩家（唯一身份，从零状态）在私聊中依次发送 我要修仙/闭关/闭关/出关，验证：角色创建成功、进入修炼中状态、忙碌状态防重复进入、不足1分钟出关不结算修为",
+  "tags": ["cultivation", "player"],
+  "conversation": { "kind": "private", "pin_players": {} },
+  "steps": [
+    { "type": "send", "player": "player1", "text": "我要修仙", "note": "创建角色，应返回欢迎语与灵根" },
+    { "type": "expect", "match": "欢迎踏入修仙之路", "timeout": 30, "note": "角色创建成功" },
+    { "type": "send", "player": "player1", "text": "闭关", "note": "进入闭关状态" },
+    { "type": "expect", "match": "已进入闭关状态", "timeout": 30, "note": "状态应切换为修炼中" },
+    { "type": "send", "player": "player1", "text": "闭关", "note": "重复闭关应被忙碌状态拦截" },
+    { "type": "expect", "match": "请勿重复进入", "timeout": 30, "note": "验证 user_cd 忙碌拦截" },
+    { "type": "send", "player": "player1", "text": "出关", "note": "闭关不足1分钟" },
+    { "type": "expect", "match": "不足1分钟", "timeout": 30, "note": "未结算修为，状态应恢复空闲" }
+  ]
+}

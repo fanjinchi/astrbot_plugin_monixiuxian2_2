@@ -1,0 +1,6 @@
+name: astrbot_plugin_testplatform # 插件唯一标识 (推荐与仓库名/文件夹名一致)
+display_name: 网页测试平台 # 插件展示名
+desc: 网页端测试平台：注册自定义平台适配器 webtest，让测试消息走 AstrBot 真实事件管线（filter/Handler/白名单/数据库/定时任务），为开发者与 AI 提供双向可见的模拟玩家消息流、消息注入（REST/CLI）、批注与自动化测试用例管理。
+version: v0.1.0
+author: guigui
+repo: https://github.com/guigui/astrbot_plugin_monixiuxian2_2
