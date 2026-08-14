@@ -18,7 +18,6 @@ uv.lock
 .serena/
 
 # Subagent / tooling output
-.opencode/
 .pi-subagents/
 subagent-*.md
 worker_*_summary.md
