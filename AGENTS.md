@@ -187,6 +187,29 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 - 运行测试：在插件目录执行 `uv run python -m pytest tests/ -v`
 - 注意：插件没有独立的 Python 解释器，`python` 命令可能不存在，请始终使用 `uv run python` 调用 AstrBot 的虚拟环境
 
+## 网页端测试平台（功能验证与反馈闭环）
+
+> 为修仙插件搭建的**贴近真实环境**测试平台：模拟玩家私聊/群聊消息走 AstrBot 真实管线（filter → Handler → 白名单 → 数据库 → 定时任务），消息流双向可见、可批注、可自动化用例。设计文档：`design_docs/test-platform.md`；**插件代码在独立仓库** `~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/`（独立 git 仓库，不在本仓库维护）。
+
+- **启用**：该目录已在 AstrBot 插件加载路径；Dashboard → 平台管理 → 启用「网页测试平台 (webtest)」（可改 host/port/access_token）→ 浏览器 `http://127.0.0.1:8765`。
+- **AI 调用与读取结果**（AstrBot uv 环境）：
+
+  ```bash
+  cd ~/code/AstrBot
+  export WEBTEST_URL=http://127.0.0.1:8765 WEBTEST_TOKEN=<token>   # 或 --url/--token
+  CLI=data/plugins/astrbot_plugin_testplatform/scripts/test_platform_cli.py
+  uv run python $CLI case run <case>                       # 一键跑用例（退出码/输出含逐步骤结果）
+  uv run python $CLI case run-all --tag <tag>              # 按标签批量
+  uv run python $CLI wait --conversation N --expect "子串" --timeout 30   # 断言：0=命中 1=超时
+  uv run python $CLI feed --conversation N                 # 拉取双向消息流
+  uv run python $CLI runs show <id>                        # 运行轨迹：步骤结果+实际回复+消息快照
+  uv run python $CLI annotations --conversation N          # 拉取用户在网页上的批注
+  ```
+
+- **反馈闭环**：用户在网页写批注 → AI `annotations` 拉取（或用户直接说）→ 修改修仙插件代码 → Dashboard 重载插件 → 重跑用例/`wait` 断言确认 → 汇报。
+- **用例格式**：`cases/` 下 JSON（send/expect/sleep 步骤；`description`/`scenario` 必填自解释；`expect.match` 支持 `re:` 正则，否则子串；`conversation.pin_players` 钉固定身份测 GM/管理员路径）；示例见插件仓库 `examples/cases/`。每次运行自动建临时会话与唯一玩家身份，多次运行零污染，轨迹不随会话删除丢失。
+- **改动同步**：插件代码改动提交到独立仓库；本文档若需同步更新，rsync 见 `design_docs/test-platform.md` 使用步骤。
+
 ## 文档地图（必读与维护）
 
 开始任何任务前，先按下表选读对应文档快速定位；完成任务后，按“维护责任”同步文档：

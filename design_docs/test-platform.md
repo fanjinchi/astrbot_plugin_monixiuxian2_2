@@ -1,8 +1,8 @@
-# 网页端测试平台（testplatform_plugin/）— 设计文档
+# 网页端测试平台 — 设计文档
 
 > 类型：本项目 · 配套工具（非游戏玩法系统）
 > 创建：2026-08-15 · 对应 OpenSpec change：`add-web-test-platform`（openspec/changes/add-web-test-platform/，specs/web-test-platform/spec.md）
-> 状态：v0.1.0 已实现（32 项单元测试 + 56 项独立端到端冒烟通过，主树零改动隔离验收通过）
+> 状态：v0.1.0 已实现；**插件代码已迁至独立仓库 `~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/`（独立 git 仓库维护），本仓库仅保留本文档**。实现时 32 项单测 + 56 项端到端冒烟通过、主树零改动隔离验收通过。
 
 ## 定位与目标
 
@@ -12,7 +12,7 @@
 - 网页端消息流**用户与 AI 同时可见**：AI 可经 CLI/API 持续发起功能测试，用户在网页看到输出并**批注**，AI 按批注修改后重跑，形成「运行 → 批注 → 修改 → 重跑」闭环；
 - 自动化：测试**用例**（JSON 定义步骤 send/expect/sleep）可一键运行、批量运行（`--tag`），每次运行留**完整轨迹**（全部消息交换快照 + 逐步骤结果 + 用例版本快照）。
 
-## 目录结构与交付形态
+## 目录结构（设计期布局；代码现居独立仓库，此处仅作设计记录）
 
 ```
 testplatform_plugin/                 # 唯一新增目录（项目本体零改动）
@@ -126,15 +126,15 @@ REST POST /api/conversations/{id}/messages {sender, text}
 
 ## 隔离性保证（对项目本体）
 
-- 唯一新增目录 `testplatform_plugin/`；**不修改项目任何文件**（git diff 主树为空）。
+- 设计期唯一新增目录 `testplatform_plugin/`（**不修改项目任何文件**，git diff 主树为空）；代码现居独立仓库，本仓库主树依然零改动。
 - 允许 import 修仙插件/AstrBot 模块以复用逻辑（如构造与真实一致的消息对象），但**绝不反向修改**：不写插件数据、不改配置文件、不 patch 模块。
 - 平台数据只存 `data/plugin_data/astrbot_plugin_testplatform/`；卸载插件后平台数据目录可整体删除。
 - 验收方式：`git status` 主树零改动 + 插件目录既有 pytest 全绿（404 项）+ 本平台 32 项单测。
 
 ## 使用步骤（真实 AstrBot 环境）
 
-1. 将 `testplatform_plugin/` 复制到 `~/code/AstrBot/data/plugins/` 下（AstrBot 插件市场/手动安装亦可）。
+1. 插件代码位于独立仓库 `~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/`（已就位于 AstrBot 插件加载路径，独立 git 仓库维护；开发改动提交到该仓库）。
 2. AstrBot Dashboard → 插件管理 → 重载插件；平台管理 → 启用「网页测试平台 (webtest)」，可改端口/令牌。
 3. 浏览器打开 `http://127.0.0.1:8765/`：新建会话 → 发送「闭关」等指令，观察机器人回复；hover 消息写批注。
-4. AI 侧：`python testplatform_plugin/scripts/test_platform_cli.py case run cultivate-basic-flow` 跑用例；`wait --expect` 做断言式交互测试。
+4. AI 侧：`python ~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/scripts/test_platform_cli.py case run cultivate-basic-flow` 跑用例；`wait --expect` 做断言式交互测试。
 5. 关闭平台：Dashboard 平台管理禁用 webtest，或卸载插件。
