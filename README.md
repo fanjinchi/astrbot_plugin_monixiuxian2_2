@@ -311,6 +311,16 @@ astrbot_plugin_monixiuxian2/
 
 ---
 
+### v3.8.0 - 新增配套：网页端测试平台（设计文档 + 独立插件仓库）
+
+**🧪 配套工具（不影响游戏玩法，主树零改动）**
+- 新增配套设计文档 `design_docs/test-platform.md`：AstrBot 平台适配器（webtest）驱动的网页端测试平台，模拟玩家消息走真实消息管线（filter/Handler/白名单/数据库/定时任务全链路）
+- 网页端消息流用户与 AI 同时可见：REST/CLI 注入消息、机器人回复实时呈现、消息批注闭环
+- 测试用例引擎：JSON 用例（send/expect/sleep 步骤，description/scenario 必填自解释），一键/批量运行（--tag），每次运行留完整轨迹（消息快照+步骤结果+用例版本快照）
+- **插件代码已迁至独立 git 仓库** `~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/`（CLI/前端/用例引擎/32 单测均在仓库内，本仓库仅保留设计文档与 AGENTS.md 使用说明）
+
+---
+
 ### v3.7.1 - 遗留五维清理与死字段修复
 
 **🧹 清理**
