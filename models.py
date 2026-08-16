@@ -263,17 +263,23 @@ class Player:
                 total["exp_multiplier"] += item.exp_multiplier
                 try:
                     passive = json.loads(item.passive_bonus)
+                    heart_route_mult = item.get_route_multiplier(self.cultivation_type)
                     for key, value in passive.items():
+                        effective_value = value * heart_route_mult
                         if key == "hp_percent":
-                            total["hp"] = int(total["hp"] * (1 + value))
+                            total["hp"] = int(total["hp"] * (1 + effective_value))
                         elif key == "damage_percent":
-                            total["damage"] = int(total["damage"] * (1 + value))
+                            total["damage"] = int(
+                                total["damage"] * (1 + effective_value)
+                            )
                         elif key == "agility_percent":
-                            total["agility"] = int(total["agility"] * (1 + value))
+                            total["agility"] = int(
+                                total["agility"] * (1 + effective_value)
+                            )
                         elif key == "speed_percent":
-                            total["speed"] = int(total["speed"] * (1 + value))
+                            total["speed"] = int(total["speed"] * (1 + effective_value))
                         elif key == "armor_value":
-                            total["armor_value"] += int(value)
+                            total["armor_value"] += int(effective_value)
                 except json.JSONDecodeError:
                     pass
 

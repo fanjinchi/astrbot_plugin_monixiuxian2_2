@@ -60,9 +60,10 @@
 ### heart_methods.csv
 
 `id,name,description,rank,required_level_index,passive_bonus_json,skill_pool_json,`
-`route,shop_weight,ref_source,design_note,status`
+`route,route_mult_ling,route_mult_ti,shop_weight,ref_source,design_note,status`
 
 - `passive_bonus_json`：如 `{"hp_percent": 0.1}`；`skill_pool_json`：决定功法池（心法是 build 的"职业"）
+- `route_mult_ling` / `route_mult_ti`：设计列，入库后对应 `route_multiplier.灵修` / `route_multiplier.体修`；v1 池可全部 1.0，未来路线专属心法再差异化
 
 ## 3. 数值预算速查（机器校验规则）
 

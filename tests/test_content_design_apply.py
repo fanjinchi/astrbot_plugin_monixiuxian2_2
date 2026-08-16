@@ -136,6 +136,35 @@ def test_build_heart_keeps_zero_exp_multiplier():
     assert _build_heart(row, [])["exp_multiplier"] == 0.08
 
 
+def test_build_heart_writes_route_multiplier():
+    """route_mult_ling / route_mult_ti CSV columns must persist into JSON."""
+    row = {
+        "id": "h1",
+        "name": "测试心法",
+        "description": "d",
+        "rank": "凡品",
+        "required_level_index": "0",
+        "passive_bonus_json": "{}",
+        "exp_multiplier": "0.0",
+        "skill_pool_json": "[]",
+        "route": "通用",
+        "route_mult_ling": "1.0",
+        "route_mult_ti": "0.8",
+        "shop_weight": "100",
+        "ref_source": "测试",
+        "design_note": "",
+        "status": "draft",
+    }
+    entry = _build_heart(row, [])
+    assert entry["route_multiplier"] == {"灵修": 1.0, "体修": 0.8}
+
+    # Missing columns default to 1.0
+    row.pop("route_mult_ling")
+    row.pop("route_mult_ti")
+    entry = _build_heart(row, [])
+    assert entry["route_multiplier"] == {"灵修": 1.0, "体修": 1.0}
+
+
 # ---------------------------------------------------------------------------
 # 6.2 skill row import contract
 # ---------------------------------------------------------------------------

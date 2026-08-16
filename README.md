@@ -311,6 +311,23 @@ astrbot_plugin_monixiuxian2/
 
 ---
 
+### v3.8.1 - 心法路线倍率与功法预算审计
+
+**🎯 功能完善**
+- 心法新增 `route_multiplier` 字段：被动加成（百分比项与 armor_value 平加项）按玩家修炼路线（灵修/体修）乘算，v1 池全部 1.0，未来 v2 路线专属心法可差异化
+- `exp_multiplier` 不受路线倍率影响，保持按配置原值生效
+
+**🔧 修复/审计**
+- 关闭 bd `dhh`：确认当前功法池全部通过 `validate_budget.py` 预算闸门（0 FAIL），旧超预算功法（御剑术、开天辟地等）已移除，万剑归宗保持 2.0 档
+- 关闭 bd `f4t`：心法路线倍率机制落地，`sync_content_to_config.py` 正确解析 `route_mult_ling` / `route_mult_ti` 并写入配置
+
+**📝 文档**
+- 更新 `design_docs/content-design/heart-methods.md`：补充 `route_multiplier` 机制说明，区分 `route`（装备校验）与 `route_multiplier`（数值倍率）
+- 新增 `tests/test_models.py`：覆盖心法路线倍率 1.0 等效、1.2 放大、缺省回退等场景
+- `tests/test_content_design_apply.py` 新增 `_build_heart` 的 `route_multiplier` 写入回归测试
+
+---
+
 ### v3.8.0 - 新增配套：网页端测试平台（设计文档 + 独立插件仓库）
 
 **🧪 配套工具（不影响游戏玩法，主树零改动）**

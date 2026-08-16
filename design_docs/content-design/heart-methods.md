@@ -21,6 +21,11 @@
 修炼经验 ×(1+v)，与灵根倍率、丹药倍率**连乘**（`cultivation_manager:calculate_cultivation_exp`）。
 商店与装备界面已会展示「修炼效率+X%」。
 
+`route_multiplier`（JSON 对象，含 `灵修` / `体修` 两个键，缺省均为 1.0）：
+按玩家当前修炼路线（`cultivation_type`）选取对应倍率，对 `passive_bonus` 的百分比项与
+`armor_value` 平加项进行乘算（`effective_value = value × route_mult`）。
+`exp_multiplier` 不受 `route_multiplier` 影响，保持按配置原值生效。
+
 ## 2. 差异化：三条设计轴
 
 1. **战斗专精轴**——被动集中在单一属性，形成 build 锚点：
@@ -55,8 +60,7 @@
 - **单条 `_percent` ≤ 15%**（§4.3，validate 强制）→ 高品级必须复合。
 - **exp cap**：凡 8% / 灵 10% / 地 15% / 天 20% / 皇 25% / 帝 30% / 道 35% /
   仙 40% / 混元 45%。修炼向心法战斗点数 ≈ 预算的 1/4~1/2（兑换比待校准，见 §5）。
-- **route**：v1 全部「通用」。`route` 字段是否参与装备校验未确认，
-  确认前不做路线专属心法（v2 候选）。
+- **route 与 route_multiplier**：`route` 为装备校验字段（决定能否装备），`route_multiplier` 为数值倍率字段（决定被动加成幅度）。v1 池 `route_multiplier` 全部 1.0；v2 路线专属心法可差异化（如灵修向 1.2 / 0.6）。
 - **required_level_index**：沿用武器标杆的品级门槛 0/11/21/31/41/51/61/71/81。
 - **shop_weight**：100/60/35/20/12/7/4/2/1（相对梯度，与武器池的配比待商店联调）。
 
@@ -90,7 +94,6 @@
   镜像对局校准，v1 按 1/4~1/2 预算占比拍定。
 - [ ] speed 收益依赖对手速度分布（镜像估值 12% speed ≈ +5.7% 出手频率），
   对速攻内战/慢速靶的边际差异在 sim 中验证。
-- [ ] 确认 `route` 字段是否参与心法装备校验；v2 再考虑灵修/体修专属心法。
+- [ ] `route_multiplier` 数值差异化设计（v2）：当前 v1 池全部 1.0，未来灵修/体修专属心法可按 1.2/0.6 等梯度设计。
 - [ ] skill_pool 回填（功法池定稿后）：每个心法挂 2-3 个配套功法，
   learn_coefficient 按「本流派功法 1.0 / 泛用 0.8 / 跨流派 0.5」梯度。
-- [ ] 引擎 `effect`/`effect_type` 键名 bug 修复后回归（独立于本设计，见 bd）。

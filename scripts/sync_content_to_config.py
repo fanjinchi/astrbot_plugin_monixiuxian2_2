@@ -216,6 +216,12 @@ def _build_heart(row: dict, errors: list[str]) -> dict | None:
         # Default matches equipment_manager.Item.exp_multiplier (0.0): an
         # absent cell means no cultivation bonus, never 1.0. Preserve 0.0.
         exp_mult = 0.0
+    route_mult_ling = _num(row.get("route_mult_ling", ""))
+    route_mult_ti = _num(row.get("route_mult_ti", ""))
+    route_multiplier = {
+        "灵修": 1.0 if route_mult_ling is None else route_mult_ling,
+        "体修": 1.0 if route_mult_ti is None else route_mult_ti,
+    }
     return {
         "id": (row.get("id") or "").strip(),
         "name": name,
@@ -226,6 +232,7 @@ def _build_heart(row: dict, errors: list[str]) -> dict | None:
         "exp_multiplier": exp_mult,
         "skill_pool": pool,
         "route": (row.get("route") or "").strip() or "通用",
+        "route_multiplier": route_multiplier,
         "shop_weight": _num(row.get("shop_weight", "")) or 0,
     }
 

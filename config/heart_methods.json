@@ -21,7 +21,11 @@
       ],
       "route": "通用",
       "shop_weight": 100,
-      "exp_multiplier": 0.0
+      "exp_multiplier": 0.0,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_004",
@@ -40,7 +44,11 @@
         }
       ],
       "route": "通用",
-      "shop_weight": 100
+      "shop_weight": 100,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_101",
@@ -59,7 +67,11 @@
         }
       ],
       "route": "灵修",
-      "shop_weight": 60
+      "shop_weight": 60,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_102",
@@ -78,7 +90,11 @@
         }
       ],
       "route": "体修",
-      "shop_weight": 60
+      "shop_weight": 60,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_201",
@@ -102,7 +118,11 @@
         }
       ],
       "route": "通用",
-      "shop_weight": 35
+      "shop_weight": 35,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_202",
@@ -121,7 +141,11 @@
         }
       ],
       "route": "通用",
-      "shop_weight": 35
+      "shop_weight": 35,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_301",
@@ -145,7 +169,11 @@
         }
       ],
       "route": "体修",
-      "shop_weight": 20
+      "shop_weight": 20,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_302",
@@ -159,7 +187,11 @@
       "exp_multiplier": 0.2,
       "skill_pool": [],
       "route": "通用",
-      "shop_weight": 20
+      "shop_weight": 20,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_401",
@@ -183,7 +215,11 @@
         }
       ],
       "route": "体修",
-      "shop_weight": 12
+      "shop_weight": 12,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_402",
@@ -198,7 +234,11 @@
       "exp_multiplier": 0.0,
       "skill_pool": [],
       "route": "通用",
-      "shop_weight": 12
+      "shop_weight": 12,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_501",
@@ -218,7 +258,11 @@
         }
       ],
       "route": "通用",
-      "shop_weight": 7
+      "shop_weight": 7,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_502",
@@ -232,7 +276,11 @@
       "exp_multiplier": 0.3,
       "skill_pool": [],
       "route": "通用",
-      "shop_weight": 7
+      "shop_weight": 7,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_601",
@@ -252,7 +300,11 @@
         }
       ],
       "route": "灵修",
-      "shop_weight": 4
+      "shop_weight": 4,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_602",
@@ -266,7 +318,11 @@
       "exp_multiplier": 0.35,
       "skill_pool": [],
       "route": "通用",
-      "shop_weight": 4
+      "shop_weight": 4,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_701",
@@ -286,7 +342,11 @@
         }
       ],
       "route": "通用",
-      "shop_weight": 2
+      "shop_weight": 2,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_702",
@@ -301,7 +361,11 @@
       "exp_multiplier": 0.0,
       "skill_pool": [],
       "route": "通用",
-      "shop_weight": 2
+      "shop_weight": 2,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_801",
@@ -325,7 +389,11 @@
         }
       ],
       "route": "通用",
-      "shop_weight": 1
+      "shop_weight": 1,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     },
     {
       "id": "heart_802",
@@ -339,7 +407,11 @@
       "exp_multiplier": 0.45,
       "skill_pool": [],
       "route": "通用",
-      "shop_weight": 1
+      "shop_weight": 1,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     }
   ]
 }
