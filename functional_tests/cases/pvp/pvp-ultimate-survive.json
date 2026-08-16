@@ -1,0 +1,118 @@
+{
+  "name": "pvp-ultimate-survive",
+  "description": "验证免死大招：涅槃诀「涅槃重生」在长线战斗触发并提供免死庇护。",
+  "scenario": "固定群聊双玩家，p1 激活涅槃诀并与高气血 p2 长线战斗，断言「施展大招【涅槃重生】」及其庇护文本；min_action_index=5。",
+  "tags": [
+    "pvp",
+    "ultimate",
+    "content-design",
+    "sampled"
+  ],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000003"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p1"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 60,
+      "note": "p1 可用"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p2"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 60,
+      "note": "p2 可用"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置攻击 900000002 100",
+      "note": "设置攻击方攻击"
+    },
+    {
+      "type": "expect",
+      "match": "re:攻击设置为|已踏入",
+      "timeout": 60,
+      "note": "攻击方攻击设置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置攻击 900000003 500",
+      "note": "设置防守方攻击"
+    },
+    {
+      "type": "expect",
+      "match": "re:攻击设置为|已踏入",
+      "timeout": 60,
+      "note": "防守方攻击设置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置气血 900000002 2000",
+      "note": "设置攻击方气血"
+    },
+    {
+      "type": "expect",
+      "match": "re:气血设置为|已踏入",
+      "timeout": 60,
+      "note": "攻击方气血设置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置气血 900000003 10000",
+      "note": "设置防守方气血"
+    },
+    {
+      "type": "expect",
+      "match": "re:气血设置为|已踏入",
+      "timeout": 60,
+      "note": "防守方气血设置成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#激活功法 涅槃诀",
+      "note": "p1 激活 涅槃诀"
+    },
+    {
+      "type": "expect",
+      "match": "已激活",
+      "timeout": 60,
+      "note": "涅槃诀 激活成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#决斗 900000003",
+      "note": "survive 大招触发文本（min_action_index=5）"
+    },
+    {
+      "type": "expect",
+      "match": "re:施展大招【涅槃重生】|获得【涅槃重生】庇护|战斗开始",
+      "timeout": 60,
+      "note": "survive 大招触发文本（min_action_index=5）"
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "name": "pvp-heart-passive",
+  "description": "验证心法被动在战斗首行属性中生效：长春功气血+10%、疾风迅雷功迅捷+12%/身法+10%。",
+  "scenario": "前置条件：固定群聊身份、GM 可用、fixture 已准备或步骤内创建。覆盖：主修心法被动、战斗首行属性、决斗。",
+  "tags": [
+    "pvp",
+    "heart-method",
+    "content-design"
+  ],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000003"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p1"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p1 可用"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p2"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p2 可用"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置气血 900000002 1000",
+      "note": "p1 基础气血"
+    },
+    {
+      "type": "expect",
+      "match": "re:气血设置为[^\\n]*1,?000",
+      "timeout": 30,
+      "note": "p1 基数确定"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#装备 长春功",
+      "note": "装备主修心法"
+    },
+    {
+      "type": "expect",
+      "match": "已装备",
+      "timeout": 30,
+      "note": "心法装备成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#决斗 900000003",
+      "note": "p1 带长春功战斗"
+    },
+    {
+      "type": "expect",
+      "match": "re:气血 1100/1100",
+      "timeout": 60,
+      "note": "气血+10% 被动在战斗首行生效（1000→1100）"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置真元 900000003 50",
+      "note": "p2 基础迅捷"
+    },
+    {
+      "type": "expect",
+      "match": "re:真元设置为[^\\n]*50",
+      "timeout": 30,
+      "note": "p2 迅捷基数确定"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置精神力 900000003 50",
+      "note": "p2 基础身法"
+    },
+    {
+      "type": "expect",
+      "match": "re:精神力设置为[^\\n]*50",
+      "timeout": 30,
+      "note": "p2 身法基数确定"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置境界 900000003 炼虚一阶",
+      "note": "p2 提升到疾风迅雷功所需境界"
+    },
+    {
+      "type": "expect",
+      "match": "re:境界设置为[^\\n]*炼虚一阶",
+      "timeout": 30,
+      "note": "境界设置成功"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#装备 疾风迅雷功",
+      "note": "p2 装备心法"
+    },
+    {
+      "type": "expect",
+      "match": "已装备",
+      "timeout": 30,
+      "note": "心法装备成功"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#决斗 900000002",
+      "note": "p2 带疾风迅雷功战斗"
+    },
+    {
+      "type": "expect",
+      "match": "re:身法 55[\\s\\S]*迅捷 56",
+      "timeout": 60,
+      "note": "迅捷+12%/身法+10% 在战斗首行生效（50→56/55）"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+[
+  {
+    "id": 158,
+    "conversation_id": 26,
+    "direction": "in",
+    "sender": "case_bank-sect-smoke_4_player1",
+    "text": "我要修仙 灵修",
+    "rich": null,
+    "created_at": 1786919773.9402254
+  },
+  {
+    "id": 159,
+    "conversation_id": 26,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎉 恭喜道友 player1 踏上仙途！\n━━━━━━━━━━━━━━━\n修炼方式：【灵修】\n灵根：【木水灵根】\n评价：【良品】双灵根，较为常见\n启动资金：100 灵石\n━━━━━━━━━━━━━━━\n⚠️ 修仙有风险，突破需谨慎！\n突破失败或生命值归零会导致\n身死道消，所有数据清除！\n━━━━━━━━━━━━━━━\n💡 发送「我的信息」查看状态",
+    "rich": [],
+    "created_at": 1786919773.965696
+  },
+  {
+    "id": 160,
+    "conversation_id": 26,
+    "direction": "in",
+    "sender": "case_bank-sect-smoke_4_player1",
+    "text": "银行",
+    "rich": null,
+    "created_at": 1786919774.2537642
+  },
+  {
+    "id": 161,
+    "conversation_id": 26,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏦 灵石银行\n━━━━━━━━━━━━━━━\n💰 存款余额：0 灵石\n📈 待领利息：0 灵石\n📊 日利率：0.1%（复利）\n━━━━━━━━━━━━━━━\n💎 持有灵石：100\n━━━━━━━━━━━━━━━\n💡 指令：\n  /存灵石 <数量>\n  /取灵石 <数量>\n  /领取利息\n  /贷款 <数量>\n  /还款\n  /银行流水",
+    "rich": [],
+    "created_at": 1786919774.277511
+  },
+  {
+    "id": 162,
+    "conversation_id": 26,
+    "direction": "in",
+    "sender": "case_bank-sect-smoke_4_player1",
+    "text": "存灵石 100",
+    "rich": null,
+    "created_at": 1786919774.5725775
+  },
+  {
+    "id": 163,
+    "conversation_id": 26,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 成功存入 100 灵石！\n当前余额：100 灵石",
+    "rich": [],
+    "created_at": 1786919774.6179562
+  },
+  {
+    "id": 164,
+    "conversation_id": 26,
+    "direction": "in",
+    "sender": "case_bank-sect-smoke_4_player1",
+    "text": "我的宗门",
+    "rich": null,
+    "created_at": 1786919774.8914857
+  },
+  {
+    "id": 165,
+    "conversation_id": 26,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 你还未加入宗门！",
+    "rich": [],
+    "created_at": 1786919774.9141595
+  },
+  {
+    "id": 166,
+    "conversation_id": 26,
+    "direction": "in",
+    "sender": "case_bank-sect-smoke_4_player1",
+    "text": "宗门列表",
+    "rich": null,
+    "created_at": 1786919775.2116659
+  },
+  {
+    "id": 167,
+    "conversation_id": 26,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 当前还没有任何宗门！",
+    "rich": [],
+    "created_at": 1786919775.234094
+  }
+]

@@ -1,0 +1,81 @@
+{
+  "name": "pvp-basic-spar",
+  "description": "覆盖切磋路径；当前预期记录 handlers/combat_handlers.py handle_spar 疑似缺 result 赋值的 Bug（待修复用例，预期失败）。",
+  "scenario": "前置条件：固定群聊身份，GM_ADMINS/白名单已配，fixture 已准备或步骤内创建。覆盖：切磋、战斗冷却、战报。若此用例失败且运行轨迹出现 UnboundLocalError/服务端错误，即为已知 Bug 证据。",
+  "tags": [
+    "pvp",
+    "core-smoke",
+    "known-bug"
+  ],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000003"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p1"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p1 可用"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p2"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p2 可用"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置攻击 900000002 1000",
+      "note": "p1 攻击"
+    },
+    {
+      "type": "expect",
+      "match": "re:攻击设置为[^\\n]*1,?000",
+      "timeout": 30,
+      "note": "p1 属性设置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置攻击 900000003 500",
+      "note": "p2 攻击"
+    },
+    {
+      "type": "expect",
+      "match": "re:攻击设置为[^\\n]*500",
+      "timeout": 30,
+      "note": "p2 属性设置成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#切磋 900000003",
+      "note": "p1 与 p2 切磋"
+    },
+    {
+      "type": "expect",
+      "match": "re:战斗开始[\\s\\S]*胜利",
+      "timeout": 60,
+      "note": "已知 Bug：handle_spar 在第 211 行前未调用 player_vs_player 给 result 赋值，疑似 UnboundLocalError，此步预期失败"
+    }
+  ]
+}

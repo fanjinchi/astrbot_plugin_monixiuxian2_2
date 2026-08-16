@@ -1,0 +1,118 @@
+{
+  "name": "pvp-ultimate-dot",
+  "description": "验证 DOT 大招：九幽噬魂咒持续侵蚀。",
+  "scenario": "固定群聊双玩家，p1 激活九幽噬魂咒与高气血 p2 长线战斗，断言「施展大招【九幽噬魂】，天地变色！」及后续「侵蚀」；min_action_index=4，需 --repeat。",
+  "tags": [
+    "pvp",
+    "effect-matrix",
+    "content-design",
+    "sampled"
+  ],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000003"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p1"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 60,
+      "note": "p1 可用"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p2"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 60,
+      "note": "p2 可用"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置攻击 900000002 200",
+      "note": "设置攻击方攻击"
+    },
+    {
+      "type": "expect",
+      "match": "re:攻击设置为|已踏入",
+      "timeout": 60,
+      "note": "攻击方攻击设置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置攻击 900000003 100",
+      "note": "设置防守方攻击"
+    },
+    {
+      "type": "expect",
+      "match": "re:攻击设置为|已踏入",
+      "timeout": 60,
+      "note": "防守方攻击设置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置气血 900000002 5000",
+      "note": "设置攻击方气血"
+    },
+    {
+      "type": "expect",
+      "match": "re:气血设置为|已踏入",
+      "timeout": 60,
+      "note": "攻击方气血设置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置气血 900000003 12000",
+      "note": "设置防守方气血"
+    },
+    {
+      "type": "expect",
+      "match": "re:气血设置为|已踏入",
+      "timeout": 60,
+      "note": "防守方气血设置成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#激活功法 九幽噬魂咒",
+      "note": "p1 激活 九幽噬魂咒"
+    },
+    {
+      "type": "expect",
+      "match": "已激活",
+      "timeout": 60,
+      "note": "九幽噬魂咒 激活成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#决斗 900000003",
+      "note": "ultimate dot（min_action=4）"
+    },
+    {
+      "type": "expect",
+      "match": "re:施展大招【九幽噬魂】|战斗开始",
+      "timeout": 60,
+      "note": "ultimate dot（min_action=4）"
+    }
+  ]
+}

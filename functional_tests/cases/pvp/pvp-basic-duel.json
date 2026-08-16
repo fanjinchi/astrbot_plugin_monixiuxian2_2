@@ -1,0 +1,104 @@
+{
+  "name": "pvp-basic-duel",
+  "description": "验证 PvP 基础路径：固定群聊身份创建双玩家→GM 设属性→决斗→战斗开始/回合/胜利。",
+  "scenario": "前置条件：群聊 webtest_pvp_001 已白名单，GM_ADMINS 含 900000001，fixture 已准备固定 ID（或步骤内创建）。覆盖：创建、GM 设置属性、决斗、战报。",
+  "tags": [
+    "pvp",
+    "core-smoke"
+  ],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000003"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p1（fixture 已建则提示已踏入）"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p1 可用"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p2"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p2 可用"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置攻击 900000002 1000",
+      "note": "p1 攻击"
+    },
+    {
+      "type": "expect",
+      "match": "re:攻击设置为[^\\n]*1,?000",
+      "timeout": 30,
+      "note": "p1 属性设置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置攻击 900000003 500",
+      "note": "p2 攻击"
+    },
+    {
+      "type": "expect",
+      "match": "re:攻击设置为[^\\n]*500",
+      "timeout": 30,
+      "note": "p2 属性设置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置气血 900000002 1500",
+      "note": "p1 气血"
+    },
+    {
+      "type": "expect",
+      "match": "re:气血设置为[^\\n]*1,?500",
+      "timeout": 30,
+      "note": "p1 气血设置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置气血 900000003 1500",
+      "note": "p2 气血"
+    },
+    {
+      "type": "expect",
+      "match": "re:气血设置为[^\\n]*1,?500",
+      "timeout": 30,
+      "note": "p2 气血设置成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#决斗 900000003",
+      "note": "p1 挑战 p2"
+    },
+    {
+      "type": "expect",
+      "match": "re:战斗开始[\\s\\S]*回合[\\s\\S]*胜利",
+      "timeout": 60,
+      "note": "战报包含战斗开始/回合/胜利，决斗路径正常"
+    }
+  ]
+}

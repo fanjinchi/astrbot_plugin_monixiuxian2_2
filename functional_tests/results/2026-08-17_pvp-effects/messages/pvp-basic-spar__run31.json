@@ -1,0 +1,92 @@
+[
+  {
+    "id": 228,
+    "conversation_id": 32,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1786919786.7132695
+  },
+  {
+    "id": 229,
+    "conversation_id": 32,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1786919786.7307482
+  },
+  {
+    "id": 230,
+    "conversation_id": 32,
+    "direction": "in",
+    "sender": "900000003",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1786919787.0276928
+  },
+  {
+    "id": 231,
+    "conversation_id": 32,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1786919787.0893943
+  },
+  {
+    "id": 232,
+    "conversation_id": 32,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置攻击 900000002 1000",
+    "rich": null,
+    "created_at": 1786919787.385458
+  },
+  {
+    "id": 233,
+    "conversation_id": 32,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的攻击设置为 1,000",
+    "rich": [],
+    "created_at": 1786919787.437285
+  },
+  {
+    "id": 234,
+    "conversation_id": 32,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置攻击 900000003 500",
+    "rich": null,
+    "created_at": 1786919787.7247005
+  },
+  {
+    "id": 235,
+    "conversation_id": 32,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家2】的攻击设置为 500",
+    "rich": [],
+    "created_at": 1786919787.8616114
+  },
+  {
+    "id": 236,
+    "conversation_id": 32,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#切磋 900000003",
+    "rich": null,
+    "created_at": 1786919788.1263516
+  },
+  {
+    "id": 237,
+    "conversation_id": 32,
+    "direction": "out",
+    "sender": "bot",
+    "text": ":(\n\n在调用插件 astrbot_plugin_monixiuxian2 的处理函数 handle_spar 时出现异常：name 'result' is not defined",
+    "rich": [],
+    "created_at": 1786919788.1634836
+  }
+]

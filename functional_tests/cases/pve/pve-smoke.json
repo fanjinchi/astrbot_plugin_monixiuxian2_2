@@ -1,0 +1,17 @@
+{
+  "name": "pve-smoke",
+  "description": "冒烟验证 PvE 入口：世界Boss/秘境列表/历练信息可触达。",
+  "scenario": "前置条件：新玩家已创建（步骤内完成）；Boss/秘境是否可用取决于当前配置与开关，本用例只验证入口响应。覆盖：Boss、秘境、历练。",
+  "tags": ["pve", "core-smoke"],
+  "conversation": { "kind": "private", "pin_players": {} },
+  "steps": [
+    { "type": "send", "player": "player1", "text": "我要修仙 灵修", "note": "创建玩家" },
+    { "type": "expect", "match": "恭喜道友", "timeout": 30, "note": "创建成功" },
+    { "type": "send", "player": "player1", "text": "世界Boss", "note": "查看 Boss 信息" },
+    { "type": "expect", "match": "re:Boss|BOSS|boss|暂无|未生成", "timeout": 30, "note": "Boss 入口可访问" },
+    { "type": "send", "player": "player1", "text": "秘境列表", "note": "查看秘境列表" },
+    { "type": "expect", "match": "re:秘境|暂无|列表", "timeout": 30, "note": "秘境列表可访问" },
+    { "type": "send", "player": "player1", "text": "历练信息", "note": "查看历练信息" },
+    { "type": "expect", "match": "re:历练|历练中|空闲|未开始", "timeout": 30, "note": "历练入口可访问" }
+  ]
+}

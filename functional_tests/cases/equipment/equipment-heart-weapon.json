@@ -1,0 +1,105 @@
+{
+  "name": "equipment-heart-weapon",
+  "description": "验证 GM 给装备/心法→玩家装备→我的装备→卸下的基础路径。",
+  "scenario": "前置条件：群聊固定 GM 与玩家身份，GM_ADMINS 含 900000001，群已白名单。覆盖：GM 工具、储物戒、装备/卸下、主修心法。",
+  "tags": [
+    "equipment",
+    "gm",
+    "core-smoke"
+  ],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000003"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "创建群聊测试玩家"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "玩家创建成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 给予装备 900000002 青铜剑 1",
+      "note": "GM 给武器"
+    },
+    {
+      "type": "expect",
+      "match": "已向",
+      "timeout": 30,
+      "note": "物品进入储物戒"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#装备 青铜剑",
+      "note": "装备武器"
+    },
+    {
+      "type": "expect",
+      "match": "已装备",
+      "timeout": 30,
+      "note": "武器装备成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的装备",
+      "note": "查看装备面板"
+    },
+    {
+      "type": "expect",
+      "match": "青铜剑",
+      "timeout": 30,
+      "note": "装备面板显示武器"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#卸下 武器",
+      "note": "卸下武器"
+    },
+    {
+      "type": "expect",
+      "match": "已卸下",
+      "timeout": 30,
+      "note": "武器卸下成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#装备 长春功",
+      "note": "装备主修心法"
+    },
+    {
+      "type": "expect",
+      "match": "已装备",
+      "timeout": 30,
+      "note": "心法装备成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的装备",
+      "note": "查看心法状态"
+    },
+    {
+      "type": "expect",
+      "match": "长春功",
+      "timeout": 30,
+      "note": "装备面板显示主修心法"
+    }
+  ]
+}

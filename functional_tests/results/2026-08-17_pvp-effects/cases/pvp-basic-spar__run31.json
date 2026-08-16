@@ -1,0 +1,294 @@
+{
+  "id": 31,
+  "case_name": "pvp-basic-spar",
+  "run_index": 4,
+  "status": "failed",
+  "conversation_id": 32,
+  "steps_result": [
+    {
+      "index": 0,
+      "type": "send",
+      "note": "创建 p1",
+      "ok": true,
+      "detail": "已注入（消息 #228）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "p1 可用",
+      "ok": true,
+      "detail": "匹配（消息 #229：道友，你已踏入仙途，无需重复此举。）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "创建 p2",
+      "ok": true,
+      "detail": "已注入（消息 #230）",
+      "actual": [],
+      "duration": 0.05
+    },
+    {
+      "index": 3,
+      "type": "expect",
+      "note": "p2 可用",
+      "ok": true,
+      "detail": "匹配（消息 #231：道友，你已踏入仙途，无需重复此举。）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "道友，你已踏入仙途，无需重复此举。"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 4,
+      "type": "send",
+      "note": "p1 攻击",
+      "ok": true,
+      "detail": "已注入（消息 #232）",
+      "actual": [],
+      "duration": 0.04
+    },
+    {
+      "index": 5,
+      "type": "expect",
+      "note": "p1 属性设置成功",
+      "ok": true,
+      "detail": "匹配（消息 #233：✅ 已将【测试玩家1】的攻击设置为 1,000）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已将【测试玩家1】的攻击设置为 1,000"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 6,
+      "type": "send",
+      "note": "p2 攻击",
+      "ok": true,
+      "detail": "已注入（消息 #234）",
+      "actual": [],
+      "duration": 0.1
+    },
+    {
+      "index": 7,
+      "type": "expect",
+      "note": "p2 属性设置成功",
+      "ok": true,
+      "detail": "匹配（消息 #235：✅ 已将【测试玩家2】的攻击设置为 500）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已将【测试玩家1】的攻击设置为 1,000",
+        "✅ 已将【测试玩家2】的攻击设置为 500"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 8,
+      "type": "send",
+      "note": "p1 与 p2 切磋",
+      "ok": true,
+      "detail": "已注入（消息 #236）",
+      "actual": [],
+      "duration": 0.03
+    },
+    {
+      "index": 9,
+      "type": "expect",
+      "note": "已知 Bug：handle_spar 在第 211 行前未调用 player_vs_player 给 result 赋值，疑似 UnboundLocalError，此步预期失败",
+      "ok": false,
+      "detail": "超时未匹配 're:战斗开始[\\\\s\\\\S]*胜利'；窗口内实际回复 5 条",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已将【测试玩家1】的攻击设置为 1,000",
+        "✅ 已将【测试玩家2】的攻击设置为 500",
+        ":(\n\n在调用插件 astrbot_plugin_monixiuxian2 的处理函数 handle_spar 时出现异常：name 'result' is not defined"
+      ],
+      "duration": 60.28
+    }
+  ],
+  "case_snapshot": {
+    "name": "pvp-basic-spar",
+    "description": "覆盖切磋路径；当前预期记录 handlers/combat_handlers.py handle_spar 疑似缺 result 赋值的 Bug（待修复用例，预期失败）。",
+    "scenario": "前置条件：固定群聊身份，GM_ADMINS/白名单已配，fixture 已准备或步骤内创建。覆盖：切磋、战斗冷却、战报。若此用例失败且运行轨迹出现 UnboundLocalError/服务端错误，即为已知 Bug 证据。",
+    "tags": [
+      "pvp",
+      "core-smoke",
+      "known-bug"
+    ],
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_pvp_001",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000002",
+        "p2": "900000003"
+      }
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#我要修仙 灵修",
+        "note": "创建 p1"
+      },
+      {
+        "type": "expect",
+        "match": "re:恭喜道友|已踏入仙途",
+        "timeout": 30,
+        "note": "p1 可用"
+      },
+      {
+        "type": "send",
+        "player": "p2",
+        "text": "#我要修仙 灵修",
+        "note": "创建 p2"
+      },
+      {
+        "type": "expect",
+        "match": "re:恭喜道友|已踏入仙途",
+        "timeout": 30,
+        "note": "p2 可用"
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置攻击 900000002 1000",
+        "note": "p1 攻击"
+      },
+      {
+        "type": "expect",
+        "match": "re:攻击设置为[^\\n]*1,?000",
+        "timeout": 30,
+        "note": "p1 属性设置成功"
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置攻击 900000003 500",
+        "note": "p2 攻击"
+      },
+      {
+        "type": "expect",
+        "match": "re:攻击设置为[^\\n]*500",
+        "timeout": 30,
+        "note": "p2 属性设置成功"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#切磋 900000003",
+        "note": "p1 与 p2 切磋"
+      },
+      {
+        "type": "expect",
+        "match": "re:战斗开始[\\s\\S]*胜利",
+        "timeout": 60,
+        "note": "已知 Bug：handle_spar 在第 211 行前未调用 player_vs_player 给 result 赋值，疑似 UnboundLocalError，此步预期失败"
+      }
+    ]
+  },
+  "run_messages": [
+    {
+      "id": 228,
+      "conversation_id": 32,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#我要修仙 灵修",
+      "rich": null,
+      "created_at": 1786919786.7132695
+    },
+    {
+      "id": 229,
+      "conversation_id": 32,
+      "direction": "out",
+      "sender": "bot",
+      "text": "道友，你已踏入仙途，无需重复此举。",
+      "rich": [],
+      "created_at": 1786919786.7307482
+    },
+    {
+      "id": 230,
+      "conversation_id": 32,
+      "direction": "in",
+      "sender": "900000003",
+      "text": "#我要修仙 灵修",
+      "rich": null,
+      "created_at": 1786919787.0276928
+    },
+    {
+      "id": 231,
+      "conversation_id": 32,
+      "direction": "out",
+      "sender": "bot",
+      "text": "道友，你已踏入仙途，无需重复此举。",
+      "rich": [],
+      "created_at": 1786919787.0893943
+    },
+    {
+      "id": 232,
+      "conversation_id": 32,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置攻击 900000002 1000",
+      "rich": null,
+      "created_at": 1786919787.385458
+    },
+    {
+      "id": 233,
+      "conversation_id": 32,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家1】的攻击设置为 1,000",
+      "rich": [],
+      "created_at": 1786919787.437285
+    },
+    {
+      "id": 234,
+      "conversation_id": 32,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置攻击 900000003 500",
+      "rich": null,
+      "created_at": 1786919787.7247005
+    },
+    {
+      "id": 235,
+      "conversation_id": 32,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家2】的攻击设置为 500",
+      "rich": [],
+      "created_at": 1786919787.8616114
+    },
+    {
+      "id": 236,
+      "conversation_id": 32,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#切磋 900000003",
+      "rich": null,
+      "created_at": 1786919788.1263516
+    },
+    {
+      "id": 237,
+      "conversation_id": 32,
+      "direction": "out",
+      "sender": "bot",
+      "text": ":(\n\n在调用插件 astrbot_plugin_monixiuxian2 的处理函数 handle_spar 时出现异常：name 'result' is not defined",
+      "rich": [],
+      "created_at": 1786919788.1634836
+    }
+  ],
+  "started_at": 1786919786.5825229,
+  "finished_at": 1786919848.4316823
+}

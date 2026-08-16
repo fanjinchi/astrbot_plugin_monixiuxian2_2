@@ -30,3 +30,7 @@ worker_*_summary.md
 .dolt/
 *.db
 .beads-credential-key
+
+# Functional test runtime artifacts
+functional_tests/.fixture-backup.json
+functional_tests/.last-run.json

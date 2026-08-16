@@ -1,0 +1,19 @@
+{
+  "name": "bank-sect-smoke",
+  "description": "冒烟验证银行与宗门基础入口可触达。",
+  "scenario": "前置条件：新玩家已创建（步骤内完成）。覆盖：银行信息/存取、宗门信息/列表。",
+  "tags": ["economy", "social", "core-smoke"],
+  "conversation": { "kind": "private", "pin_players": {} },
+  "steps": [
+    { "type": "send", "player": "player1", "text": "我要修仙 灵修", "note": "创建玩家" },
+    { "type": "expect", "match": "恭喜道友", "timeout": 30, "note": "创建成功" },
+    { "type": "send", "player": "player1", "text": "银行", "note": "进入银行面板" },
+    { "type": "expect", "match": "re:银行|灵石|存款|利息", "timeout": 30, "note": "银行入口可访问" },
+    { "type": "send", "player": "player1", "text": "存灵石 100", "note": "尝试存款" },
+    { "type": "expect", "match": "re:存入|余额|灵石|成功", "timeout": 30, "note": "存款路径有响应" },
+    { "type": "send", "player": "player1", "text": "我的宗门", "note": "查看宗门" },
+    { "type": "expect", "match": "re:宗门|无宗门|未加入|散修", "timeout": 30, "note": "宗门信息可访问" },
+    { "type": "send", "player": "player1", "text": "宗门列表", "note": "查看宗门列表" },
+    { "type": "expect", "match": "re:宗门|暂无|列表", "timeout": 30, "note": "宗门列表可访问" }
+  ]
+}

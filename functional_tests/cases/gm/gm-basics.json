@@ -1,0 +1,92 @@
+{
+  "name": "gm-basics",
+  "description": "验证 GM 核心工具：设境界/设攻击/给装备/清除忙碌状态。",
+  "scenario": "前置条件：群聊固定 GM/玩家身份，GM_ADMINS 含 900000001，群已白名单。覆盖：GM 设置、忙碌状态清除、储物戒。",
+  "tags": [
+    "gm",
+    "core-smoke"
+  ],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000003"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "创建测试玩家"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "玩家创建成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置境界 900000002 练气一阶",
+      "note": "GM 设置境界"
+    },
+    {
+      "type": "expect",
+      "match": "境界设置为",
+      "timeout": 30,
+      "note": "境界设置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置攻击 900000002 200",
+      "note": "GM 设置攻击映射到伤害"
+    },
+    {
+      "type": "expect",
+      "match": "re:攻击设置为[^\\n]*200",
+      "timeout": 30,
+      "note": "攻击设置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 给予装备 900000002 青铜剑 1",
+      "note": "GM 给装备"
+    },
+    {
+      "type": "expect",
+      "match": "已向",
+      "timeout": 30,
+      "note": "装备发放成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#闭关",
+      "note": "让玩家进入忙碌状态"
+    },
+    {
+      "type": "expect",
+      "match": "已进入闭关状态",
+      "timeout": 30,
+      "note": "进入闭关"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除CD 900000002 确认",
+      "note": "GM 清除忙碌状态"
+    },
+    {
+      "type": "expect",
+      "match": "已清除",
+      "timeout": 30,
+      "note": "忙碌状态被清除"
+    }
+  ]
+}

@@ -1,0 +1,207 @@
+{
+  "name": "pvp-weapon-trigger",
+  "description": "验证武器触发技在真实战斗中触发：青云天剑「裂空斩」、混元至宝鼎「震魂槌」、弑龙帝枪「蓄锐式」。概率触发，需配合 --repeat 聚合。",
+  "scenario": "前置条件：固定群聊身份、GM_ADMINS/白名单已配、fixture 已准备或步骤内创建。覆盖：武器触发技、等级门槛、决斗。三个角色分别作为攻击方一次，规避 5 分钟决斗冷却。",
+  "tags": [
+    "pvp",
+    "weapon-trigger",
+    "content-design",
+    "sampled"
+  ],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000003"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p1"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p1 可用"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p2"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p2 可用"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#我要修仙 灵修",
+      "note": "创建 gm 玩家（同时是 GM 管理员）"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "gm 可用"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置境界 900000002 元婴一阶",
+      "note": "p1 升到 31 级以装备青云天剑"
+    },
+    {
+      "type": "expect",
+      "match": "re:境界设置为|未找到境界",
+      "timeout": 30,
+      "note": "p1 等级提升（若境界名不同以实测调整）"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置境界 900000003 渡劫一阶",
+      "note": "p2 升到 81 级以装备混元至宝鼎"
+    },
+    {
+      "type": "expect",
+      "match": "re:境界设置为|未找到境界",
+      "timeout": 30,
+      "note": "p2 等级提升"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置境界 900000001 炼虚一阶",
+      "note": "gm 升到 51 级以装备弑龙帝枪"
+    },
+    {
+      "type": "expect",
+      "match": "re:境界设置为|未找到境界",
+      "timeout": 30,
+      "note": "gm 等级提升"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 给予装备 900000002 青云天剑 1",
+      "note": "p1 获得青云天剑"
+    },
+    {
+      "type": "expect",
+      "match": "已向",
+      "timeout": 30,
+      "note": "武器入戒"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#装备 青云天剑",
+      "note": "p1 装备"
+    },
+    {
+      "type": "expect",
+      "match": "已装备",
+      "timeout": 30,
+      "note": "青云天剑装备成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#决斗 900000003",
+      "note": "p1 触发裂空斩（15%）"
+    },
+    {
+      "type": "expect",
+      "match": "re:触发【裂空斩】|战斗开始",
+      "timeout": 60,
+      "note": "至少开始战斗；触发文本由 --repeat 聚合"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 给予装备 900000003 混元至宝鼎 1",
+      "note": "p2 获得混元至宝鼎"
+    },
+    {
+      "type": "expect",
+      "match": "已向",
+      "timeout": 30,
+      "note": "武器入戒"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#装备 混元至宝鼎",
+      "note": "p2 装备"
+    },
+    {
+      "type": "expect",
+      "match": "已装备",
+      "timeout": 30,
+      "note": "混元至宝鼎装备成功"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#决斗 900000002",
+      "note": "p2 触发震魂槌（8%）"
+    },
+    {
+      "type": "expect",
+      "match": "re:触发【震魂槌】|战斗开始",
+      "timeout": 60,
+      "note": "至少开始战斗；触发文本由 --repeat 聚合"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 给予装备 900000001 弑龙帝枪 1",
+      "note": "gm 获得弑龙帝枪"
+    },
+    {
+      "type": "expect",
+      "match": "已向",
+      "timeout": 30,
+      "note": "武器入戒"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#装备 弑龙帝枪",
+      "note": "gm 装备"
+    },
+    {
+      "type": "expect",
+      "match": "已装备",
+      "timeout": 30,
+      "note": "弑龙帝枪装备成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#决斗 900000002",
+      "note": "gm 触发蓄锐式（12%）"
+    },
+    {
+      "type": "expect",
+      "match": "re:触发【蓄锐式】|战斗开始",
+      "timeout": 60,
+      "note": "至少开始战斗；触发文本由 --repeat 聚合"
+    },
+    {
+      "type": "sleep",
+      "seconds": 60,
+      "note": "等待 AstrBot 事件队列冲刷，避免下一轮首条消息排队超时"
+    }
+  ]
+}

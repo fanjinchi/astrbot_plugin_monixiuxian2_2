@@ -1,0 +1,128 @@
+[
+  {
+    "id": 214,
+    "conversation_id": 31,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1786919784.0943692
+  },
+  {
+    "id": 215,
+    "conversation_id": 31,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1786919784.1091025
+  },
+  {
+    "id": 216,
+    "conversation_id": 31,
+    "direction": "in",
+    "sender": "900000003",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1786919784.4048715
+  },
+  {
+    "id": 217,
+    "conversation_id": 31,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1786919784.4192274
+  },
+  {
+    "id": 218,
+    "conversation_id": 31,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置攻击 900000002 1000",
+    "rich": null,
+    "created_at": 1786919784.715877
+  },
+  {
+    "id": 219,
+    "conversation_id": 31,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的攻击设置为 1,000",
+    "rich": [],
+    "created_at": 1786919784.7614758
+  },
+  {
+    "id": 220,
+    "conversation_id": 31,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置攻击 900000003 500",
+    "rich": null,
+    "created_at": 1786919785.0480561
+  },
+  {
+    "id": 221,
+    "conversation_id": 31,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家2】的攻击设置为 500",
+    "rich": [],
+    "created_at": 1786919785.089992
+  },
+  {
+    "id": 222,
+    "conversation_id": 31,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置气血 900000002 1500",
+    "rich": null,
+    "created_at": 1786919785.379568
+  },
+  {
+    "id": 223,
+    "conversation_id": 31,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的气血设置为 1,500",
+    "rich": [],
+    "created_at": 1786919785.423926
+  },
+  {
+    "id": 224,
+    "conversation_id": 31,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置气血 900000003 1500",
+    "rich": null,
+    "created_at": 1786919785.7099571
+  },
+  {
+    "id": 225,
+    "conversation_id": 31,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家2】的气血设置为 1,500",
+    "rich": [],
+    "created_at": 1786919785.8525975
+  },
+  {
+    "id": 226,
+    "conversation_id": 31,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#决斗 900000003",
+    "rich": null,
+    "created_at": 1786919786.1098433
+  },
+  {
+    "id": 227,
+    "conversation_id": 31,
+    "direction": "out",
+    "sender": "bot",
+    "text": "☆━━━━ 战斗开始 ━━━━☆\n测试玩家1 VS 测试玩家2\n测试玩家1：气血 1650/1650，伤害 1000，身法 50，迅捷 50\n测试玩家2：气血 1500/1500，伤害 500，身法 50，迅捷 50\n\n-- 第 1 回合 --\n测试玩家2 目光如电，寻得破绽！\n测试玩家2 暴击！造成 400 点伤害！\n测试玩家1 剩余气血: 1250\n测试玩家2 发起攻击，造成 257 点伤害\n测试玩家1 剩余气血: 993\n\n-- 第 2 回合 --\n测试玩家2 发起攻击，造成 247 点伤害\n测试玩家1 剩余气血: 746\n测试玩家1 发起攻击，造成 502 点伤害\n测试玩家2 剩余气血: 998\n\n-- 第 3 回合 --\n测试玩家2 发起攻击，造成 255 点伤害\n测试玩家1 剩余气血: 491\n测试玩家2 发起攻击，造成 252 点伤害\n测试玩家1 剩余气血: 239\n\n-- 第 4 回合 --\n测试玩家1 发起攻击，造成 515 点伤害\n测试玩家2 剩余气血: 483\n测试玩家2 发起攻击，造成 257 点伤害\n测试玩家1 剩余气血: 0\n\n☆━━━━ 测试玩家2 胜利！━━━━☆",
+    "rich": [],
+    "created_at": 1786919786.1615388
+  }
+]

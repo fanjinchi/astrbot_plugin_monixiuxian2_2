@@ -212,6 +212,27 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 - **用例格式**：`cases/` 下 JSON（`name` 须与文件名一致，`description`/`scenario`/`steps` 必填；步骤 `send`/`expect`/`sleep`，`expect.match` 支持 `re:` 正则，否则子串；`conversation.pin_players` 钉固定身份测 GM/管理员路径）；示例见插件仓库 `examples/cases/`。每次运行自动建临时会话与唯一玩家身份，多次运行零污染，轨迹不随会话删除丢失。
 - **改动同步**：插件代码改动提交到独立仓库；`design_docs/test-platform.md` 若需同步更新，按独立仓库实际代码修正（无自动同步）。
 
+## 功能测试套件（项目内用例与结果归档）
+
+> 统一存放本项目功能测试用例源文件与测试结果：`functional_tests/`。用例源文件在 `functional_tests/cases/`，按功能域分子目录；测试平台数据目录 `data/plugin_data/astrbot_plugin_testplatform/cases/` 只保留同步后的拍平副本。流程说明见 `functional_tests/README.md`。
+
+- **用例存放**：`functional_tests/cases/<domain>/<name>.json`；用例 `name` 必须等于文件名且全局唯一，JSON 兼容测试平台 `loader.validate_case`（必填 `description`/`scenario`/`steps`）。
+- **同步到平台**：`uv run python scripts/test_suite_ctl.py sync-cases`
+  - 扫描 `functional_tests/cases/**/*.json` → 校验合法性 + 名称全局唯一 → 拍平复制到平台 `cases/` 顶层。
+- **运行用例**：支持脚本或平台 CLI：
+  - `uv run python scripts/test_suite_ctl.py run --tag <tag> [--repeat N]`
+  - `uv run python scripts/test_suite_ctl.py run --case <name> [--repeat N]`
+  - 或平台 CLI：`uv run python $CLI case run <case>` / `uv run python $CLI case run-all --tag <tag>`。
+  - 依赖环境变量 `WEBTEST_URL` / `WEBTEST_TOKEN`（同平台 CLI）。
+- **结果归档**：`uv run python scripts/test_suite_ctl.py export --target <target> [--date <YYYY-MM-DD>]`
+  - 写入 `functional_tests/results/<YYYY-MM-DD>_<target>/summary.md` + `cases/` + `messages/`；
+  - **结果目录命名固定** `<YYYY-MM-DD>_<target>`（如 `2026-08-17_pvp-effects`）；已存在时自动加后缀，不覆盖历史。
+- **PvP fixture**（可选）：`uv run python scripts/test_suite_ctl.py fixture --profile pvp`
+  - 向专用测试实例的插件数据库写入固定测试 ID（`900000001`/`900000002`/`900000003`）的玩家属性、储物戒、`player_skills`、清除冷却/忙碌状态；
+  - ⚠ 仅用于独立测试实例，禁止对正式数据执行；操作前脚本会确认。
+- **新玩法/功能变更后**：先看 `functional_tests/` 是否有对应域用例；有则补/改用例并跑一次对应 tag；发现的功能 Bug 用 `bd` 登记，不在本套件中直接修游戏代码。
+- **平台能力边界**：`functional_tests/platform-gap-report.md` 列出当前平台 Supported / Partially supported / Unsupported 清单；新用例优先只依赖 Supported 能力。
+
 ## 文档地图（必读与维护）
 
 开始任何任务前，先按下表选读对应文档快速定位；完成任务后，按“维护责任”同步文档：
