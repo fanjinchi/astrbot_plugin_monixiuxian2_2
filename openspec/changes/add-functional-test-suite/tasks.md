@@ -55,4 +55,4 @@
 - [x] 6.2 在专用测试实例上配置 `GM_ADMINS`/白名单，运行 PvP 基础与效果矩阵用例；结果导出到 `functional_tests/results/<日期>_pvp-effects/`
 - [x] 6.3 统计通过/失败/不稳定用例，写 `summary.md`；把已知 Bug（如 `handle_spar` 缺失赋值、效果未触发等）创建 bd issue 并链接证据
 - [x] 6.4 编写 `functional_tests/platform-gap-report.md`：Supported / Partially supported / Unsupported 三类清单，含每项限制原因与平台增强建议（RNG seed、直接授予功法、结构化 At、DB 断言、时间加速、结果导出 API 等）
-- [ ] 6.5 质量门禁：`uv run ruff format . && uv run ruff check .`、既有 pytest 全绿；提交并推送
+- [x] 6.5 质量门禁：`uv run ruff format . && uv run ruff check .`、既有 pytest 全绿；提交并推送
