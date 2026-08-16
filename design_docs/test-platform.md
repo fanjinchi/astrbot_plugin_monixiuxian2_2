@@ -2,7 +2,7 @@
 
 > 类型：本项目 · 配套工具（非游戏玩法系统）
 > 创建：2026-08-15 · 对应 OpenSpec change：`add-web-test-platform`（openspec/changes/add-web-test-platform/，specs/web-test-platform/spec.md）
-> 状态：v0.1.0 已实现；**插件代码已迁至独立仓库 `~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/`（独立 git 仓库维护），本仓库仅保留本文档**。实现时 32 项单测 + 56 项端到端冒烟通过、主树零改动隔离验收通过。
+> 状态：v0.1.0 已实现；**插件代码已迁至独立仓库 `~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/`（独立 git 仓库维护），本仓库仅保留本文档**。当前插件代码已包含 Dashboard 插件页嵌入（`pages/main/`）与用例运行后台化（202 启动 + 409 防重入）。实现时 **38 项单测 + 62 项端到端冒烟**通过、主树零改动隔离验收通过（本项目 tests 404 项全绿）。
 
 ## 定位与目标
 
@@ -12,26 +12,28 @@
 - 网页端消息流**用户与 AI 同时可见**：AI 可经 CLI/API 持续发起功能测试，用户在网页看到输出并**批注**，AI 按批注修改后重跑，形成「运行 → 批注 → 修改 → 重跑」闭环；
 - 自动化：测试**用例**（JSON 定义步骤 send/expect/sleep）可一键运行、批量运行（`--tag`），每次运行留**完整轨迹**（全部消息交换快照 + 逐步骤结果 + 用例版本快照）。
 
-## 目录结构（设计期布局；代码现居独立仓库，此处仅作设计记录）
+## 目录结构（当前独立仓库实际布局）
 
 ```
-testplatform_plugin/                 # 唯一新增目录（项目本体零改动）
-├── metadata.yaml                    # AstrBot 插件元数据（astrbot_plugin_testplatform）
-├── requirements.txt                 # aiohttp>=3.9（AstrBot 加载时自动安装）
+astrbot_plugin_testplatform/          # 独立仓库（位于 AstrBot data/plugins/ 下）
+├── metadata.yaml                    # AstrBot 插件元数据
 ├── _conf_schema.json                # 可视化配置：host/port/access_token/default_players
+├── requirements.txt                 # aiohttp>=3.9（AstrBot 加载时自动安装）
 ├── main.py                          # Star 子类：初始化数据目录 + app_state
 ├── adapter/
 │   └── webtest_adapter.py           # webtest 平台适配器（@register_platform_adapter）
-├── storage/db.py                    # aiosqlite 持久化（5 表）
-├── cases/
-│   ├── loader.py                    # 用例校验/读写（description/scenario 必填，缺则拒收）
-│   └── runner.py                    # 用例运行器（不 import AstrBot，注入器由调用方提供）
 ├── server/
-│   ├── app_state.py                 # 全局状态单例：配置合并/注入/出站捕获/WS 广播/用例运行
-│   └── app.py                       # aiohttp 应用：REST + WebSocket + 静态前端
-├── webui/                           # 原生 JS 前端（无构建链、无 CDN）
+│   ├── app_state.py                 # 全局状态单例：配置合并/注入/出站捕获/WS 广播/后台用例运行
+│   └── app.py                       # aiohttp 应用：REST + WebSocket + 静态前端（路由内联）
+├── storage/db.py                    # aiosqlite 持久化（5 表，含 claim_case_run 防重入）
+├── cases/
+│   ├── loader.py                    # 用例校验/读写（description/scenario/steps 必填，缺则拒收）
+│   └── runner.py                    # 用例运行器（不 import AstrBot，注入器由调用方提供）
+├── webui/                           # 原生 JS 前端（无构建链、无 CDN；独立入口 http://127.0.0.1:8765）
+├── pages/main/                      # Dashboard 插件页嵌入副本（相对路径；修改 webui 时需同步复制 app.js/style.css）
 ├── scripts/test_platform_cli.py     # CLI：conversations/send/feed/wait/annotations/annotate/case/runs
-└── tests/                           # 32 项 pytest（storage/loader/runner）
+├── examples/cases/                  # 示例用例
+└── tests/                           # 38 项 pytest（storage/loader/runner）+ e2e_smoke.py（62 项断言）
 ```
 
 ## 真实管线接入（核心机制）
@@ -55,10 +57,10 @@ REST POST /api/conversations/{id}/messages {sender, text}
 
 | 路径 | 捕获点 | 说明 |
 |---|---|---|
-| Handler 回复 | `WebTestMessageEvent.send()/send_streaming()` | respond 管线最终调用 event.send；重写后先落库+广播再调基类 |
+| Handler 回复 | `WebTestMessageEvent.send()/send_streaming()` | respond 管线最终调用 event.send；重写后先落库+广播再调基类；流式分片逐片追加，`audio_chunk` 跳过 |
 | 主动消息/定时广播 | `WebTestAdapter.send_by_session()` | StarContext.send_message 按 `platform_id:type:session_id` 路由到平台；未知会话自动创建（system-created），出站消息在网页可见 |
 
-消息体处理：Plain 拼接为纯文本；Image/File/Record/Json 转为描述段写入 `rich` 字段（前端展示占位，不丢信息）。
+消息体处理：Plain 拼接为纯文本；Image/File/Record/Json 等转为描述段写入 `rich` 字段（前端展示占位，不丢信息）。出站捕获失败只 `logger.warning`，不阻断回复管线。
 
 ### 会话与身份
 
@@ -68,7 +70,7 @@ REST POST /api/conversations/{id}/messages {sender, text}
 
 ## 测试用例引擎
 
-用例为 JSON 文件，存放在 `data/plugin_data/astrbot_plugin_testplatform/cases/<name>.json`（AstrBot 插件数据目录，非插件自身目录）；**编辑即生效**（每次运行从磁盘重读）。
+用例为 JSON 文件，存放在 `data/plugin_data/astrbot_plugin_testplatform/cases/<name>.json`（AstrBot 插件数据目录，非插件自身目录）；**编辑即生效**（每次列表/运行从磁盘重读）。
 
 ```json
 {
@@ -88,53 +90,67 @@ REST POST /api/conversations/{id}/messages {sender, text}
 
 - 步骤类型：`send`（注入玩家消息）/ `expect`（轮询新出站消息匹配，`re:` 前缀为正则；超时记失败并保留窗口内全部实际回复）/ `sleep`（真实等待）。
 - **自解释要求**：`description`/`scenario` 必填、每个步骤可带 `note`——用例缺失必填说明时校验拒收（保存/运行时都会报错），保证用例可读、可审计。
-- 校验规则（`loader.validate_case`）：name/description/scenario 非空；tags 字符串数组；group 用例必须给 group_id；steps 非空；send 需 player+text；expect 需 match 且 timeout>0；sleep 需 seconds>0。
+- 校验规则（`loader.validate_case`）：name/description/scenario 非空；tags 字符串数组；group 用例必须给 group_id；steps 非空；send 需 player+text；expect 需 match 且 timeout>0；sleep 需 seconds>0；`name` 必须与文件名一致；`re:` 前缀必须可编译。非法用例在列表接口中以 `errors` 返回并跳过运行。
 - 每次运行：新建 `[用例] {name} #{run_index}` 临时会话（system-created，保留供人工批注）；写 `case_runs` 表：status / 逐步骤结果（含实际回复）/ `case_snapshot`（用例内容快照，可对比用例版本）/ `run_messages`（运行期全量消息交换快照）——**轨迹独立于会话持久化，删除会话不丢轨迹**。
-- 运行入口：网页「运行」按钮、CLI `case run <name>` / `case run-all --tag <tag>`、REST `POST /api/cases/{name}/runs`（AI 自动化走此通道，留相同轨迹）。
+- **运行接口为后台任务**：`POST /api/cases/{name}/runs` 先经 `db.claim_case_run` 原子抢占一条 running 记录（同用例已有 running 则 409 防重入；超过 1 小时的陈旧 running 记录自动回收为 error，防进程崩溃后永久 409），立即返回 202 `{"status":"started","run":...}`；`app_state.start_case_run()` 用 `asyncio.create_task` 后台执行并持有强引用，异常/CancelledError 均兜底标记 error，完成后广播 `case_runs`。CLI/前端轮询 `GET /api/runs/{id}` 直至终态。
+- 运行入口：网页「运行」按钮（自动轮询终态）、CLI `case run <name>`（内部等待终态，退出码 0=passed、1=failed）/ `case run-all --tag <tag>`、REST `POST /api/cases/{name}/runs`（AI 自动化走此通道，留相同轨迹）。
 
 ## REST API 与 CLI 速查
 
 | 用途 | REST | CLI |
 |---|---|---|
-| 会话 CRUD | `/api/conversations` GET/POST/PATCH/DELETE | `conversations list/create --kind private|group --member uid:nick/archive --id/delete --id` |
+| 会话 CRUD | `/api/conversations` GET/POST/PATCH/DELETE | `conversations list` / `create --kind private\|group [--name] [--group-id] [--member user_id:nickname ...]` / `archive --id N` / `delete --id N` |
 | 注入消息 | `POST /api/conversations/{id}/messages {sender,text}` | `send --conversation N --sender uid --text "闭关"` |
+| 会话成员/玩家 | `POST /api/conversations/{id}/players`、`GET /api/players` | 建会话时用 `--member` 指定；暂无独立 players CLI 子命令 |
 | 拉取消息 | `GET /api/conversations/{id}/messages?after=&limit=` | `feed --conversation N [--after N] [--json]` |
 | 断言等待 | — | `wait --conversation N --expect "修炼中" --timeout 30 --after N`（命中退出码 0，超时 1，供脚本断言） |
 | 批注 | `GET/POST/PATCH/DELETE /api/messages/{mid}/annotation` | `annotations --conversation N` / `annotate --message N --text "..."` |
-| 用例 | `/api/cases` GET/POST、`/api/cases/{name}` GET/PUT/DELETE | `case list/new/show/run/run-all` |
-| 运行记录 | `GET /api/cases/{name}/runs`、`GET /api/runs/{id}` | `runs list/show` |
+| 用例 | `/api/cases` GET/POST、`/api/cases/{name}` GET/PUT/DELETE | `case list/new/show/run/run-all`（`new --steps-json` 可带完整用例 JSON，`run-all --tag` 按标签批量） |
+| 运行记录 | `GET /api/cases/{name}/runs`、`GET /api/runs/{id}` | `runs list <case>` / `runs show --id N` |
 | 状态 | `GET /api/status` | — |
 
-- 认证：配置 `access_token` 后，`/api/*` 与 `/ws` 需 `Authorization: Bearer <token>`（或 `?token=` / `X-Access-Token`），否则 401。CLI 读 `WEBTEST_URL`（默认 http://127.0.0.1:8765）与 `WEBTEST_TOKEN`。
+- 认证：配置 `access_token` 后，`/api/*` 与 `/ws` 需 `Authorization: Bearer <token>`（或 `?token=` / `X-Access-Token`），否则 401；`OPTIONS` 预检请求放行。CLI 读 `WEBTEST_URL`（默认 http://127.0.0.1:8765）与 `WEBTEST_TOKEN`，也支持全局 `--url/--token`。
 - WebSocket `/ws`：连接推快照（会话+玩家），`{type:"open", conversation_id}` 拉历史，消息/批注/会话/用例运行实时推送。
+- `case run` / `run-all` 是**同步等待**式命令：启动 202 后内部轮询到终态，再以退出码 0/1 反映通过/失败。
 
 ## 前端页面
 
+- **独立入口**：浏览器直接打开 `http://127.0.0.1:8765`（`webui/`，原生 JS，无构建链）。
+- **Dashboard 嵌入入口**：`pages/main/` 是插件页面嵌入副本，由 AstrBot `PluginPageService` 自动发现，Dashboard 插件详情 → 页面以 iframe 加载（沙箱无 `allow-same-origin`）。嵌入模式下 `app.js` 自动按 `location.pathname` 判定，用 `API_ORIGIN/WS_ORIGIN` 显式指向 `http(s)://<hostname>:8765`；页面资源用相对路径；`localStorage` 不可用，token 降级为内存变量（会话内有效，刷新丢失）。
 - **会话页**：左侧会话列表（含归档标记），右侧消息流（玩家 in / 机器人 out 分色），底部输入框（选择发送者）；消息 hover 出现「批注」按钮，批注以黄色侧边条显示、可删除；新会话/归档在列表头操作。
-- **用例页**：用例列表（标签徽标、按标签筛选）；详情含 description/scenario/会话类型/步数；「运行」按钮一键执行；运行记录列表按次查看：逐步骤结果（含期望/实际回复对比、note）、完整轨迹快照、一键跳转到该次运行会话（可继续人工批注）；「编辑 JSON」直接改用例文件。
+- **用例页**：用例列表（标签徽标、按标签筛选）；详情含 description/scenario/会话类型/步数；「运行」按钮一键执行（后台 202 启动并轮询终态）；运行记录列表按次查看：逐步骤结果（含期望/实际回复对比、note）、完整轨迹快照、一键跳转到该次运行会话（可继续人工批注）；「编辑 JSON」直接改用例文件（保存即校验，失败不落盘）。
 
 ## 配置项（_conf_schema.json，WebUI 可改）
 
 | 键 | 默认 | 说明 |
 |---|---|---|
-| `host` | `127.0.0.1` | Web 服务监听地址（对外访问改 0.0.0.0） |
+| `host` | `127.0.0.1` | Web 服务监听地址（对外访问改 0.0.0.0，建议同时设 token） |
 | `port` | `8765` | 监听端口 |
 | `access_token` | `""` | 访问令牌；为空不鉴权 |
-| `default_players` | 测试玩家1/2 | 新建私聊会话的默认玩家（`test_player_001/002`） |
+| `default_players` | 测试玩家1/2 | 新建私聊会话的默认玩家（`test_player_001/002`；`_conf_schema` 为 template_list：nickname + user_id） |
 
 配置优先级：Dashboard 平台配置（webtest 平台页）> 插件配置 > 默认值。
 
 ## 隔离性保证（对项目本体）
 
-- 设计期唯一新增目录 `testplatform_plugin/`（**不修改项目任何文件**，git diff 主树为空）；代码现居独立仓库，本仓库主树依然零改动。
+- 插件代码全部位于独立仓库 `~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/`（**不修改本项目任何文件**，git diff 主树为空）；本仓库主树依然零改动，仅维护 `design_docs/test-platform.md` 设计记录。
 - 允许 import 修仙插件/AstrBot 模块以复用逻辑（如构造与真实一致的消息对象），但**绝不反向修改**：不写插件数据、不改配置文件、不 patch 模块。
 - 平台数据只存 `data/plugin_data/astrbot_plugin_testplatform/`；卸载插件后平台数据目录可整体删除。
-- 验收方式：`git status` 主树零改动 + 插件目录既有 pytest 全绿（404 项）+ 本平台 32 项单测。
+- 验收方式：`git status` 主树零改动 + 插件目录既有 pytest 全绿（404 项）+ 本平台 38 项单测 + 62 项端到端冒烟。
 
 ## 使用步骤（真实 AstrBot 环境）
 
 1. 插件代码位于独立仓库 `~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/`（已就位于 AstrBot 插件加载路径，独立 git 仓库维护；开发改动提交到该仓库）。
 2. AstrBot Dashboard → 插件管理 → 重载插件；平台管理 → 启用「网页测试平台 (webtest)」，可改端口/令牌。
-3. 浏览器打开 `http://127.0.0.1:8765/`：新建会话 → 发送「闭关」等指令，观察机器人回复；hover 消息写批注。
-4. AI 侧：`python ~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/scripts/test_platform_cli.py case run cultivate-basic-flow` 跑用例；`wait --expect` 做断言式交互测试。
+3. 打开入口：浏览器直接访问 `http://127.0.0.1:8765/`，或 Dashboard 插件详情 → 页面（嵌入版，token 仅会话内有效）：新建会话 → 发送「闭关」等指令，观察机器人回复；hover 消息写批注。
+4. AI 侧（在 AstrBot 根目录使用 uv 环境）：
+
+   ```bash
+   cd ~/code/AstrBot
+   export WEBTEST_URL=http://127.0.0.1:8765 WEBTEST_TOKEN=<token>   # 或 --url/--token
+   CLI=data/plugins/astrbot_plugin_testplatform/scripts/test_platform_cli.py
+   uv run python $CLI case run cultivate-basic-flow                  # 一键跑用例
+   uv run python $CLI wait --conversation N --expect "修炼中" --timeout 30   # 断言式交互测试
+   ```
+
 5. 关闭平台：Dashboard 平台管理禁用 webtest，或卸载插件。

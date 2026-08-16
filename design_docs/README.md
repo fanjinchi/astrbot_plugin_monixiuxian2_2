@@ -15,7 +15,7 @@
 | `current-design-report.md` | 本项目 | 现有系统架构与数值设计报告（基于源码静态分析，含 `file:line` 引用，数据库以 migration v27 为准）。创建于 2026-07-29、最近更新 2026-08-08（头部有文档状态标注），作为数值/战斗/技能重设计的**活基线资料**（非归档）；架构总览以 `project-architecture.md` 为准。 |
 | `project-architecture.md` | 本项目 | **架构与系统功能设计总览**（2026-08-07 建立）：分层架构与关键机制、20 个子系统功能设计表（入口/核心数值/冷却）、openspec 契约摘要与滞后点、重设计里程碑时间线、进行中工作（bd）对照、资料导航与维护约定。新增/修改功能前建议先读。 |
 | `api-overview.md` | 本项目 | **关键 API 速查**（2026-08-11 建立）：指令→main.py 路由→handlers→managers→core→data 全链路索引，各层关键入口方法与作用、横切工具（状态/事务/定时任务）、给 AI 的检索路径。改动公开方法或新增子系统时须同步本表。 |
-| `test-platform.md` | 本项目 | **网页端测试平台设计文档**（2026-08-15 建立，openspec change `add-web-test-platform`）：配套工具（非玩法系统）——平台适配器接入真实管线机制、用例引擎与校验规则、REST/CLI 速查、配置项、隔离性保证。平台功能变更时同步本表。 |
+| `test-platform.md` | 本项目 | **网页端测试平台设计文档**（2026-08-15 建立，openspec change `add-web-test-platform`）：配套工具（非玩法系统）——平台适配器接入真实管线机制、用例引擎与校验规则、后台运行接口（202/409）、REST/CLI 速查、Dashboard 嵌入页、配置项、隔离性保证。平台功能变更时同步本表。 |
 | `mybrute/` | 外部参考 | My Brute（Motion-Twin 自动战斗页游）设计调研：wiki 资料整理 + 网络调研笔记。 |
 | `qpet-daledou/` | 外部参考 | Q宠大乐斗（早期版本，约 2010-2012）设计调研笔记。 |
 | `attribute-growth/` | 混合 | 属性成长与镜像战 TTK 调研：`xiuxian-*`、`worker-xiuxian-report.md` 为本插件蒙特卡洛模拟；`mybrute-*`、`qpet-*` 为竞品模拟；另含业界自动战斗游戏平衡方案网络调研（`auto-battle-balance-web-research.md`）。汇总分析入口 `attribute-growth-analysis.md`，本项目成长/加成平衡设计方案 `growth-balance-proposals.md`。 |

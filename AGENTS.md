@@ -210,7 +210,7 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 
 - **反馈闭环**：用户在网页写批注 → AI `annotations` 拉取（或用户直接说）→ 修改修仙插件代码 → Dashboard 重载插件 → 重跑用例/`wait` 断言确认 → 汇报。
 - **用例格式**：`cases/` 下 JSON（`name` 须与文件名一致，`description`/`scenario`/`steps` 必填；步骤 `send`/`expect`/`sleep`，`expect.match` 支持 `re:` 正则，否则子串；`conversation.pin_players` 钉固定身份测 GM/管理员路径）；示例见插件仓库 `examples/cases/`。每次运行自动建临时会话与唯一玩家身份，多次运行零污染，轨迹不随会话删除丢失。
-- **改动同步**：插件代码改动提交到独立仓库；本文档若需同步更新，rsync 见 `design_docs/test-platform.md` 使用步骤。
+- **改动同步**：插件代码改动提交到独立仓库；`design_docs/test-platform.md` 若需同步更新，按独立仓库实际代码修正（无自动同步）。
 
 ## 文档地图（必读与维护）
 
