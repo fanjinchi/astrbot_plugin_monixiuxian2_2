@@ -111,7 +111,7 @@ config 的 `trigger_condition` 经 `core/skill_manager.py`（timing_map, ~L326-3
 | **真实伤害 / 破甲** | 想不想修真 混沌真伤（10% 触发）；一念逍遥破防按百分比削防 | `pierce`（无视 X% 护甲减伤） | **已实现（pierce）**：新护甲公式下按 pierce_rate 绕过减伤；真伤（无视全部减伤）未单独实现 |
 | **免死（装死）** | QPet 装死「第一神技」致死留 1 血；MB Survival 同效果 | `survive`（survive_count 层数 + survive_recovery 恢复比例） | 已实现；建议做**奥义**而非触发技（每场一次），避免触发版反复生效 |
 | **反弹** | QPet 大海无量 100% | `reflect`（reflect_rate × 实际伤害，每回合至多 1 次、不反射反射） | 已实现；可入池但需单独评估强度 |
-| **副作用/疲劳** | 乱斗堂爆裂一击 250%+疲劳 | `fatigue`（自我 debuff，×max(0,1−value)） | 已实现；天魔解体可选配，value 已降 1.8 贴线（§6） |
+| **副作用/疲劳** | 乱斗堂爆裂一击 250%+疲劳 | `fatigue`（自我 debuff，×max(0,1−value)） | 已实现；天魔解体可选配，value 已降 1.8 贴线（§6）；验证技能 verify_fatigue_001 已入池（§6.1） |
 | **闪避/命中提升** | MB Untouchable；QPet 凌波微步 +7%、铁铲 20%、青龙戟 10% | 常驻属性 → **走心法**，不做触发技 | 闪避 cap 40% 已设；触发版闪避收益不稳定，不建议 |
 
 ### 2.3 不适用（本插件无对应系统，明确排除）
@@ -217,10 +217,15 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
 
 | id | name | 池 | 触发 | effect | value | 说明 |
 |---|---|---|---|---|---|---|
-| verify_heal_001 | 回春诀 | 通用 | attack 20% | heal | 0.25 | 治疗 25% 最大气血 |
-| verify_vampire_001 | 噬血剑意 | 灵修 | attack 20% | heal (vampire) | 0.20 | 吸血 20% 实际伤害 |
+| verify_heal_001 | 回春诀 | 通用 | attack 15% | heal | 0.25 | 治疗 25% 最大气血 |
+| verify_vampire_001 | 噬血剑意 | 灵修 | attack 15% | heal (vampire) | 0.20 | 吸血 20% 实际伤害 |
 | verify_dot_001 | 蚀骨咒 | 通用 | attack 25% | dot | 0.15（duration 3） | 每回合 15% 快照伤害 |
 | verify_survive_001 | 涅槃诀 | 通用 | 大招（必放，门槛 5） | survive | 0 | survive_count 1 |
+| verify_unavoidable_001 | 破风剑意 | 灵修 | attack 20% | unavoidable | 0 | 必中一击 |
+| verify_fatigue_001 | 燃血诀 | 通用 | attack 15% | fatigue | 0.10（duration 2, stat=damage） | 自我 debuff 攻击×0.9 两回合 |
+
+> 2026-08-17 补记：verify_fatigue_001 为疲劳效果冒烟测试而加（此前引擎 EFFECT_HANDLERS 的 14 族效果中
+> fatigue 无任何 config 技能覆盖）；spec D11 自伤交换不计入预算，validate 记 PASS（expected=0.0）。
 
 ### 6.2 新效果入池扩充（2026-08-08 v2，`trigger-effect-extensions` 后）
 
@@ -247,4 +252,4 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
 **契约列补充**：skills.csv 新增 `duration/tick_rate/heal_percent/pierce_rate/reflect_rate/survive_count` 与 `stat` 列
 （sync 契约扩展：`stat` 为 buff/debuff 作用属性 `damage/armor/speed`，缺省 damage，引擎 skill.get("stat","damage")）；
 **修正遗留 bug**：verify_dot_001 蚀骨咒设计 duration=3 此前无列未入库（引擎按缺省 1 生效），已补列后生效 3 回合。
-| verify_unavoidable_001 | 破风剑意 | 灵修 | attack 20% | unavoidable | 0 | 必中一击 |
+（verify_unavoidable_001 破风剑意已移入 §6.1 表，本节不重复。）

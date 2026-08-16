@@ -226,6 +226,25 @@
         "灵修": 1.0,
         "体修": 1.0
       }
+    },
+    {
+      "id": "verify_fatigue_001",
+      "name": "燃血诀",
+      "description": "燃烧气血换取短暂战力后力竭",
+      "trigger_skill": {
+        "name": "燃血",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.15,
+        "effect_type": "fatigue",
+        "effect_value": 0.1,
+        "duration": 2,
+        "stat": "damage"
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      }
     }
   ],
   "灵修专属": [

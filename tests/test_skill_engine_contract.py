@@ -5,7 +5,6 @@ These tests verify that real config data flows through the full pipeline
 and that engine-readable keys are present and functional.
 """
 
-import random
 import sys
 from pathlib import Path
 
@@ -172,6 +171,29 @@ async def test_all_skills_have_engine_keys(skill_manager):
         assert "trigger_rate" in ult, f"Missing trigger_rate in ultimate: {ult}"
         assert ult["trigger_rate"] >= 0, f"Negative trigger_rate: {ult}"
         assert "effect_value" in ult, f"Missing effect_value in ultimate: {ult}"
+
+
+def test_shipped_skills_cover_all_engine_effects(config_manager):
+    """Every EFFECT_HANDLERS key must be exercised by at least one shipped skill.
+
+    Guards against content gaps like the 2026-08-17 fatigue hole (engine had
+    the handler but no config skill used it), which would leave an effect
+    path untested in real config data.
+    """
+    shipped = set()
+    for skill in config_manager.skills_data.values():
+        ts = skill.get("trigger_skill")
+        if ts:
+            shipped.add(ts.get("effect_type"))
+        ult = skill.get("ultimate")
+        if ult:
+            shipped.add(ult.get("effect_type", "damage_bonus"))
+    engine_effects = set(CombatEngine.EFFECT_HANDLERS.keys())
+    uncovered = sorted(engine_effects - shipped)
+    assert not uncovered, (
+        f"引擎已实现但 config 无技能覆盖的效果: {uncovered} "
+        "（补充 verify_* 冒烟技能或修改可覆盖技能）"
+    )
 
 
 # ------------------------------------------------------------------
@@ -516,9 +538,7 @@ class TestStarUpScaling:
 @pytest.mark.asyncio
 async def test_max_star_no_increment():
     """At max star, duplicate learn does not increment star level."""
-    config = FakeConfigManager()
     db = FakeDb()
-    mgr = SkillManager(config, db)
 
     player = FakePlayer()
     # Learn to 3 stars
