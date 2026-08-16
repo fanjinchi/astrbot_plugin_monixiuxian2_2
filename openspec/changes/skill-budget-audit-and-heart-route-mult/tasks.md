@@ -37,4 +37,4 @@
 
 - [x] 6.1 运行 `uv run ruff format . && uv run ruff check .`，无错误。
 - [x] 6.2 运行 `uv run python -m pytest tests/ -v`，全部 green。
-- [ ] 6.3 在 bd 中关闭 `astrbot_plugin_monixiuxian2_2-f4t`，close reason 引用本次实现。
+- [x] 6.3 在 bd 中关闭 `astrbot_plugin_monixiuxian2_2-f4t`，close reason 引用本次实现。
