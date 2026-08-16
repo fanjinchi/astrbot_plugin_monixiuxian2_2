@@ -116,7 +116,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 **属性来源**（attribute-numerics 规范）：创角随机初始值 + 突破成功随机成长累加；**不从修为 exp 派生战斗属性，不从境界配置读逐級基础值**。
 
-**总属性计算**（models.py `get_total_attributes`）：基础四主属性 + 装备累加（含 route_multiplier 路线倍率）+ 心法被动，最后乘丹药倍率（乘区在最后）。
+**总属性计算**（models.py `get_total_attributes`）：基础四主属性 + 装备累加（含 route_multiplier 路线倍率）+ 心法被动（被动加成同样按心法的 route_multiplier 与修炼路线乘算——百分比项与 armor_value 平加项均乘，exp_multiplier 不乘），最后乘丹药倍率（乘区在最后）。
 
 ### 3.2 扩展模型（models_extended.py）
 
@@ -202,7 +202,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **装备来源 = 已领悟表（player_skills 唯一依据，v25 表）**：激活/装备功法只查 `player_skills`，储物戒中的功法秘籍物品仅作为「未领悟拥有凭据」——可设为修习目标并通过领悟判定转为已领悟，MUST NOT 参与装备判定；秘籍可经「赠予」转交他人，转交不影响源玩家已领悟状态（仍可装备）
 - **功法秘籍物品**：物品名 = 技能名即为有效凭据（商店 `items.json` 4011 基础吐纳 / 4012 铁布衫；掉落表 adventure/enemies/bounty/rift 已从旧「功法残页/远古秘籍」改为掉具体秘籍名）；items.json 4001-4010 旧功法物品已标 `legacy` 并下架（无对应技能，不可作为凭据）
 - **槽位与升星**：最多同时装备 4 本功法；重复获得同名功法自动升星强化（细节见上「升星」）
-- **路线装备池**：灵修/体修同属性池、各自专属心法/功法/武器池，通用功法对两路线应用不同倍率
+- **路线装备池**：灵修/体修同属性池、各自专属心法/功法/武器池，通用功法对两路线应用不同倍率；心法被动加成按心法 `route_multiplier` 与玩家修炼路线乘算（百分比项与 armor_value 平加项，exp_multiplier 除外）
 
 ### 4.7 PvE 与世界 Boss（过渡期状态）
 
@@ -304,9 +304,9 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 ### 4.20 设计表→config 同步管道（scripts/sync_content_to_config.py）
 
-- 读 `design_docs/content-design/` 下 weapons.csv / heart_methods.csv（skills.csv 同步推迟），按 `name` 键控 merge（同名更新/新名新增/表外不动），仅处理 status=draft/final，legacy 跳过
+- 读 `design_docs/content-design/` 下 weapons.csv / heart_methods.csv / skills.csv，按 `name` 键控 merge（同名更新/新名新增/表外不动），仅处理 status=draft/final，legacy 跳过
 - 键名映射：weapons.csv `bonus_damage` → config `damage`；引擎契约校验（trigger 四键齐全、trigger_timing 词表、rate 值域、passive_bonus 词表防静默忽略）；写盘前跑 validate_budget.py，FAIL 中止不写盘；--dry-run 输出变更摘要
-- 已用本脚本入库：武器 v1（9 标杆件 + 狼牙棒）、心法 v1（17 draft）
+- 已用本脚本入库：武器 v1（9 标杆件 + 狼牙棒）、心法 v1（18 draft，含 route_multiplier 路线倍率字段）、skills.csv 全量（2026-08-08 `implement-content-design` 起）
 
 ---
 

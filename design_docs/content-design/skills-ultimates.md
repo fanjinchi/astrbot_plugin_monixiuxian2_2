@@ -46,8 +46,10 @@ config 的 `trigger_condition` 经 `core/skill_manager.py`（timing_map, ~L326-3
 > `effect` → `effect_type`（设计表 skills.csv 同步改为 `effect_type` 列），
 > `combat_manager` 重构为 `EFFECT_HANDLERS` 注册表分发，功法与武器挂载技共用入口，
 > 未知 effect_type 记 warning 并跳过、不中断战斗。
-> **遗留：修复生效后现有功法超 G2 预算**（御剑术 25%×1.5=+37.5%、撼山劲 20%×1.8=+36%），
-> 由 bd `dhh` 跟踪，随功法池重做一并下调（未上线可接受）。
+> **遗留已闭环**：修复生效后旧功法超 G2 预算的问题（御剑术 25%×1.5=+37.5%、撼山劲
+> 20%×1.8=+36%）已由 bd `dhh` 跟踪并随功法池重做下调/替换；2026-08-16 change
+> `skill-budget-audit-and-heart-route-mult` 正式审计通过（validate_budget 全 PASS），
+> `dhh` 已关闭。
 > 武器挂载技（绕过归一化）必须直接用引擎键，见 `weapon-skills.md` §0。
 
 ### 1.3 大招机制（必放制，change `skill-engine-fit-and-content-sync` 落地）
@@ -62,7 +64,8 @@ config 的 `trigger_condition` 经 `core/skill_manager.py`（timing_map, ~L326-3
   逆袭型（自身低血）、延迟型（纯行动数）。
 - **当前实现不读 `effect` 类型**：一律 `ultimate_mult += effect_value`，即当次伤害
   **×(1 + effect_value)**。config 里的 `massive_damage` 只是描述性标签。
-  → 万剑归宗 3.0 = 当次 ×4.0；开天辟地 3.5 = 当次 ×4.5（降档至 2.0 档 ×3.0 随 bd `dhh`）。
+  → 万剑归宗现为 2.0 = 当次 ×3.0（原 3.0 已降档）；开天辟地（原 3.5）已从池中移除
+  （bd `dhh` 审计闭环，2026-08-16）。
 - 要做非伤害型大招（治疗/控制/免死）需要先在 ultimate 分支加 effect 分发（bd `tt3`）。
 
 ### 1.4 升星（`core/skill_manager.py`，change `skill-engine-fit-and-content-sync` 落地）
@@ -130,7 +133,7 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
 
 | 奥义类型 | 原型（出处·数值） | 建议 value / 机制 | 代码支持 | 备注 |
 |---|---|---|---|---|
-| **爆发倍率**（现有） | MB Hammer 空手 400%；Deluge 投 6 武器不可格挡；乱斗堂爆裂一击 250%+下回合疲劳 | `massive_damage` 2.0–3.5（→ 当次 ×3–4.5） | ✓ | **现有万剑归宗 3.0 / 开天辟地 3.5 超 G2 预算**（×4/+43%、×4.5/+50%，按 rate=100% 估），核对 trigger_rate 后定下调方案 |
+| **爆发倍率**（现有） | MB Hammer 空手 400%；Deluge 投 6 武器不可格挡；乱斗堂爆裂一击 250%+下回合疲劳 | `massive_damage` 2.0–3.5（→ 当次 ×3–4.5） | ✓ | 旧配置超 G2 预算已闭环：万剑归宗降至 2.0（当次 ×3.0）、开天辟地移除（bd `dhh`，2026-08-16 审计通过） |
 | **治疗** | QPet 矿泉水 25% 并立即攻击；师傅驾到 20%+下次必中；Tragic Potion | `heal` 0.25–0.40 × 最大气血 | ✗ | 体修/气血流续航大招；value 对标 2–3 击伤害 |
 | **控制** | MB Net 困住至受击；QPet 胶水 3 回合 | `stun` 1–2 回合（必中版） | ✗ | 等效 1–2 个攻击窗口，强度对标 value 2–4，但体验更戏剧化 |
 | **免死** | QPet 装死；MB Survival；霸气护体 2 次格挡 50% | `survive_lethal`（致死留 1 血，每场一次） | ✗ | 防守向招牌，传播性好；净收益 ≈ 对手 1 击，天然贴合预算 |
@@ -162,7 +165,7 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
 
 ## 5. 开放问题
 
-- [x] 两大招 trigger_rate 核对 → 已定案：**必放制**（§1.3），config 不填概率；3.0/3.5 超预算降档随 bd `dhh`
+- [x] 两大招 trigger_rate 核对 → 已定案：**必放制**（§1.3），config 不填概率；3.0/3.5 超预算已降档闭环（万剑归宗 2.0、开天辟地移除，bd `dhh` 2026-08-16 关闭）
 - [x] `combo` 语义 → 已接受现状：倍率叠加+栈上限，不做「额外打一回合」（§1.2 备注）
 - [x] 非伤害型奥义分发 → 已实现（2026-08-08 `trigger-effect-extensions`：大招统一走 EFFECT_HANDLERS，非伤害效果经 gate+限次后分发；legacy 无 effect_type 默认 damage_bonus 兼容）
 - [x] 副作用/疲劳机制 → 已实现（`fatigue` effect_type，自我 debuff）；天魔解体（§6）已降 value 至 1.8 闭环，疲劳副作用可选配
@@ -183,9 +186,9 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
 - 斩杀/延迟/复合大招 → 传承池，learn_coefficient 0.3–0.5 稀有（draft_zhenlong / jiujian / xiuluo / tianmo / zhonghun）
 - 大招全为伤害型（加性 value 1.5–2.0 = 当次 ×2.5–3.0），必放制不填概率，全部带解锁门槛
   （斩杀型 opp_hp_below / 逆袭型 self_hp_below / 延迟型 min_action_index）
-- 万剑归宗重做：3.0 → 2.0（bd `dhh` 降档）；已于 2026-08-08 同步 config（name 覆盖 + id 保留 `spirit_001`，player_skills 引用不中断）
+- 万剑归宗重做：3.0 → 2.0（bd `dhh` 降档，2026-08-16 `dhh` 审计闭环）；已于 2026-08-08 同步 config（name 覆盖 + id 保留 `spirit_001`，player_skills 引用不中断）
 
-**待实现部分（needs_code，未入 CSV 或已入但需引擎扩展；归口 bd `dhh`）**：
+**待实现部分（needs_code，未入 CSV 或已入但需引擎扩展）**：
 
 > 2026-08-08 `trigger-effect-extensions` 后：heal/吸血、持续 BUFF/DEBUFF、DOT、必中、
 > 免死、反弹、疲劳均已引擎实现（EFFECT_HANDLERS 14 族），**可入池**；
@@ -197,14 +200,14 @@ value 击摊到全场）。中体量 TTK≈7、rate=100% 时 value≤2.1 才满�
 | 持续 BUFF/DEBUFF（残影 速度+50%、降攻、BUFF 20–100%） | QPet/无极仙途 | **已实现**（buff/debuff+StatusEffect），未入 CSV | — |
 | DOT（企鹅挠痒、真·青龙戟带毒） | QPet | **已实现**（dot+snapshot），未入 CSV | — |
 | 必中/不可反击（判官笔、狂魔镰、天使之翼） | QPet | **已实现**（unavoidable 一次性标记），未入 CSV | — |
-| 真伤/破甲（混沌真伤、破防） | 想不想修真/一念逍遥 | 破甲已实现（pierce，无视 X% 减伤）；**真伤（无视全部减伤）未实现** | dhh 高境界防拖 |
+| 真伤/破甲（混沌真伤、破防） | 想不想修真/一念逍遥 | 破甲已实现（pierce，无视 X% 减伤）；**真伤（无视全部减伤）未实现** | 高境界防拖（原归口 `dhh` 已关闭，随 `hz7` 跟踪） |
 | 免死（装死、Survival） | QPet/MB | **已实现**（survive 层数+recovery），建议大招位，验证技能见 §6.1 | — |
 | 反弹（大海无量 100%） | QPet | **已实现**（reflect，1/回合、不反射反射）；强度需单独评估 | — |
 | 副作用/疲劳（爆裂一击 250%+疲劳） | 乱斗堂 | **已实现**（fatigue）；天魔解体已入 CSV 且已降 value 至 1.8（贴线缓解） | 可选配 |
 | 多段连发（势如暴雨、真·铅球） | QPet | 用 combo 近似入池 | multi_hit 可选 |
 | 秒杀（神来一击 5–8% 降至 1 血） | QPet | 排除（§2.3）；以真龙诀斩杀替代 | 需 hp_execute 才可做 |
 
-> 跟踪：总进度 bd `hz7`；数值配平/降档 bd `dhh`；效果引擎化 bd `tt3`（2026-08-08 已闭环）。
+> 跟踪：总进度 bd `hz7`；数值配平/降档 bd `dhh`（2026-08-16 审计通过、已关闭）；效果引擎化 bd `tt3`（2026-08-08 已闭环）。
 > 入库：skills.csv → config 已同步（2026-08-08 `implement-content-design`：reconcile 全量重导 20 行、`spirit_001` 万剑归宗、天魔解体 1.8；schema-and-engine-fit.md §4 已更新）。
 > 验证技能：§6.1 新增 5 行（治疗/吸血/DOT/免死大招/必中），2026-08-08 随 `trigger-effect-extensions` 同步入库。
 

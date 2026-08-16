@@ -61,7 +61,7 @@ flowchart TD
 | 闭关修炼 | 「闭关/出关」 | 开始记时间戳、出关结算（离线收益）；`exp = 100/min × 分钟 × 灵根倍率 × (1+心法) × 丹药`；上限 1440+360×大境界分钟；每满 2h 一次领悟判定 15%（需心法，限配套池+修习目标） |
 | 突破 | 「突破」 | 成功率按大境界查表（练气100/筑基80/金丹65/元婴55/化神50/炼虚45/合体+40 地板）+ level_up_rate 永久加成 + 丹药，连败保底每败+5%、19 必成；失败死亡 uniform(0.5%,3%)×丹药倍率，死亡删号（回生丹复活减半）；未死惩罚 E(L)×25%；**方案A 成长**：hp+15 独立通道 + 5 点加权随机（伤害60/身法25/迅捷15） |
 | 丹药 | 「炼丹/服用」 | 临时丹 60min tick；永久丹每境界增益 ≤ 该属性基础增量 30%；倍率乘区 `1+Σ临时+Σ永久`；重置丹返 50% 价；定魂丹免一次负面；回生丹复活 |
-| 装备 | 「装备/卸下」 | 槽位=武器+防具+主心法+功法×4（max_technique_slots）；词条：四主属性 + base_damage/weapon_coefficient_k + armor_value + route_multiplier（路线倍率，仅乘属性词条）+ trigger_skills + passive_bonus + skill_pool |
+| 装备 | 「装备/卸下」 | 槽位=武器+防具+主心法+功法×4（max_technique_slots）；词条：四主属性 + base_damage/weapon_coefficient_k + armor_value + route_multiplier（路线倍率，乘属性词条与心法被动加成）+ trigger_skills + passive_bonus + skill_pool |
 | 商店/储物戒 | 「商店/储物戒」 | 6h 刷新、折扣 0.8~1.2、权重加权不放回；储物戒 20 格、每物品占 1 格、丹药不可入 |
 | 战斗引擎 | 「切磋/决斗/传承PK/历练/秘境/Boss」 | CombatEngine 统一结算：出手权=迅捷加权，行动上限 200；判定链=出手权→闪避→格挡→暴击→触发技→大招→伤害；伤害=floor((base_damage+伤害×K)×倍率×U(0.95,1.05))；护甲**百分比**减伤 `armor/(armor+100+10×L)`，总减伤 ≤40%；caps：闪避 0.4/格挡 0.3/暴击率 0.5/暴击倍率 1.5；战报按合并条数输出（默认 10） |
 | 技能/领悟 | 「领悟/修习」 | 挂载制（无独立技能栏）；触发技引擎契约四键 `trigger_timing/effect_type/trigger_rate/effect_value`，EFFECT_HANDLERS 注册表分发 14 种效果键（13 个处理函数，combo 复用 damage_bonus 处理器；damage_bonus/combo/stun/counter/damage_reduction + heal/dot/buff/debuff/pierce/unavoidable/survive/reflect/fatigue），功法武器共用；持续状态机制：同名同源刷新、异源同型叠加上限默认 3 层（config 可调）、战斗结束全清（battle-status-effects spec）；大招**必放制**（注入 rate=1.0，config 不填概率）+ 解锁门槛（min_action_index + 血量阈值）；升星 3 星封顶、×(1.1)^(星级-1) 乘法、满星补偿 50% 修为；领悟池=配套池（系数加权）+修习目标+（仅突破）通用池 5%；**装备=已领悟表（player_skills）唯一依据**，储物戒秘籍仅作领悟凭据（物品名=技能名，商店 4011/4012 可购，掉落掉具体秘籍；旧 4001-4010 已 legacy 下架） |
@@ -79,7 +79,7 @@ flowchart TD
 | 传承/传道 PK | 「传承」 | 传道 PK 累积 impart_value → 等阶阈值自动发奖励；PK 走统一引擎 |
 | 炼丹 | 「炼丹」 | 成功率=min(95, 配方 50 + (L-要求)×2)；失败材料全损 |
 | GM 工具 | 「修仙GM/修仙GM帮助」 | GM_ADMINS 独立权限；属性修改/给装备物品/卸装/清除CD（需确认）/强制结算/生成Boss；JSON 审计日志 500MB 滚动 |
-| 内容同步管道 | scripts/sync_content_to_config.py | weapons/heart_methods CSV→config（name 键控、契约校验、预算闸门），skills 随功法池重做 |
+| 内容同步管道 | scripts/sync_content_to_config.py | weapons/heart_methods/skills CSV→config（name 键控、契约校验、预算闸门） |
 
 **排行榜**：战力 = 伤害 + 身法 + 迅捷 + 气血 + 护甲//2（含装备、不含临时丹；排行榜与玩家信息同公式）。
 
@@ -118,6 +118,7 @@ flowchart TD
 | 2026-08-08 | content-design sync pipeline 落地 | CSV→config 同步实装（route_multiplier、心法路线校验）；ocr 评审后 reconcile 加固 |
 | 2026-08-09 | 技能池 v2 扩展 | 12 个新效果族技能入库（content-design → config） |
 | 2026-08-11 | `novel-reading-extraction` 归档 | 小说内容提取资料库建立 + spec 归档 |
+| 2026-08-16 | `skill-budget-audit-and-heart-route-mult` 归档 | dhh 预算审计闭环（validate_budget 全 PASS）、心法被动 route_multiplier 落地（f4t 关闭）、v3.8.1 |
 
 **数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底（当前最新）。
 
@@ -126,12 +127,12 @@ flowchart TD
 | bd | 内容 | 与 design_docs 的关系 |
 |---|---|---|
 | `hz7` | 武器/功法/心法内容设计（照搬 MB/QPet 适配） | 主战场：`content-design/` 工作区 |
-| `dhh` | 功法修复后数值配平（触发技/大招拉到 G2 预算；大招 3.0/3.5 降档 2.0） | 依据 `content-design/skills-ultimates.md` §6 折算公式 |
 | `9u2` | Boss/PvE 模块重做（独立境界基准表落地 attribute-numerics PvE 需求） | 待玩家侧定稿后锚定 |
-| `f4t` | 心法 route_mult 机制（被动按路线乘算） | 涉及 passive_bonus 消费点 |
 | `56y` | 固定收益类修为来源平衡（修为丹/商店/灵眼/福地/灵田/悬赏/秘境） | 依据 `level-exp-curve/balance-recommendations.md` |
 | `cqt` | 突破保命道具设计（占位） | — |
 | `cti` / `ehd` | 冻结平衡配置到 default_configs.py（两条同名，疑似重复建单，待去重） | 涉及 config 与 default_configs 的一致性 |
+
+> 已闭环移出：`dhh`（功法数值配平，2026-08-16 审计通过）、`f4t`（心法 route_mult 机制，2026-08-16 落地），均见 change `skill-budget-audit-and-heart-route-mult`。
 
 ## 7. 设计资料导航与维护约定
 
