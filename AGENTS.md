@@ -191,25 +191,9 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 
 > 为修仙插件搭建的**贴近真实环境**测试平台：模拟玩家私聊/群聊消息走 AstrBot 真实管线（filter → Handler → 白名单 → 数据库 → 定时任务），消息流双向可见、可批注、可自动化用例。设计文档：`design_docs/test-platform.md`；**插件代码在独立仓库** `~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/`（独立 git 仓库，不在本仓库维护）。
 
-- **启用**：该目录已在 AstrBot 插件加载路径；Dashboard → 平台管理 → 启用「网页测试平台 (webtest)」（可改 host/port/access_token）。网页入口二选一：
-  - 浏览器直接打开 `http://127.0.0.1:8765`（独立入口；局域网访问需把 host 配成 `0.0.0.0` 并建议设 token）；
-  - Dashboard 插件详情 → 页面（`pages/main` 嵌入版，iframe 加载，token 仅会话内有效）。
-- **AI 调用与读取结果**（AstrBot uv 环境）：
-
-  ```bash
-  cd ~/code/AstrBot
-  export WEBTEST_URL=http://127.0.0.1:8765 WEBTEST_TOKEN=<token>   # 或 --url/--token
-  CLI=data/plugins/astrbot_plugin_testplatform/scripts/test_platform_cli.py
-  uv run python $CLI case run <case>                       # 一键跑用例（退出码/输出含逐步骤结果）
-  uv run python $CLI case run-all --tag <tag>              # 按标签批量
-  uv run python $CLI wait --conversation N --expect "子串" --timeout 30   # 断言：0=命中 1=超时
-  uv run python $CLI feed --conversation N                 # 拉取双向消息流
-  uv run python $CLI runs show --id <id>                   # 运行轨迹：步骤结果+实际回复+消息快照
-  uv run python $CLI annotations --conversation N          # 拉取用户在网页上的批注
-  ```
-
-- **反馈闭环**：用户在网页写批注 → AI `annotations` 拉取（或用户直接说）→ 修改修仙插件代码 → Dashboard 重载插件 → 重跑用例/`wait` 断言确认 → 汇报。
-- **用例格式**：`cases/` 下 JSON（`name` 须与文件名一致，`description`/`scenario`/`steps` 必填；步骤 `send`/`expect`/`sleep`，`expect.match` 支持 `re:` 正则，否则子串；`conversation.pin_players` 钉固定身份测 GM/管理员路径）；示例见插件仓库 `examples/cases/`。每次运行自动建临时会话与唯一玩家身份，多次运行零污染，轨迹不随会话删除丢失。
+- **Skill 可用（首选入口）**：`.agents/skills/testing-astrbot-plugins-via-webtest` 是指向测试平台仓库 `skill/` 的符号链接，由测试平台网页端「Skill 分发」弹层维护（勾选建链接/取消删链接；**不要手动编辑链接内的文件**，改动要在测试平台仓库进行）。支持项目级 skills 的 agent 会自动发现它——**手动探测、JSON 用例编写与回归、热重载、批注读取等详细操作一律以该 SKILL.md 为准**，本节只保留项目级约定。
+- **启用前提**：Dashboard → 平台管理 → 启用「网页测试平台 (webtest)」；网页入口 `http://127.0.0.1:8765` 或 Dashboard 插件详情 → 页面（嵌入版）。skill 里的前置检查（`/api/status` 应返回 `adapter_ready: true`）失败时先启用平台。
+- **反馈闭环**：用户在网页写批注 → AI 拉取批注（方式见 SKILL.md 工作流 D）→ 修改修仙插件代码 → 热重载（`POST /api/ops/plugin-reload`，与 Dashboard 重载同一底层但不走登录态）→ 重跑用例/`wait` 断言确认 → 汇报。
 - **改动同步**：插件代码改动提交到独立仓库；`design_docs/test-platform.md` 若需同步更新，按独立仓库实际代码修正（无自动同步）。
 
 ## 功能测试套件（项目内用例与结果归档）
@@ -222,7 +206,7 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 - **运行用例**：支持脚本或平台 CLI：
   - `uv run python scripts/test_suite_ctl.py run --tag <tag> [--repeat N]`
   - `uv run python scripts/test_suite_ctl.py run --case <name> [--repeat N]`
-  - 或平台 CLI：`uv run python $CLI case run <case>` / `uv run python $CLI case run-all --tag <tag>`。
+  - 或平台 CLI（详细用法见 SKILL.md）：`uv run python data/plugins/astrbot_plugin_testplatform/scripts/test_platform_cli.py case run <case>` / `case run-all --tag <tag>`。
   - 依赖环境变量 `WEBTEST_URL` / `WEBTEST_TOKEN`（同平台 CLI）。
 - **结果归档**：`uv run python scripts/test_suite_ctl.py export --target <target> [--date <YYYY-MM-DD>]`
   - 写入 `functional_tests/results/<YYYY-MM-DD>_<target>/summary.md` + `cases/` + `messages/`；
