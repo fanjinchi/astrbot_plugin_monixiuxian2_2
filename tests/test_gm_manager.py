@@ -62,6 +62,11 @@ def mock_config_manager():
     ]
     cm.items_data = {"灵草": {"name": "灵草"}, "青锋剑": {"name": "青锋剑"}}
     cm.weapons_data = {"青锋剑": {"name": "青锋剑"}}
+    cm.pills_data = {}
+    cm.exp_pills_data = {}
+    cm.utility_pills_data = {}
+    cm.storage_rings_data = {}
+    cm.heart_methods_data = {"长春功": {"name": "长春功"}}
 
     def get_level_name(level_index, cultivation_type="灵修"):
         data = cm.body_level_data if cultivation_type == "体修" else cm.level_data
@@ -358,6 +363,24 @@ class TestSetNumericAttributes:
 
         assert success is False
         assert "不存在" in msg
+
+    @pytest.mark.asyncio
+    async def test_give_heart_method(self, gm_manager, mock_db, mock_managers):
+        """Regression (bd 7px): heart methods must pass _item_exists validation."""
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+        mock_managers["storage_ring_manager"].store_item = AsyncMock(
+            return_value=(True, "")
+        )
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_give_item(event, "长春功")
+
+        assert success is True
+        assert "长春功" in msg
+        mock_managers["storage_ring_manager"].store_item.assert_awaited_once_with(
+            player, "长春功", 1, silent=True
+        )
 
 
 class TestClearCD:

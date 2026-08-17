@@ -216,12 +216,22 @@ class GMManager:
             return None
 
     def _item_exists(self, item_name: str) -> bool:
-        """检查物品是否存在于配置中。"""
-        if item_name in self.config_manager.items_data:
-            return True
-        if item_name in self.config_manager.weapons_data:
-            return True
-        return False
+        """检查物品是否存在于配置中（覆盖所有已配置的物品类型）。
+
+        包含物品、武器、各类丹药、储物戒与心法配置表；
+        不可入戒的类型（丹药、储物戒）由下游 store_item 拦截并给出明确提示。
+        """
+        cm = self.config_manager
+        item_tables = (
+            cm.items_data,
+            cm.weapons_data,
+            cm.pills_data,
+            cm.exp_pills_data,
+            cm.utility_pills_data,
+            cm.storage_rings_data,
+            cm.heart_methods_data,
+        )
+        return any(item_name in table for table in item_tables)
 
     # ========== 分发入口 ==========
 

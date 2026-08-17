@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.8.0  
+> **版本:** v3.8.2  
 > **许可证:** AGPL-3.0  
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -308,6 +308,20 @@ astrbot_plugin_monixiuxian2/
 ---
 
 ## 📝 更新日志
+
+---
+
+### v3.8.2 - 功能测试 Bug 修复（切磋 / 忙碌落库 / GM 发放）
+
+**🔧 修复问题**
+- 修复「切磋」命令 `UnboundLocalError`：`handle_spar` 补上统一战斗引擎调用（bd `tbp`，由测试平台 `pvp-basic-spar` 用例发现）
+- 修复 `set_user_busy` 只 UPDATE 不 INSERT：改为 upsert，无 `user_cd` 行的玩家进入闭关/历练等忙碌状态时也会落库，双层状态检查保持一致（bd `qv9`）
+- 修复 GM「给予装备/给予物品」无法发放心法：`_item_exists` 校验范围扩展到全部已配置物品类型（含心法、丹药、储物戒等），不可入戒类型由下游 `store_item` 给出明确提示（bd `7px`）
+
+**🧪 测试**
+- 新增 `tests/test_user_busy_upsert.py`：覆盖 upsert 插入/更新/置闲场景
+- `tests/test_combat_handlers.py` 新增切磋引擎调用回归用例；`tests/test_gm_manager.py` 新增 GM 给予心法回归用例
+- OpenSpec 变更：`openspec/changes/fix-functional-test-bugs/`
 
 ---
 

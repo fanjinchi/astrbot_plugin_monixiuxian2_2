@@ -409,7 +409,7 @@ class DatabaseExtended:
         scheduled_time: int = 0,
         extra_data: dict = None,
     ):
-        """设置用户忙碌状态
+        """设置用户忙碌状态（无 user_cd 行时自动插入，保证双层状态检查一致）
 
         Args:
             user_id: 用户ID
@@ -422,10 +422,15 @@ class DatabaseExtended:
         extra_json = json.dumps(extra_data or {}, ensure_ascii=False)
         await self.conn.execute(
             """
-            UPDATE user_cd SET type = ?, create_time = ?, scheduled_time = ?, extra_data = ?
-            WHERE user_id = ?
+            INSERT INTO user_cd (user_id, type, create_time, scheduled_time, extra_data)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                type = excluded.type,
+                create_time = excluded.create_time,
+                scheduled_time = excluded.scheduled_time,
+                extra_data = excluded.extra_data
             """,
-            (busy_type, int(time.time()), scheduled_time, extra_json, user_id),
+            (user_id, busy_type, int(time.time()), scheduled_time, extra_json),
         )
         await self.conn.commit()
 

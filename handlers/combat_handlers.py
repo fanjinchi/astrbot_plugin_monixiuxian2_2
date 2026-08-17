@@ -207,6 +207,9 @@ class CombatHandlers:
             yield event.plain_result("❌ 双方都需要踏入修仙之路")
             return
 
+        # 调用统一战斗引擎结算（1=切磋，不产生实质惩罚）
+        result = await self.combat_mgr.player_vs_player(p1, p2, combat_type=1)
+
         # 写入最终气血（切磋原本不消耗，但统一引擎可能修正数值）
         p1.hp = result["player1_final_hp"]
         p2.hp = result["player2_final_hp"]
