@@ -183,6 +183,12 @@ class ShopHandler:
 
         price = target_item["price"]
         total_price = price * quantity
+
+        # 宗门职阶折扣（默认/玩家宗门通用，读 positions benefits.shop_discount）
+        sect_discount = self.shop_manager.get_sect_shop_discount(player)
+        if sect_discount < 1.0:
+            total_price = max(1, int(total_price * sect_discount))
+
         if player.gold < total_price:
             yield event.plain_result(
                 f"灵石不足！\n【{target_item['name']}】价格: {price} 灵石\n"
@@ -290,6 +296,10 @@ class ShopHandler:
             await self.db.conn.commit()
 
             result_lines.append(f"花费灵石: {total_price}，剩余: {player.gold}")
+            if sect_discount < 1.0:
+                result_lines.append(
+                    f"🏛️ 宗门职阶折扣已生效（{sect_discount * 100:.0f}折）"
+                )
             result_lines.append(
                 f"剩余库存: {remaining}" if remaining > 0 else "该物品已售罄！"
             )

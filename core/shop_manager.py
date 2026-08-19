@@ -427,6 +427,40 @@ class ShopManager:
         # 其他类型保持不变
         return original_type
 
+    def get_sect_shop_discount(self, player) -> float:
+        """Return the shop discount granted by the player's sect position.
+
+        Reads ``positions.<position>.benefits.shop_discount`` from
+        sect_config.json (shared by system and player-built sects). Returns
+        1.0 (no discount) when the player has no sect or the config is
+        missing/invalid.
+
+        Args:
+            player: The purchasing player.
+
+        Returns:
+            Discount multiplier in (0, 1]; 1.0 means full price.
+        """
+        if getattr(player, "sect_id", 0) in (0, None):
+            return 1.0
+        sect_config = getattr(self.config_manager, "sect_config", None)
+        if not isinstance(sect_config, dict):
+            return 1.0
+        positions = sect_config.get("positions", {})
+        info = positions.get(str(getattr(player, "sect_position", 4)), {})
+        if not isinstance(info, dict):
+            return 1.0
+        benefits = info.get("benefits", {})
+        if not isinstance(benefits, dict):
+            return 1.0
+        try:
+            discount = float(benefits.get("shop_discount", 1.0))
+        except (TypeError, ValueError):
+            return 1.0
+        if not 0 < discount < 1.0:
+            return 1.0
+        return discount
+
     def find_item_by_name(self, name: str) -> dict | None:
         """根据名称查找物品"""
         for weapon in self.config_manager.weapons_data.values():

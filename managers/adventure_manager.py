@@ -46,6 +46,9 @@ if TYPE_CHECKING:
 class AdventureManager:
     """历练系统管理器"""
 
+    # 宗门专属事件组追加进路线抽取池时使用的固定权重
+    SECT_EVENT_GROUP_WEIGHT = 15
+
     CONFIG_FILE = (
         Path(__file__).resolve().parents[1] / "config" / "adventure_config.json"
     )
@@ -279,7 +282,8 @@ class AdventureManager:
         adventure_duration = now - user_cd.create_time
         scheduled_duration = max(1, user_cd.scheduled_time - user_cd.create_time)
         effective_duration = min(adventure_duration, scheduled_duration)
-        event = self._trigger_route_event(route)
+        faction_id = await self._get_player_faction_id(player)
+        event = self._trigger_route_event(route, faction_id)
 
         combat_msg = ""
         combat_result = None
@@ -352,6 +356,7 @@ class AdventureManager:
             "bounty_progress": max(
                 1, route.get("bounty_progress", 1) + event.get("bonus_progress", 0)
             ),
+            "pve_won": bool(rewards.get("pve_won", False)),
         }
         return True, msg, reward_data
 
@@ -402,9 +407,66 @@ class AdventureManager:
         normalized = token.strip().lower()
         return self.route_alias_index.get(normalized, self.default_route_key)
 
-    def _trigger_route_event(self, route: dict) -> dict:
-        """Weighted-random pick an event group for the route, then uniformly pick one event from it."""
-        weights = route.get("event_weights", {})
+    async def _get_player_faction_id(self, player: Player) -> str | None:
+        """Resolve the faction_id of the player's sect (None when sectless or a player-built sect)."""
+        sect_id = getattr(player, "sect_id", 0)
+        if not isinstance(sect_id, int) or not sect_id:
+            return None
+        if self.db is None or getattr(self.db, "ext", None) is None:
+            return None
+        sect = await self.db.ext.get_sect_by_id(sect_id)
+        if sect is None:
+            return None
+        return getattr(sect, "faction_id", None)
+
+    def _filter_group_events(
+        self, events: list[dict], faction_id: str | None
+    ) -> list[dict]:
+        """Keep events with no sect attribution plus events matching the player's sect faction."""
+        return [
+            event
+            for event in events
+            if isinstance(event, dict)
+            and (not event.get("sect_id") or event.get("sect_id") == faction_id)
+        ]
+
+    def _build_event_weight_pool(
+        self, route: dict, faction_id: str | None
+    ) -> dict[str, int]:
+        """Build the effective event-group weight pool for a route and player faction.
+
+        Groups whose events all carry a mismatched ``sect_id`` are dropped.
+        Sect groups (any event carrying ``sect_id``) not referenced by the
+        route are appended with ``SECT_EVENT_GROUP_WEIGHT`` when the player
+        belongs to that sect.
+        """
+        weights: dict[str, int] = {}
+        for key, weight in (route.get("event_weights", {}) or {}).items():
+            group = self.event_groups.get(key)
+            if group is None:
+                weights[key] = weight
+                continue
+            if self._filter_group_events(group, faction_id):
+                weights[key] = weight
+        if faction_id:
+            for key, events in self.event_groups.items():
+                if key in weights:
+                    continue
+                if not any(
+                    isinstance(event, dict) and event.get("sect_id") for event in events
+                ):
+                    continue
+                if self._filter_group_events(events, faction_id):
+                    weights[key] = self.SECT_EVENT_GROUP_WEIGHT
+        return weights
+
+    def _trigger_route_event(self, route: dict, faction_id: str | None = None) -> dict:
+        """Weighted-random pick an event group for the route, then uniformly pick one event from it.
+
+        Sect-attributed groups/events only enter the pool when the player's
+        sect faction matches; everything else is unchanged.
+        """
+        weights = self._build_event_weight_pool(route, faction_id)
         if not weights:
             group_key = "standard"
         else:
@@ -423,7 +485,14 @@ class AdventureManager:
             or self.event_groups.get("standard")
             or self.DEFAULT_CONFIG["event_groups"]["standard"]
         )
-        return random.choice(group)
+        eligible = self._filter_group_events(group, faction_id)
+        if not eligible:
+            eligible = self._filter_group_events(
+                self.event_groups.get("standard")
+                or self.DEFAULT_CONFIG["event_groups"]["standard"],
+                faction_id,
+            )
+        return random.choice(eligible)
 
     def _calculate_rewards(
         self, player: Player, route: dict, duration: int, event: dict

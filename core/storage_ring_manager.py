@@ -61,6 +61,31 @@ class StorageRingManager:
         """检查物品是否为丹药类型"""
         return self.config_manager.is_pill(item_name)
 
+    def is_sect_bound_item(self, item_name: str) -> bool:
+        """Check whether an item is sect property that must not leave the sect.
+
+        Looks up the item's config entry (weapons/items/heart methods/skills)
+        for sect attribution markers (``sect_id`` / ``treasure`` /
+        ``sect_bound``). Such items are blocked from gifting/trading paths;
+        personal items without any marker are unaffected.
+        """
+        for source in (
+            getattr(self.config_manager, "weapons_data", None),
+            getattr(self.config_manager, "items_data", None),
+            getattr(self.config_manager, "heart_methods_data", None),
+            getattr(self.config_manager, "skills_data", None),
+        ):
+            if not isinstance(source, dict):
+                continue
+            config = source.get(item_name)
+            if isinstance(config, dict) and (
+                config.get("treasure")
+                or config.get("sect_bound")
+                or config.get("sect_id")
+            ):
+                return True
+        return False
+
     def can_store_item(self, item_name: str) -> tuple[bool, str]:
         """检查物品是否可以存入储物戒"""
         # 丹药不能存入储物戒

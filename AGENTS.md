@@ -232,7 +232,7 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 **注释约定**：
 
 - 运行时代码（main.py、handlers/、managers/、core/、data/、utils/）非 dunder 函数/类均有 docstring（design_docs/ 下的调研脚本除外）；**新代码一律用英文 Google 风格 docstring**（存量中文 docstring 保留，不强制改写），用户可见输出仍为中文。
-- main.py 的 103 个路由方法 docstring 遵循固定格式：`"""Command 「指令名」- 描述; routes to xxx_handler.handle_yyy."""`（描述段与下游调用按实际填写）——新指令照此格式写，它是 AI 定位的第一跳。
+- main.py 的 109 个路由方法 docstring 遵循固定格式：`"""Command 「指令名」- 描述; routes to xxx_handler.handle_yyy."""`（描述段与下游调用按实际填写）——新指令照此格式写，它是 AI 定位的第一跳。
 - 修改函数行为时同步更新其 docstring；docstring 与实现不一致视为 bug。
 
 ## Issue Tracking with bd (beads)

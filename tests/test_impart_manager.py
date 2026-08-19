@@ -433,5 +433,5 @@ async def test_impart_info_not_found():
 
 @pytest.mark.asyncio
 async def test_latest_db_version_bumped():
-    """Ensure the migration version was bumped for this rework."""
-    assert LATEST_DB_VERSION == 27
+    """Ensure the migration version was bumped for the sect-growth schema."""
+    assert LATEST_DB_VERSION == 30

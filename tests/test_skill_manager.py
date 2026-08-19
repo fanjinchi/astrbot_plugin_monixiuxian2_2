@@ -26,6 +26,7 @@ class FakeDbExt:
 
     def __init__(self):
         self.player_skills: dict[tuple[str, str], dict] = {}
+        self.sects: dict[int, object] = {}
 
     async def get_learned_skills(self, user_id: str) -> list[dict]:
         return [
@@ -53,6 +54,8 @@ class FakeDbExt:
         source: str = "",
         max_star: int = 3,
         max_star_exp_compensation: int = 0,
+        origin_sect_id: str | None = None,
+        sect_bound: bool = False,
     ) -> tuple[bool, int]:
         import time
 
@@ -63,6 +66,8 @@ class FakeDbExt:
                 "star_level": 1,
                 "source": source,
                 "learned_at": now,
+                "origin_sect_id": origin_sect_id,
+                "sect_bound": sect_bound,
             }
             return True, 1
         current_star = self.player_skills[key]["star_level"]
@@ -72,6 +77,9 @@ class FakeDbExt:
         self.player_skills[key]["source"] = source
         self.player_skills[key]["learned_at"] = now
         return False, self.player_skills[key]["star_level"]
+
+    async def get_sect_by_id(self, sect_id: int):
+        return self.sects.get(sect_id)
 
 
 class FakeDb:
@@ -92,6 +100,7 @@ class FakePlayer:
         self.weapon = kwargs.get("weapon", "")
         self.armor = kwargs.get("armor", "")
         self.cultivation_type = kwargs.get("cultivation_type", "灵修")
+        self.sect_id = kwargs.get("sect_id", 0)
 
     def get_techniques_list(self) -> list[str]:
         try:
@@ -158,6 +167,35 @@ class FakeConfigManager:
                 "route_multiplier": {"灵修": 1.2, "体修": 0.6},
                 "learn_coefficient": 0.8,
             },
+            "青云剑诀": {
+                "id": "qy_001",
+                "name": "青云剑诀",
+                "_group": "sect_qingyun",
+                "trigger_skill": {
+                    "name": "青云一剑",
+                    "trigger_condition": "attack",
+                    "trigger_rate": 0.18,
+                    "effect_type": "damage_bonus",
+                    "effect_value": 0.3,
+                },
+                "ultimate": None,
+                "route_multiplier": {"灵修": 1.0, "体修": 1.0},
+                "learn_coefficient": 0.5,
+                "sect_bound": True,
+            },
+        }
+        self.sect_factions = {
+            "factions": [
+                {
+                    "id": "qingyun",
+                    "name": "青云门",
+                    "skill_pool": "sect_qingyun",
+                },
+                {
+                    "id": "wuchi",
+                    "name": "无池宗",
+                },
+            ]
         }
         self.heart_methods_data = {
             "长春功": {
@@ -588,3 +626,139 @@ async def test_cultivation_learn_source(mgr, db):
     if results:
         learned = await db.ext.get_learned_skills(player.user_id)
         assert any(entry["source"] == "heart_method" for entry in learned)
+
+
+# ------------------------------------------------------------------
+# Sect exclusive pool injection (spec MODIFIED: 领悟随机池与来源规则)
+# ------------------------------------------------------------------
+
+
+def _join_qingyun(db, player, sect_id: int = 1):
+    """Make the player a member of a sect whose faction is qingyun."""
+    import types as _types
+
+    db.ext.sects[sect_id] = _types.SimpleNamespace(
+        sect_id=sect_id, faction_id="qingyun"
+    )
+    player.sect_id = sect_id
+
+
+@pytest.mark.asyncio
+async def test_sect_pool_injected_all_channels(mgr, db):
+    """Sect pool entries appear in the pool for breakthrough success/fail and cultivation."""
+    player = FakePlayer(main_technique="长春功")
+    _join_qingyun(db, player)
+    for channel in ("breakthrough_success", "breakthrough_fail", "cultivation"):
+        pool = await mgr._build_comprehension_pool(player, channel)
+        sect_entries = [e for e in pool if e["source"] == "sect"]
+        assert sect_entries, f"channel {channel} missing sect pool"
+        assert sect_entries[0]["skill_id"] == "qy_001"
+        assert sect_entries[0]["origin_sect_id"] == "qingyun"
+        assert sect_entries[0]["sect_bound"] is True
+        assert sect_entries[0]["coefficient"] == 0.5
+
+
+@pytest.mark.asyncio
+async def test_sect_pool_not_injected_without_sect(mgr, db):
+    """Sectless players get no sect pool entries in any channel."""
+    player = FakePlayer(main_technique="长春功")
+    for channel in ("breakthrough_success", "breakthrough_fail", "cultivation"):
+        pool = await mgr._build_comprehension_pool(player, channel)
+        assert all(e["source"] != "sect" for e in pool)
+
+
+@pytest.mark.asyncio
+async def test_sect_pool_not_injected_when_faction_has_no_pool(mgr, db):
+    """A sect whose faction configures no skill_pool injects nothing."""
+    import types as _types
+
+    db.ext.sects[9] = _types.SimpleNamespace(sect_id=9, faction_id="wuchi")
+    player = FakePlayer(main_technique="长春功", sect_id=9)
+    pool = await mgr._build_comprehension_pool(player, "cultivation")
+    assert all(e["source"] != "sect" for e in pool)
+
+
+@pytest.mark.asyncio
+async def test_sect_pool_learn_writes_attribution(mgr, db):
+    """Learning from the sect pool records origin_sect_id and sect_bound."""
+    player = FakePlayer(main_technique="长春功")
+    _join_qingyun(db, player)
+    result = await mgr._resolve_and_learn(
+        player,
+        {
+            "skill_id": "qy_001",
+            "source": "sect",
+            "origin_sect_id": "qingyun",
+            "sect_bound": True,
+        },
+    )
+    assert result is not None
+    record = db.ext.player_skills[(player.user_id, "qy_001")]
+    assert record["origin_sect_id"] == "qingyun"
+    assert record["sect_bound"] is True
+
+
+@pytest.mark.asyncio
+async def test_no_heart_breakthrough_injects_sect_pool(mgr, db):
+    """No-heart-method breakthrough candidates include the sect pool under the 3% gate."""
+    import random as _random
+
+    player = FakePlayer()  # no heart method
+    _join_qingyun(db, player)
+    original_random = _random.random
+    original_choice = _random.choice
+    _random.random = lambda: 0.0  # pass the 3% gate
+    _random.choice = lambda p: p[-1]  # pick the last candidate (the sect skill)
+    try:
+        result = await mgr.roll_universal_pool_breakthrough(player, success=True)
+    finally:
+        _random.random = original_random
+        _random.choice = original_choice
+
+    assert result is not None
+    assert result["id"] == "qy_001"
+    assert result["learn_source"] == "sect"
+    record = db.ext.player_skills[(player.user_id, "qy_001")]
+    assert record["origin_sect_id"] == "qingyun"
+    assert record["sect_bound"] is True
+
+
+@pytest.mark.asyncio
+async def test_no_heart_breakthrough_unchanged_without_sect(mgr, db):
+    """Sectless no-heart players still only draw from the universal pool."""
+    import random as _random
+
+    player = FakePlayer()
+    original_random = _random.random
+    _random.random = lambda: 0.0
+    try:
+        result = await mgr.roll_universal_pool_breakthrough(player, success=True)
+    finally:
+        _random.random = original_random
+
+    assert result is not None
+    assert result["learn_source"] == "universal_fallback"
+    record = db.ext.player_skills[(player.user_id, result["id"])]
+    assert record["origin_sect_id"] is None
+    assert record["sect_bound"] is False
+
+
+@pytest.mark.asyncio
+async def test_sect_pool_max_star_duplicate_compensation(mgr, db):
+    """A max-star sect skill duplicate follows the existing exp compensation rule."""
+    player = FakePlayer(main_technique="长春功")
+    _join_qingyun(db, player)
+    for _ in range(3):
+        await db.ext.learn_or_star_up(player.user_id, "qy_001", "sect")
+    result = await mgr._resolve_and_learn(
+        player,
+        {
+            "skill_id": "qy_001",
+            "source": "sect",
+            "origin_sect_id": "qingyun",
+            "sect_bound": True,
+        },
+    )
+    assert result["is_new_learn"] is False
+    assert result["max_star_compensation"] > 0
+    assert "折算" in result["compensation_message"]

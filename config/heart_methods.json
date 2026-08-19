@@ -412,6 +412,40 @@
         "灵修": 1.0,
         "体修": 1.0
       }
+    },
+    {
+      "id": "heart_qy_001",
+      "name": "青云心典",
+      "description": "青云门开派祖师所传镇派心法，心静则云生，云生则剑鸣",
+      "rank": "地品",
+      "required_level_index": 0,
+      "passive_bonus": {
+        "hp_percent": 0.06,
+        "damage_percent": 0.06
+      },
+      "exp_multiplier": 0.1,
+      "skill_pool": [
+        {
+          "skill_id": "qy_001",
+          "learn_coefficient": 1.0
+        },
+        {
+          "skill_id": "qy_002",
+          "learn_coefficient": 0.8
+        },
+        {
+          "skill_id": "qy_003",
+          "learn_coefficient": 0.5
+        }
+      ],
+      "route": "通用",
+      "shop_weight": 0,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      },
+      "sect_id": "qingyun",
+      "sect_bound": true
     }
   ]
 }

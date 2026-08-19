@@ -2,13 +2,13 @@
 
 > **文档状态**：
 > - 创建：**2026-07-29**（重设计起点，与 `redesign-combat-skills` 变更同批，commit 8fa47f7）
-> - 最近更新：**2026-08-08**（commit 6014857，spec 同步 + §4.19 GM / §4.20 内容同步管道）
+> - 最近更新：**2026-08-19**（`add-default-sects-and-sect-growth`：§4.8 宗门节重写，DB 基线升至 v30）
 > - 定位：**数值细节基线（活文档，非归档）**——架构总览见 `project-architecture.md`，行为契约见
 >   `openspec/specs/`；本文是数值/公式/数据库的权威基线，被 `project-architecture.md` §1/§3 引用。
 > - 维护义务：内容必须与代码同步（插件根 `AGENTS.md` §14，影响玩法的修改须同步修正本文）；
 >   若未来被新报告取代，移入 archive 并更新本标注。
 >
-> 生成方式：基于源码静态分析（含 `file:line` 引用），数据库结构以 `data/migration.py` 最新版本 **v27** 为准。
+> 生成方式：基于源码静态分析（含 `file:line` 引用），数据库结构以 `data/migration.py` 最新版本 **v30** 为准。
 > 战斗与属性体系为 **CombatEngine 四主属性框架**（伤害/身法/迅捷/气血 + 护甲），规范见 `openspec/specs/`（attribute-numerics / combat-core / level-progression / skill-system）。
 
 ---
@@ -19,7 +19,7 @@
 - **宿主**：运行于 `~/code/AstrBot/data/plugins/` 下，依赖 AstrBot 提供的 `Context`、`filter`、`Star` API
 - **数据库**：SQLite（aiosqlite），文件为 `xiuxian_data_lite.db`，存放于 `data/plugin_data/astrbot_plugin_monixiuxian2/`
 - **第三方依赖**：仅 `Pillow>=9.0.0`（图片生成）
-- **静态配置**：20 个 JSON 文件（`config/`），由 `config_manager.py` 加载，修改后需重启生效
+- **静态配置**：22 个 JSON 文件（`config/`），由 `config_manager.py` 加载，修改后需重启生效
 - **动态配置**：`_conf_schema.json` 暴露给 AstrBot WebUI（白名单、数值、灵根、数据库文件名）
 
 ---
@@ -37,11 +37,11 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 ├── data/              # 数据层
 │   ├── data_manager.py        # 连接管理 + 玩家 CRUD（ensure_connection 自动重连）
 │   ├── database_extended.py   # 宗门/Boss/秘境/银行/悬赏等扩展 CRUD
-│   ├── migration.py           # 版本化迁移（当前 LATEST_DB_VERSION = 27）
+│   ├── migration.py           # 版本化迁移（当前 LATEST_DB_VERSION = 30）
 │   └── default_configs.py     # 内置默认配置（config/*.json 缺失时创建）
 ├── models.py          # Player、Item 数据模型（dataclass）
 ├── models_extended.py # Sect/BuffInfo/Boss/Rift/ImpartInfo/UserCd + UserStatus 枚举
-├── config/            # 20 个静态 JSON 配置
+├── config/            # 22 个静态 JSON 配置
 ├── utils/             # 图片生成、配置加载辅助
 └── tests/             # pytest（用 tests/helpers.py 的 load_module 绕过相对导入）
 ```
@@ -75,7 +75,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | `pills.json` / `exp_pills.json` / `utility_pills.json` | 丹药（破境丹、修为丹、功能丹） |
 | `alchemy_config.json` / `alchemy_recipes.json` | 炼丹配方与成功率 |
 | `enemies.json` | PvE 敌人模板（分组的等级区间与属性倍率） |
-| `boss_config.json` / `rift_config.json` / `sect_config.json` | Boss / 秘境 / 宗门配置 |
+| `boss_config.json` / `rift_config.json` / `sect_config.json` | Boss / 秘境 / 宗门配置（sect_config：positions 含 `promotion` 晋升门槛与 `benefits` 职阶福利、`scale_ratio` 捐献折算、`buildings` 洞天/丹房等级与消耗；rift_config 条目可带 `sect_id`+`access=sect_member` 做宗门专属秘境） |
+| `sect_factions.json` / `sect_tasks.json` | 默认（系统）宗门定义（join_level_range/长老/建筑物/treasures/heart_methods/skill_pool，v28 起）与宗门建设任务池 + 师承任务链（`config_manager.py:437-441` 加载并校验） |
 | `impart_config.json` | 传承等阶（tier）与奖励表 |
 | `adventure_config.json` | 历练路线与事件 |
 | `bounty_templates.json` | 悬赏模板 |
@@ -106,7 +107,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | **四主属性** | **damage（伤害/攻击）、agility（身法/闪避命中）、speed（迅捷/出手频率）、hp（气血/生命上限）** |
 | 护甲 | armor_value（装备提供的百分比减伤来源，不作为主属性；减伤率 = 护甲/(护甲+K)） |
 | 技能修习 | study_target（修习目标）、battle_report_merge_count（战报合并条数偏好） |
-| 宗门 | sect_id、sect_position（0宗主/1长老/2亲传/3内门/4外门）、sect_contribution、sect_task、sect_elixir_get |
+| 宗门 | sect_id、sect_position（0宗主/1长老/2亲传/3内门/4外门）、sect_contribution、sect_task、sect_elixir_get、sect_treasure_claims（JSON，宝库已领取 id 列表，v29）、sect_master_progress（JSON，师承任务链进度：chain_id/stage_index/progress/done，v30） |
 | 洞天 | blessed_spot_flag、blessed_spot_name |
 | 丹药 | active_pill_effects(JSON)、permanent_pill_gains(JSON)、pills_inventory(JSON)、has_resurrection_pill、has_debuff_shield |
 | 储物戒 | storage_ring、storage_ring_items(JSON) |
@@ -120,7 +121,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 ### 3.2 扩展模型（models_extended.py）
 
-- **Sect**：sect_name、sect_owner、sect_scale（建设度）、sect_used_stone、sect_fairyland、sect_materials、mainbuff/secbuff（JSON）、elixir_room_level
+- **Sect**：sect_name、sect_owner、sect_scale（建设度）、sect_used_stone、sect_fairyland、sect_materials、mainbuff/secbuff（JSON）、elixir_room_level、is_system（1=系统默认宗门，v28）、faction_id（关联 sect_factions.json，v28）、status/destruction_tier（毁灭重建预留，v28）
+- **player_skills**（v28 起）：新增 origin_sect_id（功法来源宗门 faction_id）与 sect_bound（宗门绑定标记，离宗保留可用、不可赠予）
 - **BuffInfo**（预留）：main_buff/sec_buff/faqi_buff/fabao_weapon/armor_buff/atk_buff/blessed_spot/sub_buff
 - **Boss**：boss_level、hp/max_hp、atk、defense、stone_reward、status
 - **Rift**：rift_level、required_level、rewards(JSON)
@@ -213,12 +215,21 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **世界 Boss**（boss_manager.py）：8 档境界 hp_mult 1.0→6.0；数值同样经 level_data shim 派生；Boss 会心率固定 30%（combat.boss_crit_rate）；败给 Boss 安慰奖 `reward = int(boss经验 × 总伤害 / max_hp)`；自动刷 Boss `base_exp = 全服平均exp × 1.2`（无玩家时 50000）
 - **已知缺口**：独立于 level_config 的境界基准区间表将在 Boss/PvE 模块重做（bd-9u2，attribute-numerics 的 PvE 数值生成基准需求）落地
 
-### 4.8 宗门（managers/sect_manager.py）
+### 4.8 宗门（managers/sect_manager.py；config/sect_config.json + sect_factions.json + sect_tasks.json）
 
-- 创建：10000 灵石 + level_index ≥ 3；初始建设度/资材各 100
-- **捐献**：每灵石 +1 贡献、+10 建设度
-- **宗门任务**：贡献 randint(10,30)，资材 = 贡献×10；冷却 3600s
-- 宗主死亡自动按（职位, -贡献）传位
+- 创建：10000 灵石 + level_index ≥ 3；初始建设度/资材各 100；默认宗门名为禁用名
+- **默认（系统）宗门**：`ensure_system_sects()`（sect_manager.py:156）启动时按 `sect_factions.json` 幂等播种（is_system=1 + faction_id，main.py:440 调用）；「加入宗门」统一入口按 is_system 分流——默认宗门校验 `join_level_range` 境界段，玩家宗门走原有逻辑（sect_manager.py:374）
+- **权限统一**：职位名称/权限/入口职位全部读 `sect_config.json` positions（sect_manager.py:41 起），旧硬编码 POSITION_PERMISSIONS 已删除
+- **捐献**：每灵石 +1 贡献、+`scale_ratio`（默认 10）建设度（sect_manager.py:486，比值读配置）
+- **宗门任务**：从 `sect_tasks.json` construction_tasks 随机抽取，按任务 `cost`/`reward` 结算——`cost.stones` 扣玩家灵石入宗门库房（按 scale_ratio 折建设度）、`cost.materials` 直接增加宗门资材（玩家外出采集语义，不消耗玩家货币）、`reward.contribution/exp` 发玩家；冷却用任务自带 `cooldown` 字段（默认 3600s），busy 状态写法不变（sect_manager.py:795）
+- **建筑**（sect_config.json buildings）：洞天 `sect_fairyland` 每级 +`exp_bonus_per_level`（默认 2%）全员闭关修为，出关结算点读取（sect_manager.py:910，handlers/player_handler.py:365-374）；丹房 `elixir_room_level` 按 `unlock_pills_per_level` 解锁每日领取（sect_manager.py:995），领取标记 `sect_elixir_get` 随「签到」日重置（handlers/player_handler.py:439）；升级消耗宗门资材，默认宗门任意成员可升级、玩家宗门需长老及以上（sect_manager.py:1125）
+- **镇派功法**：`mainbuff` 位由宗主镶嵌（sect_manager.py:1223），全员战斗装配时注入被动触发（core/skill_manager.py:696-705）
+- **职阶晋升**：「宗门晋升」自助晋升，双门槛（贡献 + 境界）读 positions.`promotion`（sect_manager.py:1276）；`promotion: null`（宗主档）不设晋升通道，默认宗门无宗主晋升，玩家宗主保留任命/传位；宗主死亡自动按（职位, -贡献）传位
+- **职阶福利**（positions.`benefits`）：`daily_stones` 每日俸禄并入「签到」加发（handlers/player_handler.py:459-474）；`shop_discount` 商店结算折扣（core/shop_manager.py:430，handlers/shop_handler.py:188）；`unlocks`/`min_position` 控制宝库领取资格
+- **宗门宝库**：默认宗门按 faction `treasures`/`heart_methods` 生成传承列表（玩家宗门为空），领取按 min_position 或 benefits.unlocks 校验，`sect_treasure_claims` 记录已领取 id 防重复领取（跨退宗/重入生效）（sect_manager.py:1415/1454）
+- **师承任务链**：默认宗门专属，`sect_tasks.json` master_chains 按境界段匹配，已存储的链优先于境界段重新匹配（sect_manager.py:1567）；阶段目标挂钩 PvE 胜场/历练完成/突破成功/捐献，进度存 players.sect_master_progress；阶段奖励贡献/修为/宗门功法领悟机会
+- **离宗回收**（退出 sect_manager.py:446 / 踢出 :729 / 弃道重修 handlers/player_handler.py:537-542 三路径统一走 `reclaim_sect_treasures` :211）：`treasure` 宝物（含装备槽）回收归还宗门；`sect_bound` 功法/心法不回收不封印、离宗保留可用；储物戒赠予路径拦截一切宗门绑定物（core/storage_ring_manager.py:64，handlers/storage_ring_handler.py:271）
+- **内容联动**：悬赏模板带 `sect_id` 仅对应宗门成员可见/可接（managers/bounty_manager.py:147/189）；秘境 `sect_id`+`access=sect_member` 仅本宗成员准入、列表标注（managers/rift_manager.py:145）；历练按权重 15 追加本宗事件组（managers/adventure_manager.py:50）；功法领悟全渠道注入宗门池并打 origin_sect_id/sect_bound 归属标记（core/skill_manager.py:94-105）
 
 ### 4.9 银行（managers/bank_manager.py；game_config.json bank 区）
 
@@ -310,7 +321,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 ---
 
-## 五、数据库（SQLite，当前版本 v27）
+## 五、数据库（SQLite，当前版本 v30）
 
 ### 5.1 表清单
 
@@ -318,9 +329,9 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 |---|---|---|
 | `db_info` | — | 数据库版本号（version） |
 | `players` | user_id | 玩家全部数据（见 §3.1；v22 起为四主属性框架，旧五维/MP 列已废弃） |
-| `player_skills` | — | 技能领悟持久化（v25，替代 players.learned_skills） |
+| `player_skills` | — | 技能领悟持久化（v25，替代 players.learned_skills；v28 起含 origin_sect_id/sect_bound 宗门归属列） |
 | `shop` | shop_id | 商店（'global' 单行：last_refresh_time、current_items JSON） |
-| `sects` | sect_id (AI) | 宗门（sect_name UNIQUE，建设度/灵石/资材/功法 buff/丹房等级） |
+| `sects` | sect_id (AI) | 宗门（sect_name UNIQUE，建设度/灵石/资材/功法 buff/丹房等级；v28 起含 is_system/faction_id/status/destruction_tier） |
 | `buff_info` | id (AI)，user_id UNIQUE | 用户功法/法器 buff（预留字段） |
 | `boss` | boss_id (AI) | 世界 Boss（hp/atk/defense/stone_reward/status） |
 | `rifts` | rift_id (AI) | 秘境定义（预置 5 个：青云秘境→上古遗迹） |
@@ -363,7 +374,10 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | v24 | 补齐 players.spiritual_root 字段 |
 | v25 | 技能领悟持久化到 player_skills 表，players 移除 learned_skills |
 | v26 | 传承系统重做：impart_info 改为传承值与已领取等阶 |
-| v27 | 方案A成长模型（突破随机成长）+ 突破连败保底（breakthrough_fail_streak）（当前最新） |
+| v27 | 方案A成长模型（突破随机成长）+ 突破连败保底（breakthrough_fail_streak） |
+| v28 | 默认宗门与宗门功法归属：sects +is_system/faction_id/status/destruction_tier，player_skills +origin_sect_id/sect_bound（存量行保持默认，行为不变） |
+| v29 | players +sect_treasure_claims（宗门宝库领取记录，防跨退宗重复领取） |
+| v30 | players +sect_master_progress（师承任务链进度 JSON）（当前最新） |
 
 ---
 

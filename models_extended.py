@@ -45,6 +45,10 @@ class Sect:
     mainbuff: str = "0"  # 主修功法buff ID列表（JSON字符串）
     secbuff: str = "0"  # 辅修功法buff ID列表（JSON字符串）
     elixir_room_level: int = 0  # 丹房等级
+    is_system: int = 0  # 是否系统默认宗门（0=玩家自建，1=系统势力）
+    faction_id: str | None = None  # 关联 sect_factions.json 的宗门定义ID（仅系统宗门）
+    status: str = "normal"  # 宗门状态（normal/damaged/rebuilding，二期毁灭重建消费）
+    destruction_tier: str | None = None  # 毁灭档位（二期消费）
 
     def get_mainbuff_list(self) -> list[int]:
         """获取主修功法ID列表"""

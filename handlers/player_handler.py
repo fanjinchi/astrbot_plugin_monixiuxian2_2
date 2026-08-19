@@ -32,11 +32,13 @@ class PlayerHandler:
         config: AstrBotConfig,
         config_manager: ConfigManager,
         skill_manager: SkillManager | None = None,
+        sect_mgr=None,
     ):
         self.db = db
         self.config = config
         self.config_manager = config_manager
         self.skill_manager = skill_manager
+        self.sect_mgr = sect_mgr
         self.cultivation_manager = CultivationManager(
             config, config_manager, skill_manager
         )
@@ -360,6 +362,17 @@ class PlayerHandler:
             player, effective_minutes, technique_bonus, pill_multipliers
         )
 
+        # 宗门洞天加成：全员闭关修为 × (1 + exp_bonus_per_level × 洞天等级)
+        fairyland_line = ""
+        if self.sect_mgr and player.sect_id:
+            (
+                fairyland_bonus,
+                fairyland_level,
+            ) = await self.sect_mgr.get_fairyland_exp_bonus(player)
+            if fairyland_bonus > 0:
+                gained_exp = int(gained_exp * (1 + fairyland_bonus))
+                fairyland_line = f"🏯 宗门洞天（{fairyland_level}级）加持：修为 +{fairyland_bonus:.0%}\n"
+
         player.experience += gained_exp
 
         # 闭关悟道判定：每满 2 小时一次，每次 15%（需装备心法，仅配套池+修习目标）
@@ -403,6 +416,7 @@ class PlayerHandler:
             "🌟 道友出关成功！\n"
             "━━━━━━━━━━━━━━━\n"
             f"⏱️ 闭关时长：{time_str}\n"
+            f"{fairyland_line}"
             f"📈 获得修为：{gained_exp:,}{exceed_msg}\n"
             f"💫 当前修为：{player.experience:,}\n"
             "━━━━━━━━━━━━━━━\n"
@@ -417,6 +431,14 @@ class PlayerHandler:
         """处理签到指令"""
         # 获取今天的日期（格式：YYYY-MM-DD）
         today = datetime.now().strftime("%Y-%m-%d")
+
+        # 跨日重置：宗门丹药领取标记与宗门任务计数（以日期变更为锚，
+        # 由每日首位签到的玩家触发一次全局重置）
+        last_reset = await self.db.ext.get_system_config("sect_daily_reset_date")
+        if last_reset != today:
+            await self.db.ext.reset_sect_elixir_get()
+            await self.db.ext.reset_sect_tasks()
+            await self.db.ext.set_system_config("sect_daily_reset_date", today)
 
         # 检查是否已经签到过
         if player.last_check_in_date == today:
@@ -434,15 +456,29 @@ class PlayerHandler:
         # 生成随机奖励
         check_in_gold = random.randint(check_in_gold_min, check_in_gold_max)
 
+        # 宗门职阶俸禄：按 benefits.daily_stones 加发
+        sect_salary = 0
+        position_name = ""
+        if self.sect_mgr and player.sect_id:
+            benefits = self.sect_mgr.get_position_benefits(player.sect_position)
+            sect_salary = benefits["daily_stones"]
+            position_name = self.sect_mgr.get_position_name(player.sect_position)
+
         # 更新玩家数据
-        player.gold += check_in_gold
+        player.gold += check_in_gold + sect_salary
         player.last_check_in_date = today
         await self.db.update_player(player)
 
+        salary_line = (
+            f"🏛️ 宗门俸禄（{position_name}）：+{sect_salary} 灵石\n"
+            if sect_salary > 0
+            else ""
+        )
         reply_msg = (
             "✅ 签到成功！\n"
             "━━━━━━━━━━━━━━━\n"
             f"💰 获得灵石：{check_in_gold}\n"
+            f"{salary_line}"
             f"💎 当前灵石：{player.gold}\n"
             "━━━━━━━━━━━━━━━\n"
             "明日再来，莫要忘记哦~"
@@ -498,12 +534,24 @@ class PlayerHandler:
             )
             return
 
+        # 弃道重修视同离宗：回收宗门之宝归还宗门（sect_bound 功法随角色删除）
+        reclaimed = []
+        if self.sect_mgr and player.sect_id != 0:
+            reclaimed = await self.sect_mgr.reclaim_sect_treasures(
+                player.user_id, player.sect_id
+            )
+
         await self.db.delete_player_cascade(player.user_id)
         await self.db.ext.set_system_config(key, str(now))
+
+        reclaim_msg = ""
+        if reclaimed:
+            reclaim_msg = f"\n宗门之宝【{'、'.join(reclaimed)}】已归还宗门。"
 
         yield event.plain_result(
             "💀 你选择了弃道重修，旧生一切化为尘埃。\n"
             "━━━━━━━━━━━━━━━\n"
             "可立即使用「我要修仙」重新踏上仙途。\n"
             "（7天内不可再次重修）"
+            f"{reclaim_msg}"
         )

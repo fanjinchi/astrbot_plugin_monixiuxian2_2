@@ -4,7 +4,14 @@ from typing import Any
 
 from astrbot.api import logger
 
-from .data.default_configs import ALCHEMY_CONFIG, BOSS_CONFIG, RIFT_CONFIG, SECT_CONFIG
+from .data.default_configs import (
+    ALCHEMY_CONFIG,
+    BOSS_CONFIG,
+    RIFT_CONFIG,
+    SECT_CONFIG,
+    SECT_FACTIONS,
+    SECT_TASKS,
+)
 
 _CHINESE_DIGITS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
 
@@ -44,6 +51,8 @@ class ConfigManager:
         self.boss_config: dict[str, Any] = {}
         self.rift_config: dict[str, Any] = {}
         self.alchemy_config: dict[str, Any] = {}
+        self.sect_factions: dict[str, Any] = {}  # 默认宗门定义
+        self.sect_tasks: dict[str, Any] = {}  # 宗门建设/师承任务池
 
         # Load new system configs
         self.skills_data: dict[str, dict] = {}  # Skill definitions
@@ -424,6 +433,15 @@ class ConfigManager:
             config_dir / "heart_methods.json"
         )
 
+        # 加载宗门扩展配置（默认宗门定义 + 任务池），随后做结构校验
+        self.sect_factions = self._load_config_with_default(
+            config_dir / "sect_factions.json", SECT_FACTIONS
+        )
+        self.sect_tasks = self._load_config_with_default(
+            config_dir / "sect_tasks.json", SECT_TASKS
+        )
+        self._validate_sect_configs()
+
         logger.info(
             f"配置管理器初始化完成，"
             f"加载了 {len(self.level_data)} 个灵修境界配置，"
@@ -469,3 +487,97 @@ class ConfigManager:
     def invalidate_cache(self):
         """清除缓存，在配置重载时调用"""
         self._pill_names_cache = None
+
+    def _validate_sect_configs(self):
+        """Validate sect_factions/sect_tasks structure and cross-references.
+
+        Checks required fields (id/name) and that referenced skill pools,
+        heart methods, and weapon IDs exist in their respective configs.
+        Problems are logged as warnings without interrupting loading.
+        """
+        skill_pools = {
+            s.get("_group")
+            for s in self.skills_data.values()
+            if isinstance(s, dict) and s.get("_group")
+        }
+        heart_method_ids = {
+            h.get("id")
+            for h in self.heart_methods_data.values()
+            if isinstance(h, dict) and h.get("id")
+        }
+        weapon_ids = {
+            w.get("id")
+            for w in self.weapons_data.values()
+            if isinstance(w, dict) and w.get("id")
+        }
+
+        factions = self.sect_factions.get("factions", [])
+        if not isinstance(factions, list):
+            logger.warning("sect_factions.json 的 factions 字段应为列表，已跳过校验。")
+            factions = []
+
+        faction_ids: set = set()
+        for faction in factions:
+            if not isinstance(faction, dict):
+                logger.warning(
+                    f"sect_factions.json 存在非对象条目，已跳过: {faction!r}"
+                )
+                continue
+            fid, name = faction.get("id"), faction.get("name")
+            if not fid or not name:
+                logger.warning(
+                    f"sect_factions.json 条目缺少必填字段 id/name: {faction!r}"
+                )
+                continue
+            faction_ids.add(fid)
+
+            pool = faction.get("skill_pool")
+            if pool and pool not in skill_pools:
+                logger.warning(
+                    f"宗门 {fid} 引用的功法池 {pool} 在 skills.json 中不存在。"
+                )
+            for hm_id in faction.get("heart_methods", []):
+                if hm_id not in heart_method_ids:
+                    logger.warning(
+                        f"宗门 {fid} 引用的心法 {hm_id} 在 heart_methods.json 中不存在。"
+                    )
+            for treasure in faction.get("treasures", []):
+                tid = treasure.get("id") if isinstance(treasure, dict) else None
+                if (
+                    isinstance(treasure, dict)
+                    and treasure.get("type") == "weapon"
+                    and tid not in weapon_ids
+                ):
+                    logger.warning(
+                        f"宗门 {fid} 引用的宗门之宝 {tid} 在 weapons.json 中不存在。"
+                    )
+
+        for task in self.sect_tasks.get("construction_tasks", []):
+            if not isinstance(task, dict) or not task.get("id") or not task.get("name"):
+                logger.warning(
+                    f"sect_tasks.json 建设任务缺少必填字段 id/name: {task!r}"
+                )
+
+        for chain in self.sect_tasks.get("master_task_chains", []):
+            if not isinstance(chain, dict):
+                logger.warning(f"sect_tasks.json 师承任务链存在非对象条目: {chain!r}")
+                continue
+            cid, sid = chain.get("id"), chain.get("sect_id")
+            if not cid or not sid:
+                logger.warning(
+                    f"sect_tasks.json 师承任务链缺少必填字段 id/sect_id: {chain!r}"
+                )
+                continue
+            if faction_ids and sid not in faction_ids:
+                logger.warning(
+                    f"师承任务链 {cid} 引用的宗门 {sid} 在 sect_factions.json 中不存在。"
+                )
+            for stage in chain.get("stages", []):
+                if not isinstance(stage, dict):
+                    continue
+                chance_pool = (stage.get("reward") or {}).get("skill_learn_chance")
+                if chance_pool and chance_pool not in skill_pools:
+                    logger.warning(
+                        f"师承任务链 {cid} 阶段「{stage.get('name', '?')}」引用的功法池 "
+                        f"{chance_pool} 在 skills.json 中不存在。"
+                    )

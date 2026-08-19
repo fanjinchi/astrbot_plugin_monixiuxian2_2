@@ -24,8 +24,9 @@ class DatabaseExtended:
             """
             INSERT INTO sects (
                 sect_name, sect_owner, sect_scale, sect_used_stone,
-                sect_fairyland, sect_materials, mainbuff, secbuff, elixir_room_level
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                sect_fairyland, sect_materials, mainbuff, secbuff, elixir_room_level,
+                is_system, faction_id, status, destruction_tier
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 sect.sect_name,
@@ -37,6 +38,10 @@ class DatabaseExtended:
                 sect.mainbuff,
                 sect.secbuff,
                 sect.elixir_room_level,
+                sect.is_system,
+                sect.faction_id,
+                sect.status,
+                sect.destruction_tier,
             ),
         )
         await self.conn.commit()
@@ -76,6 +81,16 @@ class DatabaseExtended:
                 return Sect(**dict(row))
             return None
 
+    async def get_sect_by_faction_id(self, faction_id: str) -> Sect | None:
+        """Get a system sect by its sect_factions.json faction ID."""
+        async with self.conn.execute(
+            "SELECT * FROM sects WHERE faction_id = ?", (faction_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return Sect(**dict(row))
+            return None
+
     async def update_sect(self, sect: Sect):
         """更新宗门信息"""
         await self.conn.execute(
@@ -83,7 +98,8 @@ class DatabaseExtended:
             UPDATE sects SET
                 sect_name = ?, sect_owner = ?, sect_scale = ?, sect_used_stone = ?,
                 sect_fairyland = ?, sect_materials = ?, mainbuff = ?, secbuff = ?,
-                elixir_room_level = ?
+                elixir_room_level = ?, is_system = ?, faction_id = ?, status = ?,
+                destruction_tier = ?
             WHERE sect_id = ?
             """,
             (
@@ -96,6 +112,10 @@ class DatabaseExtended:
                 sect.mainbuff,
                 sect.secbuff,
                 sect.elixir_room_level,
+                sect.is_system,
+                sect.faction_id,
+                sect.status,
+                sect.destruction_tier,
                 sect.sect_id,
             ),
         )
@@ -136,8 +156,8 @@ class DatabaseExtended:
             )
         await self.conn.commit()
 
-    async def donate_to_sect(self, sect_id: int, stone_num: int):
-        """宗门捐献（增加灵石和建设度）"""
+    async def donate_to_sect(self, sect_id: int, stone_num: int, scale_ratio: int = 10):
+        """宗门捐献（增加灵石和建设度，建设度 = 灵石 × scale_ratio）"""
         await self.conn.execute(
             """
             UPDATE sects SET
@@ -145,21 +165,20 @@ class DatabaseExtended:
                 sect_scale = sect_scale + ?
             WHERE sect_id = ?
             """,
-            (stone_num, stone_num * 10, sect_id),  # 1灵石 = 10建设度
+            (stone_num, stone_num * scale_ratio, sect_id),
         )
         await self.conn.commit()
 
     # ===== BuffInfo 系统 CRUD =====
 
     async def create_buff_info(self, user_id: str):
-        """初始化用户的buff信息"""
+        """初始化用户的buff信息
+
+        Note: v22 migration rebuilt buff_info as (id, user_id) only; the old
+        buff columns are retired, so only the user_id row is created here.
+        """
         await self.conn.execute(
-            """
-            INSERT INTO buff_info (
-                user_id, main_buff, sec_buff, faqi_buff, fabao_weapon,
-                armor_buff, atk_buff, blessed_spot, sub_buff
-            ) VALUES (?, 0, 0, 0, 0, 0, 0, 0, 0)
-            """,
+            "INSERT OR IGNORE INTO buff_info (user_id) VALUES (?)",
             (user_id,),
         )
         await self.conn.commit()
@@ -447,11 +466,13 @@ class DatabaseExtended:
             user_id: Player user ID.
 
         Returns:
-            List of dicts with keys skill_id, star_level, source, learned_at.
+            List of dicts with keys skill_id, star_level, source, learned_at,
+            origin_sect_id, sect_bound.
         """
         skills = []
         async with self.conn.execute(
-            "SELECT skill_id, star_level, source, learned_at FROM player_skills WHERE user_id = ?",
+            "SELECT skill_id, star_level, source, learned_at, origin_sect_id, sect_bound "
+            "FROM player_skills WHERE user_id = ?",
             (user_id,),
         ) as cursor:
             async for row in cursor:
@@ -461,6 +482,8 @@ class DatabaseExtended:
                         "star_level": row[1],
                         "source": row[2],
                         "learned_at": row[3],
+                        "origin_sect_id": row[4],
+                        "sect_bound": bool(row[5]),
                     }
                 )
         return skills
@@ -490,6 +513,8 @@ class DatabaseExtended:
         source: str = "",
         max_star: int = 3,
         max_star_exp_compensation: int = 0,
+        origin_sect_id: str | None = None,
+        sect_bound: bool = False,
     ) -> tuple[bool, int]:
         """Learn a new skill or increment the star level if already learned.
 
@@ -500,6 +525,10 @@ class DatabaseExtended:
             max_star: Maximum star level (default 3).
             max_star_exp_compensation: Experience granted atomically (inside
                 this transaction) when the skill is already at max_star.
+            origin_sect_id: Sect ID the skill was learned from (only written
+                on first learn; star-ups keep the original attribution).
+            sect_bound: Whether the skill is inherently sect-bound (only
+                passable to members of the same sect); stored on first learn.
 
         Returns:
             (is_new_learn, new_star_level). If already at max_star,
@@ -519,10 +548,21 @@ class DatabaseExtended:
             if row is None:
                 await self.conn.execute(
                     """
-                    INSERT INTO player_skills (user_id, skill_id, star_level, source, learned_at)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO player_skills (
+                        user_id, skill_id, star_level, source, learned_at,
+                        origin_sect_id, sect_bound
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (user_id, skill_id, 1, source, now),
+                    (
+                        user_id,
+                        skill_id,
+                        1,
+                        source,
+                        now,
+                        origin_sect_id,
+                        int(sect_bound),
+                    ),
                 )
                 await self.conn.commit()
                 return True, 1

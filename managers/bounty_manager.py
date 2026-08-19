@@ -144,20 +144,33 @@ class BountyManager:
         }
 
     async def get_bounty_list(self, player: Player) -> list[dict]:
-        """获取悬赏列表"""
+        """获取悬赏列表（带 sect_id 的宗门模板仅对对应宗门成员出现）"""
         cached = self._get_cached_bounties(player.user_id)
         if cached:
             return cached
 
+        faction_id = await self._get_player_faction_id(player)
         plan = self._get_difficulty_plan(player.level_index)
         bounties: list[dict] = []
         for diff in plan:
-            entry = self._build_bounty_entry(diff, player)
+            entry = self._build_bounty_entry(diff, player, faction_id)
             if entry:
                 bounties.append(entry)
 
         self._set_cached_bounties(player.user_id, bounties)
         return bounties
+
+    async def _get_player_faction_id(self, player: Player) -> str | None:
+        """Resolve the faction_id of the player's sect (None when sectless or a player-built sect)."""
+        sect_id = getattr(player, "sect_id", 0)
+        if not isinstance(sect_id, int) or not sect_id:
+            return None
+        if self.db is None or self.db.ext is None:
+            return None
+        sect = await self.db.ext.get_sect_by_id(sect_id)
+        if sect is None:
+            return None
+        return getattr(sect, "faction_id", None)
 
     def _get_difficulty_plan(self, level_index: int) -> list[str]:
         """Pick available difficulty tiers for the player level (easy+normal; +hard at >=7; +elite at >=12)."""
@@ -168,9 +181,19 @@ class BountyManager:
             plan.append("elite")
         return [diff for diff in plan if diff in self.difficulties]
 
-    def _pick_template(self, difficulty: str) -> dict | None:
-        """Weighted-random pick of a bounty template within a difficulty tier."""
-        templates = self.templates_by_diff.get(difficulty)
+    def _pick_template(
+        self, difficulty: str, faction_id: str | None = None
+    ) -> dict | None:
+        """Weighted-random pick of a bounty template within a difficulty tier.
+
+        Templates carrying ``sect_id`` are sect-exclusive: they are only
+        eligible when the player's sect faction matches.
+        """
+        templates = [
+            tpl
+            for tpl in self.templates_by_diff.get(difficulty, [])
+            if not tpl.get("sect_id") or tpl.get("sect_id") == faction_id
+        ]
         if not templates:
             return None
         total = sum(max(1, tpl.get("weight", 1)) for tpl in templates)
@@ -182,9 +205,11 @@ class BountyManager:
                 return tpl
         return templates[0]
 
-    def _build_bounty_entry(self, difficulty: str, player: Player) -> dict | None:
+    def _build_bounty_entry(
+        self, difficulty: str, player: Player, faction_id: str | None = None
+    ) -> dict | None:
         """Build one bounty list entry: rolled target count, scaled reward, calibrated time limit, progress tags."""
-        template = self._pick_template(difficulty)
+        template = self._pick_template(difficulty, faction_id)
         if not template:
             return None
         diff_cfg = self.difficulties.get(difficulty, {})
@@ -206,6 +231,7 @@ class BountyManager:
             "time_limit": time_limit,
             "progress_tags": progress_tags,
             "item_table": template.get("item_table", "gather"),
+            "sect_id": template.get("sect_id"),
         }
 
     def _calculate_reward(
@@ -257,6 +283,13 @@ class BountyManager:
         template = self.templates_by_id.get(bounty_id)
         if not template:
             return False, "该悬赏已失效，请刷新列表。"
+
+        # 宗门专属悬赏：仅本宗成员可接取
+        template_sect = template.get("sect_id")
+        if template_sect:
+            faction_id = await self._get_player_faction_id(player)
+            if faction_id != template_sect:
+                return False, "该悬赏为宗门专属委托，仅面向本宗弟子发布。"
 
         diff_key = template.get("difficulty", "easy")
         self.difficulties.get(diff_key, {})

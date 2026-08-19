@@ -120,9 +120,42 @@ class RiftManager:
             return self.config_manager.get_level_name(level_index, "灵修")
         return f"境界{level_index}"
 
-    async def list_rifts(self) -> tuple[bool, str]:
+    def _get_rift_config_entry(self, rift_id: int) -> dict | None:
+        """Look up the static rift_config.json entry for a rift id (carries sect_id/access)."""
+        for entry in (self.config or {}).get("rifts", []):
+            if isinstance(entry, dict) and entry.get("id") == rift_id:
+                return entry
+        return None
+
+    async def _get_player_faction_id(self, player: Player) -> str | None:
+        """Resolve the faction_id of the player's sect (None when sectless or a player-built sect)."""
+        sect_id = getattr(player, "sect_id", 0)
+        if not isinstance(sect_id, int) or not sect_id:
+            return None
+        if self.db is None or self.db.ext is None:
+            return None
+        sect = await self.db.ext.get_sect_by_id(sect_id)
+        if sect is None:
+            return None
+        return getattr(sect, "faction_id", None)
+
+    async def _check_rift_access(
+        self, player: Player, rift_id: int
+    ) -> tuple[bool, str]:
+        """Validate sect-exclusive access: rifts with sect_id + access=sect_member only admit that sect's members."""
+        entry = self._get_rift_config_entry(rift_id)
+        if not entry:
+            return True, ""
+        if not entry.get("sect_id") or entry.get("access") != "sect_member":
+            return True, ""
+        faction_id = await self._get_player_faction_id(player)
+        if faction_id == entry.get("sect_id"):
+            return True, ""
+        return False, f"❌ 【{entry.get('name', '该秘境')}】仅对本宗弟子开放！"
+
+    async def list_rifts(self, user_id: str = "") -> tuple[bool, str]:
         """
-        列出所有秘境
+        列出所有秘境（宗门专属秘境对非本宗成员标注锁定）
 
         Returns:
             (成功标志, 消息)
@@ -131,6 +164,12 @@ class RiftManager:
 
         if not rifts:
             return False, "❌ 当前没有开放的秘境！"
+
+        faction_id = None
+        if user_id:
+            player = await self.db.get_player_by_id(user_id)
+            if player:
+                faction_id = await self._get_player_faction_id(player)
 
         msg = "🌀 秘境列表\n"
         msg += "━━━━━━━━━━━━━━━\n"
@@ -142,6 +181,12 @@ class RiftManager:
             level_name = self._get_level_name(rift.required_level)
 
             msg += f"【{rift.rift_name}】(ID:{rift.rift_id})\n"
+            entry = self._get_rift_config_entry(rift.rift_id)
+            if entry and entry.get("sect_id") and entry.get("access") == "sect_member":
+                if faction_id == entry.get("sect_id"):
+                    msg += "  🏯 宗门专属秘境\n"
+                else:
+                    msg += "  🔒 宗门专属秘境（仅本宗弟子可进）\n"
             if rift.required_level == 0:
                 msg += "  等级要求：无限制\n"
             else:
@@ -185,6 +230,11 @@ class RiftManager:
         rift = await self.db.ext.get_rift_by_id(rift_id)
         if not rift:
             return False, "❌ 秘境不存在！使用 /秘境列表 查看可用秘境"
+
+        # 3.5 宗门专属秘境准入校验
+        access_ok, access_msg = await self._check_rift_access(player, rift_id)
+        if not access_ok:
+            return False, access_msg
 
         # 4. 检查境界要求
         if player.level_index < rift.required_level:
@@ -340,6 +390,7 @@ class RiftManager:
             "event": event["desc"],
             "items": dropped_items,
             "rift_name": rift_name,
+            "pve_won": bool(combat_rewards.get("pve_won", False)),
         }
 
         return True, msg, reward_data

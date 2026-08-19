@@ -39,6 +39,21 @@
         1000,
         5000
       ]
+    },
+    {
+      "id": 4,
+      "name": "青云剑冢",
+      "level": 3,
+      "exp_range": [
+        300,
+        900
+      ],
+      "gold_range": [
+        100,
+        400
+      ],
+      "sect_id": "qingyun",
+      "access": "sect_member"
     }
   ]
 }

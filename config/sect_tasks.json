@@ -1,0 +1,112 @@
+{
+  "construction_tasks": [
+    {
+      "id": "build_001",
+      "name": "修缮山门",
+      "type": "donate_materials",
+      "cost": {
+        "materials": 50
+      },
+      "reward": {
+        "contribution": 30
+      },
+      "cooldown": 3600
+    },
+    {
+      "id": "build_002",
+      "name": "输财助宗",
+      "type": "donate_stones",
+      "cost": {
+        "stones": 500
+      },
+      "reward": {
+        "contribution": 40
+      },
+      "cooldown": 3600
+    },
+    {
+      "id": "build_003",
+      "name": "加固护山大阵",
+      "type": "donate_materials",
+      "cost": {
+        "materials": 200
+      },
+      "reward": {
+        "contribution": 120
+      },
+      "cooldown": 7200
+    }
+  ],
+  "master_task_chains": [
+    {
+      "id": "chain_qy_01",
+      "sect_id": "qingyun",
+      "level_range": [
+        0,
+        2
+      ],
+      "stages": [
+        {
+          "name": "入门演武",
+          "type": "win_pve",
+          "count": 3,
+          "reward": {
+            "contribution": 50,
+            "exp": 200
+          },
+          "text": "玄诚子：新入门弟子，先去后山演武场活动筋骨，胜三场妖兽来见我。"
+        },
+        {
+          "name": "采药历练",
+          "type": "adventure_complete",
+          "count": 1,
+          "reward": {
+            "contribution": 80,
+            "skill_learn_chance": "sect_qingyun"
+          },
+          "text": "玄诚子：丹房缺几味常见灵草，你去历练一趟，顺便把采药的规矩学了。"
+        },
+        {
+          "name": "破境之礼",
+          "type": "breakthrough",
+          "count": 1,
+          "reward": {
+            "contribution": 150,
+            "exp": 1000
+          },
+          "text": "清微道长：破境乃修行第一关，成之后来执事堂登记，门中自有嘉奖。"
+        }
+      ]
+    },
+    {
+      "id": "chain_hx_01",
+      "sect_id": "huanxi",
+      "level_range": [
+        2,
+        4
+      ],
+      "stages": [
+        {
+          "name": "投名状",
+          "type": "donate",
+          "count": 1000,
+          "reward": {
+            "contribution": 80,
+            "exp": 500
+          },
+          "text": "花妩娘：入我合欢宗，先纳一千灵石做投名状，宗门不养闲人。"
+        },
+        {
+          "name": "见血",
+          "type": "win_pve",
+          "count": 5,
+          "reward": {
+            "contribution": 120,
+            "skill_learn_chance": "sect_huanxi"
+          },
+          "text": "厉无欢：去杀五个不开眼的东西，提着他们的兵刃回来，才算自己人。"
+        }
+      ]
+    }
+  ]
+}

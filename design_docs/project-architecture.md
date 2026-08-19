@@ -67,7 +67,7 @@ flowchart TD
 | 技能/领悟 | 「领悟/修习」 | 挂载制（无独立技能栏）；触发技引擎契约四键 `trigger_timing/effect_type/trigger_rate/effect_value`，EFFECT_HANDLERS 注册表分发 14 种效果键（13 个处理函数，combo 复用 damage_bonus 处理器；damage_bonus/combo/stun/counter/damage_reduction + heal/dot/buff/debuff/pierce/unavoidable/survive/reflect/fatigue），功法武器共用；持续状态机制：同名同源刷新、异源同型叠加上限默认 3 层（config 可调）、战斗结束全清（battle-status-effects spec）；大招**必放制**（注入 rate=1.0，config 不填概率）+ 解锁门槛（min_action_index + 血量阈值）；升星 3 星封顶、×(1.1)^(星级-1) 乘法、满星补偿 50% 修为；领悟池=配套池（系数加权）+修习目标+（仅突破）通用池 5%；**装备=已领悟表（player_skills）唯一依据**，储物戒秘籍仅作领悟凭据（物品名=技能名，商店 4011/4012 可购，掉落掉具体秘籍；旧 4001-4010 已 legacy 下架） |
 | PvE 敌人 | 历练/秘境遭遇 | 过渡方案：level_data shim 合成 exp_needed 派生属性（damage≈exp//10、hp≈exp//2）× 模板系数（0.85/1.0/1.2）× 难度系数 ±10%；**待重做**：独立境界基准表（bd 9u2） |
 | 世界 Boss | 「世界Boss」 | 8 档境界 hp_mult 1.0→6.0，数值同走 level_data 派生；Boss 会心 30%；败者安慰奖=经验×总伤害/max_hp；自动刷 base_exp=全服平均×1.2 |
-| 宗门 | 「宗门」 | 创建 1万灵石+L3；捐献 1灵石→+1贡献+10建设度；任务 3600s；宗主死亡自动传位 |
+| 宗门 | 「宗门」 | 创建 1万灵石+L3；捐献 1灵石→+1贡献+`scale_ratio`(10)建设度；建设任务从 sect_tasks.json 抽（cost/reward/cooldown 按任务配置）；**默认宗门**（sect_factions.json，启动幂等播种，加入校验境界段）；建筑：洞天全员闭关加成/丹房每日领丹（签到日重置）；镇派功法位全员被动；职阶晋升双门槛（贡献+境界，读 positions.promotion）+ 福利（签到俸禄/商店折扣/宝库 unlocks）；师承任务链（默认宗门专属，进度存 players.sect_master_progress）；离宗三路径回收 treasure 宝物、sect_bound 功法保留可用、绑定物禁赠；悬赏/秘境/历练/领悟池按宗门过滤注入；宗主死亡自动传位 |
 | 银行/贷款 | 「银行」 | 存款复利 0.1%/日、上限 1000 万；普通贷 0.5%/7d、突破贷 0.8%/3d；还款单利；**逾期删号** |
 | 悬赏 | 「悬赏」 | 难度解锁（hard L7/elite L12）；奖励=base×scale×(target/min)×(1+max(0,L-3)×0.06)；时限、70% 掉 1 件、放弃 1800s CD |
 | 历练 | 「历练」 | 纯收益玩法（不受 pve 开关影响）；exp/gold 按分钟+等级加成+完成奖励×事件倍率；事件组 safe 1.1×/standard 1.2×/risky 0.7×+受伤；休整=疲劳 300s |
@@ -119,8 +119,9 @@ flowchart TD
 | 2026-08-09 | 技能池 v2 扩展 | 12 个新效果族技能入库（content-design → config） |
 | 2026-08-11 | `novel-reading-extraction` 归档 | 小说内容提取资料库建立 + spec 归档 |
 | 2026-08-16 | `skill-budget-audit-and-heart-route-mult` 归档 | dhh 预算审计闭环（validate_budget 全 PASS）、心法被动 route_multiplier 落地（f4t 关闭）、v3.8.1 |
+| 2026-08-19 | `add-default-sects-and-sect-growth` 落地 | 默认宗门（sect_factions.json 幂等播种、境界段拜入）+ 宗门成长（洞天/丹房/镇派功法/职阶晋升+福利/宝库/师承任务链）+ 离宗回收三路径与绑定物禁赠 + 悬赏/秘境/历练/领悟池宗门联动；DB v28-v30 |
 
-**数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底（当前最新）。
+**数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底 → v28 默认宗门+功法归属（sects.is_system/faction_id、player_skills.sect_bound）→ v29 宝库领取记录 → v30 师承任务链进度（当前最新）。
 
 ## 6. 进行中的工作（bd open，设计相关）
 

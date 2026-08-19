@@ -140,6 +140,10 @@ class Player:
     sect_contribution: int = 0
     sect_task: int = 0
     sect_elixir_get: int = 0
+    # Sect treasury claim records (JSON list of claimed treasure/heart-method IDs)
+    sect_treasure_claims: str = "[]"
+    # Master task chain progress (JSON: {"chain_id", "stage_index", "progress", "done"})
+    sect_master_progress: str = "{}"
 
     # Blessed land
     blessed_spot_flag: int = 0
@@ -222,6 +226,34 @@ class Player:
     def set_storage_ring_items(self, items: dict):
         """Set storage ring items"""
         self.storage_ring_items = json.dumps(items, ensure_ascii=False)
+
+    def get_sect_treasure_claims(self) -> list[str]:
+        """Get the list of claimed sect treasury item IDs."""
+        try:
+            claims = json.loads(self.sect_treasure_claims)
+            return claims if isinstance(claims, list) else []
+        except json.JSONDecodeError:
+            return []
+
+    def set_sect_treasure_claims(self, claims: list[str]):
+        """Store the list of claimed sect treasury item IDs."""
+        self.sect_treasure_claims = json.dumps(claims, ensure_ascii=False)
+
+    def get_sect_master_progress(self) -> dict:
+        """Get master task chain progress (empty dict when not started).
+
+        Structure: ``{"chain_id": str, "stage_index": int, "progress": int,
+        "done": bool}``.
+        """
+        try:
+            data = json.loads(self.sect_master_progress)
+            return data if isinstance(data, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+
+    def set_sect_master_progress(self, progress: dict):
+        """Store master task chain progress."""
+        self.sect_master_progress = json.dumps(progress, ensure_ascii=False)
 
     def get_total_attributes(
         self, equipped_items: list[Item], pill_multipliers: dict | None = None

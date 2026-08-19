@@ -211,6 +211,7 @@ class PVECombatManager:
             "gold": base_rewards.get("gold", 0),
             "bonus_exp": 0,
             "hp_penalty": False,
+            "pve_won": False,  # 玩家是否获胜（师承任务链 win_pve 计数依据）
         }
 
         winner = result.get("winner", "")
@@ -232,6 +233,7 @@ class PVECombatManager:
             # 胜利
             rewards["exp"] = int(rewards["exp"] * 1.2)
             rewards["bonus_exp"] = enemy.exp
+            rewards["pve_won"] = True
 
         return rewards
 

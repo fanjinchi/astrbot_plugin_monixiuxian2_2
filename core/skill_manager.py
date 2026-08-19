@@ -49,6 +49,8 @@ class SkillManager:
         - Heart method skill pool (uniform selection; coefficient only affects
           success probability, not selection weight).
         - Study target (if set and not yet learned).
+        - Sect exclusive pool (all channels; only while the player belongs to
+          a sect whose faction configures ``skill_pool``).
         - Universal pool is intentionally excluded here; it is handled by a
           separate independent roll in breakthrough channels.
 
@@ -88,7 +90,55 @@ class SkillManager:
                 }
             )
 
+        # 3. Sect exclusive skill pool (spec skill-system MODIFIED): injected
+        # for every comprehension channel while the player belongs to a sect
+        # whose faction configures ``skill_pool``.
+        faction_id = await self._get_player_faction_id(player)
+        for skill in self._get_sect_pool_skills(faction_id):
+            pool.append(
+                {
+                    "skill_id": str(skill["id"]),
+                    "weight": 1.0,
+                    "coefficient": skill.get("learn_coefficient", 1.0),
+                    "source": "sect",
+                    "origin_sect_id": faction_id,
+                    "sect_bound": True,
+                }
+            )
+
         return pool
+
+    async def _get_player_faction_id(self, player: Player) -> str | None:
+        """Resolve the faction_id of the player's sect (None when sectless or a player-built sect)."""
+        sect_id = getattr(player, "sect_id", 0)
+        if not isinstance(sect_id, int) or not sect_id:
+            return None
+        if self.db is None or self.db.ext is None:
+            return None
+        sect = await self.db.ext.get_sect_by_id(sect_id)
+        if sect is None:
+            return None
+        return getattr(sect, "faction_id", None)
+
+    def _get_sect_pool_skills(self, faction_id: str | None) -> list[dict]:
+        """Return skill definitions of the faction's exclusive skill pool (empty when unconfigured)."""
+        if not faction_id:
+            return []
+        sect_factions = getattr(self.config_manager, "sect_factions", None) or {}
+        pool_name = None
+        for faction in sect_factions.get("factions", []):
+            if isinstance(faction, dict) and faction.get("id") == faction_id:
+                pool_name = faction.get("skill_pool")
+                break
+        if not pool_name:
+            return []
+        return [
+            skill
+            for skill in self.config_manager.skills_data.values()
+            if isinstance(skill, dict)
+            and skill.get("_group") == pool_name
+            and skill.get("id")
+        ]
 
     async def _is_skill_learned(self, player: Player, skill_id: str) -> bool:
         """Check if a skill is already learned by the player."""
@@ -224,6 +274,10 @@ class SkillManager:
         pool is empty. This method provides the 3% fallback (design D4).
         Called separately from the main comprehension roll.
 
+        The sect exclusive pool is injected into the candidate set under the
+        same 3% gate when the player belongs to a sect with a configured
+        ``skill_pool`` (spec MODIFIED: sect pool applies to all channels).
+
         The ``success`` parameter is kept for API compatibility but the rate
         is always ``universal_pool_no_heart_rate`` (3%) when no heart
         method is equipped.
@@ -233,16 +287,40 @@ class SkillManager:
 
         base_rate = self._skill_cfg.get("universal_pool_no_heart_rate", 0.03)
 
-        universal_skill = await self._pick_universal_skill(player)
-        if universal_skill is None:
+        # Candidates are copies so the shared config definitions are never
+        # mutated; sect pool entries are tagged with their attribution.
+        candidates: list[dict] = [
+            dict(skill) for skill in await self._list_universal_skills(player)
+        ]
+        faction_id = await self._get_player_faction_id(player)
+        for skill in self._get_sect_pool_skills(faction_id):
+            candidates.append(
+                dict(skill, _fallback_source="sect", _origin_sect_id=faction_id)
+            )
+        if not candidates:
             return None
 
         if random.random() < base_rate:
-            return await self._resolve_and_learn(
-                player,
-                {"skill_id": universal_skill["id"], "source": "universal_fallback"},
-            )
+            chosen = random.choice(candidates)
+            entry: dict = {
+                "skill_id": str(chosen["id"]),
+                "source": chosen.get("_fallback_source", "universal_fallback"),
+            }
+            if entry["source"] == "sect":
+                entry["origin_sect_id"] = chosen.get("_origin_sect_id")
+                entry["sect_bound"] = True
+            return await self._resolve_and_learn(player, entry)
         return None
+
+    async def _list_universal_skills(self, player: Player) -> list[dict]:
+        """List unlearned skills from the universal pool."""
+        return [
+            skill
+            for skill in self.config_manager.skills_data.values()
+            if skill.get("_group") == "通用功法池"
+            and skill.get("id")
+            and not await self._is_skill_learned(player, skill["id"])
+        ]
 
     async def _pick_universal_skill(self, player: Player) -> dict | None:
         """Pick a random unlearned skill from the universal pool.
@@ -250,13 +328,7 @@ class SkillManager:
         Returns the skill definition or None if all universal skills are
         already learned or the pool is empty.
         """
-        universal_skills = [
-            skill
-            for skill in self.config_manager.skills_data.values()
-            if skill.get("_group") == "通用功法池"
-            and skill.get("id")
-            and not await self._is_skill_learned(player, skill["id"])
-        ]
+        universal_skills = await self._list_universal_skills(player)
         if not universal_skills:
             return None
         return random.choice(universal_skills)
@@ -286,12 +358,18 @@ class SkillManager:
         # Pre-compute the max-star duplicate compensation so the exp grant
         # commits in the same transaction as the comprehension record.
         compensation = self._calc_star_compensation(skill_def)
+        # Sect-pool skills carry origin attribution (spec: 宗门功法归属标记).
+        learn_kwargs: dict = {}
+        if chosen.get("sect_bound"):
+            learn_kwargs["origin_sect_id"] = chosen.get("origin_sect_id")
+            learn_kwargs["sect_bound"] = True
         is_new, star_level = await self.db.ext.learn_or_star_up(
             player.user_id,
             skill_id,
             source,
             max_star=max_star,
             max_star_exp_compensation=compensation,
+            **learn_kwargs,
         )
 
         # Clear study target if matched
@@ -539,6 +617,11 @@ class SkillManager:
         multiplier and capped at 1.0; ultimate effect_value is scaled by it
         (mandatory-cast ultimates keep rate at 1.0). Star-level bonuses are
         applied before the route multiplier.
+
+        When the player belongs to a sect with an enshrined mainbuff skill
+        (镇派功法位), that skill's trigger skill is appended to
+        ``trigger_skills`` at star-1 normalization with the route multiplier
+        applied (sect buffs are not learned skills).
         """
         loadout = {
             "trigger_skills": [],
@@ -609,6 +692,31 @@ class SkillManager:
                     ultimate.get("effect_value", 0.0) * route_mult
                 )
                 loadout["ultimates"].append(ultimate)
+
+        # Sect mainbuff (镇派功法位, design §4.3): members of a sect with an
+        # enshrined skill gain its trigger skill as an additional battle
+        # trigger. Injection lives here so every combat path (PvE/PvP/Boss)
+        # picks it up via the same loadout export; sect buffs are not
+        # learned skills, so they are fixed at star 1 normalization.
+        sect_id = getattr(player, "sect_id", 0)
+        if self.db is not None and self.db.ext is not None and sect_id:
+            sect = await self.db.ext.get_sect_by_id(sect_id)
+            if sect is not None:
+                for buff_skill_id in sect.get_mainbuff_list():
+                    sect_skill_def = self._find_skill_definition(str(buff_skill_id))
+                    if sect_skill_def is None:
+                        continue
+                    sect_skill_def = self._apply_star_to_def(sect_skill_def, 1)
+                    route_mult = sect_skill_def.get("route_multiplier", {}).get(
+                        player.cultivation_type, 1.0
+                    )
+                    trigger = sect_skill_def.get("trigger_skill")
+                    if trigger:
+                        trigger = dict(trigger)
+                        trigger["trigger_rate"] = min(
+                            1.0, trigger.get("trigger_rate", 0.0) * route_mult
+                        )
+                        loadout["trigger_skills"].append(trigger)
 
         return loadout
 

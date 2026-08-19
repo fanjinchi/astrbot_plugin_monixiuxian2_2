@@ -73,6 +73,20 @@ async def test_fresh_install_reaches_latest_version():
             "claimed_tiers",
         }, f"Unexpected impart_info columns: {impart_cols}"
 
+        # v28: fresh installs already carry the system-sect / skill attribution columns
+        async with db_conn2.execute("PRAGMA table_info(sects)") as cursor:
+            sect_cols = {row[1] for row in await cursor.fetchall()}
+        assert {"is_system", "faction_id", "status", "destruction_tier"} <= sect_cols
+
+        async with db_conn2.execute("PRAGMA table_info(player_skills)") as cursor:
+            skill_cols = {row[1] for row in await cursor.fetchall()}
+        assert {"origin_sect_id", "sect_bound"} <= skill_cols
+
+        # v30: fresh installs carry the master task chain progress column
+        async with db_conn2.execute("PRAGMA table_info(players)") as cursor:
+            player_cols = {row[1] for row in await cursor.fetchall()}
+        assert "sect_master_progress" in player_cols
+
 
 @pytest.mark.asyncio
 async def test_fresh_install_player_crud_works():
@@ -292,3 +306,100 @@ async def test_player_skills_crud():
         assert skills[0]["skill_id"] == "common_001"
         assert skills[0]["star_level"] == 2
         assert skills[0]["source"] == "retest"
+
+
+@pytest.mark.asyncio
+async def test_v28_adds_system_sect_and_skill_attribution_columns():
+    """v27 -> v28 adds system-sect columns and skill attribution with safe defaults."""
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
+        await db_conn.execute("INSERT INTO db_info (version) VALUES (?)", (27,))
+        await db_conn.execute("""
+            CREATE TABLE sects (
+                sect_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sect_name TEXT NOT NULL UNIQUE,
+                sect_owner TEXT NOT NULL,
+                sect_scale INTEGER NOT NULL DEFAULT 0,
+                sect_used_stone INTEGER NOT NULL DEFAULT 0,
+                sect_fairyland INTEGER NOT NULL DEFAULT 0,
+                sect_materials INTEGER NOT NULL DEFAULT 0,
+                mainbuff TEXT NOT NULL DEFAULT '0',
+                secbuff TEXT NOT NULL DEFAULT '0',
+                elixir_room_level INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        await db_conn.execute(
+            "INSERT INTO sects (sect_name, sect_owner) VALUES ('太一宗', 'u1')"
+        )
+        await db_conn.execute("""
+            CREATE TABLE player_skills (
+                user_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                star_level INTEGER NOT NULL DEFAULT 1,
+                source TEXT NOT NULL DEFAULT '',
+                learned_at INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, skill_id)
+            )
+        """)
+        await db_conn.execute(
+            "INSERT INTO player_skills (user_id, skill_id) VALUES ('u1', 'common_001')"
+        )
+        await db_conn.commit()
+
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        async with db_conn.execute("SELECT version FROM db_info") as cursor:
+            assert (await cursor.fetchone())[0] == LATEST_DB_VERSION
+
+        async with db_conn.execute("PRAGMA table_info(sects)") as cursor:
+            sect_cols = {row[1] for row in await cursor.fetchall()}
+        assert {"is_system", "faction_id", "status", "destruction_tier"} <= sect_cols
+
+        async with db_conn.execute("PRAGMA table_info(player_skills)") as cursor:
+            skill_cols = {row[1] for row in await cursor.fetchall()}
+        assert {"origin_sect_id", "sect_bound"} <= skill_cols
+
+        # Existing rows keep zero-behavior defaults
+        async with db_conn.execute(
+            "SELECT is_system, faction_id, status, destruction_tier FROM sects"
+        ) as cursor:
+            row = await cursor.fetchone()
+        assert row == (0, None, "normal", None)
+
+        async with db_conn.execute(
+            "SELECT origin_sect_id, sect_bound FROM player_skills"
+        ) as cursor:
+            row = await cursor.fetchone()
+        assert row == (None, 0)
+
+
+@pytest.mark.asyncio
+async def test_player_skills_sect_attribution_pass_through():
+    """learn_or_star_up stores origin_sect_id/sect_bound on first learn only."""
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        db = DataBase(":memory:")
+        db.conn = db_conn
+        db.ext = _data_mod.DatabaseExtended(db_conn)
+
+        is_new, star = await db.ext.learn_or_star_up(
+            "u1", "qy_001", "test", origin_sect_id="qingyun", sect_bound=True
+        )
+        assert is_new and star == 1
+
+        skills = await db.ext.get_learned_skills("u1")
+        assert skills[0]["origin_sect_id"] == "qingyun"
+        assert skills[0]["sect_bound"] is True
+
+        # Star-up does not overwrite the original attribution
+        is_new2, star2 = await db.ext.learn_or_star_up("u1", "qy_001", "retest")
+        assert not is_new2 and star2 == 2
+        skills = await db.ext.get_learned_skills("u1")
+        assert skills[0]["origin_sect_id"] == "qingyun"
+        assert skills[0]["sect_bound"] is True
+
+        # Plain skills default to unattributed/unbound
+        await db.ext.learn_or_star_up("u1", "common_001", "test")
+        skills = {s["skill_id"]: s for s in await db.ext.get_learned_skills("u1")}
+        assert skills["common_001"]["origin_sect_id"] is None
+        assert skills["common_001"]["sect_bound"] is False

@@ -20,18 +20,27 @@ class BountyHandlers:
 
     @player_required
     async def handle_bounty_list(self, player: Player, event: AstrMessageEvent):
-        """显示悬赏列表"""
+        """显示悬赏列表（宗门专属委托单列分区）"""
         bounties = await self.bounty_mgr.get_bounty_list(player)
 
-        lines = ["📜 悬赏令 · 今日委托", "━━━━━━━━━━━━━━━"]
-        for b in bounties:
+        def _format(b: dict) -> str:
             reward = b.get("reward", {})
-            lines.append(
+            return (
                 f"[{b['id']}] {b['name']}（{b.get('difficulty_name', '未知')}·{b.get('category', '任务')}）\n"
                 f"  - 目标：完成 {b.get('count')} 次 | 时限：{b.get('time_limit', 0) // 60} 分钟\n"
                 f"  - 奖励：{reward.get('stone', 0):,} 灵石 + {reward.get('exp', 0):,} 修为\n"
                 f"  - 说明：{b.get('description', '')}"
             )
+
+        normal = [b for b in bounties if not b.get("sect_id")]
+        sect_only = [b for b in bounties if b.get("sect_id")]
+
+        lines = ["📜 悬赏令 · 今日委托", "━━━━━━━━━━━━━━━"]
+        lines.extend(_format(b) for b in normal)
+        if sect_only:
+            lines.append("━━━━━━━━━━━━━━━")
+            lines.append("🏯 宗门悬赏")
+            lines.extend(_format(b) for b in sect_only)
         lines.append("━━━━━━━━━━━━━━━")
         lines.append("💡 使用 /接取悬赏 <编号> 接取任务")
 

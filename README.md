@@ -311,6 +311,29 @@ astrbot_plugin_monixiuxian2/
 
 ---
 
+### v3.9.0 - 默认宗门与宗门成长体系
+
+**✨ 新增功能**
+- 默认（系统）宗门：启动时按 `sect_factions.json` 幂等播种 2 个默认宗门（青云门/合欢宗），「加入宗门」统一入口按宗门类型分流，默认宗门按 `join_level_range` 校验拜入境界
+- 宗门建设：「宗门建设」升级洞天（全员闭关修为加成）与丹房（「宗门丹房 领取」每日领丹，签到日重置）；「宗门任务」改为从 `sect_tasks.json` 建设任务池抽取，按任务配置结算贡献/资材/修为
+- 镇派功法：「镇派功法」查看/宗主镶嵌，全员战斗被动生效
+- 职阶晋升：「宗门晋升」贡献+境界双门槛自助晋升（读 `sect_config.json` positions.promotion）；职阶福利落地——每日俸禄并入「签到」、商店折扣、宝库传承解锁
+- 宗门宝库：「宗门宝库」查看/领取本宗传承宝物与心法（职阶门槛或福利解锁，每人限领一次，跨退宗生效）
+- 师承任务：默认宗门专属任务链，按境界段匹配、阶段挂钩 PvE/历练/突破/捐献，奖励贡献/修为/宗门功法领悟机会
+- 内容联动：宗门专属悬赏（模板带 sect_id 仅本宗可见可接）、宗门秘境（sect_member 准入）、历练宗门事件组、功法领悟池注入本宗专属池并打归属标记
+
+**🔧 机制调整**
+- 离宗语义统一：退出/被踢/弃道重修三路径回收宗门之宝（含装备槽）归还宗门；宗门绑定功法/心法离宗保留可用（不回收不封印）；储物戒赠予拦截一切宗门绑定物
+- 宗门权限合并：删除硬编码 `POSITION_PERMISSIONS`，职位名称/权限/晋升/福利统一读 `sect_config.json`；捐献建设度折算读 `scale_ratio` 配置
+
+**🗄️ 数据库**
+- 迁移至 v30：sects +is_system/faction_id/status/destruction_tier（v28）、player_skills +origin_sect_id/sect_bound（v28）、players +sect_treasure_claims（v29）/sect_master_progress（v30）
+
+**🧪 测试与文档**
+- 新增 `tests/test_sect_manager.py` / `test_sect_growth.py` / `test_sect_master.py` / `test_sect_content_link.py`；全量 473 通过
+- 同步 design_docs：current-design-report §4.8 重写、api-overview、project-architecture、sect-system-design 实施期决策补记
+- OpenSpec 变更：`openspec/changes/add-default-sects-and-sect-growth/`
+
 ### v3.8.2 - 功能测试 Bug 修复（切磋 / 忙碌落库 / GM 发放）
 
 **🔧 修复问题**

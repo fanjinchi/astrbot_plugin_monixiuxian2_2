@@ -123,6 +123,12 @@ CMD_SECT_KICK = "踢出成员"
 CMD_SECT_TRANSFER = "宗主传位"
 CMD_SECT_TASK = "宗门任务"
 CMD_SECT_POSITION = "职位变更"
+CMD_SECT_ELIXIR = "宗门丹房"
+CMD_SECT_CONSTRUCTION = "宗门建设"
+CMD_SECT_MAINBUFF = "镇派功法"
+CMD_SECT_PROMOTE = "宗门晋升"
+CMD_SECT_TREASURY = "宗门宝库"
+CMD_MASTER_TASK = "师承任务"
 
 # Boss系统指令
 CMD_BOSS_INFO = "世界Boss"
@@ -244,16 +250,26 @@ class XiuXianPlugin(Star):
         self.equipment_mgr = EquipmentManager(
             self.db, self.config_manager, self.storage_ring_mgr
         )
+        # 宗门管理器提前初始化（player_handler 弃道重修路径依赖其回收钩子）
+        self.sect_mgr = SectManager(self.db, self.config_manager)
 
         self.misc_handler = MiscHandler(self.db)
         self.player_handler = PlayerHandler(
-            self.db, self.config, self.config_manager, self.skill_manager
+            self.db,
+            self.config,
+            self.config_manager,
+            self.skill_manager,
+            sect_mgr=self.sect_mgr,
         )
         self.equipment_handler = EquipmentHandler(
             self.db, self.config_manager, self.skill_manager
         )
         self.breakthrough_handler = BreakthroughHandler(
-            self.db, self.config_manager, self.config, self.skill_manager
+            self.db,
+            self.config_manager,
+            self.config,
+            self.skill_manager,
+            sect_manager=self.sect_mgr,
         )
         self.pill_handler = PillHandler(self.db, self.config_manager)
         self.shop_handler = ShopHandler(self.db, self.config, self.config_manager)
@@ -272,7 +288,6 @@ class XiuXianPlugin(Star):
             self.config_manager,
             self.impart_mgr,
         )
-        self.sect_mgr = SectManager(self.db, self.config_manager)
         self.boss_mgr = BossManager(
             self.db,
             self.combat_mgr,
@@ -419,6 +434,12 @@ class XiuXianPlugin(Star):
         await self.db.connect()
         migration_manager = MigrationManager(self.db.conn, self.config_manager)
         await migration_manager.migrate()
+
+        # 播种默认宗门（幂等 upsert，失败不阻断插件加载）
+        try:
+            await self.sect_mgr.ensure_system_sects()
+        except Exception as e:
+            logger.error(f"【修仙插件】默认宗门播种失败: {e}")
 
         # 启动定时任务
         if self._is_boss_enabled():
@@ -1141,6 +1162,50 @@ class XiuXianPlugin(Star):
         ):
             yield r
 
+    @filter.command(CMD_SECT_ELIXIR, "宗门丹房领取丹药")
+    @require_whitelist
+    async def handle_sect_elixir(self, event: AstrMessageEvent, action: str = ""):
+        """Command 「宗门丹房」- 查看丹房状态或领取丹药（「宗门丹房 领取」）; routes to sect_handlers.handle_sect_elixir."""
+        async for r in self.sect_handlers.handle_sect_elixir(event, action):
+            yield r
+
+    @filter.command(CMD_SECT_CONSTRUCTION, "宗门建设与建筑升级")
+    @require_whitelist
+    async def handle_sect_construction(
+        self, event: AstrMessageEvent, building: str = ""
+    ):
+        """Command 「宗门建设」- 查看建筑状态或升级建筑（「宗门建设 洞天/丹房」）; routes to sect_handlers.handle_sect_construction."""
+        async for r in self.sect_handlers.handle_sect_construction(event, building):
+            yield r
+
+    @filter.command(CMD_SECT_MAINBUFF, "查看或镶嵌镇派功法")
+    @require_whitelist
+    async def handle_sect_mainbuff(self, event: AstrMessageEvent, skill_ref: str = ""):
+        """Command 「镇派功法」- 查看镇派功法或宗主镶嵌功法（「镇派功法 <功法ID>」）; routes to sect_handlers.handle_sect_mainbuff."""
+        async for r in self.sect_handlers.handle_sect_mainbuff(event, skill_ref):
+            yield r
+
+    @filter.command(CMD_SECT_PROMOTE, "宗门职阶晋升")
+    @require_whitelist
+    async def handle_sect_promote(self, event: AstrMessageEvent):
+        """Command 「宗门晋升」- 贡献+境界双门槛晋升职阶; routes to sect_handlers.handle_sect_promote."""
+        async for r in self.sect_handlers.handle_sect_promote(event):
+            yield r
+
+    @filter.command(CMD_SECT_TREASURY, "宗门宝库领取传承")
+    @require_whitelist
+    async def handle_sect_treasury(self, event: AstrMessageEvent, item_ref: str = ""):
+        """Command 「宗门宝库」- 查看本宗传承或领取宝物/心法（「宗门宝库 <名称>」）; routes to sect_handlers.handle_sect_treasury."""
+        async for r in self.sect_handlers.handle_sect_treasury(event, item_ref):
+            yield r
+
+    @filter.command(CMD_MASTER_TASK, "查看师承任务进度")
+    @require_whitelist
+    async def handle_master_task(self, event: AstrMessageEvent):
+        """Command 「师承任务」- 查看师承任务链与阶段进度; routes to sect_handlers.handle_master_task."""
+        async for r in self.sect_handlers.handle_master_task(event):
+            yield r
+
     # ===== Boss系统指令 =====
 
     @filter.command(CMD_BOSS_INFO, "查看世界Boss状态")
@@ -1286,6 +1351,18 @@ class XiuXianPlugin(Star):
                 )
                 if has_progress:
                     msg += bounty_msg
+            # 师承任务链：PvE 胜利计数（失败不影响秘境主流程）
+            if reward_data.get("pve_won"):
+                try:
+                    master_msg = await self.sect_mgr.advance_master_progress(
+                        user_id, "win_pve"
+                    )
+                    if master_msg:
+                        msg += master_msg
+                except Exception:
+                    logger.warning(
+                        "【修仙插件】师承任务PvE胜场推进失败（秘境）", exc_info=True
+                    )
 
         yield event.plain_result(msg)
 
@@ -1322,6 +1399,23 @@ class XiuXianPlugin(Star):
                 )
                 if has_progress:
                     msg += bounty_msg
+            # 师承任务链：历练完成 + PvE 胜利计数（失败不影响历练主流程）
+            try:
+                master_msg = await self.sect_mgr.advance_master_progress(
+                    user_id, "adventure_complete"
+                )
+                if reward_data.get("pve_won"):
+                    win_msg = await self.sect_mgr.advance_master_progress(
+                        user_id, "win_pve"
+                    )
+                    if win_msg:
+                        master_msg = (master_msg or "") + win_msg
+                if master_msg:
+                    msg += master_msg
+            except Exception:
+                logger.warning(
+                    "【修仙插件】师承任务进度推进失败（历练）", exc_info=True
+                )
 
         yield event.plain_result(msg)
 

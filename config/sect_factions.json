@@ -1,0 +1,188 @@
+{
+  "factions": [
+    {
+      "id": "qingyun",
+      "name": "青云门",
+      "alignment": "正",
+      "description": "青云门立派于青云山巅，开派祖师青云子以一卷《青云心典》创下千年基业。门中崇尚循序渐进的学院式修行：外门演武、内门讲道、亲传授业，层层递进。当代掌门云游在外，门务由传功长老玄诚子代为主持，广收天下有志于道的少年修士。",
+      "join_level_range": [
+        0,
+        5
+      ],
+      "skill_pool": "sect_qingyun",
+      "mainbuff": [
+        "qy_001"
+      ],
+      "heart_methods": [
+        "heart_qy_001"
+      ],
+      "treasures": [
+        {
+          "type": "weapon",
+          "id": "wpn_qy_001",
+          "min_position": 2
+        }
+      ],
+      "buildings": {
+        "fairyland": {
+          "max_level": 5,
+          "exp_bonus_per_level": 0.02,
+          "upgrade_cost": [
+            200,
+            400,
+            800,
+            1600,
+            3200
+          ]
+        },
+        "elixir_room": {
+          "max_level": 5,
+          "unlock_pills_per_level": [
+            "炼气丹",
+            "聚灵丹",
+            "凝气丹"
+          ],
+          "upgrade_cost": [
+            200,
+            400,
+            800,
+            1600,
+            3200
+          ]
+        }
+      },
+      "elders": [
+        {
+          "name": "玄诚子",
+          "title": "传功长老"
+        },
+        {
+          "name": "清微道长",
+          "title": "执事长老"
+        }
+      ],
+      "destruction": {
+        "enabled": true,
+        "default_loss_profile": "medium",
+        "loss_profiles": {
+          "light": {
+            "scale": 0.2,
+            "materials": 0.2,
+            "stones": 0.2,
+            "skills": 0.1,
+            "treasures": 0.0
+          },
+          "medium": {
+            "scale": 0.5,
+            "materials": 0.5,
+            "stones": 0.5,
+            "skills": 0.3,
+            "treasures": 0.2
+          },
+          "heavy": {
+            "scale": 0.8,
+            "materials": 0.8,
+            "stones": 0.8,
+            "skills": 0.6,
+            "treasures": 0.5
+          },
+          "ruined": {
+            "scale": 1.0,
+            "materials": 1.0,
+            "stones": 1.0,
+            "skills": 0.9,
+            "treasures": 0.8
+          }
+        }
+      }
+    },
+    {
+      "id": "huanxi",
+      "name": "合欢宗",
+      "alignment": "魔",
+      "description": "合欢宗没有山门，只有一座随季候迁徙的销金窟。三百年前一群被名门正派逐出门墙的散修在此立誓：道法不问出处，强弱只论生死。宗内不讲辈分，只讲投名状；不传心诀，只传杀术。护法长老厉无欢坐镇总坛，凡带艺投宗者，须先见血，再入门墙。",
+      "join_level_range": [
+        2,
+        6
+      ],
+      "skill_pool": "sect_huanxi",
+      "mainbuff": [
+        "hx_001"
+      ],
+      "heart_methods": [],
+      "treasures": [],
+      "buildings": {
+        "fairyland": {
+          "max_level": 5,
+          "exp_bonus_per_level": 0.02,
+          "upgrade_cost": [
+            200,
+            400,
+            800,
+            1600,
+            3200
+          ]
+        },
+        "elixir_room": {
+          "max_level": 5,
+          "unlock_pills_per_level": [
+            "聚灵丹",
+            "凝气丹",
+            "培元丹"
+          ],
+          "upgrade_cost": [
+            200,
+            400,
+            800,
+            1600,
+            3200
+          ]
+        }
+      },
+      "elders": [
+        {
+          "name": "厉无欢",
+          "title": "护法长老"
+        },
+        {
+          "name": "花妩娘",
+          "title": "传功长老"
+        }
+      ],
+      "destruction": {
+        "enabled": true,
+        "default_loss_profile": "medium",
+        "loss_profiles": {
+          "light": {
+            "scale": 0.2,
+            "materials": 0.2,
+            "stones": 0.2,
+            "skills": 0.1,
+            "treasures": 0.0
+          },
+          "medium": {
+            "scale": 0.5,
+            "materials": 0.5,
+            "stones": 0.5,
+            "skills": 0.3,
+            "treasures": 0.2
+          },
+          "heavy": {
+            "scale": 0.8,
+            "materials": 0.8,
+            "stones": 0.8,
+            "skills": 0.6,
+            "treasures": 0.5
+          },
+          "ruined": {
+            "scale": 1.0,
+            "materials": 1.0,
+            "stones": 1.0,
+            "skills": 0.9,
+            "treasures": 0.8
+          }
+        }
+      }
+    }
+  ]
+}

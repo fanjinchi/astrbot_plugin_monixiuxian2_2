@@ -146,3 +146,77 @@ class SectHandlers:
         user_id = event.get_sender_id()
         success, msg = await self.sect_mgr.perform_sect_task(user_id)
         yield event.plain_result(msg)
+
+    async def _get_busy_message(self, user_id: str) -> str | None:
+        """Return a busy-state notice for the sender, or None when idle."""
+        user_cd = await self.db.ext.get_user_cd(user_id)
+        if user_cd and user_cd.type != UserStatus.IDLE:
+            current_status = UserStatus.get_name(user_cd.type)
+            return f"❌ 你当前正{current_status}，无法进行此操作！"
+        return None
+
+    async def handle_sect_elixir(self, event: AstrMessageEvent, action: str = ""):
+        """宗门丹房（查看状态/领取丹药）"""
+        busy_msg = await self._get_busy_message(event.get_sender_id())
+        if busy_msg:
+            yield event.plain_result(busy_msg)
+            return
+        user_id = event.get_sender_id()
+        if (action or "").strip() == "领取":
+            success, msg = await self.sect_mgr.claim_elixir(user_id)
+        else:
+            success, msg = await self.sect_mgr.get_elixir_room_status(user_id)
+        yield event.plain_result(msg)
+
+    async def handle_sect_construction(
+        self, event: AstrMessageEvent, building: str = ""
+    ):
+        """宗门建设（查看建筑状态/升级建筑）"""
+        busy_msg = await self._get_busy_message(event.get_sender_id())
+        if busy_msg:
+            yield event.plain_result(busy_msg)
+            return
+        user_id = event.get_sender_id()
+        if (building or "").strip():
+            success, msg = await self.sect_mgr.upgrade_building(user_id, building)
+        else:
+            success, msg = await self.sect_mgr.get_construction_status(user_id)
+        yield event.plain_result(msg)
+
+    async def handle_sect_mainbuff(self, event: AstrMessageEvent, skill_ref: str = ""):
+        """镇派功法（查看/镶嵌镇派功法）"""
+        busy_msg = await self._get_busy_message(event.get_sender_id())
+        if busy_msg:
+            yield event.plain_result(busy_msg)
+            return
+        user_id = event.get_sender_id()
+        success, msg = await self.sect_mgr.manage_sect_buff(user_id, skill_ref)
+        yield event.plain_result(msg)
+
+    async def handle_sect_promote(self, event: AstrMessageEvent):
+        """宗门晋升（贡献+境界双门槛校验）"""
+        busy_msg = await self._get_busy_message(event.get_sender_id())
+        if busy_msg:
+            yield event.plain_result(busy_msg)
+            return
+        user_id = event.get_sender_id()
+        success, msg = await self.sect_mgr.promote_position(user_id)
+        yield event.plain_result(msg)
+
+    async def handle_sect_treasury(self, event: AstrMessageEvent, item_ref: str = ""):
+        """宗门宝库（查看传承/领取宝物心法）"""
+        busy_msg = await self._get_busy_message(event.get_sender_id())
+        if busy_msg:
+            yield event.plain_result(busy_msg)
+            return
+        user_id = event.get_sender_id()
+        if (item_ref or "").strip():
+            success, msg = await self.sect_mgr.claim_treasure(user_id, item_ref)
+        else:
+            success, msg = await self.sect_mgr.get_treasury_info(user_id)
+        yield event.plain_result(msg)
+
+    async def handle_master_task(self, event: AstrMessageEvent):
+        """师承任务（查看当前任务链与阶段进度，查看类指令不做忙碌拦截）"""
+        success, msg = await self.sect_mgr.get_master_task_status(event.get_sender_id())
+        yield event.plain_result(msg)

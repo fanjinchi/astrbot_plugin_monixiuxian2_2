@@ -675,5 +675,110 @@
         "体修": 1.0
       }
     }
+  ],
+  "sect_qingyun": [
+    {
+      "id": "qy_001",
+      "name": "青云剑诀",
+      "description": "青云门镇派剑诀，剑出如青云出岫，绵里藏针",
+      "trigger_skill": {
+        "name": "青云一剑",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.18,
+        "effect_type": "damage_bonus",
+        "effect_value": 0.3
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.1,
+        "体修": 0.9
+      },
+      "learn_coefficient": 1.0,
+      "sect_bound": true
+    },
+    {
+      "id": "qy_002",
+      "name": "清风护体功",
+      "description": "青云门内门护身功法，清气护体，可卸来敌攻势",
+      "trigger_skill": {
+        "name": "清风屏障",
+        "trigger_condition": "defend",
+        "trigger_rate": 0.2,
+        "effect_type": "damage_reduction",
+        "effect_value": 0.35
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      },
+      "learn_coefficient": 0.8,
+      "sect_bound": true
+    },
+    {
+      "id": "qy_003",
+      "name": "紫霄雷引",
+      "description": "青云门亲传绝学，引紫霄神雷淬体，偶发雷霆之威",
+      "trigger_skill": {
+        "name": "紫霄落雷",
+        "trigger_condition": "crit",
+        "trigger_rate": 0.25,
+        "effect_type": "damage_bonus",
+        "effect_value": 0.5
+      },
+      "ultimate": {
+        "name": "万剑归宗",
+        "trigger_condition": "once_per_battle",
+        "effect_type": "massive_damage",
+        "effect_value": 1.5,
+        "min_action_index": 5
+      },
+      "route_multiplier": {
+        "灵修": 1.2,
+        "体修": 0.8
+      },
+      "learn_coefficient": 0.5,
+      "sect_bound": true
+    }
+  ],
+  "sect_huanxi": [
+    {
+      "id": "hx_001",
+      "name": "蚀心魔音",
+      "description": "合欢宗杀术，魔音蚀心，乱敌心神",
+      "trigger_skill": {
+        "name": "蚀心之音",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.15,
+        "effect_type": "debuff",
+        "effect_value": 0.2
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 1.0,
+        "体修": 1.0
+      },
+      "learn_coefficient": 1.0,
+      "sect_bound": true
+    },
+    {
+      "id": "hx_002",
+      "name": "血影掠杀",
+      "description": "合欢宗护法亲传，身化血影，连环掠杀",
+      "trigger_skill": {
+        "name": "血影连击",
+        "trigger_condition": "attack",
+        "trigger_rate": 0.18,
+        "effect_type": "combo",
+        "effect_value": 0.55
+      },
+      "ultimate": null,
+      "route_multiplier": {
+        "灵修": 0.9,
+        "体修": 1.1
+      },
+      "learn_coefficient": 0.7,
+      "sect_bound": true
+    }
   ]
 }

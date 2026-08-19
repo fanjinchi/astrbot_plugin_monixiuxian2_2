@@ -210,5 +210,36 @@
       "体修": 1.0
     },
     "damage": 0
+  },
+  {
+    "id": "wpn_qy_001",
+    "name": "青云镇山剑",
+    "type": "weapon",
+    "weapon_category": "剑",
+    "rank": "天品",
+    "required_level_index": 21,
+    "description": "青云门镇派之宝，剑身铭刻开派祖师手书「青云」二字，离宗即自动归还宗门",
+    "price": 0,
+    "shop_weight": 0,
+    "weapon_coefficient_k": 0.5,
+    "base_damage": 35,
+    "armor_value": 80,
+    "trigger_skills": [
+      {
+        "name": "青云剑意",
+        "trigger_timing": "on_attack",
+        "trigger_rate": 0.15,
+        "effect_type": "damage_bonus",
+        "effect_value": 0.4
+      }
+    ],
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "damage": 0,
+    "sect_id": "qingyun",
+    "treasure": true,
+    "min_position": 2
   }
 ]

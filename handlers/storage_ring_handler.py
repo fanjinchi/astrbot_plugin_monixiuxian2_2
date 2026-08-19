@@ -267,6 +267,11 @@ class StorageRingHandler:
             yield event.plain_result("数量必须大于0")
             return
 
+        # 宗门绑定物（宗门之宝/宗门功法等带 sect_id/treasure/sect_bound 标记）不可赠予
+        if self.storage_ring_manager.is_sect_bound_item(item_name):
+            yield event.plain_result(f"❌ 【{item_name}】乃宗门之物，不可外传！")
+            return
+
         # 检查物品是否在储物戒中
         if not self.storage_ring_manager.has_item(player, item_name, count):
             current = self.storage_ring_manager.get_item_count(player, item_name)

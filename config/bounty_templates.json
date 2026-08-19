@@ -149,6 +149,49 @@
       "item_table": "mystic",
       "description": "封印上古禁地残余煞气，仅限身经百战者参与。",
       "weight": 15
+    },
+    {
+      "id": 307,
+      "name": "后山巡视",
+      "difficulty": "easy",
+      "category": "巡山",
+      "progress_tags": [
+        "adventure_scout",
+        "gather"
+      ],
+      "min_target": 2,
+      "max_target": 4,
+      "time_limit": 3600,
+      "reward": {
+        "stone": 200,
+        "exp": 1800
+      },
+      "item_table": "scout",
+      "description": "为本门巡视后山灵脉，驱逐窥探的外人。",
+      "weight": 20,
+      "sect_id": "qingyun"
+    },
+    {
+      "id": 308,
+      "name": "执事堂派差",
+      "difficulty": "normal",
+      "category": "采集",
+      "progress_tags": [
+        "adventure_roam",
+        "gather",
+        "collect"
+      ],
+      "min_target": 3,
+      "max_target": 6,
+      "time_limit": 5400,
+      "reward": {
+        "stone": 320,
+        "exp": 2800
+      },
+      "item_table": "gather",
+      "description": "执事堂征调弟子下山采买宗门用度，顺带历练。",
+      "weight": 20,
+      "sect_id": "qingyun"
     }
   ],
   "item_tables": {

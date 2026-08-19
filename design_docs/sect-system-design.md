@@ -160,13 +160,21 @@
           "benefits": {"daily_stones": 100, "shop_discount": 0.95, "unlocks": ["heart_qy_001"]}},
     "2": {"name": "亲传弟子", "permission": 5,
           "promotion": {"contribution": 8000, "level_index": 6},
-          "benefits": {"daily_stones": 300, "shop_discount": 0.9,  "unlocks": ["wpn_qy_001"]}}
+          "benefits": {"daily_stones": 300, "shop_discount": 0.9,  "unlocks": ["wpn_qy_001"]}},
+    "1": {"name": "长老", "permission": 8,
+          "promotion": {"contribution": 30000, "level_index": 9},
+          "benefits": {"daily_stones": 800, "shop_discount": 0.85, "unlocks": []}},
+    "0": {"name": "宗主", "permission": 10,
+          "promotion": null,
+          "benefits": {"daily_stones": 2000, "shop_discount": 0.8, "unlocks": []}}
   },
   "scale_ratio": 10
 }
 ```
 
-> ⚠ 现有 `scale_ratio` 配置未被代码读取（硬编码在 `sect_manager.py:229`、`database_extended.py:148`），本次一并接线。
+> 高档位补记（实施落地值）：长老 `promotion` = 贡献 30000 + 境界 9、福利 800 灵石/日 + 0.85 折；宗主 `promotion = null`（不设晋升通道，只能传位获得）、福利 2000 灵石/日 + 0.8 折。
+
+> ✅ `scale_ratio` 已接线（实施完成）：捐献折算读配置，原 `sect_manager.py`/`database_extended.py` 硬编码已移除。
 
 ### 3.9 `config/sect_tasks.json`（新增）**[策划可配]**
 
@@ -199,7 +207,7 @@
 ### 4.1 拜入与出师（一期）
 
 - 新玩家境界在 faction 的 `join_level_range` 内可拜入默认宗门。「加入宗门」为统一入口，按目标宗门 `is_system` 分流校验逻辑（默认宗门校验境界区间，玩家宗门保持现有自由加入）。
-- 默认宗门**无宗主职位**，玩家最高可升至长老之下（亲传/执事类），权限表 `POSITION_PERMISSIONS`（`sect_manager.py:22`，现为死定义）本期接线生效。
+- 默认宗门**无宗主职位**，玩家最高可升至长老之下（亲传/执事类）。权限统一读 `sect_config.json` 的 positions.permission（实施时已删除 `sect_manager.py` 硬编码 `POSITION_PERMISSIONS`，两套定义合并为配置单一真源）。
 - 「出师」= 退出默认宗门：自由离开，已习得的宗门功法/心法**保留且正常使用**（其不可转让的固有属性不变），宗门之宝回收归还宗门，贡献清零（与现有退出语义一致）。
 - 玩家宗门不受 `join_level_range` 限制（保持现有自由加入）。
 
@@ -258,7 +266,7 @@
 
 ### 5.3 宗门逻辑重构（一期）
 
-- `sect_manager.py` 拆分：归属/绑定物回收、建设升级、职阶晋升各成方法；`POSITION_PERMISSIONS` 与 `sect_config.json` 的 permission 两套定义合并（现互不互通）。
+- `sect_manager.py` 拆分：归属/绑定物回收、建设升级、职阶晋升各成方法；`POSITION_PERMISSIONS` 与 `sect_config.json` 的 permission 两套定义已合并——硬编码表已删除，权限判断统一读 `sect_config.json`。
 - `sect_fairyland`/`elixir_room_level`/`mainbuff` 接线（§4.2）。
 - 退出宗门路径加"宗门之宝回收"钩子（默认宗门与玩家宗门通用；功法/心法离宗不回收）。
 
@@ -289,6 +297,17 @@
 
 - 单元测试：`tests/test_sect_*.py`（晋升门槛、绑定物回收、建设升级、播种幂等）。
 - 功能测试：独立 OpenSpec change，在 `functional_tests/cases/sect/` 下编写测试平台用例（拜入/师承链推进/建设/晋升/出师回收全流程）。注意 `functional_tests/platform-gap-report.md` 的能力边界：RNG seed、DB 直断、时间加速属 Unsupported/Partially，用例设计优先只依赖 Supported 能力（指令链路 + 消息断言）。
+
+### 5.10 实施期决策（2026-08-19 落地补记）
+
+实施过程中拍板的细节，设计文档此前未写明，特此补记（均已在代码中生效）：
+
+1. **师承链匹配优先级**：玩家已存储的未完成链优先于按境界段重新匹配（`sect_manager.py` `_match_master_chain`）——跨境界段时继续原链，不被新区间顶掉。
+2. **历练宗门事件组权重**：宗门事件组以固定权重常量 15 追加进抽取池（`adventure_manager.py` `SECT_EVENT_GROUP_WEIGHT = 15`），不进配置文件。
+3. **宗门宝库对玩家宗门为空**：宝库条目仅由 faction 配置的 `treasures`/`heart_methods` 生成，玩家自建宗门无 faction 配置，宝库为空（`sect_manager.py` `_get_treasury_entries`）。
+4. **建设任务 `donate_materials` 语义**：`cost.materials` 表示玩家为宗门采集/筹备资材——宗门资材直接增加，**不消耗玩家任何货币/物品**；仅 `cost.stones` 类任务扣玩家灵石（并入宗门库房按 `scale_ratio` 折建设度）。
+5. **建筑升级权限**：默认（系统）宗门任意成员可升级建筑；玩家宗门需长老及以上职阶（`sect_manager.py` `upgrade_building`）。
+6. **建筑升级消耗**：一期实现仅消耗宗门资材（`upgrade_cost` 按当前等级索引），不扣建设度——与 §4.2 "资材 + 建设度" 的原描述有出入，以代码为准，二期如需建设度消耗再补。
 
 ## 6. 分期实施计划
 

@@ -1,5 +1,6 @@
 # handlers/breakthrough_handler.py
 
+from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 
 from ..config_manager import ConfigManager
@@ -23,6 +24,7 @@ class BreakthroughHandler:
         config_manager: ConfigManager,
         config: dict,
         skill_manager: SkillManager | None = None,
+        sect_manager=None,
     ):
         self.db = db
         self.config_manager = config_manager
@@ -31,6 +33,8 @@ class BreakthroughHandler:
             db, config_manager, config, skill_manager
         )
         self.pill_manager = PillManager(db, config_manager)
+        # 可选：师承任务链进度推进（突破成功挂钩点）
+        self.sect_manager = sect_manager
 
     @player_required
     async def handle_breakthrough_info(self, player: Player, event: AstrMessageEvent):
@@ -238,3 +242,14 @@ class BreakthroughHandler:
             await self.pill_manager.consume_breakthrough_effects(player)
 
         yield event.plain_result(message)
+
+        # 师承任务链：突破成功计数（失败不影响突破主流程）
+        if success and not died and self.sect_manager is not None:
+            try:
+                master_msg = await self.sect_manager.advance_master_progress(
+                    player.user_id, "breakthrough"
+                )
+                if master_msg:
+                    yield event.plain_result(master_msg.strip())
+            except Exception:
+                logger.warning("【修仙插件】师承任务突破进度推进失败", exc_info=True)

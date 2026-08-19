@@ -12,7 +12,7 @@ from astrbot.api import logger
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 27  # v27: Plan-A growth model + breakthrough fail-streak pity
+LATEST_DB_VERSION = 30  # v30: players.sect_master_progress（师承任务链进度）
 
 MIGRATION_TASKS: dict[
     int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]
@@ -486,7 +486,11 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             sect_materials INTEGER NOT NULL DEFAULT 0,
             mainbuff TEXT NOT NULL DEFAULT '0',
             secbuff TEXT NOT NULL DEFAULT '0',
-            elixir_room_level INTEGER NOT NULL DEFAULT 0
+            elixir_room_level INTEGER NOT NULL DEFAULT 0,
+            is_system INTEGER NOT NULL DEFAULT 0,
+            faction_id TEXT,
+            status TEXT NOT NULL DEFAULT 'normal',
+            destruction_tier TEXT
         )
     """)
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_sect_owner ON sects(sect_owner)")
@@ -838,6 +842,8 @@ async def _create_all_tables_v22(conn: aiosqlite.Connection):
             sect_contribution INTEGER NOT NULL DEFAULT 0,
             sect_task INTEGER NOT NULL DEFAULT 0,
             sect_elixir_get INTEGER NOT NULL DEFAULT 0,
+            sect_treasure_claims TEXT NOT NULL DEFAULT '[]',
+            sect_master_progress TEXT NOT NULL DEFAULT '{}',
 
             blessed_spot_flag INTEGER NOT NULL DEFAULT 0,
             blessed_spot_name TEXT NOT NULL DEFAULT '',
@@ -884,12 +890,19 @@ async def _create_all_tables_v22(conn: aiosqlite.Connection):
             sect_materials INTEGER NOT NULL DEFAULT 0,
             mainbuff TEXT NOT NULL DEFAULT '0',
             secbuff TEXT NOT NULL DEFAULT '0',
-            elixir_room_level INTEGER NOT NULL DEFAULT 0
+            elixir_room_level INTEGER NOT NULL DEFAULT 0,
+            is_system INTEGER NOT NULL DEFAULT 0,
+            faction_id TEXT,
+            status TEXT NOT NULL DEFAULT 'normal',
+            destruction_tier TEXT
         )
     """)
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_sect_owner ON sects(sect_owner)")
     await conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_sect_scale ON sects(sect_scale DESC)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sect_faction ON sects(faction_id)"
     )
 
     # Buff信息表（简化，旧字段废弃）
@@ -1139,6 +1152,8 @@ async def _create_all_tables_v22(conn: aiosqlite.Connection):
             star_level INTEGER NOT NULL DEFAULT 1,
             source TEXT NOT NULL DEFAULT '',
             learned_at INTEGER NOT NULL DEFAULT 0,
+            origin_sect_id TEXT,
+            sect_bound INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (user_id, skill_id)
         )
     """)
@@ -1370,6 +1385,8 @@ async def _migrate_to_v25(conn: aiosqlite.Connection, config_manager: ConfigMana
             star_level INTEGER NOT NULL DEFAULT 1,
             source TEXT NOT NULL DEFAULT '',
             learned_at INTEGER NOT NULL DEFAULT 0,
+            origin_sect_id TEXT,
+            sect_bound INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (user_id, skill_id)
         )
     """)
@@ -1534,7 +1551,11 @@ async def _migrate_to_v12(conn: aiosqlite.Connection, config_manager: ConfigMana
             sect_materials INTEGER NOT NULL DEFAULT 0,
             mainbuff TEXT NOT NULL DEFAULT '0',
             secbuff TEXT NOT NULL DEFAULT '0',
-            elixir_room_level INTEGER NOT NULL DEFAULT 0
+            elixir_room_level INTEGER NOT NULL DEFAULT 0,
+            is_system INTEGER NOT NULL DEFAULT 0,
+            faction_id TEXT,
+            status TEXT NOT NULL DEFAULT 'normal',
+            destruction_tier TEXT
         )
     """)
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_sect_owner ON sects(sect_owner)")
@@ -2113,3 +2134,117 @@ async def _migrate_to_v27(conn: aiosqlite.Connection, config_manager: ConfigMana
 
     await conn.commit()
     logger.info("v27迁移完成：方案A成长模型 + 突破连败保底")
+
+
+@migration(28)
+async def _migrate_to_v28(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """Migrate to v28 - system sects and sect-bound skill attribution.
+
+    Adds ``is_system`` / ``faction_id`` / ``status`` / ``destruction_tier`` to
+    ``sects`` and ``origin_sect_id`` / ``sect_bound`` to ``player_skills``.
+    Existing rows keep the defaults (player-built sect, unbound skill), so
+    behavior is unchanged. No ``sealed`` column is added: sect skills have no
+    sealed state by design (D3).
+    """
+    logger.info("开始迁移到v28：默认宗门与宗门功法归属")
+
+    # 1. sects 表：系统宗门标记与毁灭状态字段
+    async with conn.execute("PRAGMA table_info(sects)") as cursor:
+        sect_columns = {row[1] for row in await cursor.fetchall()}
+
+    if not sect_columns:
+        # sects 表不存在（部分测试夹具只建相关表），跳过
+        logger.info("sects 表不存在，跳过 sects 加列")
+    else:
+        sect_new_columns = {
+            "is_system": "ALTER TABLE sects ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0",
+            "faction_id": "ALTER TABLE sects ADD COLUMN faction_id TEXT",
+            "status": "ALTER TABLE sects ADD COLUMN status TEXT NOT NULL DEFAULT 'normal'",
+            "destruction_tier": "ALTER TABLE sects ADD COLUMN destruction_tier TEXT",
+        }
+        for column, ddl in sect_new_columns.items():
+            if column not in sect_columns:
+                await conn.execute(ddl)
+                logger.info(f"已为 sects 表添加 {column} 字段")
+            else:
+                logger.info(f"sects.{column} 字段已存在，跳过")
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sect_faction ON sects(faction_id)"
+        )
+
+    # 2. player_skills 表：功法来源宗门与宗门绑定标记（无封印状态，见设计 D3）
+    async with conn.execute("PRAGMA table_info(player_skills)") as cursor:
+        skill_columns = {row[1] for row in await cursor.fetchall()}
+
+    if not skill_columns:
+        logger.info("player_skills 表不存在，跳过 player_skills 加列")
+    else:
+        skill_new_columns = {
+            "origin_sect_id": "ALTER TABLE player_skills ADD COLUMN origin_sect_id TEXT",
+            "sect_bound": "ALTER TABLE player_skills ADD COLUMN sect_bound INTEGER NOT NULL DEFAULT 0",
+        }
+        for column, ddl in skill_new_columns.items():
+            if column not in skill_columns:
+                await conn.execute(ddl)
+                logger.info(f"已为 player_skills 表添加 {column} 字段")
+            else:
+                logger.info(f"player_skills.{column} 字段已存在，跳过")
+
+    await conn.commit()
+    logger.info("v28迁移完成：默认宗门与宗门功法归属")
+
+
+@migration(29)
+async def _migrate_to_v29(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """Migrate to v29 - sect treasury claim records on players.
+
+    Adds ``sect_treasure_claims`` (JSON list of claimed treasure / heart
+    method IDs) so the sect treasury can enforce the once-per-person claim
+    limit for sect treasures across leave/rejoin cycles.
+    """
+    logger.info("开始迁移到v29：宗门宝库领取记录")
+
+    async with conn.execute("PRAGMA table_info(players)") as cursor:
+        columns = {row[1] for row in await cursor.fetchall()}
+
+    if not columns:
+        # players 表不存在（部分测试夹具只建相关表），跳过
+        logger.info("players 表不存在，跳过 v29 迁移内容")
+    elif "sect_treasure_claims" not in columns:
+        await conn.execute(
+            "ALTER TABLE players ADD COLUMN sect_treasure_claims TEXT NOT NULL DEFAULT '[]'"
+        )
+        logger.info("已为 players 表添加 sect_treasure_claims 字段")
+    else:
+        logger.info("players.sect_treasure_claims 字段已存在，跳过")
+
+    await conn.commit()
+    logger.info("v29迁移完成：宗门宝库领取记录")
+
+
+@migration(30)
+async def _migrate_to_v30(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """Migrate to v30 - master task chain progress on players.
+
+    Adds ``sect_master_progress`` (JSON object: ``{"chain_id", "stage_index",
+    "progress", "done"}``) so sect master task chains can persist per-player
+    stage counters across sessions.
+    """
+    logger.info("开始迁移到v30：师承任务链进度")
+
+    async with conn.execute("PRAGMA table_info(players)") as cursor:
+        columns = {row[1] for row in await cursor.fetchall()}
+
+    if not columns:
+        # players 表不存在（部分测试夹具只建相关表），跳过
+        logger.info("players 表不存在，跳过 v30 迁移内容")
+    elif "sect_master_progress" not in columns:
+        await conn.execute(
+            "ALTER TABLE players ADD COLUMN sect_master_progress TEXT NOT NULL DEFAULT '{}'"
+        )
+        logger.info("已为 players 表添加 sect_master_progress 字段")
+    else:
+        logger.info("players.sect_master_progress 字段已存在，跳过")
+
+    await conn.commit()
+    logger.info("v30迁移完成：师承任务链进度")
