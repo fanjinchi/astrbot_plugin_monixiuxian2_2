@@ -249,6 +249,9 @@ async def test_leave_sect_reclaims_treasure_and_keeps_personal_items():
     await db.ext.learn_or_star_up(
         "u1", "qy_001", "test", origin_sect_id="qingyun", sect_bound=True
     )
+    # 进行中的师承任务链进度
+    player.set_sect_master_progress({"chain_id": "chain_qy_01", "stage_index": 0, "progress": 1})
+    await db.update_player(player)
 
     success, msg = await mgr.leave_sect("u1")
     assert success, msg
@@ -258,6 +261,8 @@ async def test_leave_sect_reclaims_treasure_and_keeps_personal_items():
     player = await db.get_player_by_id("u1")
     assert player.sect_id == 0
     assert player.sect_contribution == 0
+    # 师承任务链进度随离宗清除（bd-c1y：改投他派后不得仍显示原宗门任务链）
+    assert player.get_sect_master_progress() == {}
     items = player.get_storage_ring_items()
     assert "青云镇山剑" not in items  # 宝物被回收
     assert items.get("铁剑") == 2  # 个人物品不受影响
@@ -287,6 +292,7 @@ async def test_kick_member_reclaims_treasure():
     member = await db.get_player_by_id("member")
     member.set_storage_ring_items({"青云镇山剑": 1})
     member.sect_contribution = 50
+    member.set_sect_master_progress({"chain_id": "chain_qy_01", "stage_index": 1, "progress": 2})
     await db.update_player(member)
 
     success, msg = await mgr.kick_member("leader", "member")
@@ -297,6 +303,7 @@ async def test_kick_member_reclaims_treasure():
     assert member.sect_id == 0
     assert member.sect_contribution == 0
     assert member.get_storage_ring_items() == {}
+    assert member.get_sect_master_progress() == {}  # 被逐同样清除师承进度
     await db.close()
 
 

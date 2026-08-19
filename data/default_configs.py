@@ -134,26 +134,42 @@ BOSS_CONFIG = {
 RIFT_CONFIG = {
     "default_duration": 1800,  # 30分钟
     "rifts": [
+        # id 1-5 的内容以 rifts 表 DB 种子为准（migration v15），此处仅保留
+        # 与 DB 一致的基础信息 + 宗门准入字段（sect_id/access），避免双写漂移
         {
             "id": 1,
             "name": "青云秘境",
-            "level": 2,
-            "exp_range": [100, 500],
-            "gold_range": [50, 200],
-        },
-        {
-            "id": 2,
-            "name": "幽冥鬼域",
-            "level": 5,
-            "exp_range": [500, 2000],
+            "level": 0,
+            "exp_range": [500, 1500],
             "gold_range": [200, 800],
         },
         {
+            "id": 2,
+            "name": "落日峡谷",
+            "level": 3,
+            "exp_range": [1500, 4000],
+            "gold_range": [500, 2000],
+        },
+        {
             "id": 3,
-            "name": "太古遗迹",
-            "level": 10,
-            "exp_range": [5000, 10000],
+            "name": "万妖洞",
+            "level": 6,
+            "exp_range": [3000, 8000],
             "gold_range": [1000, 5000],
+        },
+        {
+            "id": 4,
+            "name": "玄冰地宫",
+            "level": 10,
+            "exp_range": [5000, 15000],
+            "gold_range": [2000, 10000],
+        },
+        {
+            "id": 5,
+            "name": "上古遗迹",
+            "level": 15,
+            "exp_range": [10000, 30000],
+            "gold_range": [5000, 20000],
         },
         {
             "id": 6,
