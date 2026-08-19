@@ -156,7 +156,7 @@ RIFT_CONFIG = {
             "gold_range": [1000, 5000],
         },
         {
-            "id": 4,
+            "id": 6,
             "name": "青云剑冢",
             "level": 3,
             "exp_range": [300, 900],

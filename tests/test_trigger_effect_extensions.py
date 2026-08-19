@@ -60,7 +60,16 @@ def make_engine(cfg=None):
 
 
 def make_fighter(
-    name, hp, damage, agility, speed, armor=0, weapon_k=1.0, base_dmg=0, level_index=1, max_hp=None
+    name,
+    hp,
+    damage,
+    agility,
+    speed,
+    armor=0,
+    weapon_k=1.0,
+    base_dmg=0,
+    level_index=1,
+    max_hp=None,
 ):
     return FighterState(
         user_id=name,
@@ -109,19 +118,15 @@ class TestHeal:
     def test_heal_percent_override(self):
         engine = make_engine()
         actor = make_fighter("A", 50, 100, 5, 10, max_hp=100)
-        actor.trigger_skills = [
-            trigger_skill("回春术", "heal", 0.5, heal_percent=0.25)
-        ]
+        actor.trigger_skills = [trigger_skill("回春术", "heal", 0.5, heal_percent=0.25)]
         target = make_fighter("B", 1000, 100, 5, 10)
-        engine._process_trigger_skills("on_attack", actor, target, log := [])
+        engine._process_trigger_skills("on_attack", actor, target, [])
         assert actor.hp == 75  # 25% of max_hp, not 50%
 
     def test_vampire_defers_heal_to_attack(self):
         engine = make_engine()
         actor = make_fighter("A", 50, 100, 5, 10, max_hp=100)
-        actor.trigger_skills = [
-            trigger_skill("吸星", "heal", 0.5, vampire=True)
-        ]
+        actor.trigger_skills = [trigger_skill("吸星", "heal", 0.5, vampire=True)]
         target = make_fighter("B", 1000, 100, 5, 10, armor=0)
         engine._process_trigger_skills("on_attack", actor, target, log := [])
         # Heal deferred: no immediate heal, one-shot flag armed
@@ -159,9 +164,7 @@ class TestDot:
     def test_dot_same_source_refreshes_not_stacks(self):
         engine = make_engine()
         actor = make_fighter("A", 1000, 100, 5, 10)
-        actor.trigger_skills = [
-            trigger_skill("蚀骨", "dot", 0.1, duration=3)
-        ]
+        actor.trigger_skills = [trigger_skill("蚀骨", "dot", 0.1, duration=3)]
         target = make_fighter("B", 1000, 100, 5, 10, armor=0)
         log: list[str] = []
         engine._resolve_attack(actor, target, 0.0, 1.5, log)
@@ -175,9 +178,7 @@ class TestDot:
         log: list[str] = []
         for i in range(4):
             actor = make_fighter(f"A{i}", 1000, 100, 5, 10)
-            actor.trigger_skills = [
-                trigger_skill(f"蚀骨{i}", "dot", 0.1, duration=3)
-            ]
+            actor.trigger_skills = [trigger_skill(f"蚀骨{i}", "dot", 0.1, duration=3)]
             engine._process_trigger_skills("on_attack", actor, target, log)
         # cap = 3 (default status_stack_cap): 4th source rejected
         assert len(target.status_effects) == 3
@@ -243,7 +244,7 @@ class TestPierce:
         actor = make_fighter("A", 1000, 100, 5, 10)
         actor.next_attack_pierce_rate = 0.5
         target = make_fighter("B", 1000, 100, 5, 10, armor=100, level_index=1)
-        engine._resolve_attack(actor, target, 0.0, 1.5, log := [])
+        engine._resolve_attack(actor, target, 0.0, 1.5, [])
         assert actor.next_attack_pierce_rate == 0.0  # consumed
 
 
@@ -277,12 +278,12 @@ class TestUnavoidable:
         ]
         # Normal attack triggers the counter (100 x 1.0 = 100 damage back)
         attacker = make_fighter("A", 1000, 100, 5, 10)
-        engine._resolve_attack(attacker, defender, 0.0, 1.5, log := [])
+        engine._resolve_attack(attacker, defender, 0.0, 1.5, [])
         assert attacker.hp == 1000 - 100
         # Unavoidable attack skips the counter entirely
         attacker2 = make_fighter("C", 1000, 100, 5, 10)
         attacker2.next_attack_unavoidable = True
-        engine._resolve_attack(attacker2, defender, 0.0, 1.5, log2 := [])
+        engine._resolve_attack(attacker2, defender, 0.0, 1.5, [])
         assert attacker2.hp == 1000
 
 
@@ -337,7 +338,7 @@ class TestSurvive:
         target = make_fighter("B", 50, 100, 5, 10, max_hp=100)
         target.survive_charges = 1
         target.survive_recovery = 0.5
-        engine._resolve_attack(attacker, target, 0.0, 1.5, log := [])
+        engine._resolve_attack(attacker, target, 0.0, 1.5, [])
         assert target.hp == 51  # 1 + 50% of max_hp
 
 
@@ -432,9 +433,7 @@ class TestReviewFixes:
         engine = make_engine()
         actor = make_fighter("A", 1000, 100, 5, 10)
         actor.trigger_skills = [
-            trigger_skill(
-                "战意", "buff", 0.5, duration=1, trigger_timing="round_start"
-            )
+            trigger_skill("战意", "buff", 0.5, duration=1, trigger_timing="round_start")
         ]
         log: list[str] = []
         engine._process_round_start_skills(actor, log)
@@ -469,7 +468,9 @@ class TestUltimateDispatch:
         assert "u_heal" in actor.used_ultimates
         # Once-per-battle: second attack does not re-heal
         engine._resolve_attack(actor, target, 0.0, 1.5, log)
-        assert actor.hp == 80  # 30 + 50% (no double heal); damage ignored (hp 80, no heal)
+        assert (
+            actor.hp == 80
+        )  # 30 + 50% (no double heal); damage ignored (hp 80, no heal)
 
     def test_legacy_ultimate_without_effect_type_keeps_damage(self, monkeypatch):
         monkeypatch.setattr(random, "uniform", lambda a, b: 1.0)
@@ -514,9 +515,7 @@ class TestUltimateDispatch:
 class TestSyncContract:
     def test_effect_vocabulary_in_sync_with_registry(self):
         """SKILL_EFFECT_TYPES must match the engine registry exactly."""
-        assert set(_sync.SKILL_EFFECT_TYPES) == set(
-            CombatEngine.EFFECT_HANDLERS.keys()
-        )
+        assert set(_sync.SKILL_EFFECT_TYPES) == set(CombatEngine.EFFECT_HANDLERS.keys())
 
     @staticmethod
     def _skill_row(**overrides):
@@ -549,17 +548,13 @@ class TestSyncContract:
 
     def test_build_skill_rejects_invalid_duration(self):
         errors: list[str] = []
-        skill = _sync._build_skill(
-            self._skill_row(duration="0"), errors
-        )
+        skill = _sync._build_skill(self._skill_row(duration="0"), errors)
         assert skill is not None  # errors are collected, not fatal per row
         assert any("duration" in e for e in errors)
 
     def test_build_skill_rejects_out_of_range_rate(self):
         errors: list[str] = []
-        skill = _sync._build_skill(
-            self._skill_row(pierce_rate="1.5"), errors
-        )
+        skill = _sync._build_skill(self._skill_row(pierce_rate="1.5"), errors)
         assert skill is not None
         assert any("pierce_rate" in e for e in errors)
 
@@ -567,8 +562,12 @@ class TestSyncContract:
         errors: list[str] = []
         skill = _sync._build_skill(
             self._skill_row(
-                duration="2", tick_rate="0.8", heal_percent="0.3",
-                pierce_rate="0.4", reflect_rate="0.5", survive_count="2",
+                duration="2",
+                tick_rate="0.8",
+                heal_percent="0.3",
+                pierce_rate="0.4",
+                reflect_rate="0.5",
+                survive_count="2",
             ),
             errors,
         )
@@ -612,8 +611,8 @@ class TestValidateBudgetConversions:
     def test_heal_conversion_and_fail(self):
         rows = self._rows(
             "id,name,status,trigger_rate,effect_type,effect_value,duration,tick_rate\n"
-            "h1,大治疗,draft,0.5,heal,0.1,,\n"          # 0.5x0.1x7 = 0.35 FAIL
-            "h2,小治疗,draft,0.2,heal,0.1,,\n"           # 0.2x0.1x7 = 0.14 PASS
+            "h1,大治疗,draft,0.5,heal,0.1,,\n"  # 0.5x0.1x7 = 0.35 FAIL
+            "h2,小治疗,draft,0.2,heal,0.1,,\n"  # 0.2x0.1x7 = 0.14 PASS
         )
         results = _vb.check_skills(rows)
         assert results[0].startswith("FAIL"), results[0]
@@ -622,7 +621,7 @@ class TestValidateBudgetConversions:
     def test_dot_conversion(self):
         rows = self._rows(
             "id,name,status,trigger_rate,effect_type,effect_value,duration,tick_rate\n"
-            "d1,蚀骨,draft,0.3,dot,0.05,3,1.0\n"         # 0.045 PASS
+            "d1,蚀骨,draft,0.3,dot,0.05,3,1.0\n"  # 0.045 PASS
         )
         results = _vb.check_skills(rows)
         assert results[0].startswith("PASS"), results[0]
@@ -634,7 +633,7 @@ class TestValidateBudgetConversions:
             "id,name,status,trigger_rate,effect_type,effect_value,duration,tick_rate\n"
             "d1,坏时长,draft,0.3,dot,0.05,abc,1.0\n"
             "d2,坏频率,draft,0.3,dot,0.05,3,fast\n"
-            "d3,零时长,draft,0.3,dot,0.05,0,1.0\n"        # sync 契约要求 >=1
+            "d3,零时长,draft,0.3,dot,0.05,0,1.0\n"  # sync 契约要求 >=1
         )
         results = _vb.check_skills(rows)
         assert results[0].startswith("FAIL"), results[0]
@@ -703,10 +702,7 @@ class TestIntegration:
         result = engine.resolve_combat(attacker, defender, "duel", merge_count=10)
         assert result.winner in ("A", "B", "draw")
         log_text = "\n".join(result.combat_log)
-        assert any(
-            marker in log_text
-            for marker in ("侵蚀", "免死", "恢复")
-        )
+        assert any(marker in log_text for marker in ("侵蚀", "免死", "恢复"))
 
     def test_manager_adapter_path(self):
         """CombatManager adapter still drives the engine end to end."""

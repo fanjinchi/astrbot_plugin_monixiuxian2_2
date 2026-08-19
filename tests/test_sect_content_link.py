@@ -22,10 +22,6 @@ _data_mod = load_package_module(
 )
 DataBase = _data_mod.DataBase
 
-# bounty_manager does ``from ..data import DataBase``; expose it on the
-# synthetic package so the import resolves under tests.
-sys.modules["astrbot_plugin_monixiuxian2_2.data"].DataBase = DataBase
-
 Player = load_package_module("models.py", "astrbot_plugin_monixiuxian2_2.models").Player
 
 _sect_mod = load_package_module(
@@ -33,12 +29,6 @@ _sect_mod = load_package_module(
     "astrbot_plugin_monixiuxian2_2.managers.sect_content_link_manager",
 )
 SectManager = _sect_mod.SectManager
-
-_bounty_mod = load_package_module(
-    "managers/bounty_manager.py",
-    "astrbot_plugin_monixiuxian2_2.managers.bounty_manager_cl",
-)
-BountyManager = _bounty_mod.BountyManager
 
 _rift_mod = load_module("rift_manager_cl", "managers/rift_manager.py")
 RiftManager = _rift_mod.RiftManager
@@ -113,6 +103,31 @@ async def db():
     await database.close()
 
 
+@pytest.fixture(scope="module", autouse=True)
+def bounty_manager_cls():
+    """Load bounty_manager and yield its BountyManager class.
+
+    bounty_manager does ``from ..data import DataBase`` at import time, so
+    ``DataBase`` is exposed on the synthetic data package for the load only.
+    Interpreter state is restored at module teardown so the patch never
+    leaks into other test modules.
+    """
+    data_pkg = sys.modules["astrbot_plugin_monixiuxian2_2.data"]
+    sentinel = object()
+    previous = getattr(data_pkg, "DataBase", sentinel)
+    data_pkg.DataBase = DataBase
+    mod = load_package_module(
+        "managers/bounty_manager.py",
+        "astrbot_plugin_monixiuxian2_2.managers.bounty_manager_cl",
+    )
+    yield mod.BountyManager
+    sys.modules.pop("astrbot_plugin_monixiuxian2_2.managers.bounty_manager_cl", None)
+    if previous is sentinel:
+        del data_pkg.DataBase
+    else:
+        data_pkg.DataBase = previous
+
+
 async def _make_player(db: DataBase, user_id: str, level_index: int = 1) -> Player:
     player = Player(
         user_id=user_id,
@@ -173,8 +188,8 @@ def _normal_template() -> dict:
     }
 
 
-def _make_bounty_mgr(db) -> BountyManager:
-    mgr = BountyManager(db)
+def _make_bounty_mgr(db, bounty_manager_cls):
+    mgr = bounty_manager_cls(db)
     sect_tpl = _sect_template()
     normal_tpl = _normal_template()
     mgr.templates_by_id = {901: sect_tpl, 902: normal_tpl}
@@ -186,9 +201,9 @@ def _make_bounty_mgr(db) -> BountyManager:
 
 
 @pytest.mark.asyncio
-async def test_bounty_list_hides_sect_template_for_non_member(db):
+async def test_bounty_list_hides_sect_template_for_non_member(db, bounty_manager_cls):
     """Sect-attributed templates never appear for sectless/other-sect players."""
-    bounty_mgr = _make_bounty_mgr(db)
+    bounty_mgr = _make_bounty_mgr(db, bounty_manager_cls)
 
     player = await _make_player(db, "b1")
     bounties = await bounty_mgr.get_bounty_list(player)
@@ -198,10 +213,10 @@ async def test_bounty_list_hides_sect_template_for_non_member(db):
 
 
 @pytest.mark.asyncio
-async def test_bounty_list_shows_sect_template_for_member(db):
+async def test_bounty_list_shows_sect_template_for_member(db, bounty_manager_cls):
     """A qingyun member's list can include the qingyun sect template."""
     sect_mgr = await _make_sect_mgr(db)
-    bounty_mgr = _make_bounty_mgr(db)
+    bounty_mgr = _make_bounty_mgr(db, bounty_manager_cls)
 
     # Sect-only pool: members see it, non-members get nothing from it.
     bounty_mgr.templates_by_diff = {"easy": [_sect_template()]}
@@ -212,16 +227,16 @@ async def test_bounty_list_shows_sect_template_for_member(db):
     assert bounties[0]["sect_id"] == "qingyun"
 
     # Mixed pool: both templates are eligible for the member.
-    bounty_mgr2 = _make_bounty_mgr(db)
+    bounty_mgr2 = _make_bounty_mgr(db, bounty_manager_cls)
     seen = {bounty_mgr2._pick_template("easy", "qingyun")["id"] for _ in range(100)}
     assert seen == {901, 902}
 
 
 @pytest.mark.asyncio
-async def test_bounty_accept_rejects_non_member(db):
+async def test_bounty_accept_rejects_non_member(db, bounty_manager_cls):
     """Accepting a sect bounty as a non-member is rejected with a hint."""
     sect_mgr = await _make_sect_mgr(db)
-    bounty_mgr = _make_bounty_mgr(db)
+    bounty_mgr = _make_bounty_mgr(db, bounty_manager_cls)
 
     outsider = await _make_player(db, "b3")
     success, msg = await bounty_mgr.accept_bounty(outsider, 901)
@@ -235,10 +250,10 @@ async def test_bounty_accept_rejects_non_member(db):
 
 
 @pytest.mark.asyncio
-async def test_bounty_accept_allows_member(db):
+async def test_bounty_accept_allows_member(db, bounty_manager_cls):
     """A qingyun member can accept the sect bounty (full accept flow)."""
     sect_mgr = await _make_sect_mgr(db)
-    bounty_mgr = _make_bounty_mgr(db)
+    bounty_mgr = _make_bounty_mgr(db, bounty_manager_cls)
 
     player = await _join(db, sect_mgr, "b5", "青云门")
     # Sect-only pool so the cached list deterministically holds the sect bounty.
@@ -252,9 +267,9 @@ async def test_bounty_accept_allows_member(db):
 
 
 @pytest.mark.asyncio
-async def test_bounty_accept_normal_template_unchanged(db):
+async def test_bounty_accept_normal_template_unchanged(db, bounty_manager_cls):
     """Templates without sect_id keep the existing accept behavior."""
-    bounty_mgr = _make_bounty_mgr(db)
+    bounty_mgr = _make_bounty_mgr(db, bounty_manager_cls)
 
     player = await _make_player(db, "b6")
     await bounty_mgr.get_bounty_list(player)

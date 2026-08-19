@@ -439,7 +439,7 @@ class XiuXianPlugin(Star):
         try:
             await self.sect_mgr.ensure_system_sects()
         except Exception as e:
-            logger.error(f"【修仙插件】默认宗门播种失败: {e}")
+            logger.error("【修仙插件】默认宗门播种失败: %s", e, exc_info=True)
 
         # 启动定时任务
         if self._is_boss_enabled():
@@ -1399,23 +1399,31 @@ class XiuXianPlugin(Star):
                 )
                 if has_progress:
                     msg += bounty_msg
-            # 师承任务链：历练完成 + PvE 胜利计数（失败不影响历练主流程）
+            # 师承任务链：历练完成 + PvE 胜利计数（各自独立 try/except，
+            # 任一失败不影响另一条的反馈消息，也不影响历练主流程）
+            master_msg = None
             try:
                 master_msg = await self.sect_mgr.advance_master_progress(
                     user_id, "adventure_complete"
                 )
-                if reward_data.get("pve_won"):
+            except Exception:
+                logger.warning(
+                    "【修仙插件】师承任务进度推进失败（历练完成）", exc_info=True
+                )
+            if reward_data.get("pve_won"):
+                try:
                     win_msg = await self.sect_mgr.advance_master_progress(
                         user_id, "win_pve"
                     )
                     if win_msg:
                         master_msg = (master_msg or "") + win_msg
-                if master_msg:
-                    msg += master_msg
-            except Exception:
-                logger.warning(
-                    "【修仙插件】师承任务进度推进失败（历练）", exc_info=True
-                )
+                except Exception:
+                    logger.warning(
+                        "【修仙插件】师承任务进度推进失败（历练PvE胜利）",
+                        exc_info=True,
+                    )
+            if master_msg:
+                msg += master_msg
 
         yield event.plain_result(msg)
 

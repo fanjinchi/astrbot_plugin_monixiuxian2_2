@@ -99,9 +99,7 @@ class FakePlayer:
         self.weapon = kwargs.get("weapon", "")
         self.armor = kwargs.get("armor", "")
         self.cultivation_type = kwargs.get("cultivation_type", "灵修")
-        self.battle_report_merge_count = kwargs.get(
-            "battle_report_merge_count", 0
-        )
+        self.battle_report_merge_count = kwargs.get("battle_report_merge_count", 0)
         self.damage = kwargs.get("damage", 10)
         self.agility = kwargs.get("agility", 5)
         self.speed = kwargs.get("speed", 5)

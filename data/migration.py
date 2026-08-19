@@ -12,7 +12,7 @@ from astrbot.api import logger
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 30  # v30: players.sect_master_progress（师承任务链进度）
+LATEST_DB_VERSION = 31  # v31: rifts 表播种青云剑冢（id 6，宗门专属秘境）
 
 MIGRATION_TASKS: dict[
     int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]
@@ -418,6 +418,8 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             sect_contribution INTEGER NOT NULL DEFAULT 0,
             sect_task INTEGER NOT NULL DEFAULT 0,
             sect_elixir_get INTEGER NOT NULL DEFAULT 0,
+            sect_treasure_claims TEXT NOT NULL DEFAULT '[]',
+            sect_master_progress TEXT NOT NULL DEFAULT '{}',
             blessed_spot_flag INTEGER NOT NULL DEFAULT 0,
             blessed_spot_name TEXT NOT NULL DEFAULT '',
             level_up_rate INTEGER NOT NULL DEFAULT 0,
@@ -496,6 +498,9 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_sect_owner ON sects(sect_owner)")
     await conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_sect_scale ON sects(sect_scale DESC)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sect_faction ON sects(faction_id)"
     )
 
     # 创建Buff信息表
@@ -747,6 +752,23 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
         )
     """)
 
+    # player_skills 表：独立存储玩家已领悟技能与星级（含宗门归属标记，与 v22 对齐）
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS player_skills (
+            user_id TEXT NOT NULL,
+            skill_id TEXT NOT NULL,
+            star_level INTEGER NOT NULL DEFAULT 1,
+            source TEXT NOT NULL DEFAULT '',
+            learned_at INTEGER NOT NULL DEFAULT 0,
+            origin_sect_id TEXT,
+            sect_bound INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, skill_id)
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_player_skills_user ON player_skills(user_id)"
+    )
+
     # ===== 插入初始数据 =====
 
     # 插入默认秘境数据
@@ -769,6 +791,13 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             5,
             15,
             json.dumps({"exp": [10000, 30000], "gold": [5000, 20000]}),
+        ),
+        (
+            6,
+            "青云剑冢",
+            3,
+            3,
+            json.dumps({"exp": [300, 900], "gold": [100, 400]}),
         ),
     ]
     for rift in default_rifts:
@@ -1194,6 +1223,13 @@ async def _create_all_tables_v22(conn: aiosqlite.Connection):
             5,
             15,
             json.dumps({"exp": [10000, 30000], "gold": [5000, 20000]}),
+        ),
+        (
+            6,
+            "青云剑冢",
+            3,
+            3,
+            json.dumps({"exp": [300, 900], "gold": [100, 400]}),
         ),
     ]
     for rift in default_rifts:
@@ -2248,3 +2284,26 @@ async def _migrate_to_v30(conn: aiosqlite.Connection, config_manager: ConfigMana
 
     await conn.commit()
     logger.info("v30迁移完成：师承任务链进度")
+
+
+@migration(31)
+async def _migrate_to_v31(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """Migrate to v31 - seed the qingyun sect-exclusive rift.
+
+    ``rift_config.json`` assigns the sect-exclusive rift 青云剑冢 the new
+    ``rift_id`` 6 (the old id 4 collided with the v15-seeded 玄冰地宫). This
+    migration inserts the matching row into the ``rifts`` table with the
+    same name/level/rewards as the config entry. ``INSERT OR IGNORE`` keeps
+    it idempotent.
+    """
+    logger.info("开始迁移到v31：播种宗门专属秘境青云剑冢")
+
+    import json
+
+    await conn.execute(
+        "INSERT OR IGNORE INTO rifts (rift_id, rift_name, rift_level, required_level, rewards) VALUES (?, ?, ?, ?, ?)",
+        (6, "青云剑冢", 3, 3, json.dumps({"exp": [300, 900], "gold": [100, 400]})),
+    )
+
+    await conn.commit()
+    logger.info("v31迁移完成：已播种青云剑冢（id 6）")

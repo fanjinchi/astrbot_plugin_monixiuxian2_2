@@ -16,9 +16,7 @@ _data_mod = load_package_module(
     "astrbot_plugin_monixiuxian2_2.data.data_manager",
 )
 DataBase = _data_mod.DataBase
-Player = load_package_module(
-    "models.py", "astrbot_plugin_monixiuxian2_2.models"
-).Player
+Player = load_package_module("models.py", "astrbot_plugin_monixiuxian2_2.models").Player
 
 
 class DummyConfigManager:
@@ -159,7 +157,9 @@ async def test_v21_to_latest_migration_rebuilds_players():
             "physical_defense",
             "mental_power",
         }
-        assert not old_fields & columns, f"Old fields still present: {old_fields & columns}"
+        assert not old_fields & columns, (
+            f"Old fields still present: {old_fields & columns}"
+        )
 
         assert "learned_skills" not in columns, "learned_skills column still present"
 
@@ -205,6 +205,18 @@ async def test_v23_to_v24_adds_spiritual_root():
             )
             """
         )
+        # v31 会向 rifts 表播种青云剑冢，最小库需带上该表
+        await db_conn.execute(
+            """
+            CREATE TABLE rifts (
+                rift_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rift_name TEXT NOT NULL,
+                rift_level INTEGER NOT NULL,
+                required_level INTEGER NOT NULL,
+                rewards TEXT NOT NULL DEFAULT '{}'
+            )
+            """
+        )
         await db_conn.commit()
 
         await MigrationManager(db_conn, DummyConfigManager()).migrate()
@@ -239,6 +251,16 @@ async def test_v25_to_v26_rebuilds_impart_info():
             "INSERT INTO impart_info (user_id, impart_hp_per, impart_atk_per) VALUES (?, 0.1, 0.5)",
             ("u1",),
         )
+        # v31 会向 rifts 表播种青云剑冢，最小库需带上该表
+        await db_conn.execute("""
+            CREATE TABLE rifts (
+                rift_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rift_name TEXT NOT NULL,
+                rift_level INTEGER NOT NULL,
+                required_level INTEGER NOT NULL,
+                rewards TEXT NOT NULL DEFAULT '{}'
+            )
+        """)
         await db_conn.commit()
 
         await MigrationManager(db_conn, DummyConfigManager()).migrate()
@@ -344,6 +366,16 @@ async def test_v28_adds_system_sect_and_skill_attribution_columns():
         await db_conn.execute(
             "INSERT INTO player_skills (user_id, skill_id) VALUES ('u1', 'common_001')"
         )
+        # v31 会向 rifts 表播种青云剑冢，最小库需带上该表
+        await db_conn.execute("""
+            CREATE TABLE rifts (
+                rift_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rift_name TEXT NOT NULL,
+                rift_level INTEGER NOT NULL,
+                required_level INTEGER NOT NULL,
+                rewards TEXT NOT NULL DEFAULT '{}'
+            )
+        """)
         await db_conn.commit()
 
         await MigrationManager(db_conn, DummyConfigManager()).migrate()
@@ -403,3 +435,92 @@ async def test_player_skills_sect_attribution_pass_through():
         skills = {s["skill_id"]: s for s in await db.ext.get_learned_skills("u1")}
         assert skills["common_001"]["origin_sect_id"] is None
         assert skills["common_001"]["sect_bound"] is False
+
+
+@pytest.mark.asyncio
+async def test_v31_fresh_install_seeds_sword_tomb_rift():
+    """Fresh installs carry rift id 6 青云剑冢 (sect-exclusive) alongside the
+    original five seeds; id 4 stays 玄冰地宫 (no collision with rift_config)."""
+    import json
+
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        async with db_conn.execute(
+            "SELECT rift_id, rift_name, rift_level, required_level, rewards FROM rifts"
+        ) as cursor:
+            rows = await cursor.fetchall()
+
+    by_id = {row[0]: row for row in rows}
+    assert set(by_id) == {1, 2, 3, 4, 5, 6}
+    assert by_id[4][1] == "玄冰地宫"
+    tomb = by_id[6]
+    assert tomb[1] == "青云剑冢"
+    assert tomb[2] == 3  # rift_level
+    assert tomb[3] == 3  # required_level
+    assert json.loads(tomb[4]) == {"exp": [300, 900], "gold": [100, 400]}
+
+
+@pytest.mark.asyncio
+async def test_v30_to_v31_seeds_sword_tomb_idempotently():
+    """Existing databases get rift id 6 from v31 without touching id 4;
+    a second migrate run is a no-op."""
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
+        await db_conn.execute("INSERT INTO db_info (version) VALUES (30)")
+        await db_conn.execute("""
+            CREATE TABLE rifts (
+                rift_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rift_name TEXT NOT NULL,
+                rift_level INTEGER NOT NULL,
+                required_level INTEGER NOT NULL,
+                rewards TEXT NOT NULL DEFAULT '{}'
+            )
+        """)
+        await db_conn.execute(
+            "INSERT INTO rifts (rift_id, rift_name, rift_level, required_level, rewards)"
+            " VALUES (4, '玄冰地宫', 4, 10, '{}')"
+        )
+        await db_conn.commit()
+
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        async with db_conn.execute("SELECT version FROM db_info") as cursor:
+            assert (await cursor.fetchone())[0] == LATEST_DB_VERSION
+        async with db_conn.execute(
+            "SELECT rift_name FROM rifts WHERE rift_id = 6"
+        ) as cursor:
+            row = await cursor.fetchone()
+        assert row is not None and row[0] == "青云剑冢"
+        async with db_conn.execute(
+            "SELECT rift_name FROM rifts WHERE rift_id = 4"
+        ) as cursor:
+            assert (await cursor.fetchone())[0] == "玄冰地宫"
+
+        # 幂等：再次迁移不报错、不重复插入
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        async with db_conn.execute(
+            "SELECT COUNT(*) FROM rifts WHERE rift_id = 6"
+        ) as cursor:
+            assert (await cursor.fetchone())[0] == 1
+
+
+@pytest.mark.asyncio
+async def test_create_all_tables_v2_backfills_sect_columns():
+    """_create_all_tables_v2 aligns with v22: players sect JSON columns,
+    player_skills attribution columns and the idx_sect_faction index."""
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await _create_all_tables_v21(db_conn)  # v21 builds on top of v2
+
+        async with db_conn.execute("PRAGMA table_info(players)") as cursor:
+            player_cols = {row[1] for row in await cursor.fetchall()}
+        assert {"sect_treasure_claims", "sect_master_progress"} <= player_cols
+
+        async with db_conn.execute("PRAGMA table_info(player_skills)") as cursor:
+            skill_cols = {row[1] for row in await cursor.fetchall()}
+        assert {"origin_sect_id", "sect_bound"} <= skill_cols
+
+        async with db_conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_sect_faction'"
+        ) as cursor:
+            assert await cursor.fetchone() is not None

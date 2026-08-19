@@ -532,7 +532,7 @@ class ConfigManager:
             faction_ids.add(fid)
 
             pool = faction.get("skill_pool")
-            if pool and pool not in skill_pools:
+            if pool and isinstance(pool, str) and pool not in skill_pools:
                 logger.warning(
                     f"宗门 {fid} 引用的功法池 {pool} 在 skills.json 中不存在。"
                 )
@@ -575,8 +575,17 @@ class ConfigManager:
             for stage in chain.get("stages", []):
                 if not isinstance(stage, dict):
                     continue
-                chance_pool = (stage.get("reward") or {}).get("skill_learn_chance")
-                if chance_pool and chance_pool not in skill_pools:
+                reward = stage.get("reward")
+                chance_pool = (
+                    reward.get("skill_learn_chance")
+                    if isinstance(reward, dict)
+                    else None
+                )
+                if (
+                    chance_pool
+                    and isinstance(chance_pool, str)
+                    and chance_pool not in skill_pools
+                ):
                     logger.warning(
                         f"师承任务链 {cid} 阶段「{stage.get('name', '?')}」引用的功法池 "
                         f"{chance_pool} 在 skills.json 中不存在。"

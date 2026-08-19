@@ -2,8 +2,8 @@
 
 ## 1. 准备（依赖确认）
 
-- [ ] 1.1 确认配套 change `add-default-sects-and-sect-growth` 已实施完成；核对 `main.py` 最终指令常量与 design_docs/sect-system-design.md §4 约定是否一致，不一致以代码为准
-- [ ] 1.2 通读 `functional_tests/README.md`、`functional_tests/platform-gap-report.md` 与测试平台 SKILL.md（`.agents/skills/testing-astrbot-plugins-via-webtest`），确认平台 `/api/status` 可用
+- [x] 1.1 确认配套 change `add-default-sects-and-sect-growth` 已实施完成；核对 `main.py` 最终指令常量与 design_docs/sect-system-design.md §4 约定是否一致，不一致以代码为准
+- [x] 1.2 通读 `functional_tests/README.md`、`functional_tests/platform-gap-report.md` 与测试平台 SKILL.md（`.agents/skills/testing-astrbot-plugins-via-webtest`），确认平台 `/api/status` 可用
 
 ## 2. Fixture 扩展
 

@@ -6,10 +6,7 @@ import pytest
 
 from tests.helpers import load_package_module
 
-
-_models_mod = load_package_module(
-    "models.py", "astrbot_plugin_monixiuxian2_2.models"
-)
+_models_mod = load_package_module("models.py", "astrbot_plugin_monixiuxian2_2.models")
 Player = _models_mod.Player
 
 _dual_mod = load_package_module(
@@ -68,7 +65,7 @@ def test_calculate_exp_gain_power15(manager, player, fake_config_manager):
     player.level_index = 11
     fake_config_manager.game_config["dual_cultivation"]["realm_factor"] = "power1.5"
     gain = manager._calculate_exp_gain(player)
-    expected = int(2 * 100 * 60 * 1.0 * (2 ** 1.5))
+    expected = int(2 * 100 * 60 * 1.0 * (2**1.5))
     assert gain == expected
 
 

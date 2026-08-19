@@ -156,13 +156,13 @@ class SectHandlers:
         return None
 
     async def handle_sect_elixir(self, event: AstrMessageEvent, action: str = ""):
-        """宗门丹房（查看状态/领取丹药）"""
-        busy_msg = await self._get_busy_message(event.get_sender_id())
-        if busy_msg:
-            yield event.plain_result(busy_msg)
-            return
+        """宗门丹房（查看状态/领取丹药，仅领取分支做忙碌拦截）"""
         user_id = event.get_sender_id()
         if (action or "").strip() == "领取":
+            busy_msg = await self._get_busy_message(user_id)
+            if busy_msg:
+                yield event.plain_result(busy_msg)
+                return
             success, msg = await self.sect_mgr.claim_elixir(user_id)
         else:
             success, msg = await self.sect_mgr.get_elixir_room_status(user_id)
@@ -171,13 +171,13 @@ class SectHandlers:
     async def handle_sect_construction(
         self, event: AstrMessageEvent, building: str = ""
     ):
-        """宗门建设（查看建筑状态/升级建筑）"""
-        busy_msg = await self._get_busy_message(event.get_sender_id())
-        if busy_msg:
-            yield event.plain_result(busy_msg)
-            return
+        """宗门建设（查看建筑状态/升级建筑，仅升级分支做忙碌拦截）"""
         user_id = event.get_sender_id()
         if (building or "").strip():
+            busy_msg = await self._get_busy_message(user_id)
+            if busy_msg:
+                yield event.plain_result(busy_msg)
+                return
             success, msg = await self.sect_mgr.upgrade_building(user_id, building)
         else:
             success, msg = await self.sect_mgr.get_construction_status(user_id)
@@ -204,13 +204,13 @@ class SectHandlers:
         yield event.plain_result(msg)
 
     async def handle_sect_treasury(self, event: AstrMessageEvent, item_ref: str = ""):
-        """宗门宝库（查看传承/领取宝物心法）"""
-        busy_msg = await self._get_busy_message(event.get_sender_id())
-        if busy_msg:
-            yield event.plain_result(busy_msg)
-            return
+        """宗门宝库（查看传承/领取宝物心法，仅领取分支做忙碌拦截）"""
         user_id = event.get_sender_id()
         if (item_ref or "").strip():
+            busy_msg = await self._get_busy_message(user_id)
+            if busy_msg:
+                yield event.plain_result(busy_msg)
+                return
             success, msg = await self.sect_mgr.claim_treasure(user_id, item_ref)
         else:
             success, msg = await self.sect_mgr.get_treasury_info(user_id)

@@ -154,8 +154,12 @@ def test_tome_name_maps_to_skill_id(config_manager):
 def test_drop_tables_use_skill_names():
     """Drop tables must no longer reference the disconnected old tome names."""
     stale = ("功法残页", "远古秘籍")
-    for rel in ("config/adventure_config.json", "config/enemies.json",
-                "config/game_config.json", "config/bounty_templates.json"):
+    for rel in (
+        "config/adventure_config.json",
+        "config/enemies.json",
+        "config/game_config.json",
+        "config/bounty_templates.json",
+    ):
         with (PLUGIN_ROOT / rel).open(encoding="utf-8") as f:
             text = f.read()
         assert not any(name in text for name in stale), f"{rel} still has stale names"

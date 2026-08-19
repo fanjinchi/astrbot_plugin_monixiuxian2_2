@@ -567,6 +567,8 @@ async def test_sect_shop_discount():
     config = FakeConfigManager()
     shop_mgr = ShopManager({}, config)
 
+    # Player 是 dataclass，仅 user_id 必填，user_name/spiritual_root 等字段
+    # 均有默认值（见 models.py），此处按需只传 sect 相关字段即可。
     member = Player(user_id="u1", sect_id=1, sect_position=2)
     assert shop_mgr.get_sect_shop_discount(member) == 0.9
 
@@ -646,4 +648,121 @@ async def test_leave_sect_reclaims_equipped_treasure():
     player = await db.get_player_by_id("u1")
     assert player.weapon == ""
     assert player.get_storage_ring_items() == {"铁剑": 1}
+    await db.close()
+
+
+# ===== OCR 评审修复回归（H2/H4/M6/M13/L16） =====
+
+import sys
+
+UserStatus = sys.modules["astrbot_plugin_monixiuxian2_2.models_extended"].UserStatus
+
+
+@pytest.mark.asyncio
+async def test_mainbuff_trigger_dedup_when_player_learned_same_skill():
+    """H4: the mainbuff trigger is skipped when the player already has the
+    same-named trigger in the loadout (learned + equipped the sect skill)."""
+    db = await _make_db()
+    config = FakeConfigManager()
+    mgr = SectManager(db, config)
+    await mgr.ensure_system_sects()
+    await _join_qingyun(db, mgr, "u1")
+
+    # 玩家自行领悟并装备镇派功法
+    await db.ext.learn_or_star_up("u1", "qy_001", "test")
+    player = await db.get_player_by_id("u1")
+    player.set_techniques_list(["青云剑诀"])
+    await db.update_player(player)
+
+    skill_mgr = SkillManager(config, db)
+    player = await db.get_player_by_id("u1")
+    loadout = await skill_mgr.get_battle_loadout(player)
+    names = [t.get("name") for t in loadout["trigger_skills"]]
+    assert names.count("青云一剑") == 1
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_claim_treasure_rolls_back_when_update_fails(monkeypatch):
+    """H2: a mid-claim write failure persists neither the item nor the claim."""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager())
+    await mgr.ensure_system_sects()
+    sect = await _join_qingyun(db, mgr, "u1", level_index=2)
+    await db.ext.update_player_sect_info("u1", sect.sect_id, 3)
+
+    async def _boom(player):
+        raise RuntimeError("simulated write failure")
+
+    monkeypatch.setattr(db, "update_player", _boom)
+
+    with pytest.raises(RuntimeError):
+        await mgr.claim_treasure("u1", "青云心典")
+
+    monkeypatch.undo()
+    player = await db.get_player_by_id("u1")
+    assert player.get_storage_ring_items() == {}
+    assert player.get_sect_treasure_claims() == []
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_perform_sect_task_rolls_back_on_first_write_failure(monkeypatch):
+    """M6: failure at the first settlement write leaves gold, contribution,
+    sect stores and cooldown untouched."""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager())
+    await mgr.ensure_system_sects()
+    sect = await _join_qingyun(db, mgr, "u1", level_index=2, gold=1000)
+    scale_before = sect.sect_scale
+
+    async def _boom(sect_id, stone_num, scale_ratio=10):
+        raise RuntimeError("simulated write failure")
+
+    monkeypatch.setattr(db.ext, "donate_to_sect", _boom)
+
+    with pytest.raises(RuntimeError):
+        await mgr.perform_sect_task("u1")
+
+    monkeypatch.undo()
+    player = await db.get_player_by_id("u1")
+    assert player.gold == 1000
+    assert player.sect_contribution == 0
+    sect_after = await db.ext.get_sect_by_id(sect.sect_id)
+    assert sect_after.sect_scale == scale_before
+    user_cd = await db.ext.get_user_cd("u1")
+    assert user_cd is None or user_cd.type == UserStatus.IDLE
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_sect_shop_discount_with_non_dict_positions():
+    """M13: a malformed positions config falls back to full price."""
+    config = FakeConfigManager()
+    config.sect_config = {"positions": ["not", "a", "dict"]}
+    shop_mgr = ShopManager({}, config)
+    member = Player(user_id="u9", sect_id=1, sect_position=2)
+    assert shop_mgr.get_sect_shop_discount(member) == 1.0
+
+
+@pytest.mark.asyncio
+async def test_treasury_min_position_zero_is_honored():
+    """L16: an explicit min_position=0 is kept (None-only fallback to 99)."""
+    db = await _make_db()
+    config = FakeConfigManager()
+    config.sect_factions["factions"][0]["treasures"] = [
+        {"type": "weapon", "id": "wpn_qy_001", "min_position": 0}
+    ]
+    config.heart_methods_data["青云心典"]["min_position"] = 0
+    mgr = SectManager(db, config)
+    await mgr.ensure_system_sects()
+
+    sect = await db.ext.get_sect_by_faction_id("qingyun")
+    entries = {e["id"]: e for e in mgr._get_treasury_entries(sect)}
+    assert entries["wpn_qy_001"]["min_position"] == 0
+    assert entries["heart_qy_001"]["min_position"] == 0
+
+    # 仅宗主（0）达职阶门槛；外门弟子（4）不可领
+    assert mgr._can_claim_entry(entries["wpn_qy_001"], 0)
+    assert not mgr._can_claim_entry(entries["wpn_qy_001"], 4)
     await db.close()

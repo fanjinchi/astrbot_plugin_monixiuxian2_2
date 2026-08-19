@@ -449,9 +449,7 @@ async def test_set_study_target_already_learned(mgr, db):
 async def test_study_target_cleared_on_learn(mgr, db):
     """Study target is auto-cleared when the skill is learned."""
     player = FakePlayer(study_target="common_001")
-    await mgr._resolve_and_learn(
-        player, {"skill_id": "common_001", "source": "test"}
-    )
+    await mgr._resolve_and_learn(player, {"skill_id": "common_001", "source": "test"})
     assert player.study_target == ""
 
 

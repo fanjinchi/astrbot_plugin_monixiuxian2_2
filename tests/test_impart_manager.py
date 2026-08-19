@@ -1,6 +1,5 @@
 """Tests for managers/impart_manager.py (impart value tiers and rewards)."""
 
-import aiosqlite
 import pytest
 
 from tests.helpers import load_module, load_package_module
@@ -210,7 +209,7 @@ async def test_heart_method_reward_to_storage():
     """Tier 1 heart-method reward is added to the player's storage ring."""
     db = await TestHelpers.setup_db()
     try:
-        player = await TestHelpers.create_player(db)
+        await TestHelpers.create_player(db)
         mgr = ImpartManager(db, DummyConfigManager())
 
         await db.ext.create_impart_info("u1")
@@ -235,7 +234,7 @@ async def test_technique_reward_writes_player_skills():
     """Tier 3 technique reward is learned directly with source='impart'."""
     db = await TestHelpers.setup_db()
     try:
-        player = await TestHelpers.create_player(db)
+        await TestHelpers.create_player(db)
         mgr = ImpartManager(db, DummyConfigManager())
 
         await db.ext.create_impart_info("u1")
@@ -304,7 +303,7 @@ async def test_repeat_reward_prevention():
     """Claimed tier rewards are not granted again when impart value increases."""
     db = await TestHelpers.setup_db()
     try:
-        player = await TestHelpers.create_player(db)
+        await TestHelpers.create_player(db)
         mgr = ImpartManager(db, DummyConfigManager())
 
         await db.ext.create_impart_info("u1")
@@ -335,7 +334,7 @@ async def test_technique_star_up_on_repeat_claim():
     """Claiming a technique tier again only stars up the existing learned skill."""
     db = await TestHelpers.setup_db()
     try:
-        player = await TestHelpers.create_player(db)
+        await TestHelpers.create_player(db)
         mgr = ImpartManager(db, DummyConfigManager())
 
         await db.ext.create_impart_info("u1")
@@ -364,7 +363,7 @@ async def test_technique_max_star_compensation():
     """Max-star technique reward grants exp compensation, not a fake star-up."""
     db = await TestHelpers.setup_db()
     try:
-        player = await TestHelpers.create_player(db)
+        await TestHelpers.create_player(db)
         mgr = ImpartManager(db, DummyConfigManager())
 
         await db.ext.create_impart_info("u1")
@@ -396,7 +395,7 @@ async def test_get_info_auto_grants_pending_rewards():
     """Opening the impart panel grants pending rewards and reflects them."""
     db = await TestHelpers.setup_db()
     try:
-        player = await TestHelpers.create_player(db)
+        await TestHelpers.create_player(db)
         await db.ext.create_impart_info("u1")
 
         # Manually bump impart value without using the manager (so rewards are pending).
@@ -434,4 +433,4 @@ async def test_impart_info_not_found():
 @pytest.mark.asyncio
 async def test_latest_db_version_bumped():
     """Ensure the migration version was bumped for the sect-growth schema."""
-    assert LATEST_DB_VERSION == 30
+    assert LATEST_DB_VERSION == 31

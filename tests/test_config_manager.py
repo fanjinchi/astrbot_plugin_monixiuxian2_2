@@ -4,9 +4,13 @@ import pytest
 
 from tests.helpers import load_package_module
 
-_config_mod = load_package_module("config_manager.py", "astrbot_plugin_monixiuxian2_2.config_manager")
+_config_mod = load_package_module(
+    "config_manager.py", "astrbot_plugin_monixiuxian2_2.config_manager"
+)
 ConfigManager = _config_mod.ConfigManager
-_skill_mod = load_package_module("core/skill_manager.py", "astrbot_plugin_monixiuxian2_2.core.skill_manager")
+_skill_mod = load_package_module(
+    "core/skill_manager.py", "astrbot_plugin_monixiuxian2_2.core.skill_manager"
+)
 SkillManager = _skill_mod.SkillManager
 
 PLUGIN_ROOT = _config_mod.Path(__file__).resolve().parent.parent
@@ -39,6 +43,7 @@ def test_config_manager_loads_weapon_coefficient_k(config_manager):
 @pytest.mark.asyncio
 async def test_skill_manager_works_with_flattened_skills(config_manager):
     """SkillManager must not mix universal skills into the main pool."""
+
     class FakeDbExt:
         async def is_skill_learned(self, user_id, skill_id):
             return False
@@ -113,7 +118,7 @@ class TestLevelConfigCentralApi:
         at_10 = config_manager.get_exp_needed(10)
         at_50 = config_manager.get_exp_needed(50)
         # Linear segment at 10 equals the early-curve segment at 10.
-        assert at_10 == int(1800 * (10 ** 1.5))
+        assert at_10 == int(1800 * (10**1.5))
         assert config_manager.get_exp_needed(11) == int(at_10 * 1.1)
         # Late segment at 50 equals the linear segment at 50.
         assert at_50 == int(at_10 * 5)
@@ -137,9 +142,7 @@ class TestLevelConfigCentralApi:
         spirit = config_manager.get_exp_needed(1, "灵修")
         body = config_manager.get_exp_needed(1, "体修")
         assert body == spirit
-        assert config_manager.get_exp_needed(10, "体修") == int(
-            1800 * (10**1.5)
-        )
+        assert config_manager.get_exp_needed(10, "体修") == int(1800 * (10**1.5))
 
     def test_get_success_rate_level_zero(self, config_manager):
         """An invalid level below 1 returns a safe default rate."""
@@ -152,6 +155,4 @@ class TestLevelConfigCentralApi:
         assert config_manager.get_level_index_by_name("筑基初期") == 10
         assert config_manager.get_level_index_by_name("地仙九阶") == 99
         assert config_manager.get_level_index_by_name("不存在") is None
-        assert (
-            config_manager.get_level_index_by_name("锻体一阶", "体修") == 1
-        )
+        assert config_manager.get_level_index_by_name("锻体一阶", "体修") == 1

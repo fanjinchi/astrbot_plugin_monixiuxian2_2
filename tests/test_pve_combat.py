@@ -392,13 +392,9 @@ class TestPveEngineIntegration:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_spawn_enemy_failure_returns_none(
-        self, pve_manager, mock_player
-    ):
+    async def test_spawn_enemy_failure_returns_none(self, pve_manager, mock_player):
         """When spawn_enemy raises, trigger_pve_combat returns None."""
-        pve_manager.enemy_mgr.spawn_enemy.side_effect = ValueError(
-            "未找到敌人模板配置"
-        )
+        pve_manager.enemy_mgr.spawn_enemy.side_effect = ValueError("未找到敌人模板配置")
         with patch.object(pve_manager, "_should_trigger_combat", return_value=True):
             with patch.object(
                 pve_manager, "_select_enemy_category", return_value="normal"

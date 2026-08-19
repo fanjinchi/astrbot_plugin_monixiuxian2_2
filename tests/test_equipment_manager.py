@@ -4,10 +4,14 @@ import pytest
 
 from tests.helpers import load_package_module
 
-_config_mod = load_package_module("config_manager.py", "astrbot_plugin_monixiuxian2_2.config_manager")
+_config_mod = load_package_module(
+    "config_manager.py", "astrbot_plugin_monixiuxian2_2.config_manager"
+)
 ConfigManager = _config_mod.ConfigManager
 
-_equipment_mod = load_package_module("core/equipment_manager.py", "astrbot_plugin_monixiuxian2_2.core.equipment_manager")
+_equipment_mod = load_package_module(
+    "core/equipment_manager.py", "astrbot_plugin_monixiuxian2_2.core.equipment_manager"
+)
 EquipmentManager = _equipment_mod.EquipmentManager
 
 PLUGIN_ROOT = _config_mod.Path(__file__).resolve().parent.parent

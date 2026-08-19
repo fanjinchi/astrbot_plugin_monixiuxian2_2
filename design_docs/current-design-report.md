@@ -334,7 +334,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | `sects` | sect_id (AI) | 宗门（sect_name UNIQUE，建设度/灵石/资材/功法 buff/丹房等级；v28 起含 is_system/faction_id/status/destruction_tier） |
 | `buff_info` | id (AI)，user_id UNIQUE | 用户功法/法器 buff（预留字段） |
 | `boss` | boss_id (AI) | 世界 Boss（hp/atk/defense/stone_reward/status） |
-| `rifts` | rift_id (AI) | 秘境定义（预置 5 个：青云秘境→上古遗迹） |
+| `rifts` | rift_id (AI) | 秘境定义（预置 6 个：青云秘境→上古遗迹 + id 6 青云剑冢，后者为 rift_config.json 标记的青云门专属秘境，v31 播种） |
 | `impart_info` | id (AI)，user_id UNIQUE | 传承值与已领取等阶（v26 重做） |
 | `user_cd` | user_id | 忙碌状态（type/create_time/scheduled_time/extra_data JSON） |
 | `pending_gifts` | id (AI) | 赠予请求（receiver/sender/item/count/expires_at，默认 24h） |
@@ -377,7 +377,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | v27 | 方案A成长模型（突破随机成长）+ 突破连败保底（breakthrough_fail_streak） |
 | v28 | 默认宗门与宗门功法归属：sects +is_system/faction_id/status/destruction_tier，player_skills +origin_sect_id/sect_bound（存量行保持默认，行为不变） |
 | v29 | players +sect_treasure_claims（宗门宝库领取记录，防跨退宗重复领取） |
-| v30 | players +sect_master_progress（师承任务链进度 JSON）（当前最新） |
+| v30 | players +sect_master_progress（师承任务链进度 JSON） |
+| v31 | rifts 播种青云剑冢（id 6，青云门专属秘境；config/rift_config.json 该条目 id 同步 4→6，消除与 id 4 玄冰地宫的冲突）（当前最新） |
 
 ---
 

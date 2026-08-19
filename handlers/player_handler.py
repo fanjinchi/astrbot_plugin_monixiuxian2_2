@@ -3,7 +3,7 @@ import random
 import time
 from datetime import datetime
 
-from astrbot.api import AstrBotConfig
+from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent
 
 from ..config_manager import ConfigManager
@@ -433,12 +433,27 @@ class PlayerHandler:
         today = datetime.now().strftime("%Y-%m-%d")
 
         # 跨日重置：宗门丹药领取标记与宗门任务计数（以日期变更为锚，
-        # 由每日首位签到的玩家触发一次全局重置）
-        last_reset = await self.db.ext.get_system_config("sect_daily_reset_date")
-        if last_reset != today:
-            await self.db.ext.reset_sect_elixir_get()
-            await self.db.ext.reset_sect_tasks()
-            await self.db.ext.set_system_config("sect_daily_reset_date", today)
+        # 由每日首位签到的玩家触发一次全局重置）。原子推进日期：
+        # INSERT ... ON CONFLICT ... WHERE value != 今日，仅 rowcount > 0
+        # 的调用方执行重置，避免并发签到双重重置；失败不得影响签到主流程。
+        try:
+            now_ts = int(time.time())
+            cursor = await self.db.conn.execute(
+                """
+                INSERT INTO system_config (key, value, updated_at)
+                VALUES ('sect_daily_reset_date', ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value, updated_at = excluded.updated_at
+                WHERE system_config.value != excluded.value
+                """,
+                (today, now_ts),
+            )
+            await self.db.conn.commit()
+            if cursor.rowcount > 0:
+                await self.db.ext.reset_sect_elixir_get()
+                await self.db.ext.reset_sect_tasks()
+        except Exception as e:
+            logger.warning("【修仙插件】宗门每日重置失败（不影响签到）: %s", e)
 
         # 检查是否已经签到过
         if player.last_check_in_date == today:

@@ -60,7 +60,7 @@ class FakeSkillManager:
         if skill_id in self.learned_skills:
             return False, "该功法已领悟，无需再修习"
         player.study_target = skill_id
-        return True, f"已将【基础吐纳】设为修习目标"
+        return True, "已将【基础吐纳】设为修习目标"
 
 
 class FakePlayer:

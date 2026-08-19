@@ -1,16 +1,23 @@
 """Regression tests for pill manager new-attribute migration."""
 
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from tests.helpers import load_package_module
 
-_config_mod = load_package_module("config_manager.py", "astrbot_plugin_monixiuxian2_2.config_manager")
+_config_mod = load_package_module(
+    "config_manager.py", "astrbot_plugin_monixiuxian2_2.config_manager"
+)
 ConfigManager = _config_mod.ConfigManager
 
-_pill_mod = load_package_module("core/pill_manager.py", "astrbot_plugin_monixiuxian2_2.core.pill_manager")
+_pill_mod = load_package_module(
+    "core/pill_manager.py", "astrbot_plugin_monixiuxian2_2.core.pill_manager"
+)
 PillManager = _pill_mod.PillManager
-_Player = load_package_module("models.py", "astrbot_plugin_monixiuxian2_2.models").Player
+_Player = load_package_module(
+    "models.py", "astrbot_plugin_monixiuxian2_2.models"
+).Player
 
 PLUGIN_ROOT = _config_mod.Path(__file__).resolve().parent.parent
 
@@ -37,16 +44,18 @@ def test_ensure_non_negative_attributes_handles_new_attrs(pill_manager):
 def test_pill_attribute_effects_map_to_new_keys(pill_manager):
     """Legacy physical/magic multipliers are folded into the four main attributes."""
     player = _Player(user_id="u1")
-    player.set_active_pill_effects([
-        {
-            "pill_name": "test",
-            "expiry_time": 9999999999,
-            "physical_damage_multiplier": 0.2,
-            "magic_damage_multiplier": 0.1,
-            "physical_defense_multiplier": 0.15,
-            "magic_defense_multiplier": 0.05,
-        }
-    ])
+    player.set_active_pill_effects(
+        [
+            {
+                "pill_name": "test",
+                "expiry_time": 9999999999,
+                "physical_damage_multiplier": 0.2,
+                "magic_damage_multiplier": 0.1,
+                "physical_defense_multiplier": 0.15,
+                "magic_defense_multiplier": 0.05,
+            }
+        ]
+    )
     multipliers = pill_manager.calculate_pill_attribute_effects(player)
     assert multipliers["damage"] == 1.3  # 1.0 + 0.2 + 0.1
     assert multipliers["armor_value"] == 1.2  # 1.0 + 0.15 + 0.05

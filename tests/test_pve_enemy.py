@@ -163,38 +163,262 @@ SAMPLE_ENEMIES_CONFIG = {
 # Simplified level_config covering level indices 0-31 (mirroring real level_config.json)
 # with the new four-main-attribute base values.
 SAMPLE_LEVEL_CONFIG = [
-    {"level_name": "炼气期一层", "exp_needed": 0, "base_damage": 10, "base_agility": 5, "base_speed": 5, "base_hp": 100},  # 0
-    {"level_name": "炼气期二层", "exp_needed": 500, "base_damage": 13, "base_agility": 6, "base_speed": 5, "base_hp": 115},  # 1
-    {"level_name": "炼气期三层", "exp_needed": 1200, "base_damage": 16, "base_agility": 7, "base_speed": 6, "base_hp": 130},  # 2
-    {"level_name": "炼气期四层", "exp_needed": 2000, "base_damage": 19, "base_agility": 8, "base_speed": 6, "base_hp": 145},  # 3
-    {"level_name": "炼气期五层", "exp_needed": 3000, "base_damage": 22, "base_agility": 9, "base_speed": 7, "base_hp": 160},  # 4
-    {"level_name": "炼气期六层", "exp_needed": 4500, "base_damage": 25, "base_agility": 10, "base_speed": 7, "base_hp": 175},  # 5
-    {"level_name": "炼气期七层", "exp_needed": 6500, "base_damage": 28, "base_agility": 11, "base_speed": 8, "base_hp": 190},  # 6
-    {"level_name": "炼气期八层", "exp_needed": 9000, "base_damage": 31, "base_agility": 12, "base_speed": 8, "base_hp": 205},  # 7
-    {"level_name": "炼气期九层", "exp_needed": 12000, "base_damage": 34, "base_agility": 13, "base_speed": 9, "base_hp": 220},  # 8
-    {"level_name": "炼气期十层", "exp_needed": 16000, "base_damage": 37, "base_agility": 14, "base_speed": 9, "base_hp": 235},  # 9
-    {"level_name": "炼气期十层", "exp_needed": 16000, "base_damage": 37, "base_agility": 14, "base_speed": 9, "base_hp": 235},  # 10
-    {"level_name": "筑基期初期", "exp_needed": 25000, "base_damage": 40, "base_agility": 15, "base_speed": 10, "base_hp": 250},  # 11
-    {"level_name": "筑基期初期", "exp_needed": 25000, "base_damage": 40, "base_agility": 15, "base_speed": 10, "base_hp": 250},  # 12
-    {"level_name": "筑基期中期", "exp_needed": 45000, "base_damage": 46, "base_agility": 17, "base_speed": 11, "base_hp": 280},  # 13
-    {"level_name": "筑基期中期", "exp_needed": 45000, "base_damage": 46, "base_agility": 17, "base_speed": 11, "base_hp": 280},  # 14
-    {"level_name": "筑基期中期", "exp_needed": 45000, "base_damage": 46, "base_agility": 17, "base_speed": 11, "base_hp": 280},  # 15
-    {"level_name": "筑基期中期", "exp_needed": 45000, "base_damage": 46, "base_agility": 17, "base_speed": 11, "base_hp": 280},  # 16
-    {"level_name": "筑基期中期", "exp_needed": 45000, "base_damage": 46, "base_agility": 17, "base_speed": 11, "base_hp": 280},  # 17
-    {"level_name": "筑基期中期", "exp_needed": 45000, "base_damage": 46, "base_agility": 17, "base_speed": 11, "base_hp": 280},  # 18
-    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 19
-    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 20
-    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 21
-    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 22
-    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 23
-    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 24
-    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 25
-    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 26
-    {"level_name": "金丹期初期", "exp_needed": 150000, "base_damage": 80, "base_agility": 30, "base_speed": 20, "base_hp": 500},  # 27
-    {"level_name": "大乘期初期", "exp_needed": 600000000, "base_damage": 1000, "base_agility": 300, "base_speed": 300, "base_hp": 10000},  # 28
-    {"level_name": "大乘期初期", "exp_needed": 600000000, "base_damage": 1000, "base_agility": 300, "base_speed": 300, "base_hp": 10000},  # 29
-    {"level_name": "大乘期初期", "exp_needed": 600000000, "base_damage": 1000, "base_agility": 300, "base_speed": 300, "base_hp": 10000},  # 30
-    {"level_name": "大乘期初期", "exp_needed": 600000000, "base_damage": 1000, "base_agility": 300, "base_speed": 300, "base_hp": 10000},  # 31
+    {
+        "level_name": "炼气期一层",
+        "exp_needed": 0,
+        "base_damage": 10,
+        "base_agility": 5,
+        "base_speed": 5,
+        "base_hp": 100,
+    },  # 0
+    {
+        "level_name": "炼气期二层",
+        "exp_needed": 500,
+        "base_damage": 13,
+        "base_agility": 6,
+        "base_speed": 5,
+        "base_hp": 115,
+    },  # 1
+    {
+        "level_name": "炼气期三层",
+        "exp_needed": 1200,
+        "base_damage": 16,
+        "base_agility": 7,
+        "base_speed": 6,
+        "base_hp": 130,
+    },  # 2
+    {
+        "level_name": "炼气期四层",
+        "exp_needed": 2000,
+        "base_damage": 19,
+        "base_agility": 8,
+        "base_speed": 6,
+        "base_hp": 145,
+    },  # 3
+    {
+        "level_name": "炼气期五层",
+        "exp_needed": 3000,
+        "base_damage": 22,
+        "base_agility": 9,
+        "base_speed": 7,
+        "base_hp": 160,
+    },  # 4
+    {
+        "level_name": "炼气期六层",
+        "exp_needed": 4500,
+        "base_damage": 25,
+        "base_agility": 10,
+        "base_speed": 7,
+        "base_hp": 175,
+    },  # 5
+    {
+        "level_name": "炼气期七层",
+        "exp_needed": 6500,
+        "base_damage": 28,
+        "base_agility": 11,
+        "base_speed": 8,
+        "base_hp": 190,
+    },  # 6
+    {
+        "level_name": "炼气期八层",
+        "exp_needed": 9000,
+        "base_damage": 31,
+        "base_agility": 12,
+        "base_speed": 8,
+        "base_hp": 205,
+    },  # 7
+    {
+        "level_name": "炼气期九层",
+        "exp_needed": 12000,
+        "base_damage": 34,
+        "base_agility": 13,
+        "base_speed": 9,
+        "base_hp": 220,
+    },  # 8
+    {
+        "level_name": "炼气期十层",
+        "exp_needed": 16000,
+        "base_damage": 37,
+        "base_agility": 14,
+        "base_speed": 9,
+        "base_hp": 235,
+    },  # 9
+    {
+        "level_name": "炼气期十层",
+        "exp_needed": 16000,
+        "base_damage": 37,
+        "base_agility": 14,
+        "base_speed": 9,
+        "base_hp": 235,
+    },  # 10
+    {
+        "level_name": "筑基期初期",
+        "exp_needed": 25000,
+        "base_damage": 40,
+        "base_agility": 15,
+        "base_speed": 10,
+        "base_hp": 250,
+    },  # 11
+    {
+        "level_name": "筑基期初期",
+        "exp_needed": 25000,
+        "base_damage": 40,
+        "base_agility": 15,
+        "base_speed": 10,
+        "base_hp": 250,
+    },  # 12
+    {
+        "level_name": "筑基期中期",
+        "exp_needed": 45000,
+        "base_damage": 46,
+        "base_agility": 17,
+        "base_speed": 11,
+        "base_hp": 280,
+    },  # 13
+    {
+        "level_name": "筑基期中期",
+        "exp_needed": 45000,
+        "base_damage": 46,
+        "base_agility": 17,
+        "base_speed": 11,
+        "base_hp": 280,
+    },  # 14
+    {
+        "level_name": "筑基期中期",
+        "exp_needed": 45000,
+        "base_damage": 46,
+        "base_agility": 17,
+        "base_speed": 11,
+        "base_hp": 280,
+    },  # 15
+    {
+        "level_name": "筑基期中期",
+        "exp_needed": 45000,
+        "base_damage": 46,
+        "base_agility": 17,
+        "base_speed": 11,
+        "base_hp": 280,
+    },  # 16
+    {
+        "level_name": "筑基期中期",
+        "exp_needed": 45000,
+        "base_damage": 46,
+        "base_agility": 17,
+        "base_speed": 11,
+        "base_hp": 280,
+    },  # 17
+    {
+        "level_name": "筑基期中期",
+        "exp_needed": 45000,
+        "base_damage": 46,
+        "base_agility": 17,
+        "base_speed": 11,
+        "base_hp": 280,
+    },  # 18
+    {
+        "level_name": "金丹期初期",
+        "exp_needed": 150000,
+        "base_damage": 80,
+        "base_agility": 30,
+        "base_speed": 20,
+        "base_hp": 500,
+    },  # 19
+    {
+        "level_name": "金丹期初期",
+        "exp_needed": 150000,
+        "base_damage": 80,
+        "base_agility": 30,
+        "base_speed": 20,
+        "base_hp": 500,
+    },  # 20
+    {
+        "level_name": "金丹期初期",
+        "exp_needed": 150000,
+        "base_damage": 80,
+        "base_agility": 30,
+        "base_speed": 20,
+        "base_hp": 500,
+    },  # 21
+    {
+        "level_name": "金丹期初期",
+        "exp_needed": 150000,
+        "base_damage": 80,
+        "base_agility": 30,
+        "base_speed": 20,
+        "base_hp": 500,
+    },  # 22
+    {
+        "level_name": "金丹期初期",
+        "exp_needed": 150000,
+        "base_damage": 80,
+        "base_agility": 30,
+        "base_speed": 20,
+        "base_hp": 500,
+    },  # 23
+    {
+        "level_name": "金丹期初期",
+        "exp_needed": 150000,
+        "base_damage": 80,
+        "base_agility": 30,
+        "base_speed": 20,
+        "base_hp": 500,
+    },  # 24
+    {
+        "level_name": "金丹期初期",
+        "exp_needed": 150000,
+        "base_damage": 80,
+        "base_agility": 30,
+        "base_speed": 20,
+        "base_hp": 500,
+    },  # 25
+    {
+        "level_name": "金丹期初期",
+        "exp_needed": 150000,
+        "base_damage": 80,
+        "base_agility": 30,
+        "base_speed": 20,
+        "base_hp": 500,
+    },  # 26
+    {
+        "level_name": "金丹期初期",
+        "exp_needed": 150000,
+        "base_damage": 80,
+        "base_agility": 30,
+        "base_speed": 20,
+        "base_hp": 500,
+    },  # 27
+    {
+        "level_name": "大乘期初期",
+        "exp_needed": 600000000,
+        "base_damage": 1000,
+        "base_agility": 300,
+        "base_speed": 300,
+        "base_hp": 10000,
+    },  # 28
+    {
+        "level_name": "大乘期初期",
+        "exp_needed": 600000000,
+        "base_damage": 1000,
+        "base_agility": 300,
+        "base_speed": 300,
+        "base_hp": 10000,
+    },  # 29
+    {
+        "level_name": "大乘期初期",
+        "exp_needed": 600000000,
+        "base_damage": 1000,
+        "base_agility": 300,
+        "base_speed": 300,
+        "base_hp": 10000,
+    },  # 30
+    {
+        "level_name": "大乘期初期",
+        "exp_needed": 600000000,
+        "base_damage": 1000,
+        "base_agility": 300,
+        "base_speed": 300,
+        "base_hp": 10000,
+    },  # 31
 ]
 
 
@@ -371,9 +595,7 @@ class TestStatCalculation:
             ):
                 mock_choice.side_effect = lambda lst: lst[0]
                 mock_randint.return_value = level
-                enemy = enemy_manager.spawn_enemy(
-                    player_level=level, category="normal"
-                )
+                enemy = enemy_manager.spawn_enemy(player_level=level, category="normal")
                 assert enemy.exp > 0
                 assert enemy.hp > 0
                 assert enemy.damage > 0

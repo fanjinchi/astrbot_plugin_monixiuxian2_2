@@ -1,6 +1,7 @@
 """Tests for sect master task chains (师承任务链, change group 5)."""
 
 import pytest
+import pytest_asyncio
 
 from tests.helpers import load_module, load_package_module
 
@@ -34,28 +35,32 @@ def _qingyun_chain():
                 "type": "win_pve",
                 "count": 3,
                 "reward": {"contribution": 50, "exp": 200},
-                "text": "玄诚子：新入门弟子，先去后山演武场活动筋骨。",
+                "text": "玄诚子：新入门弟子，先去后山演武场活动筋骨，胜三场妖兽来见我。",
             },
             {
                 "name": "采药历练",
                 "type": "adventure_complete",
                 "count": 1,
                 "reward": {"contribution": 80, "skill_learn_chance": "sect_qingyun"},
-                "text": "玄诚子：丹房缺几味常见灵草，你去历练一趟。",
+                "text": "玄诚子：丹房缺几味常见灵草，你去历练一趟，顺便把采药的规矩学了。",
             },
             {
                 "name": "破境之礼",
                 "type": "breakthrough",
                 "count": 1,
                 "reward": {"contribution": 150, "exp": 1000},
-                "text": "清微道长：破境乃修行第一关。",
+                "text": "清微道长：破境乃修行第一关，成之后来执事堂登记，门中自有嘉奖。",
             },
         ],
     }
 
 
 def _huanxi_chain():
-    """Donate-type chain mirroring chain_hx_01."""
+    """Master task chain mirroring config/sect_tasks.json chain_hx_01.
+
+    Faithful copy of the real config: two stages (投名状 donate 1000 →
+    见血 win_pve 5) under level_range [2, 4].
+    """
     return {
         "id": "chain_hx_01",
         "sect_id": "huanxi",
@@ -66,7 +71,14 @@ def _huanxi_chain():
                 "type": "donate",
                 "count": 1000,
                 "reward": {"contribution": 80, "exp": 500},
-                "text": "花妩娘：先纳一千灵石做投名状。",
+                "text": "花妩娘：入我合欢宗，先纳一千灵石做投名状，宗门不养闲人。",
+            },
+            {
+                "name": "见血",
+                "type": "win_pve",
+                "count": 5,
+                "reward": {"contribution": 120, "skill_learn_chance": "sect_huanxi"},
+                "text": "厉无欢：去杀五个不开眼的东西，提着他们的兵刃回来，才算自己人。",
             },
         ],
     }
@@ -88,7 +100,8 @@ class FakeConfigManager:
                 {
                     "id": "huanxi",
                     "name": "合欢宗",
-                    "join_level_range": [0, 5],
+                    # 与 config/sect_factions.json 一致
+                    "join_level_range": [2, 6],
                     "elders": [{"name": "厉无欢", "title": "护法长老"}],
                 },
             ]
@@ -110,18 +123,28 @@ class FakeConfigManager:
                 "name": "青云剑诀",
                 "_group": "sect_qingyun",
                 "sect_bound": True,
-            }
+            },
+            # 合欢宗功法池桩（真实配置见 config/skills.json sect_huanxi）
+            "蚀心魔音": {
+                "id": "hx_001",
+                "name": "蚀心魔音",
+                "_group": "sect_huanxi",
+                "sect_bound": True,
+            },
         }
 
     def get_level_name(self, level_index: int, cultivation_type: str = "灵修") -> str:
         return f"境界{level_index}"
 
 
-async def _make_db() -> DataBase:
-    db = DataBase(":memory:")
-    await db.connect()
-    await MigrationManager(db.conn, FakeConfigManager()).migrate()
-    return db
+@pytest_asyncio.fixture
+async def db():
+    """Provide a migrated in-memory database and close it after the test."""
+    database = DataBase(":memory:")
+    await database.connect()
+    await MigrationManager(database.conn, FakeConfigManager()).migrate()
+    yield database
+    await database.close()
 
 
 async def _make_player(
@@ -148,9 +171,8 @@ async def _join(db, mgr, user_id: str, sect_name: str, level_index: int = 1, gol
 
 
 @pytest.mark.asyncio
-async def test_chain_matched_by_level_range():
+async def test_chain_matched_by_level_range(db):
     """A member sees the chain matching their level range; others see none."""
-    db = await _make_db()
     mgr = SectManager(db, FakeConfigManager())
     await mgr.ensure_system_sects()
 
@@ -173,13 +195,11 @@ async def test_chain_matched_by_level_range():
     success, msg = await mgr.get_master_task_status("u3")
     assert not success
     assert "还未加入宗门" in msg
-    await db.close()
 
 
 @pytest.mark.asyncio
-async def test_player_sect_has_no_master_chain():
+async def test_player_sect_has_no_master_chain(db):
     """Player-built sects (no faction) have no master tasks."""
-    db = await _make_db()
     mgr = SectManager(db, FakeConfigManager())
     await mgr.ensure_system_sects()
     await _make_player(db, "owner", level_index=5, gold=20000)
@@ -190,16 +210,14 @@ async def test_player_sect_has_no_master_chain():
     assert not success
     assert "暂无师承任务" in msg
     assert await mgr.advance_master_progress("owner", "win_pve") is None
-    await db.close()
 
 
 # ===== 5.2 阶段推进与结算 =====
 
 
 @pytest.mark.asyncio
-async def test_win_pve_progress_and_stage_settlement():
+async def test_win_pve_progress_and_stage_settlement(db):
     """win_pve events advance the stage; reaching count settles it."""
-    db = await _make_db()
     mgr = SectManager(db, FakeConfigManager())
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "青云门", level_index=1)
@@ -236,13 +254,11 @@ async def test_win_pve_progress_and_stage_settlement():
 
     # 阶段顺序推进：win_pve 对第二阶段（adventure_complete）无效
     assert await mgr.advance_master_progress("u1", "win_pve") is None
-    await db.close()
 
 
 @pytest.mark.asyncio
-async def test_breakthrough_stage_survives_level_range_exit():
+async def test_breakthrough_stage_survives_level_range_exit(db):
     """An in-progress chain still settles after breakthrough leaves its range."""
-    db = await _make_db()
     mgr = SectManager(db, FakeConfigManager())
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "青云门", level_index=2)
@@ -276,13 +292,12 @@ async def test_breakthrough_stage_survives_level_range_exit():
     success, msg = await mgr.get_master_task_status("u1")
     assert success
     assert "已全部完成" in msg
-    await db.close()
 
 
 @pytest.mark.asyncio
-async def test_donate_progress_counts_stone_amount():
-    """The donate stage advances by the donated stone amount."""
-    db = await _make_db()
+async def test_donate_progress_counts_stone_amount(db):
+    """The donate stage advances by the donated stone amount, then the chain
+    continues with the win_pve stage (mirrors the two-stage chain_hx_01)."""
     mgr = SectManager(db, FakeConfigManager())
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "合欢宗", level_index=3, gold=2000)
@@ -297,21 +312,51 @@ async def test_donate_progress_counts_stone_amount():
     success, msg = await mgr.donate_to_sect("u1", 600)
     assert success, msg
     assert "【投名状】完成" in msg
-    assert "师承任务已全部完成" in msg
+    # 真实配置 chain_hx_01 还有第二阶段【见血】，donate 结算后推进而非全部完成
+    assert "师承任务已全部完成" not in msg
+    assert "下一阶段：【见血】" in msg
     player = await db.get_player_by_id("u1")
     # 捐献贡献（400+600）+ 阶段奖励 80
     assert player.sect_contribution == 1080
     assert player.experience == 500
-    await db.close()
+    assert player.get_sect_master_progress() == {
+        "chain_id": "chain_hx_01",
+        "stage_index": 1,
+        "progress": 0,
+        "done": False,
+    }
+
+    # 第二阶段【见血】：win_pve ×5 结算后全链完成
+    for i in range(1, 5):
+        msg = await mgr.advance_master_progress("u1", "win_pve")
+        assert f"【见血】进度：{i}/5" in msg
+    msg = await mgr.advance_master_progress("u1", "win_pve")
+    assert "【见血】完成" in msg
+    assert "宗门贡献 +120" in msg
+    assert "领悟宗门功法【蚀心魔音】" in msg
+    assert "师承任务已全部完成" in msg
+
+    player = await db.get_player_by_id("u1")
+    assert player.sect_contribution == 1200
+    assert player.get_sect_master_progress()["done"] is True
+    skills = await db.ext.get_learned_skills("u1")
+    assert len(skills) == 1
+    assert skills[0]["skill_id"] == "hx_001"
+    assert skills[0]["origin_sect_id"] == "huanxi"
+    assert skills[0]["sect_bound"] is True
+
+    # 查看指令显示全部完成
+    success, msg = await mgr.get_master_task_status("u1")
+    assert success
+    assert "已全部完成" in msg
 
 
 # ===== 5.3 功法领悟奖励 =====
 
 
 @pytest.mark.asyncio
-async def test_skill_learn_chance_grants_sect_skill():
+async def test_skill_learn_chance_grants_sect_skill(db):
     """skill_learn_chance draws a pool skill with sect attribution."""
-    db = await _make_db()
     mgr = SectManager(db, FakeConfigManager())
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "青云门", level_index=1)
@@ -335,13 +380,11 @@ async def test_skill_learn_chance_grants_sect_skill():
 
     player = await db.get_player_by_id("u1")
     assert player.sect_contribution == 80
-    await db.close()
 
 
 @pytest.mark.asyncio
-async def test_skill_learn_chance_star_up_and_max_star_compensation():
+async def test_skill_learn_chance_star_up_and_max_star_compensation(db):
     """Duplicate draws star up; max-star duplicates convert to exp."""
-    db = await _make_db()
     mgr = SectManager(db, FakeConfigManager())
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "青云门", level_index=1)
@@ -379,4 +422,80 @@ async def test_skill_learn_chance_star_up_and_max_star_compensation():
     # 满星折算不覆盖原有归属标记
     assert skills[0]["origin_sect_id"] == "qingyun"
     assert skills[0]["sect_bound"] is True
-    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_skill_grant_failure_keeps_stage_unsettled_and_retryable(
+    db, monkeypatch
+):
+    """M7: when the skill grant fails, the stage is NOT settled — no
+    contribution/exp is granted, stored progress is kept, and the next
+    matching event retries the settlement."""
+    mgr = SectManager(db, FakeConfigManager())
+    await mgr.ensure_system_sects()
+    await _join(db, mgr, "u1", "青云门", level_index=1)
+
+    # 定位到第二阶段（采药历练，count=1，奖励含 skill_learn_chance）
+    player = await db.get_player_by_id("u1")
+    player.set_sect_master_progress(
+        {"chain_id": "chain_qy_01", "stage_index": 1, "progress": 0, "done": False}
+    )
+    await db.update_player(player)
+
+    async def _boom(*args, **kwargs):
+        raise RuntimeError("simulated skill write failure")
+
+    monkeypatch.setattr(db.ext, "learn_or_star_up", _boom)
+
+    msg = await mgr.advance_master_progress("u1", "adventure_complete")
+    assert msg is not None
+    assert "发放失败" in msg
+
+    player = await db.get_player_by_id("u1")
+    assert player.sect_contribution == 0  # 奖励未发
+    assert player.experience == 0
+    # 阶段未标记完成，进度保持，可重试
+    assert player.get_sect_master_progress() == {
+        "chain_id": "chain_qy_01",
+        "stage_index": 1,
+        "progress": 0,
+        "done": False,
+    }
+
+    # 故障恢复后，下次事件重试结算成功
+    monkeypatch.undo()
+    msg = await mgr.advance_master_progress("u1", "adventure_complete")
+    assert "【采药历练】完成" in msg
+    assert "领悟宗门功法【青云剑诀】" in msg
+    player = await db.get_player_by_id("u1")
+    assert player.sect_contribution == 80
+    skills = await db.ext.get_learned_skills("u1")
+    assert len(skills) == 1 and skills[0]["skill_id"] == "qy_001"
+
+
+@pytest.mark.asyncio
+async def test_max_star_compensation_not_overwritten_by_stage_settlement(db):
+    """M7: stage settlement after a max-star duplicate draw keeps the atomic
+    exp compensation granted by learn_or_star_up (player is re-read first)."""
+    mgr = SectManager(db, FakeConfigManager())
+    await mgr.ensure_system_sects()
+    await _join(db, mgr, "u1", "青云门", level_index=1)
+
+    # 已满星（max_star=3）
+    for _ in range(3):
+        await db.ext.learn_or_star_up("u1", "qy_001", "test")
+
+    player = await db.get_player_by_id("u1")
+    player.set_sect_master_progress(
+        {"chain_id": "chain_qy_01", "stage_index": 1, "progress": 0, "done": False}
+    )
+    await db.update_player(player)
+
+    msg = await mgr.advance_master_progress("u1", "adventure_complete")
+    assert "已达3星圆满" in msg
+    assert "折算修为 +500" in msg
+
+    player = await db.get_player_by_id("u1")
+    assert player.experience == 500  # 折算修为未被整行 update 覆盖
+    assert player.sect_contribution == 80
+    assert player.get_sect_master_progress()["done"] is False  # 推进到第三阶段

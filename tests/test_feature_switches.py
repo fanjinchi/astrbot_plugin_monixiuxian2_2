@@ -88,7 +88,9 @@ def plugin_class():
     original_star = getattr(star_mod, "Star", None)
     star_mod.Star = _StarBase
 
-    command_mod = sys.modules.setdefault("astrbot.core.star.filter.command", MagicMock())
+    command_mod = sys.modules.setdefault(
+        "astrbot.core.star.filter.command", MagicMock()
+    )
     original_greedy = getattr(command_mod, "GreedyStr", None)
     command_mod.GreedyStr = str
 
@@ -180,8 +182,7 @@ class TestBossGate:
         plugin.config_manager.game_config["boss"]["enabled"] = False
         plugin.boss_handlers = MagicMock()
         results = [
-            result
-            async for result in plugin.handle_spawn_boss(FakeEvent("生成Boss"))
+            result async for result in plugin.handle_spawn_boss(FakeEvent("生成Boss"))
         ]
         assert len(results) == 1
         assert "维护" in results[0].text
@@ -197,9 +198,7 @@ class TestPvEGate:
         plugin.rift_handlers = MagicMock()
         results = [
             result
-            async for result in plugin.handle_rift_explore(
-                FakeEvent("探索秘境 1"), 1
-            )
+            async for result in plugin.handle_rift_explore(FakeEvent("探索秘境 1"), 1)
         ]
         assert len(results) == 1
         assert "维护" in results[0].text
@@ -235,8 +234,7 @@ class TestNonPvEGameplay:
             [FakeEvent().plain_result("切磋开始")]
         )
         results = [
-            result
-            async for result in plugin.handle_spar(FakeEvent("切磋 @u2"), "@u2")
+            result async for result in plugin.handle_spar(FakeEvent("切磋 @u2"), "@u2")
         ]
         assert len(results) == 1
         assert results[0].text == "切磋开始"
@@ -247,7 +245,9 @@ class TestScheduledTask:
     """The boss spawn background task is not scheduled when the switch is off."""
 
     @pytest.mark.asyncio
-    async def test_boss_spawn_task_not_started_when_disabled(self, plugin, plugin_class):
+    async def test_boss_spawn_task_not_started_when_disabled(
+        self, plugin, plugin_class
+    ):
         plugin.config_manager.game_config["boss"]["enabled"] = False
         plugin.db.connect = AsyncMock()
         plugin.db.ensure_connection = AsyncMock()

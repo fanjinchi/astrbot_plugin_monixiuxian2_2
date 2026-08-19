@@ -8,7 +8,8 @@ import pytest
 from tests.helpers import load_package_module
 
 _combat_mod = load_package_module(
-    "handlers/combat_handlers.py", "astrbot_plugin_monixiuxian2_2.handlers.combat_handlers"
+    "handlers/combat_handlers.py",
+    "astrbot_plugin_monixiuxian2_2.handlers.combat_handlers",
 )
 CombatHandlers = _combat_mod.CombatHandlers
 

@@ -133,9 +133,7 @@ def mock_storage_ring_manager():
 @pytest.fixture
 def boss_manager(mock_db, mock_combat_manager, mock_config_manager):
     """BossManager with mocked dependencies and deterministic HP variance."""
-    mgr = BossManager(
-        mock_db, mock_combat_manager, mock_config_manager, None
-    )
+    mgr = BossManager(mock_db, mock_combat_manager, mock_config_manager, None)
     mgr._resolve_boss_stats = lambda level_config: mgr._generate_boss_stats(
         level_config
     )
@@ -292,14 +290,10 @@ class TestSpawnBoss:
     """Boss spawn flow and messages."""
 
     @pytest.mark.asyncio
-    async def test_spawn_boss_creates_boss_with_new_stats(
-        self, boss_manager, mock_db
-    ):
+    async def test_spawn_boss_creates_boss_with_new_stats(self, boss_manager, mock_db):
         """spawn_boss returns a Boss with hp/atk/defense from new stats."""
         level_config = boss_manager.levels[1]  # 筑基
-        success, msg, boss = await boss_manager.spawn_boss(
-            level_config=level_config
-        )
+        success, msg, boss = await boss_manager.spawn_boss(level_config=level_config)
         assert success
         assert boss is not None
         # HP is base 235 * 1.5 = 352 (with variance disabled in fixture)
@@ -489,9 +483,7 @@ class TestChallengeBoss:
         assert "没有Boss" in msg
 
     @pytest.mark.asyncio
-    async def test_challenge_busy_player(
-        self, boss_manager, mock_db, player_idle
-    ):
+    async def test_challenge_busy_player(self, boss_manager, mock_db, player_idle):
         """Challenge fails when player is busy."""
         boss = Boss(
             boss_id=1,
@@ -522,9 +514,7 @@ class TestBossInfoAndAutoSpawn:
     """get_boss_info and auto_spawn_boss behavior."""
 
     @pytest.mark.asyncio
-    async def test_get_boss_info_shows_four_attributes(
-        self, boss_manager, mock_db
-    ):
+    async def test_get_boss_info_shows_four_attributes(self, boss_manager, mock_db):
         """Boss info displays damage, agility, speed, and armor."""
         boss = Boss(
             boss_id=1,
@@ -553,9 +543,7 @@ class TestBossInfoAndAutoSpawn:
         assert "没有Boss" in msg
 
     @pytest.mark.asyncio
-    async def test_auto_spawn_boss_by_average_level(
-        self, boss_manager, mock_db
-    ):
+    async def test_auto_spawn_boss_by_average_level(self, boss_manager, mock_db):
         """auto_spawn_boss picks a tier matching the average player level."""
         p1 = Player(user_id="a", level_index=8, hp=100, damage=10)
         p2 = Player(user_id="b", level_index=12, hp=100, damage=10)
@@ -564,7 +552,9 @@ class TestBossInfoAndAutoSpawn:
         assert success
         avg = (8 + 12) // 2
         # 练气 level 1 <= 10, 筑基 level 10 <= 15 (avg+5)
-        selected = [cfg for cfg in boss_manager.levels if cfg["level_index"] <= avg + 5][-1]
+        selected = [
+            cfg for cfg in boss_manager.levels if cfg["level_index"] <= avg + 5
+        ][-1]
         assert boss.boss_level == selected["name"]
 
     @pytest.mark.asyncio
@@ -575,9 +565,7 @@ class TestBossInfoAndAutoSpawn:
         assert boss.boss_level == boss_manager.levels[0]["name"]
 
     @pytest.mark.asyncio
-    async def test_auto_spawn_boss_refuses_existing(
-        self, boss_manager, mock_db
-    ):
+    async def test_auto_spawn_boss_refuses_existing(self, boss_manager, mock_db):
         """auto_spawn_boss refuses when a boss already exists."""
         existing = Boss(
             boss_id=1,

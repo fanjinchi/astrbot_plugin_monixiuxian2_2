@@ -297,9 +297,7 @@ class ShopHandler:
 
             result_lines.append(f"花费灵石: {total_price}，剩余: {player.gold}")
             if sect_discount < 1.0:
-                result_lines.append(
-                    f"🏛️ 宗门职阶折扣已生效（{sect_discount * 100:.0f}折）"
-                )
+                result_lines.append(f"🏛️ 宗门职阶折扣已生效（{sect_discount * 10:g}折）")
             result_lines.append(
                 f"剩余库存: {remaining}" if remaining > 0 else "该物品已售罄！"
             )

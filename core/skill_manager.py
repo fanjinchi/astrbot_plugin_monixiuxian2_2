@@ -697,7 +697,10 @@ class SkillManager:
         # enshrined skill gain its trigger skill as an additional battle
         # trigger. Injection lives here so every combat path (PvE/PvP/Boss)
         # picks it up via the same loadout export; sect buffs are not
-        # learned skills, so they are fixed at star 1 normalization.
+        # learned skills, so they are fixed at star 1 normalization. A
+        # trigger skill whose name is already present (the player learned
+        # and equipped the same sect skill themselves) is skipped so it
+        # never fires twice per attack.
         sect_id = getattr(player, "sect_id", 0)
         if self.db is not None and self.db.ext is not None and sect_id:
             sect = await self.db.ext.get_sect_by_id(sect_id)
@@ -712,6 +715,13 @@ class SkillManager:
                     )
                     trigger = sect_skill_def.get("trigger_skill")
                     if trigger:
+                        existing_names = {
+                            t.get("name")
+                            for t in loadout["trigger_skills"]
+                            if isinstance(t, dict)
+                        }
+                        if trigger.get("name") in existing_names:
+                            continue
                         trigger = dict(trigger)
                         trigger["trigger_rate"] = min(
                             1.0, trigger.get("trigger_rate", 0.0) * route_mult

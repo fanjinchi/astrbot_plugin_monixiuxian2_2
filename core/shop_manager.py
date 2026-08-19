@@ -447,6 +447,8 @@ class ShopManager:
         if not isinstance(sect_config, dict):
             return 1.0
         positions = sect_config.get("positions", {})
+        if not isinstance(positions, dict):
+            return 1.0
         info = positions.get(str(getattr(player, "sect_position", 4)), {})
         if not isinstance(info, dict):
             return 1.0

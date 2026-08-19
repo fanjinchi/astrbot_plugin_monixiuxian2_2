@@ -805,6 +805,10 @@ class SectManager:
 
         The cooldown uses the task's own ``cooldown`` field (default 1h) and
         keeps the existing ``user_cd`` busy-state write (SECT_TASK type).
+        The settlement section (deduct cost, grant rewards, bump counters,
+        set cooldown) runs inside a single ``BEGIN IMMEDIATE`` transaction
+        so a mid-settlement failure cannot charge the player without
+        granting rewards.
         """
         player = await self.db.get_player_by_id(user_id)
         if not player or player.sect_id == 0:
@@ -834,48 +838,59 @@ class SectManager:
         cooldown = int(task.get("cooldown", 3600) or 3600)
         scale_ratio = self.config.get("scale_ratio", 10)
 
-        # 灵石类任务前置校验（资材类任务由玩家外出采集，不消耗玩家货币）
-        stones_cost = int(cost.get("stones", 0) or 0)
-        if stones_cost > 0 and player.gold < stones_cost:
-            return (
-                False,
-                f"❌ 灵石不足！建设任务【{task_name}】需捐献 {stones_cost} 灵石，"
-                f"你当前仅有 {player.gold} 灵石。",
+        await self.db.conn.execute("BEGIN IMMEDIATE")
+        try:
+            # 灵石类任务前置校验（资材类任务由玩家外出采集，不消耗玩家货币）
+            stones_cost = int(cost.get("stones", 0) or 0)
+            if stones_cost > 0 and player.gold < stones_cost:
+                await self.db.conn.rollback()
+                return (
+                    False,
+                    f"❌ 灵石不足！建设任务【{task_name}】需捐献 {stones_cost} 灵石，"
+                    f"你当前仅有 {player.gold} 灵石。",
+                )
+
+            lines = [f"✨ 完成建设任务【{task_name}】！"]
+
+            if stones_cost > 0:
+                player.gold -= stones_cost
+                # 灵石入宗门库房并按 scale_ratio 折算建设度
+                await self.db.ext.donate_to_sect(
+                    player.sect_id, stones_cost, scale_ratio
+                )
+                lines.append(
+                    f"捐献灵石：-{stones_cost}（宗门建设度 +{stones_cost * scale_ratio}）"
+                )
+
+            materials_gain = int(cost.get("materials", 0) or 0)
+            if materials_gain > 0:
+                # 玩家为宗门采集/筹备资材，资材直接入宗门库房
+                await self.db.ext.update_sect_materials(
+                    player.sect_id, materials_gain, 1
+                )
+                lines.append(f"宗门资材：+{materials_gain}")
+
+            contribution_gain = int(reward.get("contribution", 0) or 0)
+            if contribution_gain > 0:
+                player.sect_contribution += contribution_gain
+                lines.append(f"获得贡献：+{contribution_gain}")
+
+            exp_gain = int(reward.get("exp", 0) or 0)
+            if exp_gain > 0:
+                player.experience += exp_gain
+                lines.append(f"获得修为：+{exp_gain}")
+
+            await self.db.update_player(player)
+            await self.db.ext.increment_sect_task_count(user_id)
+
+            # 冷却使用任务配置的 cooldown 字段，状态写法保持不变
+            await self.db.ext.set_user_busy(
+                user_id, UserStatus.SECT_TASK, current_time + cooldown
             )
-
-        lines = [f"✨ 完成建设任务【{task_name}】！"]
-
-        if stones_cost > 0:
-            player.gold -= stones_cost
-            # 灵石入宗门库房并按 scale_ratio 折算建设度
-            await self.db.ext.donate_to_sect(player.sect_id, stones_cost, scale_ratio)
-            lines.append(
-                f"捐献灵石：-{stones_cost}（宗门建设度 +{stones_cost * scale_ratio}）"
-            )
-
-        materials_gain = int(cost.get("materials", 0) or 0)
-        if materials_gain > 0:
-            # 玩家为宗门采集/筹备资材，资材直接入宗门库房
-            await self.db.ext.update_sect_materials(player.sect_id, materials_gain, 1)
-            lines.append(f"宗门资材：+{materials_gain}")
-
-        contribution_gain = int(reward.get("contribution", 0) or 0)
-        if contribution_gain > 0:
-            player.sect_contribution += contribution_gain
-            lines.append(f"获得贡献：+{contribution_gain}")
-
-        exp_gain = int(reward.get("exp", 0) or 0)
-        if exp_gain > 0:
-            player.experience += exp_gain
-            lines.append(f"获得修为：+{exp_gain}")
-
-        await self.db.update_player(player)
-        await self.db.ext.increment_sect_task_count(user_id)
-
-        # 冷却使用任务配置的 cooldown 字段，状态写法保持不变
-        await self.db.ext.set_user_busy(
-            user_id, UserStatus.SECT_TASK, current_time + cooldown
-        )
+            await self.db.conn.commit()
+        except Exception:
+            await self.db.conn.rollback()
+            raise
 
         return True, "\n".join(lines)
 
@@ -997,39 +1012,54 @@ class SectManager:
 
         The pill granted is the one unlocked at the sect's current elixir
         room level. The claim writes ``player.sect_elixir_get``; the flag is
-        reset daily (wired at the check-in settlement point).
+        reset daily (wired at the check-in settlement point). The
+        read-check-write critical section runs inside a ``BEGIN IMMEDIATE``
+        transaction so concurrent claims cannot double-grant the pill.
         """
-        player = await self.db.get_player_by_id(user_id)
-        if not player or player.sect_id == 0:
-            return False, "❌ 你还未加入宗门！"
-        sect = await self.db.ext.get_sect_by_id(player.sect_id)
-        if not sect:
-            return False, "❌ 宗门信息异常！"
+        await self.db.conn.execute("BEGIN IMMEDIATE")
+        try:
+            player = await self.db.get_player_by_id(user_id)
+            if not player or player.sect_id == 0:
+                await self.db.conn.rollback()
+                return False, "❌ 你还未加入宗门！"
+            sect = await self.db.ext.get_sect_by_id(player.sect_id)
+            if not sect:
+                await self.db.conn.rollback()
+                return False, "❌ 宗门信息异常！"
 
-        if sect.elixir_room_level <= 0:
-            return (
-                False,
-                "❌ 宗门丹房尚未建成！可通过「宗门建设 丹房」升级丹房。",
-            )
-        if player.sect_elixir_get:
-            return False, "❌ 你今日已在丹房领取过丹药，请明日再来！"
+            if sect.elixir_room_level <= 0:
+                await self.db.conn.rollback()
+                return (
+                    False,
+                    "❌ 宗门丹房尚未建成！可通过「宗门建设 丹房」升级丹房。",
+                )
+            if player.sect_elixir_get:
+                await self.db.conn.rollback()
+                return False, "❌ 你今日已在丹房领取过丹药，请明日再来！"
 
-        unlocked = self.get_unlocked_elixir_pills(sect)
-        if not unlocked:
-            return False, "❌ 丹房当前等级未配置可领取的丹药！"
+            unlocked = self.get_unlocked_elixir_pills(sect)
+            if not unlocked:
+                await self.db.conn.rollback()
+                return False, "❌ 丹房当前等级未配置可领取的丹药！"
 
-        pill_name = unlocked[-1]
-        if not self._pill_exists(pill_name):
-            logger.warning(
-                f"【修仙插件】宗门「{sect.sect_name}」丹房配置的丹药「{pill_name}」不存在，领取失败。"
-            )
-            return False, f"❌ 丹房存丹【{pill_name}】的配置缺失，请联系管理员！"
+            pill_name = unlocked[-1]
+            if not self._pill_exists(pill_name):
+                logger.warning(
+                    f"【修仙插件】宗门「{sect.sect_name}」丹房配置的丹药「{pill_name}」不存在，领取失败。"
+                )
+                await self.db.conn.rollback()
+                return False, f"❌ 丹房存丹【{pill_name}】的配置缺失，请联系管理员！"
 
-        inventory = player.get_pills_inventory()
-        inventory[pill_name] = inventory.get(pill_name, 0) + 1
-        player.set_pills_inventory(inventory)
-        player.sect_elixir_get = 1
-        await self.db.update_player(player)
+            inventory = player.get_pills_inventory()
+            inventory[pill_name] = inventory.get(pill_name, 0) + 1
+            player.set_pills_inventory(inventory)
+            player.sect_elixir_get = 1
+            await self.db.update_player(player)
+
+            await self.db.conn.commit()
+        except Exception:
+            await self.db.conn.rollback()
+            raise
 
         return (
             True,
@@ -1131,69 +1161,92 @@ class SectManager:
         by current level). System sects allow any member to upgrade;
         player-built sects require the second-highest permission tier
         (elder and above) to prevent griefing.
+        The read-check-write critical section runs inside a
+        ``BEGIN IMMEDIATE`` transaction so concurrent upgrades cannot
+        double-spend sect materials.
         """
-        player = await self.db.get_player_by_id(user_id)
-        if not player or player.sect_id == 0:
-            return False, "❌ 你还未加入宗门！"
-        sect = await self.db.ext.get_sect_by_id(player.sect_id)
-        if not sect:
-            return False, "❌ 宗门信息异常！"
-
-        key = self.BUILDING_ALIASES.get((building_key or "").strip())
-        if not key:
-            return False, "❌ 未知建筑！可升级：洞天、丹房（例如：宗门建设 洞天）"
-
-        # 玩家宗门需长老及以上权限，防止低阶弟子擅动宗门资材
-        if not sect.is_system:
-            ladder = self._get_permission_ladder()
-            threshold = ladder[1] if len(ladder) > 1 else (ladder[0] if ladder else 0)
-            if self.get_position_permission(player.sect_position) < threshold:
-                return False, "❌ 只有宗主和长老才能主持宗门建设！"
-
-        buildings = self.get_sect_buildings(sect)
-        cfg = buildings.get(key, {})
-        if not isinstance(cfg, dict) or not cfg:
-            return False, "❌ 本宗门未配置该建筑！"
-
-        current_level = (
-            sect.sect_fairyland if key == "fairyland" else sect.elixir_room_level
-        )
-        max_level = int(cfg.get("max_level", 0) or 0)
-        if current_level >= max_level:
-            return (
-                False,
-                f"❌ {self.BUILDING_DISPLAY_NAMES[key]}已达满级（{max_level}级）！",
-            )
-
-        costs = cfg.get("upgrade_cost", [])
-        if not isinstance(costs, list) or current_level >= len(costs):
-            return False, "❌ 该建筑未配置升级消耗，无法升级！"
+        await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
-            cost = int(costs[current_level])
-        except (TypeError, ValueError):
-            return False, "❌ 该建筑升级消耗配置异常，无法升级！"
+            player = await self.db.get_player_by_id(user_id)
+            if not player or player.sect_id == 0:
+                await self.db.conn.rollback()
+                return False, "❌ 你还未加入宗门！"
+            sect = await self.db.ext.get_sect_by_id(player.sect_id)
+            if not sect:
+                await self.db.conn.rollback()
+                return False, "❌ 宗门信息异常！"
 
-        if sect.sect_materials < cost:
-            return (
-                False,
-                f"❌ 宗门资材不足！升级需 {cost} 资材，当前仅有 {sect.sect_materials}。"
-                f"\n💡 可通过「宗门任务」积累资材。",
-            )
+            key = self.BUILDING_ALIASES.get((building_key or "").strip())
+            if not key:
+                await self.db.conn.rollback()
+                return False, "❌ 未知建筑！可升级：洞天、丹房（例如：宗门建设 洞天）"
 
-        sect.sect_materials -= cost
-        if key == "fairyland":
-            sect.sect_fairyland += 1
-            new_level = sect.sect_fairyland
-            per_level = float(cfg.get("exp_bonus_per_level", 0) or 0)
-            effect_msg = f"全员闭关修为加成提升至 +{per_level * new_level:.0%}！"
-        else:
-            sect.elixir_room_level += 1
-            new_level = sect.elixir_room_level
-            unlocked = self.get_unlocked_elixir_pills(sect)
-            effect_msg = (
-                f"丹房现可领取：{unlocked[-1]}！" if unlocked else "暂无新丹药解锁。"
+            # 玩家宗门需长老及以上权限，防止低阶弟子擅动宗门资材
+            if not sect.is_system:
+                ladder = self._get_permission_ladder()
+                threshold = (
+                    ladder[1] if len(ladder) > 1 else (ladder[0] if ladder else 0)
+                )
+                if self.get_position_permission(player.sect_position) < threshold:
+                    await self.db.conn.rollback()
+                    return False, "❌ 只有宗主和长老才能主持宗门建设！"
+
+            buildings = self.get_sect_buildings(sect)
+            cfg = buildings.get(key, {})
+            if not isinstance(cfg, dict) or not cfg:
+                await self.db.conn.rollback()
+                return False, "❌ 本宗门未配置该建筑！"
+
+            current_level = (
+                sect.sect_fairyland if key == "fairyland" else sect.elixir_room_level
             )
-        await self.db.ext.update_sect(sect)
+            max_level = int(cfg.get("max_level", 0) or 0)
+            if current_level >= max_level:
+                await self.db.conn.rollback()
+                return (
+                    False,
+                    f"❌ {self.BUILDING_DISPLAY_NAMES[key]}已达满级（{max_level}级）！",
+                )
+
+            costs = cfg.get("upgrade_cost", [])
+            if not isinstance(costs, list) or current_level >= len(costs):
+                await self.db.conn.rollback()
+                return False, "❌ 该建筑未配置升级消耗，无法升级！"
+            try:
+                cost = int(costs[current_level])
+            except (TypeError, ValueError):
+                await self.db.conn.rollback()
+                return False, "❌ 该建筑升级消耗配置异常，无法升级！"
+
+            if sect.sect_materials < cost:
+                await self.db.conn.rollback()
+                return (
+                    False,
+                    f"❌ 宗门资材不足！升级需 {cost} 资材，当前仅有 {sect.sect_materials}。"
+                    f"\n💡 可通过「宗门任务」积累资材。",
+                )
+
+            sect.sect_materials -= cost
+            if key == "fairyland":
+                sect.sect_fairyland += 1
+                new_level = sect.sect_fairyland
+                per_level = float(cfg.get("exp_bonus_per_level", 0) or 0)
+                effect_msg = f"全员闭关修为加成提升至 +{per_level * new_level:.0%}！"
+            else:
+                sect.elixir_room_level += 1
+                new_level = sect.elixir_room_level
+                unlocked = self.get_unlocked_elixir_pills(sect)
+                effect_msg = (
+                    f"丹房现可领取：{unlocked[-1]}！"
+                    if unlocked
+                    else "暂无新丹药解锁。"
+                )
+            await self.db.ext.update_sect(sect)
+
+            await self.db.conn.commit()
+        except Exception:
+            await self.db.conn.rollback()
+            raise
 
         name = self.BUILDING_DISPLAY_NAMES[key]
         return (
@@ -1279,55 +1332,74 @@ class SectManager:
         The target is ``current_position - 1`` (lower number = higher rank);
         its ``promotion`` config defines the dual gates (contribution +
         level_index). Positions with ``promotion: null`` (e.g. 宗主) have no
-        promotion channel — sect-master transfer logic is untouched.
+        promotion channel — sect-master transfer logic is untouched. The
+        read-check-write critical section runs inside a ``BEGIN IMMEDIATE``
+        transaction.
         """
-        player = await self.db.get_player_by_id(user_id)
-        if not player or player.sect_id == 0:
-            return False, "❌ 你还未加入宗门！"
+        await self.db.conn.execute("BEGIN IMMEDIATE")
+        try:
+            player = await self.db.get_player_by_id(user_id)
+            if not player or player.sect_id == 0:
+                await self.db.conn.rollback()
+                return False, "❌ 你还未加入宗门！"
 
-        positions = self._get_positions()
-        current = player.sect_position
-        if current == 0:
-            return False, "❌ 你已是一宗之主，无需晋升！"
+            positions = self._get_positions()
+            current = player.sect_position
+            if current == 0:
+                await self.db.conn.rollback()
+                return False, "❌ 你已是一宗之主，无需晋升！"
 
-        target = current - 1
-        target_info = positions.get(str(target))
-        if not isinstance(target_info, dict):
-            return False, "❌ 你已是可晋升的最高职阶！"
+            target = current - 1
+            target_info = positions.get(str(target))
+            if not isinstance(target_info, dict):
+                await self.db.conn.rollback()
+                return False, "❌ 你已是可晋升的最高职阶！"
 
-        target_name = target_info.get("name", f"职位{target}")
-        promotion = target_info.get("promotion")
-        if not isinstance(promotion, dict):
-            return (
-                False,
-                f"❌ 【{target_name}】之位不设晋升通道（宗主之位只能传位获得）！",
-            )
+            target_name = target_info.get("name", f"职位{target}")
+            promotion = target_info.get("promotion")
+            if not isinstance(promotion, dict):
+                await self.db.conn.rollback()
+                return (
+                    False,
+                    f"❌ 【{target_name}】之位不设晋升通道（宗主之位只能传位获得）！",
+                )
 
-        need_contribution = int(promotion.get("contribution", 0) or 0)
-        need_level = int(promotion.get("level_index", 0) or 0)
+            need_contribution = int(promotion.get("contribution", 0) or 0)
+            need_level = int(promotion.get("level_index", 0) or 0)
 
-        gaps = []
-        if player.sect_contribution < need_contribution:
-            gaps.append(f"贡献不足（{player.sect_contribution}/{need_contribution}）")
-        if player.level_index < need_level:
-            level_name = (
-                self.config_manager.get_level_name(need_level, player.cultivation_type)
-                if self.config_manager
-                and hasattr(self.config_manager, "get_level_name")
-                else f"境界{need_level}"
-            )
-            gaps.append(f"境界不足（需达到{level_name or f'境界{need_level}'}）")
-        if gaps:
-            return False, (f"❌ 晋升【{target_name}】未达门槛：\n" + "\n".join(gaps))
+            gaps = []
+            if player.sect_contribution < need_contribution:
+                gaps.append(
+                    f"贡献不足（{player.sect_contribution}/{need_contribution}）"
+                )
+            if player.level_index < need_level:
+                level_name = (
+                    self.config_manager.get_level_name(
+                        need_level, player.cultivation_type
+                    )
+                    if self.config_manager
+                    and hasattr(self.config_manager, "get_level_name")
+                    else f"境界{need_level}"
+                )
+                gaps.append(f"境界不足（需达到{level_name or f'境界{need_level}'}）")
+            if gaps:
+                await self.db.conn.rollback()
+                return False, (
+                    f"❌ 晋升【{target_name}】未达门槛：\n" + "\n".join(gaps)
+                )
 
-        await self.db.ext.update_player_sect_info(user_id, player.sect_id, target)
+            await self.db.ext.update_player_sect_info(user_id, player.sect_id, target)
+            await self.db.conn.commit()
+        except Exception:
+            await self.db.conn.rollback()
+            raise
 
         benefits = self.get_position_benefits(target)
         welfare_lines = []
         if benefits["daily_stones"] > 0:
             welfare_lines.append(f"每日签到俸禄：+{benefits['daily_stones']} 灵石")
         if benefits["shop_discount"] < 1.0:
-            welfare_lines.append(f"商店折扣：{benefits['shop_discount'] * 100:.0f}折")
+            welfare_lines.append(f"商店折扣：{benefits['shop_discount'] * 10:g}折")
         if benefits["unlocks"]:
             welfare_lines.append(
                 f"传承解锁：{'、'.join(str(u) for u in benefits['unlocks'])}"
@@ -1375,27 +1447,27 @@ class SectManager:
             if not isinstance(treasure, dict) or not treasure.get("id"):
                 continue
             config = self._find_item_config_by_id(treasure["id"])
+            # None 哨兵：显式配置的 0（宗主即可领）必须保留，缺省才回退 99
+            raw_min = treasure.get(
+                "min_position", (config or {}).get("min_position", 99)
+            )
             entries.append(
                 {
                     "kind": "treasure",
                     "id": treasure["id"],
                     "name": (config or {}).get("name", treasure["id"]),
-                    "min_position": int(
-                        treasure.get(
-                            "min_position", (config or {}).get("min_position", 99)
-                        )
-                        or 99
-                    ),
+                    "min_position": 99 if raw_min is None else int(raw_min),
                 }
             )
         for heart_id in faction.get("heart_methods", []) or []:
             config = self._find_item_config_by_id(str(heart_id))
+            raw_min = (config or {}).get("min_position", 99)
             entries.append(
                 {
                     "kind": "heart_method",
                     "id": str(heart_id),
                     "name": (config or {}).get("name", str(heart_id)),
-                    "min_position": int((config or {}).get("min_position", 99) or 99),
+                    "min_position": 99 if raw_min is None else int(raw_min),
                 }
             )
         return entries
@@ -1457,53 +1529,71 @@ class SectManager:
         Treasures are limited to one claim per person per item (recorded in
         ``player.sect_treasure_claims``) and are reclaimed on leaving the
         sect; heart methods can only be claimed by members who do not
-        already own them.
+        already own them. The read-check-write critical section runs inside
+        a ``BEGIN IMMEDIATE`` transaction so concurrent claims cannot
+        double-grant the same item.
         """
-        player = await self.db.get_player_by_id(user_id)
-        if not player or player.sect_id == 0:
-            return False, "❌ 你还未加入宗门！"
-        sect = await self.db.ext.get_sect_by_id(player.sect_id)
-        if not sect:
-            return False, "❌ 宗门信息异常！"
+        await self.db.conn.execute("BEGIN IMMEDIATE")
+        try:
+            player = await self.db.get_player_by_id(user_id)
+            if not player or player.sect_id == 0:
+                await self.db.conn.rollback()
+                return False, "❌ 你还未加入宗门！"
+            sect = await self.db.ext.get_sect_by_id(player.sect_id)
+            if not sect:
+                await self.db.conn.rollback()
+                return False, "❌ 宗门信息异常！"
 
-        ref = (item_ref or "").strip()
-        if not ref:
-            return False, "❌ 请指定要领取的传承，例如：宗门宝库 青云镇山剑"
+            ref = (item_ref or "").strip()
+            if not ref:
+                await self.db.conn.rollback()
+                return False, "❌ 请指定要领取的传承，例如：宗门宝库 青云镇山剑"
 
-        entries = self._get_treasury_entries(sect)
-        entry = next((e for e in entries if e["id"] == ref or e["name"] == ref), None)
-        if not entry:
-            return False, f"❌ 宝库中没有【{ref}】！"
-
-        if not self._can_claim_entry(entry, player.sect_position):
-            gate = (
-                f"需{self.get_position_name(entry['min_position'])}及以上职阶"
-                if entry["min_position"] < 99
-                else "需职阶福利解锁"
+            entries = self._get_treasury_entries(sect)
+            entry = next(
+                (e for e in entries if e["id"] == ref or e["name"] == ref), None
             )
-            return False, f"❌ 你的职阶不足以领取【{entry['name']}】（{gate}）！"
+            if not entry:
+                await self.db.conn.rollback()
+                return False, f"❌ 宝库中没有【{ref}】！"
 
-        claims = player.get_sect_treasure_claims()
-        items = player.get_storage_ring_items()
-
-        if entry["kind"] == "treasure":
-            if entry["id"] in claims:
-                return (
-                    False,
-                    f"❌ 你已领取过【{entry['name']}】，每件宗门之宝每人限领一次！",
+            if not self._can_claim_entry(entry, player.sect_position):
+                gate = (
+                    f"需{self.get_position_name(entry['min_position'])}及以上职阶"
+                    if entry["min_position"] < 99
+                    else "需职阶福利解锁"
                 )
-        else:
-            # 心法限未学者（储物戒持有或已装备均视为已习得）
-            if entry["name"] in items or player.main_technique == entry["name"]:
-                return False, f"❌ 你已习得【{entry['name']}】，无需重复领取！"
-            if entry["id"] in claims:
-                return False, f"❌ 你已领取过【{entry['name']}】！"
+                await self.db.conn.rollback()
+                return False, f"❌ 你的职阶不足以领取【{entry['name']}】（{gate}）！"
 
-        items[entry["name"]] = items.get(entry["name"], 0) + 1
-        player.set_storage_ring_items(items)
-        claims.append(entry["id"])
-        player.set_sect_treasure_claims(claims)
-        await self.db.update_player(player)
+            claims = player.get_sect_treasure_claims()
+            items = player.get_storage_ring_items()
+
+            if entry["kind"] == "treasure":
+                if entry["id"] in claims:
+                    await self.db.conn.rollback()
+                    return (
+                        False,
+                        f"❌ 你已领取过【{entry['name']}】，每件宗门之宝每人限领一次！",
+                    )
+            else:
+                # 心法限未学者（储物戒持有或已装备均视为已习得）
+                if entry["name"] in items or player.main_technique == entry["name"]:
+                    await self.db.conn.rollback()
+                    return False, f"❌ 你已习得【{entry['name']}】，无需重复领取！"
+                if entry["id"] in claims:
+                    await self.db.conn.rollback()
+                    return False, f"❌ 你已领取过【{entry['name']}】！"
+
+            items[entry["name"]] = items.get(entry["name"], 0) + 1
+            player.set_storage_ring_items(items)
+            claims.append(entry["id"])
+            player.set_sect_treasure_claims(claims)
+            await self.db.update_player(player)
+            await self.db.conn.commit()
+        except Exception:
+            await self.db.conn.rollback()
+            raise
 
         if entry["kind"] == "treasure":
             return True, (
@@ -1686,7 +1776,13 @@ class SectManager:
         reward draws one random skill from the named pool (learned via
         ``learn_or_star_up`` with sect attribution; max-star duplicates
         follow the existing exp-compensation rule), and the chain advances
-        to the next stage (or completes).
+        to the next stage (or completes). The skill is granted FIRST and
+        the player row is then re-read before applying contribution/exp and
+        stage progress, so the atomic max-star exp compensation inside
+        ``learn_or_star_up`` is never overwritten by a stale full-row
+        update; if the skill grant fails, the stage is NOT marked complete
+        (stored progress is kept) so the next matching event retries the
+        settlement.
 
         Args:
             user_id: Player user ID.
@@ -1745,6 +1841,28 @@ class SectManager:
         reward = reward if isinstance(reward, dict) else {}
         reward_lines = []
 
+        # 先发功法（内部 try/except，失败记日志并返回 None）：learn_or_star_up
+        # 内部对满星折算修为做原子增量，必须在其完成后重新读取玩家再整行落库，
+        # 否则折算修为会被旧值覆盖。功法发放失败时阶段不标记完成（进度保持），
+        # 下次事件可重试结算。
+        pool_name = reward.get("skill_learn_chance")
+        if pool_name:
+            skill_msg = await self._grant_master_skill(
+                user_id, str(pool_name), faction.get("id")
+            )
+            if skill_msg:
+                reward_lines.append(skill_msg)
+            else:
+                return (
+                    f"\n\n⚠️ 师承任务【{stage_name}】的功法传承发放失败，"
+                    "本次进度已保留，请再次触发对应行为重试结算。"
+                )
+
+        # 功法发放可能已原子写入折算修为，重新读取玩家避免整行覆盖
+        player = await self.db.get_player_by_id(user_id)
+        if not player:
+            return None
+
         contribution = int(reward.get("contribution", 0) or 0)
         if contribution > 0:
             player.sect_contribution += contribution
@@ -1764,17 +1882,7 @@ class SectManager:
                 "done": finished,
             }
         )
-        # 先落库贡献/修为/进度，再发功法：learn_or_star_up 内部对满星折算修为做
-        # 原子增量，若在其后整行 update_player 会被覆盖
         await self.db.update_player(player)
-
-        pool_name = reward.get("skill_learn_chance")
-        if pool_name:
-            skill_msg = await self._grant_master_skill(
-                user_id, str(pool_name), faction.get("id")
-            )
-            if skill_msg:
-                reward_lines.append(skill_msg)
 
         lines = [f"📜 师承任务【{stage_name}】完成！"]
         if stage.get("text"):
@@ -1795,7 +1903,9 @@ class SectManager:
 
         The skill is recorded with ``origin_sect_id`` / ``sect_bound``
         attribution. A duplicate at max star follows the existing max-star
-        exp-compensation rule (same config keys as SkillManager).
+        exp-compensation rule (same config keys as SkillManager). Database
+        failures are caught and logged here; the method returns None so the
+        caller keeps the stage unsettled and retries on the next event.
         """
         if not self.config_manager:
             return None
@@ -1828,20 +1938,27 @@ class SectManager:
             * skill_cfg.get("star_compensation_ratio", 0.5)
         )
 
-        # learn_or_star_up 对"升到满星"与"已满星重复"都返回 (False, max_star)，
-        # 需先记录调用前星级以区分：仅已满星重复才发放折算修为
-        prev_star = await self.db.ext.get_star_level(user_id, skill_id)
-        was_learned = await self.db.ext.is_skill_learned(user_id, skill_id)
+        try:
+            # learn_or_star_up 对"升到满星"与"已满星重复"都返回 (False, max_star)，
+            # 需先记录调用前星级以区分：仅已满星重复才发放折算修为
+            prev_star = await self.db.ext.get_star_level(user_id, skill_id)
+            was_learned = await self.db.ext.is_skill_learned(user_id, skill_id)
 
-        is_new, star_level = await self.db.ext.learn_or_star_up(
-            user_id,
-            skill_id,
-            "master_task",
-            max_star=max_star,
-            max_star_exp_compensation=compensation,
-            origin_sect_id=faction_id,
-            sect_bound=True,
-        )
+            is_new, star_level = await self.db.ext.learn_or_star_up(
+                user_id,
+                skill_id,
+                "master_task",
+                max_star=max_star,
+                max_star_exp_compensation=compensation,
+                origin_sect_id=faction_id,
+                sect_bound=True,
+            )
+        except Exception:
+            logger.warning(
+                f"【修仙插件】师承任务功法「{skill_name}」（{skill_id}）发放失败",
+                exc_info=True,
+            )
+            return None
         if is_new:
             return f"领悟宗门功法【{skill_name}】"
         if was_learned and prev_star >= max_star and compensation > 0:
