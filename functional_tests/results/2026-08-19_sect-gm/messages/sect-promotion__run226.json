@@ -1,0 +1,74 @@
+[
+  {
+    "id": 2834,
+    "conversation_id": 231,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000002 练气五阶",
+    "rich": null,
+    "created_at": 1787144030.5335286
+  },
+  {
+    "id": 2835,
+    "conversation_id": 231,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的境界设置为「练气五阶」",
+    "rich": [],
+    "created_at": 1787144030.5550249
+  },
+  {
+    "id": 2836,
+    "conversation_id": 231,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门晋升",
+    "rich": null,
+    "created_at": 1787144030.8442938
+  },
+  {
+    "id": 2837,
+    "conversation_id": 231,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎖️ 晋升成功！你已成为【内门弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+100 灵石\n商店折扣：9.5折\n传承解锁：heart_qy_001",
+    "rich": [],
+    "created_at": 1787144030.8669412
+  },
+  {
+    "id": 2838,
+    "conversation_id": 231,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门晋升",
+    "rich": null,
+    "created_at": 1787144031.1567235
+  },
+  {
+    "id": 2839,
+    "conversation_id": 231,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 晋升【亲传弟子】未达门槛：\n贡献不足（2500/8000）\n境界不足（需达到练气六阶）",
+    "rich": [],
+    "created_at": 1787144031.2193525
+  },
+  {
+    "id": 2840,
+    "conversation_id": 231,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#签到",
+    "rich": null,
+    "created_at": 1787144031.5163538
+  },
+  {
+    "id": 2841,
+    "conversation_id": 231,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 签到成功！\n━━━━━━━━━━━━━━━\n💰 获得灵石：440\n🏛️ 宗门俸禄（内门弟子）：+100 灵石\n💎 当前灵石：100540\n━━━━━━━━━━━━━━━\n明日再来，莫要忘记哦~",
+    "rich": [],
+    "created_at": 1787144031.594462
+  }
+]

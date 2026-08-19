@@ -1,0 +1,341 @@
+{
+  "id": 218,
+  "case_name": "sect-join-level-gate",
+  "run_index": 9,
+  "status": "passed",
+  "conversation_id": 223,
+  "steps_result": [
+    {
+      "index": 0,
+      "type": "send",
+      "note": "新建玩家（练气一阶）",
+      "ok": true,
+      "detail": "已注入（消息 #2710）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2711：道友，你已踏入仙途，无需重复此举。）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "练气一阶在青云门区间 [0,5] 内",
+      "ok": true,
+      "detail": "已注入（消息 #2712）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 3,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2713：✨ 你成功拜入『青云门』，成为外门弟子！）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✨ 你成功拜入『青云门』，成为外门弟子！"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 4,
+      "type": "send",
+      "note": "出师（无宗门之宝，无回收提示）",
+      "ok": true,
+      "detail": "已注入（消息 #2714）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 5,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2715：✨ 你已退出宗门『青云门』！）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✨ 你成功拜入『青云门』，成为外门弟子！",
+        "✨ 你已退出宗门『青云门』！"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 6,
+      "type": "send",
+      "note": "练气一阶不在合欢宗区间 [2,6] 内",
+      "ok": true,
+      "detail": "已注入（消息 #2716）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 7,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2717：❌ 『合欢宗』不再招收此境界的修士！（招收范围：练气二阶 ~ 练气六阶））",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✨ 你成功拜入『青云门』，成为外门弟子！",
+        "✨ 你已退出宗门『青云门』！",
+        "❌ 『合欢宗』不再招收此境界的修士！（招收范围：练气二阶 ~ 练气六阶）"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 8,
+      "type": "send",
+      "note": "抬入合欢宗区间",
+      "ok": true,
+      "detail": "已注入（消息 #2718）",
+      "actual": [],
+      "duration": 0.08
+    },
+    {
+      "index": 9,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2719：✅ 已将【测试玩家5】的境界设置为「练气三阶」）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✨ 你成功拜入『青云门』，成为外门弟子！",
+        "✨ 你已退出宗门『青云门』！",
+        "❌ 『合欢宗』不再招收此境界的修士！（招收范围：练气二阶 ~ 练气六阶）",
+        "✅ 已将【测试玩家5】的境界设置为「练气三阶」"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 10,
+      "type": "send",
+      "note": "练气三阶在区间内",
+      "ok": true,
+      "detail": "已注入（消息 #2720）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 11,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2721：✨ 你成功拜入『合欢宗』，成为外门弟子！）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✨ 你成功拜入『青云门』，成为外门弟子！",
+        "✨ 你已退出宗门『青云门』！",
+        "❌ 『合欢宗』不再招收此境界的修士！（招收范围：练气二阶 ~ 练气六阶）",
+        "✅ 已将【测试玩家5】的境界设置为「练气三阶」",
+        "✨ 你成功拜入『合欢宗』，成为外门弟子！"
+      ],
+      "duration": 0.3
+    }
+  ],
+  "case_snapshot": {
+    "name": "sect-join-level-gate",
+    "description": "spec Requirement「拜入与出师」：默认宗门按境界区间招收——区间内拜入成功、区间外拒绝；出师后可改投他派。",
+    "scenario": "新建玩家（练气一阶）拜入青云门（区间 0-5）成功；出师后拜入合欢宗（区间 2-6）被拒（练气一阶超区间）；GM 抬到练气三阶后拜入成功。",
+    "tags": [
+      "sect",
+      "smoke"
+    ],
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_sect_002",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000005"
+      }
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#我要修仙 灵修",
+        "note": "新建玩家（练气一阶）"
+      },
+      {
+        "type": "expect",
+        "match": "re:恭喜道友|已踏入仙途",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#加入宗门 青云门",
+        "note": "练气一阶在青云门区间 [0,5] 内"
+      },
+      {
+        "type": "expect",
+        "match": "re:成功拜入『青云门』，成为外门弟子",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#退出宗门",
+        "note": "出师（无宗门之宝，无回收提示）"
+      },
+      {
+        "type": "expect",
+        "match": "re:已退出宗门『青云门』",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#加入宗门 合欢宗",
+        "note": "练气一阶不在合欢宗区间 [2,6] 内"
+      },
+      {
+        "type": "expect",
+        "match": "re:『合欢宗』不再招收此境界的修士！[\\s\\S]*招收范围：练气二阶 ~ 练气六阶",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置境界 900000005 练气三阶",
+        "note": "抬入合欢宗区间"
+      },
+      {
+        "type": "expect",
+        "match": "re:境界设置为「练气三阶」",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#加入宗门 合欢宗",
+        "note": "练气三阶在区间内"
+      },
+      {
+        "type": "expect",
+        "match": "re:成功拜入『合欢宗』，成为外门弟子",
+        "timeout": 10
+      }
+    ]
+  },
+  "run_messages": [
+    {
+      "id": 2710,
+      "conversation_id": 223,
+      "direction": "in",
+      "sender": "900000005",
+      "text": "#我要修仙 灵修",
+      "rich": null,
+      "created_at": 1787144008.5004048
+    },
+    {
+      "id": 2711,
+      "conversation_id": 223,
+      "direction": "out",
+      "sender": "bot",
+      "text": "道友，你已踏入仙途，无需重复此举。",
+      "rich": [],
+      "created_at": 1787144008.5159624
+    },
+    {
+      "id": 2712,
+      "conversation_id": 223,
+      "direction": "in",
+      "sender": "900000005",
+      "text": "#加入宗门 青云门",
+      "rich": null,
+      "created_at": 1787144008.810725
+    },
+    {
+      "id": 2713,
+      "conversation_id": 223,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✨ 你成功拜入『青云门』，成为外门弟子！",
+      "rich": [],
+      "created_at": 1787144008.8339758
+    },
+    {
+      "id": 2714,
+      "conversation_id": 223,
+      "direction": "in",
+      "sender": "900000005",
+      "text": "#退出宗门",
+      "rich": null,
+      "created_at": 1787144009.1221144
+    },
+    {
+      "id": 2715,
+      "conversation_id": 223,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✨ 你已退出宗门『青云门』！",
+      "rich": [],
+      "created_at": 1787144009.1724017
+    },
+    {
+      "id": 2716,
+      "conversation_id": 223,
+      "direction": "in",
+      "sender": "900000005",
+      "text": "#加入宗门 合欢宗",
+      "rich": null,
+      "created_at": 1787144009.4468546
+    },
+    {
+      "id": 2717,
+      "conversation_id": 223,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 『合欢宗』不再招收此境界的修士！（招收范围：练气二阶 ~ 练气六阶）",
+      "rich": [],
+      "created_at": 1787144009.479957
+    },
+    {
+      "id": 2718,
+      "conversation_id": 223,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置境界 900000005 练气三阶",
+      "rich": null,
+      "created_at": 1787144009.7756815
+    },
+    {
+      "id": 2719,
+      "conversation_id": 223,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家5】的境界设置为「练气三阶」",
+      "rich": [],
+      "created_at": 1787144009.9541912
+    },
+    {
+      "id": 2720,
+      "conversation_id": 223,
+      "direction": "in",
+      "sender": "900000005",
+      "text": "#加入宗门 合欢宗",
+      "rich": null,
+      "created_at": 1787144010.1637459
+    },
+    {
+      "id": 2721,
+      "conversation_id": 223,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✨ 你成功拜入『合欢宗』，成为外门弟子！",
+      "rich": [],
+      "created_at": 1787144010.2033486
+    }
+  ],
+  "started_at": 1787144008.4630854,
+  "finished_at": 1787144010.4880228
+}

@@ -1,0 +1,92 @@
+[
+  {
+    "id": 2860,
+    "conversation_id": 234,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#退出宗门",
+    "rich": null,
+    "created_at": 1787144035.780986
+  },
+  {
+    "id": 2861,
+    "conversation_id": 234,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 你已退出宗门『青云门』！\n宗门之宝【青云镇山剑】已归还宗门。",
+    "rich": [],
+    "created_at": 1787144035.8168085
+  },
+  {
+    "id": 2862,
+    "conversation_id": 234,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#加入宗门 合欢宗",
+    "rich": null,
+    "created_at": 1787144036.0921626
+  },
+  {
+    "id": 2863,
+    "conversation_id": 234,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 你成功拜入『合欢宗』，成为外门弟子！",
+    "rich": [],
+    "created_at": 1787144036.125377
+  },
+  {
+    "id": 2864,
+    "conversation_id": 234,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我的宗门",
+    "rich": null,
+    "created_at": 1787144036.4125896
+  },
+  {
+    "id": 2865,
+    "conversation_id": 234,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：合欢宗\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：8000\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：外门弟子\n你的贡献：0",
+    "rich": [],
+    "created_at": 1787144036.4306593
+  },
+  {
+    "id": 2866,
+    "conversation_id": 234,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我的技能",
+    "rich": null,
+    "created_at": 1787144036.727511
+  },
+  {
+    "id": 2867,
+    "conversation_id": 234,
+    "direction": "out",
+    "sender": "bot",
+    "text": "📜 我的功法\n━━━━━━━━━━━━━━━\n【已激活】0/4\n  暂无激活功法\n\n【已领悟】1个\n  • 青云剑诀 | 星级：1 | 来源：master_task\n\n【修习目标】无\n━━━━━━━━━━━━━━━",
+    "rich": [],
+    "created_at": 1787144036.7479625
+  },
+  {
+    "id": 2868,
+    "conversation_id": 234,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#赠予 900000003 青云镇山剑",
+    "rich": null,
+    "created_at": 1787144037.0435035
+  },
+  {
+    "id": 2869,
+    "conversation_id": 234,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 【青云镇山剑】乃宗门之物，不可外传！",
+    "rich": [],
+    "created_at": 1787144037.0652936
+  }
+]

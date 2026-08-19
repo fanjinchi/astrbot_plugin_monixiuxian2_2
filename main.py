@@ -317,6 +317,7 @@ class XiuXianPlugin(Star):
             bounty_manager=self.bounty_mgr,
             plugin_data_path=plugin_data_path,
             broadcast_callback=self._broadcast_boss_spawn,
+            sect_manager=self.sect_mgr,
         )
 
         # 初始化新功能处理器

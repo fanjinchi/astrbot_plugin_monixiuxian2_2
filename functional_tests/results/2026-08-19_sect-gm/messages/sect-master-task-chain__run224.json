@@ -1,0 +1,164 @@
+[
+  {
+    "id": 2798,
+    "conversation_id": 229,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#师承任务",
+    "rich": null,
+    "created_at": 1787144024.3186316
+  },
+  {
+    "id": 2799,
+    "conversation_id": 229,
+    "direction": "out",
+    "sender": "bot",
+    "text": "📜 师承任务 · 青云门\n━━━━━━━━━━━━━━━\n▶ 【入门演武】历练/秘境战斗胜利：0/3\n  玄诚子：新入门弟子，先去后山演武场活动筋骨，胜三场妖兽来见我。\n  奖励：贡献+50、修为+200\n🔒 【采药历练】未解锁\n🔒 【破境之礼】未解锁\n—— 玄诚子",
+    "rich": [],
+    "created_at": 1787144024.333026
+  },
+  {
+    "id": 2800,
+    "conversation_id": 229,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#退出宗门",
+    "rich": null,
+    "created_at": 1787144024.6292915
+  },
+  {
+    "id": 2801,
+    "conversation_id": 229,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 你已退出宗门『青云门』！\n宗门之宝【青云镇山剑】已归还宗门。",
+    "rich": [],
+    "created_at": 1787144024.6700854
+  },
+  {
+    "id": 2802,
+    "conversation_id": 229,
+    "direction": "in",
+    "sender": "900000006",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1787144024.9411154
+  },
+  {
+    "id": 2803,
+    "conversation_id": 229,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1787144024.9590702
+  },
+  {
+    "id": 2804,
+    "conversation_id": 229,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000006 练气三阶",
+    "rich": null,
+    "created_at": 1787144025.2559037
+  },
+  {
+    "id": 2805,
+    "conversation_id": 229,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家6】的境界设置为「练气三阶」",
+    "rich": [],
+    "created_at": 1787144025.3214855
+  },
+  {
+    "id": 2806,
+    "conversation_id": 229,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置灵石 900000006 100000",
+    "rich": null,
+    "created_at": 1787144025.6110654
+  },
+  {
+    "id": 2807,
+    "conversation_id": 229,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家6】的灵石设置为 100,000",
+    "rich": [],
+    "created_at": 1787144025.6508467
+  },
+  {
+    "id": 2808,
+    "conversation_id": 229,
+    "direction": "in",
+    "sender": "900000006",
+    "text": "#加入宗门 合欢宗",
+    "rich": null,
+    "created_at": 1787144025.9400415
+  },
+  {
+    "id": 2809,
+    "conversation_id": 229,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 你成功拜入『合欢宗』，成为外门弟子！",
+    "rich": [],
+    "created_at": 1787144025.9668307
+  },
+  {
+    "id": 2810,
+    "conversation_id": 229,
+    "direction": "in",
+    "sender": "900000006",
+    "text": "#师承任务",
+    "rich": null,
+    "created_at": 1787144026.256664
+  },
+  {
+    "id": 2811,
+    "conversation_id": 229,
+    "direction": "out",
+    "sender": "bot",
+    "text": "📜 师承任务 · 合欢宗\n━━━━━━━━━━━━━━━\n▶ 【投名状】宗门捐献（灵石）：0/1000\n  花妩娘：入我合欢宗，先纳一千灵石做投名状，宗门不养闲人。\n  奖励：贡献+80、修为+500\n🔒 【见血】未解锁\n—— 厉无欢",
+    "rich": [],
+    "created_at": 1787144026.288189
+  },
+  {
+    "id": 2812,
+    "conversation_id": 229,
+    "direction": "in",
+    "sender": "900000006",
+    "text": "#宗门捐献 1000",
+    "rich": null,
+    "created_at": 1787144026.584015
+  },
+  {
+    "id": 2813,
+    "conversation_id": 229,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 捐献成功！消耗 1000 灵石，宗门获得 10000 建设度！\n你的宗门贡献度：1000\n\n📜 师承任务【投名状】完成！\n花妩娘：入我合欢宗，先纳一千灵石做投名状，宗门不养闲人。\n—— 厉无欢\n奖励：宗门贡献 +80、修为 +500\n下一阶段：【见血】",
+    "rich": [],
+    "created_at": 1787144026.6277719
+  },
+  {
+    "id": 2814,
+    "conversation_id": 229,
+    "direction": "in",
+    "sender": "900000006",
+    "text": "#师承任务",
+    "rich": null,
+    "created_at": 1787144026.9008787
+  },
+  {
+    "id": 2815,
+    "conversation_id": 229,
+    "direction": "out",
+    "sender": "bot",
+    "text": "📜 师承任务 · 合欢宗\n━━━━━━━━━━━━━━━\n✅ 【投名状】已完成\n▶ 【见血】历练/秘境战斗胜利：0/5\n  厉无欢：去杀五个不开眼的东西，提着他们的兵刃回来，才算自己人。\n  奖励：贡献+120、宗门功法领悟机会\n—— 厉无欢",
+    "rich": [],
+    "created_at": 1787144026.923149
+  }
+]

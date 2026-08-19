@@ -31,7 +31,8 @@
 | 状态/DB 断言 | 平台只能断言“回复文本” | 不能直接查 DB 验证玩家属性/储物戒/`user_cd` | fixture 直接写库 + 战斗文本证据；GM 命令作为间接断言 |
 | 时间推进 | 平台无虚拟时钟/时间加速 | 闭关、历练、Boss 等长周期不可真实等待 | 用例只做“入口可达”冒烟；需要结算时用插件 GM 强制结算命令 |
 | 结果归档 | 平台有运行记录但没有“导出目录包” | 结果需自行拉取并组织 | 本项目 `scripts/test_suite_ctl.py export` 本地生成 `results/<date>_<target>/` |
-| 师承链进度推进 | 插件 GM `触发秘境结算`/`触发历练结算`（`core/gm_manager.py` `cmd_force_rift`/`cmd_force_adventure`）只调 finish 并更新悬赏进度，**不调用** `sect_manager.advance_master_progress`（该调用仅存在于 `main.py` 正常完成路径 `handle_rift_complete`/`handle_adventure_complete`） | 无时间加速时 `win_pve`/`adventure_complete` 型阶段无法确定性推进 | 用例只对捐赠型阶段（`宗门捐献` → `donate` 事件）做真实推进与结算断言（`sect-master-task-chain` 合欢宗投名状）；`win_pve` 型阶段仅断言视图与阶段顺序；见下“随机池”与 bd `leave_sect` 滞留链两项 |
+| GM 目标解析单数字参数 | 通用 `_resolve_target` 将剩余参数中「唯一数字」视为命令自身数值参数并回落到发送者，强制命令（`触发历练结算 900000002`）曾因此作用到错误目标（检查到 GM 自身，被 sect-master-chain-gm 用例暴露） | 无法通过纯数字单参数定位目标 | v3.9.1 起强制结算类（触发历练/秘境结算/师承推进/清除CD）单数字参数即视为目标 ID |
+| 师承链进度推进 | 插件 GM `触发秘境结算`/`触发历练结算`（`core/gm_manager.py` `cmd_force_rift`/`cmd_force_adventure`）**v3.9.1 起**强制结算与正常完成流程一致追加 `sect_manager.advance_master_progress`（adventure_complete 必然推进；win_pve 受 PvE 遭遇概率限制），并新增 GM「师承推进」（`cmd_advance_master`，事件 战斗/历练/突破/捐献）确定性直推 | PvE 遭遇战为概率事件（`pve_combat_manager._should_trigger_combat` adventure low 30% / rift low 50-95%），真实结算的 win_pve 计数不保证递增 | `sect-master-chain-gm` 用例用「师承推进」确定性覆盖三阶段全链（win_pve×3→adventure_complete→breakthrough）；真实历练结算只断言 adventure_complete 阶段（与 PvE 胜负无关） |
 | 随机选择池（悬赏/任务） | 悬赏普通池（301-306）与宗门池（307/308）按难度加权随机出单，单轮无法断定具体条目；宗门建设任务随机三选一 | 不能断言具体名称 | 断言编号区间（普通 `[30[0-9]]`、宗门 `[30[78]]`）；建设任务断言 `完成建设任务【.+】|获得贡献：\+\d+` 与 `--repeat 2` 稳定性证据 |
 | 反向（不存在）断言 | `expect` 只能断言“出现”，不能断言“不出现” | 非成员悬赏“不含宗门悬赏分区”无法直接验证 | 正向替代：成员断言宗门悬赏条目存在 + 非成员断言普通条目存在 + 秘境对非成员的锁定展示与入口拦截消息（均为正向） |
 | 秘境 ID 与 DB 配置漂移 | 秘境表由迁移脚本 `INSERT OR IGNORE` 播种（v31 新增青云剑冢=id 6），**仅改配置不重播种**；被配置移除的旧秘境（玄冰地宫 id4/上古遗迹 id5）仍留在库中 | 断言必须按测试库真实 rifts 表 ID 编写，且新增秘境需重载插件 | 用例对青云剑冢断言使用 `(ID:6)`（测试库 v31 迁移后实际值）；重载插件后再跑用例 |

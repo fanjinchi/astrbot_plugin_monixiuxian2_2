@@ -1,0 +1,25 @@
+{
+  "name": "sect-gm-set-position",
+  "description": "GM 指令「设置职位」：接受数字 0-4 与中文职位名，直接调整职阶；宗主职位晋升被拦截，职位对晋升目标门槛的判定即时生效。",
+  "scenario": "GM 设置职位为 0（宗主）：我的宗门显示宗主、宗门晋升提示无需晋升；以中文名设置 亲传弟子 后晋升指向长老（贡献 30000/9 级）双缺失被拒；最后复位外门弟子。",
+  "tags": ["sect", "gm"],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_sect_011",
+    "pin_players": { "gm": "900000001", "p1": "900000002" }
+  },
+  "steps": [
+    { "type": "send", "player": "gm", "text": "#修仙GM 设置职位 900000002 0", "note": "数字职位：宗主" },
+    { "type": "expect", "match": "re:职位设置为「宗主」", "timeout": 10 },
+    { "type": "send", "player": "p1", "text": "#我的宗门", "note": "职位展示" },
+    { "type": "expect", "match": "re:宗门信息[\\s\\S]*你的职位：宗主", "timeout": 10 },
+    { "type": "send", "player": "p1", "text": "#宗门晋升", "note": "宗主无晋升通道" },
+    { "type": "expect", "match": "re:你已是一宗之主，无需晋升！", "timeout": 10 },
+    { "type": "send", "player": "gm", "text": "#修仙GM 设置职位 900000002 亲传弟子", "note": "中文职位名映射" },
+    { "type": "expect", "match": "re:职位设置为「亲传弟子」", "timeout": 10 },
+    { "type": "send", "player": "p1", "text": "#宗门晋升", "note": "亲传→长老门槛：贡献 30000/9 级，fixture 预置 2500/2 级双缺失" },
+    { "type": "expect", "match": "re:晋升【长老】未达门槛：[\\s\\S]*贡献不足（2500/30000）[\\s\\S]*境界不足（需达到练气九阶）", "timeout": 10 },
+    { "type": "send", "player": "gm", "text": "#修仙GM 设置职位 900000002 4", "note": "复位外门弟子" },
+    { "type": "expect", "match": "re:职位设置为「外门弟子」", "timeout": 10 }
+  ]
+}

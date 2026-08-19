@@ -68,6 +68,7 @@ class GMManager:
         bounty_manager=None,
         plugin_data_path: Path = None,
         broadcast_callback=None,
+        sect_manager=None,
     ):
         self.db = db
         self.config_manager = config_manager
@@ -77,6 +78,7 @@ class GMManager:
         self.rift_manager = rift_manager
         self.boss_manager = boss_manager
         self.bounty_manager = bounty_manager
+        self.sect_manager = sect_manager
         self.plugin_data_path = plugin_data_path
         self.broadcast_callback = broadcast_callback
 
@@ -90,6 +92,9 @@ class GMManager:
             "设置真元": self.cmd_set_mp,
             "设置攻击": self.cmd_set_atk,
             "设置精神力": self.cmd_set_mental_power,
+            "设置贡献": self.cmd_set_sect_contribution,
+            "设置职位": self.cmd_set_sect_position,
+            "师承推进": self.cmd_advance_master,
             "给予装备": self.cmd_give_equipment,
             "给予物品": self.cmd_give_item,
             "卸下装备": self.cmd_unequip,
@@ -281,6 +286,13 @@ class GMManager:
             "  设置攻击 [@玩家/ID] <数值> （映射为伤害）\n"
             "  设置精神力 [@玩家/ID] <数值> （映射为身法）\n"
             "\n"
+            "🏛 宗门\n"
+            "  设置贡献 [@玩家/ID] <数值>\n"
+            "  设置职位 [@玩家/ID] <职位名/0-4> （宗主/长老/亲传弟子/内门弟子/外门弟子）\n"
+            "\n"
+            "⛓ 师承任务\n"
+            "  师承推进 [@玩家/ID] <事件> [数量] （事件：战斗/历练/突破/捐献；确定性推进）\n"
+            "\n"
             "🎒 装备物品\n"
             "  给予装备 [@玩家/ID] <物品名> [数量]\n"
             "  给予物品 [@玩家/ID] <物品名> [数量]\n"
@@ -333,6 +345,117 @@ class GMManager:
         return (
             True,
             f"✅ 已将【{player.user_name or target_id}】的境界设置为「{realm_name}」",
+        )
+
+    async def cmd_set_sect_contribution(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """GM command: set the target player's sect contribution value."""
+        target_id, remaining = self._resolve_target(event, args)
+        player = await self._get_player(target_id)
+        if not player:
+            return False, "❌ 目标玩家尚未踏入修仙之路！"
+
+        value = self._parse_int(remaining.strip())
+        if value is None or value < 0:
+            return False, "❌ 请输入非负整数，例如：/修仙GM 设置贡献 900000002 30000"
+
+        player.sect_contribution = value
+        await self.db.update_player(player)
+        return (
+            True,
+            f"✅ 已将【{player.user_name or target_id}】的宗门贡献设置为 {value:,}",
+        )
+
+    async def cmd_set_sect_position(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """GM command: set the target player's sect position (0-4 or name)."""
+        target_id, remaining = self._resolve_target(event, args)
+        player = await self._get_player(target_id)
+        if not player:
+            return False, "❌ 目标玩家尚未踏入修仙之路！"
+
+        if not self.sect_manager:
+            return False, "❌ 宗门管理器未初始化！"
+
+        token = remaining.strip()
+        position_names = {self.sect_manager.get_position_name(i): i for i in range(5)}
+        if token.isdigit():
+            position = int(token)
+        else:
+            position = position_names.get(token)
+        if position is None or position < 0 or position > 4:
+            return False, (
+                "❌ 无效的职位！可用：0-4 或 宗主/长老/亲传弟子/内门弟子/外门弟子"
+            )
+
+        player.sect_position = position
+        await self.db.update_player(player)
+        pos_name = self.sect_manager.get_position_name(position)
+        return (
+            True,
+            f"✅ 已将【{player.user_name or target_id}】的职位设置为「{pos_name}」",
+        )
+
+    async def cmd_advance_master(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """GM command: deterministically advance the target's master task chain.
+
+        Event tokens: 战斗(win_pve) / 历练(adventure_complete) / 突破(breakthrough)
+        / 捐献(donate, optional amount in stones). PvE win-pve counting is
+        probabilistic in normal flow (see pve combat encounter rates), so this
+        command provides a deterministic path for tests.
+        """
+        tokens = args.split() if args else []
+        if tokens and tokens[0].lstrip("@").isdigit():
+            target_id = tokens[0].lstrip("@")
+            rest = tokens[1:]
+        else:
+            target_id, remaining = self._resolve_target(event, args)
+            rest = remaining.split() if remaining else []
+
+        player = await self._get_player(target_id)
+        if not player:
+            return False, "❌ 目标玩家尚未踏入修仙之路！"
+        if not self.sect_manager:
+            return False, "❌ 宗门管理器未初始化！"
+
+        if not rest:
+            return (
+                False,
+                "❌ 请输入事件：战斗/历练/突破/捐献，例如：/修仙GM 师承推进 900000002 战斗",
+            )
+        event_map = {
+            "战斗": "win_pve",
+            "历练": "adventure_complete",
+            "突破": "breakthrough",
+            "捐献": "donate",
+        }
+        event_type = event_map.get(rest[0])
+        if not event_type:
+            return False, f"❌ 未知事件「{rest[0]}」。可用：战斗/历练/突破/捐献"
+
+        amount = 1
+        if len(rest) > 1:
+            parsed = self._parse_int(rest[1])
+            if parsed is not None and parsed > 0:
+                amount = parsed
+
+        try:
+            master_msg = await self.sect_manager.advance_master_progress(
+                target_id, event_type, amount
+            )
+        except Exception as e:
+            logger.warning("【修仙插件】师承推进失败", exc_info=True)
+            return False, f"❌ 师承推进失败：{e}"
+
+        if master_msg:
+            return True, f"✅ 已推进师承任务：{master_msg}"
+        return (
+            True,
+            "✅ 已推进师承任务：当前阶段与该事件不匹配（查看 /师承任务 了解阶段）。",
         )
 
     async def _set_numeric_attr(
@@ -536,7 +659,13 @@ class GMManager:
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
         """强制历练结算。"""
-        target_id, _ = self._resolve_target(event, args)
+        # 强制结算类命令的参数即目标 ID：单个数字也视为目标（
+        # 通用规则会将单个数字当作命令自身数值参数而回落到发送者）。
+        tokens = args.split() if args else []
+        if tokens and tokens[0].lstrip("@").isdigit():
+            target_id = tokens[0].lstrip("@")
+        else:
+            target_id, _ = self._resolve_target(event, args)
         player = await self._get_player(target_id)
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"
@@ -558,6 +687,11 @@ class GMManager:
         if not success:
             return False, f"❌ 历练结算失败：{msg}"
 
+        # 强制结算即"立即完成"：同时清除该玩家的历练路线休整冷却，
+        # 允许测试脚本连续开启同一路线（正常流程仍按配置冷却）。
+        if self.adventure_manager:
+            self.adventure_manager._route_cooldowns.pop(target_id, None)
+
         # 更新悬赏进度（与正常 /完成历练 保持一致）
         if reward_data and self.bounty_manager:
             bounty_tag = reward_data.get("bounty_tag", "adventure")
@@ -568,13 +702,44 @@ class GMManager:
             if has_progress:
                 msg += bounty_msg
 
+        # 师承任务链：与 main.py handle_adventure_complete 保持一致——
+        # 历练完成与 PvE 胜利各自独立推进，任一失败不影响另一条反馈。
+        master_msg = None
+        try:
+            master_msg = await self.sect_manager.advance_master_progress(
+                target_id, "adventure_complete"
+            )
+        except Exception:
+            logger.warning(
+                "【修仙插件】师承任务进度推进失败（强制历练完成）", exc_info=True
+            )
+        if (reward_data or {}).get("pve_won"):
+            try:
+                win_msg = await self.sect_manager.advance_master_progress(
+                    target_id, "win_pve"
+                )
+                if win_msg:
+                    master_msg = (master_msg or "") + win_msg
+            except Exception:
+                logger.warning(
+                    "【修仙插件】师承任务进度推进失败（强制历练PvE胜利）", exc_info=True
+                )
+        if master_msg:
+            msg += master_msg
+
         return True, f"✅ 已强制结算【{player.user_name or target_id}】的历练\n{msg}"
 
     async def cmd_force_rift(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
         """强制秘境结算。"""
-        target_id, _ = self._resolve_target(event, args)
+        # 强制结算类命令的参数即目标 ID：单个数字也视为目标（
+        # 通用规则会将单个数字当作命令自身数值参数而回落到发送者）。
+        tokens = args.split() if args else []
+        if tokens and tokens[0].lstrip("@").isdigit():
+            target_id = tokens[0].lstrip("@")
+        else:
+            target_id, _ = self._resolve_target(event, args)
         player = await self._get_player(target_id)
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"
@@ -603,6 +768,19 @@ class GMManager:
             )
             if has_progress:
                 msg += bounty_msg
+
+        # 师承任务链：PvE 胜利计数（与 main.py handle_rift_complete 保持一致）
+        if (reward_data or {}).get("pve_won"):
+            try:
+                master_msg = await self.sect_manager.advance_master_progress(
+                    target_id, "win_pve"
+                )
+                if master_msg:
+                    msg += master_msg
+            except Exception:
+                logger.warning(
+                    "【修仙插件】师承任务PvE胜场推进失败（强制秘境结算）", exc_info=True
+                )
 
         return (
             True,

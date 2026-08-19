@@ -1,0 +1,341 @@
+{
+  "id": 217,
+  "case_name": "sect-gm-set-position",
+  "run_index": 5,
+  "status": "passed",
+  "conversation_id": 222,
+  "steps_result": [
+    {
+      "index": 0,
+      "type": "send",
+      "note": "数字职位：宗主",
+      "ok": true,
+      "detail": "已注入（消息 #2698）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2699：✅ 已将【测试玩家1】的职位设置为「宗主」）",
+      "actual": [
+        "✅ 已将【测试玩家1】的职位设置为「宗主」"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "职位展示",
+      "ok": true,
+      "detail": "已注入（消息 #2700）",
+      "actual": [],
+      "duration": 0.03
+    },
+    {
+      "index": 3,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2701：🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：青云门\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：）",
+      "actual": [
+        "✅ 已将【测试玩家1】的职位设置为「宗主」",
+        "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：青云门\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：2000\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：宗主\n你的贡献：2500"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 4,
+      "type": "send",
+      "note": "宗主无晋升通道",
+      "ok": true,
+      "detail": "已注入（消息 #2702）",
+      "actual": [],
+      "duration": 0.1
+    },
+    {
+      "index": 5,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2703：❌ 你已是一宗之主，无需晋升！）",
+      "actual": [
+        "✅ 已将【测试玩家1】的职位设置为「宗主」",
+        "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：青云门\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：2000\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：宗主\n你的贡献：2500",
+        "❌ 你已是一宗之主，无需晋升！"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 6,
+      "type": "send",
+      "note": "中文职位名映射",
+      "ok": true,
+      "detail": "已注入（消息 #2704）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 7,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2705：✅ 已将【测试玩家1】的职位设置为「亲传弟子」）",
+      "actual": [
+        "✅ 已将【测试玩家1】的职位设置为「宗主」",
+        "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：青云门\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：2000\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：宗主\n你的贡献：2500",
+        "❌ 你已是一宗之主，无需晋升！",
+        "✅ 已将【测试玩家1】的职位设置为「亲传弟子」"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 8,
+      "type": "send",
+      "note": "亲传→长老门槛：贡献 30000/9 级，fixture 预置 2500/2 级双缺失",
+      "ok": true,
+      "detail": "已注入（消息 #2706）",
+      "actual": [],
+      "duration": 0.03
+    },
+    {
+      "index": 9,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2707：❌ 晋升【长老】未达门槛：\n贡献不足（2500/30000）\n境界不足（需达到练气九阶））",
+      "actual": [
+        "✅ 已将【测试玩家1】的职位设置为「宗主」",
+        "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：青云门\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：2000\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：宗主\n你的贡献：2500",
+        "❌ 你已是一宗之主，无需晋升！",
+        "✅ 已将【测试玩家1】的职位设置为「亲传弟子」",
+        "❌ 晋升【长老】未达门槛：\n贡献不足（2500/30000）\n境界不足（需达到练气九阶）"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 10,
+      "type": "send",
+      "note": "复位外门弟子",
+      "ok": true,
+      "detail": "已注入（消息 #2708）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 11,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2709：✅ 已将【测试玩家1】的职位设置为「外门弟子」）",
+      "actual": [
+        "✅ 已将【测试玩家1】的职位设置为「宗主」",
+        "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：青云门\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：2000\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：宗主\n你的贡献：2500",
+        "❌ 你已是一宗之主，无需晋升！",
+        "✅ 已将【测试玩家1】的职位设置为「亲传弟子」",
+        "❌ 晋升【长老】未达门槛：\n贡献不足（2500/30000）\n境界不足（需达到练气九阶）",
+        "✅ 已将【测试玩家1】的职位设置为「外门弟子」"
+      ],
+      "duration": 0.31
+    }
+  ],
+  "case_snapshot": {
+    "name": "sect-gm-set-position",
+    "description": "GM 指令「设置职位」：接受数字 0-4 与中文职位名，直接调整职阶；宗主职位晋升被拦截，职位对晋升目标门槛的判定即时生效。",
+    "scenario": "GM 设置职位为 0（宗主）：我的宗门显示宗主、宗门晋升提示无需晋升；以中文名设置 亲传弟子 后晋升指向长老（贡献 30000/9 级）双缺失被拒；最后复位外门弟子。",
+    "tags": [
+      "sect",
+      "gm"
+    ],
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_sect_011",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000002"
+      }
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置职位 900000002 0",
+        "note": "数字职位：宗主"
+      },
+      {
+        "type": "expect",
+        "match": "re:职位设置为「宗主」",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#我的宗门",
+        "note": "职位展示"
+      },
+      {
+        "type": "expect",
+        "match": "re:宗门信息[\\s\\S]*你的职位：宗主",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#宗门晋升",
+        "note": "宗主无晋升通道"
+      },
+      {
+        "type": "expect",
+        "match": "re:你已是一宗之主，无需晋升！",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置职位 900000002 亲传弟子",
+        "note": "中文职位名映射"
+      },
+      {
+        "type": "expect",
+        "match": "re:职位设置为「亲传弟子」",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#宗门晋升",
+        "note": "亲传→长老门槛：贡献 30000/9 级，fixture 预置 2500/2 级双缺失"
+      },
+      {
+        "type": "expect",
+        "match": "re:晋升【长老】未达门槛：[\\s\\S]*贡献不足（2500/30000）[\\s\\S]*境界不足（需达到练气九阶）",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置职位 900000002 4",
+        "note": "复位外门弟子"
+      },
+      {
+        "type": "expect",
+        "match": "re:职位设置为「外门弟子」",
+        "timeout": 10
+      }
+    ]
+  },
+  "run_messages": [
+    {
+      "id": 2698,
+      "conversation_id": 222,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置职位 900000002 0",
+      "rich": null,
+      "created_at": 1787144005.9521804
+    },
+    {
+      "id": 2699,
+      "conversation_id": 222,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家1】的职位设置为「宗主」",
+      "rich": [],
+      "created_at": 1787144005.9760022
+    },
+    {
+      "id": 2700,
+      "conversation_id": 222,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#我的宗门",
+      "rich": null,
+      "created_at": 1787144006.2636838
+    },
+    {
+      "id": 2701,
+      "conversation_id": 222,
+      "direction": "out",
+      "sender": "bot",
+      "text": "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：青云门\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：2000\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：宗主\n你的贡献：2500",
+      "rich": [],
+      "created_at": 1787144006.2976506
+    },
+    {
+      "id": 2702,
+      "conversation_id": 222,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#宗门晋升",
+      "rich": null,
+      "created_at": 1787144006.593209
+    },
+    {
+      "id": 2703,
+      "conversation_id": 222,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 你已是一宗之主，无需晋升！",
+      "rich": [],
+      "created_at": 1787144006.7032745
+    },
+    {
+      "id": 2704,
+      "conversation_id": 222,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置职位 900000002 亲传弟子",
+      "rich": null,
+      "created_at": 1787144006.9995792
+    },
+    {
+      "id": 2705,
+      "conversation_id": 222,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家1】的职位设置为「亲传弟子」",
+      "rich": [],
+      "created_at": 1787144007.0381472
+    },
+    {
+      "id": 2706,
+      "conversation_id": 222,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#宗门晋升",
+      "rich": null,
+      "created_at": 1787144007.326537
+    },
+    {
+      "id": 2707,
+      "conversation_id": 222,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 晋升【长老】未达门槛：\n贡献不足（2500/30000）\n境界不足（需达到练气九阶）",
+      "rich": [],
+      "created_at": 1787144007.3607266
+    },
+    {
+      "id": 2708,
+      "conversation_id": 222,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置职位 900000002 4",
+      "rich": null,
+      "created_at": 1787144007.6553144
+    },
+    {
+      "id": 2709,
+      "conversation_id": 222,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家1】的职位设置为「外门弟子」",
+      "rich": [],
+      "created_at": 1787144007.6947947
+    }
+  ],
+  "started_at": 1787144005.9150167,
+  "finished_at": 1787144007.9834144
+}

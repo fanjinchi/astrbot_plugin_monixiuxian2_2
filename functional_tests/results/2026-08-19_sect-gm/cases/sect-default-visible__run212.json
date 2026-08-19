@@ -1,0 +1,341 @@
+{
+  "id": 212,
+  "case_name": "sect-default-visible",
+  "run_index": 9,
+  "status": "passed",
+  "conversation_id": 217,
+  "steps_result": [
+    {
+      "index": 0,
+      "type": "send",
+      "note": "新建玩家",
+      "ok": true,
+      "detail": "已注入（消息 #2642）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2643：道友，你已踏入仙途，无需重复此举。）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "默认宗门可见（顺序依建设度不固定，双序断言）",
+      "ok": true,
+      "detail": "已注入（消息 #2644）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 3,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2645：🏛️ 宗门列表\n━━━━━━━━━━━━━━━\n1. 【青云门】\n   宗主：未知\n   建设度：100 | 成员：1人）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "🏛️ 宗门列表\n━━━━━━━━━━━━━━━\n1. 【青云门】\n   宗主：未知\n   建设度：100 | 成员：1人\n\n2. 【合欢宗】\n   宗主：未知\n   建设度：100 | 成员：0人\n\n"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 4,
+      "type": "send",
+      "note": "满足建宗等级门槛",
+      "ok": true,
+      "detail": "已注入（消息 #2646）",
+      "actual": [],
+      "duration": 0.07
+    },
+    {
+      "index": 5,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2647：✅ 已将【测试玩家4】的境界设置为「练气三阶」）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "🏛️ 宗门列表\n━━━━━━━━━━━━━━━\n1. 【青云门】\n   宗主：未知\n   建设度：100 | 成员：1人\n\n2. 【合欢宗】\n   宗主：未知\n   建设度：100 | 成员：0人\n\n",
+        "✅ 已将【测试玩家4】的境界设置为「练气三阶」"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 6,
+      "type": "send",
+      "note": "满足建宗灵石门槛",
+      "ok": true,
+      "detail": "已注入（消息 #2648）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 7,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2649：✅ 已将【测试玩家4】的灵石设置为 50,000）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "🏛️ 宗门列表\n━━━━━━━━━━━━━━━\n1. 【青云门】\n   宗主：未知\n   建设度：100 | 成员：1人\n\n2. 【合欢宗】\n   宗主：未知\n   建设度：100 | 成员：0人\n\n",
+        "✅ 已将【测试玩家4】的境界设置为「练气三阶」",
+        "✅ 已将【测试玩家4】的灵石设置为 50,000"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 8,
+      "type": "send",
+      "note": "系统名保留：不可同名建宗",
+      "ok": true,
+      "detail": "已注入（消息 #2650）",
+      "actual": [],
+      "duration": 0.06
+    },
+    {
+      "index": 9,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2651：❌ 『青云门』乃天下名门，不可用作宗门名称！）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "🏛️ 宗门列表\n━━━━━━━━━━━━━━━\n1. 【青云门】\n   宗主：未知\n   建设度：100 | 成员：1人\n\n2. 【合欢宗】\n   宗主：未知\n   建设度：100 | 成员：0人\n\n",
+        "✅ 已将【测试玩家4】的境界设置为「练气三阶」",
+        "✅ 已将【测试玩家4】的灵石设置为 50,000",
+        "❌ 『青云门』乃天下名门，不可用作宗门名称！"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 10,
+      "type": "send",
+      "note": "系统名保留：不可同名建宗",
+      "ok": true,
+      "detail": "已注入（消息 #2652）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 11,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #2653：❌ 『合欢宗』乃天下名门，不可用作宗门名称！）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "🏛️ 宗门列表\n━━━━━━━━━━━━━━━\n1. 【青云门】\n   宗主：未知\n   建设度：100 | 成员：1人\n\n2. 【合欢宗】\n   宗主：未知\n   建设度：100 | 成员：0人\n\n",
+        "✅ 已将【测试玩家4】的境界设置为「练气三阶」",
+        "✅ 已将【测试玩家4】的灵石设置为 50,000",
+        "❌ 『青云门』乃天下名门，不可用作宗门名称！",
+        "❌ 『合欢宗』乃天下名门，不可用作宗门名称！"
+      ],
+      "duration": 0.3
+    }
+  ],
+  "case_snapshot": {
+    "name": "sect-default-visible",
+    "description": "spec Requirement「默认宗门配置与播种」：默认宗门（青云门/合欢宗）在宗门列表可见，且玩家不可用同名创建宗门（系统名保留）。",
+    "scenario": "新建玩家在群聊中查询宗门列表看到两个默认宗门；GM 将等级/灵石抬高后尝试创建同名宗门被保留名拦截。",
+    "tags": [
+      "sect",
+      "smoke"
+    ],
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_sect_001",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000004"
+      }
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#我要修仙 灵修",
+        "note": "新建玩家"
+      },
+      {
+        "type": "expect",
+        "match": "re:恭喜道友|已踏入仙途",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#宗门列表",
+        "note": "默认宗门可见（顺序依建设度不固定，双序断言）"
+      },
+      {
+        "type": "expect",
+        "match": "re:宗门列表[\\s\\S]*【青云门】[\\s\\S]*【合欢宗】|宗门列表[\\s\\S]*【合欢宗】[\\s\\S]*【青云门】",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置境界 900000004 练气三阶",
+        "note": "满足建宗等级门槛"
+      },
+      {
+        "type": "expect",
+        "match": "re:境界设置为「练气三阶」",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置灵石 900000004 50000",
+        "note": "满足建宗灵石门槛"
+      },
+      {
+        "type": "expect",
+        "match": "re:灵石设置为 50,000|灵石设置为[\\s\\S]*50,?000",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#创建宗门 青云门",
+        "note": "系统名保留：不可同名建宗"
+      },
+      {
+        "type": "expect",
+        "match": "re:『青云门』乃天下名门，不可用作宗门名称",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#创建宗门 合欢宗",
+        "note": "系统名保留：不可同名建宗"
+      },
+      {
+        "type": "expect",
+        "match": "re:『合欢宗』乃天下名门，不可用作宗门名称",
+        "timeout": 10
+      }
+    ]
+  },
+  "run_messages": [
+    {
+      "id": 2642,
+      "conversation_id": 217,
+      "direction": "in",
+      "sender": "900000004",
+      "text": "#我要修仙 灵修",
+      "rich": null,
+      "created_at": 1787143995.1173558
+    },
+    {
+      "id": 2643,
+      "conversation_id": 217,
+      "direction": "out",
+      "sender": "bot",
+      "text": "道友，你已踏入仙途，无需重复此举。",
+      "rich": [],
+      "created_at": 1787143995.1310472
+    },
+    {
+      "id": 2644,
+      "conversation_id": 217,
+      "direction": "in",
+      "sender": "900000004",
+      "text": "#宗门列表",
+      "rich": null,
+      "created_at": 1787143995.4274442
+    },
+    {
+      "id": 2645,
+      "conversation_id": 217,
+      "direction": "out",
+      "sender": "bot",
+      "text": "🏛️ 宗门列表\n━━━━━━━━━━━━━━━\n1. 【青云门】\n   宗主：未知\n   建设度：100 | 成员：1人\n\n2. 【合欢宗】\n   宗主：未知\n   建设度：100 | 成员：0人\n\n",
+      "rich": [],
+      "created_at": 1787143995.442144
+    },
+    {
+      "id": 2646,
+      "conversation_id": 217,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置境界 900000004 练气三阶",
+      "rich": null,
+      "created_at": 1787143995.738321
+    },
+    {
+      "id": 2647,
+      "conversation_id": 217,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家4】的境界设置为「练气三阶」",
+      "rich": [],
+      "created_at": 1787143995.8724904
+    },
+    {
+      "id": 2648,
+      "conversation_id": 217,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置灵石 900000004 50000",
+      "rich": null,
+      "created_at": 1787143996.1116118
+    },
+    {
+      "id": 2649,
+      "conversation_id": 217,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家4】的灵石设置为 50,000",
+      "rich": [],
+      "created_at": 1787143996.1504064
+    },
+    {
+      "id": 2650,
+      "conversation_id": 217,
+      "direction": "in",
+      "sender": "900000004",
+      "text": "#创建宗门 青云门",
+      "rich": null,
+      "created_at": 1787143996.4387245
+    },
+    {
+      "id": 2651,
+      "conversation_id": 217,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 『青云门』乃天下名门，不可用作宗门名称！",
+      "rich": [],
+      "created_at": 1787143996.5048683
+    },
+    {
+      "id": 2652,
+      "conversation_id": 217,
+      "direction": "in",
+      "sender": "900000004",
+      "text": "#创建宗门 合欢宗",
+      "rich": null,
+      "created_at": 1787143996.7994967
+    },
+    {
+      "id": 2653,
+      "conversation_id": 217,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 『合欢宗』乃天下名门，不可用作宗门名称！",
+      "rich": [],
+      "created_at": 1787143996.8217041
+    }
+  ],
+  "started_at": 1787143995.0821412,
+  "finished_at": 1787143997.1167755
+}
