@@ -18,6 +18,8 @@ Examples:
   WEBTEST_URL=http://127.0.0.1:8765 WEBTEST_TOKEN=secret \\
     uv run python scripts/test_suite_ctl.py export --target pvp-effects
   uv run python scripts/test_suite_ctl.py fixture --profile pvp --yes
+  uv run python scripts/test_suite_ctl.py run --tag sect --fixture --fixture-profile sect
+  uv run python scripts/test_suite_ctl.py fixture --profile sect --yes
 """
 
 from __future__ import annotations
@@ -42,6 +44,35 @@ DISCOVERED_JSON_PATTERN = "**/*.json"
 LAST_RUN_MANIFEST = FUNCTIONAL_TESTS_DIR / ".last-run.json"
 
 PVP_TEST_IDS = ("900000001", "900000002", "900000003")
+
+# sect profile：宗门功能用例。GM 沿用 900000001，业务玩家为 900000002
+# （青云门成员预置）与 900000003（无宗门，用于反例/对照组）。
+SECT_TEST_IDS = ("900000002", "900000003")
+# 新建型用例使用的固定 ID（GM 指令需数字 ID 定位），fixture 每次重置为无宗门初始态。
+SECT_FRESH_TEST_IDS = ("900000004", "900000005", "900000006")
+SECT_FACTION_ID = "qingyun"
+SECT_SECT_NAME = "青云门"
+# 成员预置：贡献 2500（达标内门 2000/4 级、不达标亲传 8000/6 级）、境界 2
+# （匹配 chain_qy_01 区间 [0,2]）、储物戒含宗门之宝青云镇山剑（配置带
+# treasure+sect_id 标记，离宗自动回收）、已习得宗门绑定功法 qy_001。
+SECT_MEMBER_PRESET = {
+    "level_index": 2,
+    "sect_position": 4,  # 外门弟子
+    "sect_contribution": 2500,
+    "storage_ring_items": {"青云镇山剑": 1, "青铜剑": 1},
+    "sect_treasure_claims": ["wpn_qy_001"],
+    "sect_master_progress": {
+        "chain_id": "chain_qy_01",
+        "stage_index": 0,
+        "progress": 0,
+        "done": False,
+    },
+}
+SECT_SECT_SKILL_IDS = ("qy_001",)  # 青云剑诀：师承任务来源 + 宗门绑定
+SECT_INITIAL_MATERIALS = 500  # 供建设用例升级洞天(200)+丹房(200)
+# 商店种子：丹阁固定上架筑基丹（原价 5000），供折扣用例结算价格断言。
+SECT_SHOP_SEED = [{"name": "筑基丹", "type": "pill", "price": 5000, "stock": 5}]
+
 PVP_PROFILE_SKILL_IDS = (
     "common_001",  # 基础吐纳 damage_bonus
     "draft_kuangfeng",  # 狂风诀 combo
@@ -319,7 +350,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         for repeat in range(1, max(1, args.repeat) + 1):
             run_index += 1
             if args.fixture:
-                fixture_args = argparse.Namespace(profile="pvp", db=args.db, yes=True)
+                fixture_args = argparse.Namespace(
+                    profile=args.fixture_profile, db=args.db, yes=True
+                )
                 cmd_fixture(fixture_args)
             name = case["name"]
             started = _request(
@@ -688,6 +721,134 @@ def _upsert_player(conn: sqlite3.Connection, user_id: str, user_name: str) -> No
     )
 
 
+def _write_sect_skills(conn: sqlite3.Connection, user_id: str) -> None:
+    """Insert sect-bound skills for the member preset player.
+
+    Args:
+        conn: Open sqlite connection.
+        user_id: Fixed test user id.
+    """
+    if user_id != SECT_TEST_IDS[0]:
+        return
+    now = int(time.time())
+    for skill_id in SECT_SECT_SKILL_IDS:
+        conn.execute(
+            "INSERT OR REPLACE INTO player_skills "
+            "(user_id, skill_id, star_level, source, learned_at, origin_sect_id, sect_bound) "
+            "VALUES (?, ?, 1, 'master_task', ?, ?, 1)",
+            (user_id, skill_id, now, SECT_FACTION_ID),
+        )
+
+
+def _apply_sect_member_preset(
+    conn: sqlite3.Connection, user_id: str, sect_row_id: int | None
+) -> None:
+    """Apply deterministic sect-profile overrides to a fixed test player.
+
+    Args:
+        conn: Open sqlite connection.
+        user_id: Fixed test user id.
+        sect_row_id: The ``sects.sect_id`` of 青云门 (None when unseeded).
+    """
+    if user_id == SECT_TEST_IDS[0]:  # 900000002 宗门成员
+        preset = SECT_MEMBER_PRESET
+        if sect_row_id is None:
+            raise CtlError(
+                f"测试库中未找到宗门「{SECT_SECT_NAME}」——"
+                "需先重载插件使 ensure_system_sects 播种默认宗门"
+            )
+        conn.execute(
+            "UPDATE players SET level_index = ?, sect_id = ?, sect_position = ?, "
+            "sect_contribution = ?, sect_treasure_claims = ?, "
+            "sect_master_progress = ?, storage_ring_items = ?, level_up_rate = 100 "
+            "WHERE user_id = ?",
+            (
+                preset["level_index"],
+                sect_row_id,
+                preset["sect_position"],
+                preset["sect_contribution"],
+                json.dumps(preset["sect_treasure_claims"], ensure_ascii=False),
+                json.dumps(preset["sect_master_progress"], ensure_ascii=False),
+                json.dumps(preset["storage_ring_items"], ensure_ascii=False),
+                user_id,
+            ),
+        )
+    else:  # 900000003 非成员对照
+        conn.execute(
+            "UPDATE players SET level_index = 1, sect_id = 0, sect_position = 4, "
+            "sect_contribution = 0, sect_treasure_claims = '[]', "
+            "sect_master_progress = '{}', storage_ring_items = '{}', level_up_rate = 0 "
+            "WHERE user_id = ?",
+            (user_id,),
+        )
+    # 清理旧 profile 残留的技能（如 pvp 的 18 个技能），再写本 profile 的绑定功法。
+    conn.execute("DELETE FROM player_skills WHERE user_id = ?", (user_id,))
+    _write_sect_skills(conn, user_id)
+
+
+def _reset_fresh_player(conn: sqlite3.Connection, user_id: str) -> None:
+    """Reset a fresh-type test player to a pristine, sectless state.
+
+    Args:
+        conn: Open sqlite connection.
+        user_id: Fixed test user id.
+    """
+    conn.execute(
+        "UPDATE players SET level_index = 1, sect_id = 0, sect_position = 4, "
+        "sect_contribution = 0, sect_treasure_claims = '[]', "
+        "sect_master_progress = '{}', storage_ring_items = '{}', level_up_rate = 0 "
+        "WHERE user_id = ?",
+        (user_id,),
+    )
+    conn.execute("DELETE FROM player_skills WHERE user_id = ?", (user_id,))
+    _ensure_idle_cd(conn, user_id)
+
+
+def _ensure_idle_cd(conn: sqlite3.Connection, user_id: str) -> None:
+    """Insert an idle user_cd row so busy-state writes work for a fresh player.
+
+    Args:
+        conn: Open sqlite connection.
+        user_id: Fixed test user id.
+    """
+    # set_user_busy 只 UPDATE 不 INSERT，必须预置 idle 行，否则闭关后 user_cd 仍为空。
+    conn.execute(
+        "INSERT OR REPLACE INTO user_cd "
+        "(user_id, type, create_time, scheduled_time, extra_data) "
+        "VALUES (?, 0, 0, 0, '{}')",
+        (user_id,),
+    )
+
+
+def _reset_sect_rows(conn: sqlite3.Connection) -> None:
+    """Reset operational columns of all system (default) sects to a clean baseline.
+
+    Only resets scale/materials/building levels; never touches names/owners
+    or destroy state (``status``/``destruction_tier`` preserved).
+
+    Args:
+        conn: Open sqlite connection.
+    """
+    conn.execute(
+        "UPDATE sects SET sect_scale = 100, sect_materials = ?, "
+        "sect_fairyland = 0, elixir_room_level = 0 WHERE is_system = 1",
+        (SECT_INITIAL_MATERIALS,),
+    )
+
+
+def _seed_shop(conn: sqlite3.Connection) -> None:
+    """Seed the pill pavilion with a deterministic item for discount math.
+
+    Args:
+        conn: Open sqlite connection.
+    """
+    conn.execute(
+        "INSERT OR REPLACE INTO shop (shop_id, last_refresh_time, current_items) "
+        "VALUES ('pill_pavilion', ?, ?)",
+        (int(time.time()), json.dumps(SECT_SHOP_SEED, ensure_ascii=False)),
+    )
+
+
 def _write_pvp_skills(conn: sqlite3.Connection, user_id: str) -> None:
     """Insert the full set of PvP verification skill ids for one player.
 
@@ -704,12 +865,34 @@ def _write_pvp_skills(conn: sqlite3.Connection, user_id: str) -> None:
         )
 
 
+def _resolve_sect_row(conn: sqlite3.Connection) -> int | None:
+    """Return the sects.sect_id of the default 青云门, or None.
+
+    Args:
+        conn: Open sqlite connection.
+
+    Returns:
+        The 青云门 sect_id or None when not seeded.
+    """
+    row = conn.execute(
+        "SELECT sect_id FROM sects WHERE faction_id = ? LIMIT 1", (SECT_FACTION_ID,)
+    ).fetchone()
+    return int(row[0]) if row else None
+
+
 def cmd_fixture(args: argparse.Namespace) -> int:
-    """Implement ``fixture``: write a deterministic PvP baseline to the test DB."""
-    if args.profile != "pvp":
-        raise CtlError(f"不支持的 fixture profile: {args.profile}")
+    """Implement ``fixture``: write a deterministic baseline to the test DB.
+
+    ``pvp`` writes the PvP verification baseline; ``sect`` writes the sect
+    domain baseline (member preset, sect rows, shop seed, idle cds).
+    """
     db_path = _resolve_db_path(args)
-    ids = list(PVP_TEST_IDS)
+    if args.profile == "pvp":
+        ids = list(PVP_TEST_IDS)
+    elif args.profile == "sect":
+        ids = list(SECT_TEST_IDS)
+    else:
+        raise CtlError(f"不支持的 fixture profile: {args.profile}")
     if not args.yes:
         answer = input(
             f"即将直接写测试数据库 {db_path}（仅固定 ID {ids}）。确认继续？[y/N] "
@@ -722,27 +905,36 @@ def cmd_fixture(args: argparse.Namespace) -> int:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
-        _backup_players(conn, ids, backup_path)
+        _backup_players(conn, ids + ["900000001"], backup_path)
         names = {
             "900000001": "测试GM",
             "900000002": "测试玩家1",
             "900000003": "测试玩家2",
         }
-        for user_id in ids:
-            _upsert_player(conn, user_id, names[user_id])
-            _write_pvp_skills(conn, user_id)
-            # set_user_busy 只 UPDATE 不 INSERT，必须预置 idle 行，否则闭关后 user_cd 仍为空。
-            conn.execute(
-                "INSERT OR REPLACE INTO user_cd "
-                "(user_id, type, create_time, scheduled_time, extra_data) "
-                "VALUES (?, 0, 0, 0, '{}')",
-                (user_id,),
-            )
+        if args.profile == "pvp":
+            for user_id in ids:
+                _upsert_player(conn, user_id, names[user_id])
+                _write_pvp_skills(conn, user_id)
+                _ensure_idle_cd(conn, user_id)
             conn.execute("DELETE FROM combat_cooldowns WHERE user_id IN (?,?,?)", ids)
+        else:  # sect
+            sect_row_id = _resolve_sect_row(conn)
+            for user_id in ids:
+                _upsert_player(conn, user_id, names[user_id])
+                _apply_sect_member_preset(conn, user_id, sect_row_id)
+                _ensure_idle_cd(conn, user_id)
+            for user_id in SECT_FRESH_TEST_IDS:
+                _upsert_player(conn, user_id, f"测试玩家{user_id[-1]}")
+                _reset_fresh_player(conn, user_id)
+            conn.execute(
+                "DELETE FROM combat_cooldowns WHERE user_id IN (?,?,?)", PVP_TEST_IDS
+            )
+            _reset_sect_rows(conn)
+            _seed_shop(conn)
         conn.commit()
     finally:
         conn.close()
-    print(f"fixture pvp 完成：{len(ids)} 个固定测试玩家已重置，player_skills 已写入")
+    print(f"fixture {args.profile} 完成：{len(ids)} 个固定测试玩家已重置")
     return 0
 
 
@@ -788,7 +980,13 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--fixture",
         action="store_true",
-        help="每轮重复前执行 fixture --profile pvp（用于随机效果采样）",
+        help="每轮重复前执行 fixture（用于随机效果采样/固定基线）",
+    )
+    run.add_argument(
+        "--fixture-profile",
+        choices=["pvp", "sect"],
+        default="pvp",
+        help="--fixture 使用的 profile（默认 pvp）",
     )
     run.add_argument("--db", default=None, help="fixture 使用的插件数据库路径")
     run.set_defaults(func=cmd_run)
@@ -799,7 +997,7 @@ def build_parser() -> argparse.ArgumentParser:
     export.set_defaults(func=cmd_export)
 
     fixture = sub.add_parser("fixture", help="准备测试基线数据")
-    fixture.add_argument("--profile", choices=["pvp"], default="pvp")
+    fixture.add_argument("--profile", choices=["pvp", "sect"], default="pvp")
     fixture.add_argument("--db", default=None, help="插件数据库路径覆盖")
     fixture.add_argument("--yes", action="store_true", help="跳过确认提示")
     fixture.set_defaults(func=cmd_fixture)

@@ -1,7 +1,7 @@
 # 网页测试平台能力差距报告
 
 > 对着 `astrbot_plugin_testplatform`（webtest）实际 REST 能力与首批功能测试用例需求整理。
-> 更新日期：2026-08-17。范围：`add-functional-test-suite` 第一批 28 条用例。
+> 更新日期：2026-08-19。范围：`add-functional-test-suite` 第一批 28 条用例 + `add-sect-functional-tests` 9 条宗门用例。
 
 ## Supported（可直接依赖）
 
@@ -10,6 +10,7 @@
 | 用例 JSON 加载 | 顶层 `cases/*.json`，`name` 与文件名一致，自动校验必填字段 | 全部用例 |
 | 步骤类型 `send` / `expect` / `sleep` | 真实注入消息并轮询回复 | 全部用例 |
 | 文本断言 | 子串匹配；`re:` 前缀正则搜索 | 全部期望步骤 |
+| 插件热重载运维端点 | `POST /api/ops/plugin-reload`（JSON `{ plugin_name }`）可不经 Dashboard 触发插件重载，迁移/代码变更后立即可测 | 宗门用例起跑前重载插件使 v31 秘境播种与最新折扣文案生效 |
 | 临时会话 | 每次运行新建会话，私聊玩家默认唯一 ID，轨迹独立保存 | 私聊冒烟用例 |
 | 固定身份 `pin_players` | 群聊可钉住 GM/玩家真实 `user_id`，承担状态继承 | 全部 PvP / GM / 装备用例 |
 | 群聊模拟 | 通过 `webtest!group!{group_id}` 走真实 AstrBot 群聊管线 | 全部群聊用例 |
@@ -30,13 +31,17 @@
 | 状态/DB 断言 | 平台只能断言“回复文本” | 不能直接查 DB 验证玩家属性/储物戒/`user_cd` | fixture 直接写库 + 战斗文本证据；GM 命令作为间接断言 |
 | 时间推进 | 平台无虚拟时钟/时间加速 | 闭关、历练、Boss 等长周期不可真实等待 | 用例只做“入口可达”冒烟；需要结算时用插件 GM 强制结算命令 |
 | 结果归档 | 平台有运行记录但没有“导出目录包” | 结果需自行拉取并组织 | 本项目 `scripts/test_suite_ctl.py export` 本地生成 `results/<date>_<target>/` |
+| 师承链进度推进 | 插件 GM `触发秘境结算`/`触发历练结算`（`core/gm_manager.py` `cmd_force_rift`/`cmd_force_adventure`）只调 finish 并更新悬赏进度，**不调用** `sect_manager.advance_master_progress`（该调用仅存在于 `main.py` 正常完成路径 `handle_rift_complete`/`handle_adventure_complete`） | 无时间加速时 `win_pve`/`adventure_complete` 型阶段无法确定性推进 | 用例只对捐赠型阶段（`宗门捐献` → `donate` 事件）做真实推进与结算断言（`sect-master-task-chain` 合欢宗投名状）；`win_pve` 型阶段仅断言视图与阶段顺序；见下“随机池”与 bd `leave_sect` 滞留链两项 |
+| 随机选择池（悬赏/任务） | 悬赏普通池（301-306）与宗门池（307/308）按难度加权随机出单，单轮无法断定具体条目；宗门建设任务随机三选一 | 不能断言具体名称 | 断言编号区间（普通 `[30[0-9]]`、宗门 `[30[78]]`）；建设任务断言 `完成建设任务【.+】|获得贡献：\+\d+` 与 `--repeat 2` 稳定性证据 |
+| 反向（不存在）断言 | `expect` 只能断言“出现”，不能断言“不出现” | 非成员悬赏“不含宗门悬赏分区”无法直接验证 | 正向替代：成员断言宗门悬赏条目存在 + 非成员断言普通条目存在 + 秘境对非成员的锁定展示与入口拦截消息（均为正向） |
+| 秘境 ID 与 DB 配置漂移 | 秘境表由迁移脚本 `INSERT OR IGNORE` 播种（v31 新增青云剑冢=id 6），**仅改配置不重播种**；被配置移除的旧秘境（玄冰地宫 id4/上古遗迹 id5）仍留在库中 | 断言必须按测试库真实 rifts 表 ID 编写，且新增秘境需重载插件 | 用例对青云剑冢断言使用 `(ID:6)`（测试库 v31 迁移后实际值）；重载插件后再跑用例 |
+| 功法赠予无通道 | 游戏无“赠予已学技能”指令，宗门绑定**功法**的不可赠予性无法直接覆盖 | 只能验证物品类绑定物 | 用宗门之宝青云镇山剑（配置 `treasure+sect_id` 标记，`core/storage_ring_manager.py:64` `is_sect_bound_item` 按配置判定）作代理：赠予被拒在持有与离宗后均成立；功法保留可用改由 `我的技能` 断言
 
 ## Unsupported（当前没有，列入平台增强建议）
 
 | 能力 | 为什么需要 | 建议平台增强 |
 |---|---|---|
 | 随机数种子注入 | 效果矩阵需要可复现触发概率 | 适配器/运行器支持 `run.rng_seed`，并传递给插件测试入口或 mock `random` |
-| 插件热重载运维端点 | 修改 `GM_ADMINS` 等初始化配置后必须手动 Dashboard 重载，AI 无法完成闭环 | 新增 `POST /api/ops/plugin-reload`（可选 `GET /api/ops/plugins`），内部调用 AstrBot `PluginService`，不依赖 Dashboard 登录态 |
 | 结构化消息组件注入 | GM `@目标`、图片/文件/引用等路径无法覆盖 | `send` 步骤支持 `components` 数组（At/Image/Reply） |
 | 直接 DB 断言 | 强断言需要核对库内落盘状态 | 提供 `GET /api/ops/db-query` 白名单查询或运行后 DB 快照 API |
 | 时间加速/虚拟时钟 | 长周期玩法（闭关 1 分钟、Boss 冷却）不适合真实等待 | 支持 `run.time_offset` / `POST /api/ops/tick` 推进测试会话 |

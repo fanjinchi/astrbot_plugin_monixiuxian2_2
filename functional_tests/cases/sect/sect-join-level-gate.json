@@ -1,0 +1,25 @@
+{
+  "name": "sect-join-level-gate",
+  "description": "spec Requirement「拜入与出师」：默认宗门按境界区间招收——区间内拜入成功、区间外拒绝；出师后可改投他派。",
+  "scenario": "新建玩家（练气一阶）拜入青云门（区间 0-5）成功；出师后拜入合欢宗（区间 2-6）被拒（练气一阶超区间）；GM 抬到练气三阶后拜入成功。",
+  "tags": ["sect", "smoke"],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_sect_002",
+    "pin_players": { "gm": "900000001", "p1": "900000005" }
+  },
+  "steps": [
+    { "type": "send", "player": "p1", "text": "#我要修仙 灵修", "note": "新建玩家（练气一阶）" },
+    { "type": "expect", "match": "re:恭喜道友|已踏入仙途", "timeout": 30 },
+    { "type": "send", "player": "p1", "text": "#加入宗门 青云门", "note": "练气一阶在青云门区间 [0,5] 内" },
+    { "type": "expect", "match": "re:成功拜入『青云门』，成为外门弟子", "timeout": 10 },
+    { "type": "send", "player": "p1", "text": "#退出宗门", "note": "出师（无宗门之宝，无回收提示）" },
+    { "type": "expect", "match": "re:已退出宗门『青云门』", "timeout": 10 },
+    { "type": "send", "player": "p1", "text": "#加入宗门 合欢宗", "note": "练气一阶不在合欢宗区间 [2,6] 内" },
+    { "type": "expect", "match": "re:『合欢宗』不再招收此境界的修士！[\\s\\S]*招收范围：练气二阶 ~ 练气六阶", "timeout": 10 },
+    { "type": "send", "player": "gm", "text": "#修仙GM 设置境界 900000005 练气三阶", "note": "抬入合欢宗区间" },
+    { "type": "expect", "match": "re:境界设置为「练气三阶」", "timeout": 10 },
+    { "type": "send", "player": "p1", "text": "#加入宗门 合欢宗", "note": "练气三阶在区间内" },
+    { "type": "expect", "match": "re:成功拜入『合欢宗』，成为外门弟子", "timeout": 10 }
+  ]
+}

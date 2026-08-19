@@ -1,0 +1,110 @@
+[
+  {
+    "id": 2100,
+    "conversation_id": 174,
+    "direction": "in",
+    "sender": "900000005",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1787139136.2839262
+  },
+  {
+    "id": 2101,
+    "conversation_id": 174,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1787139136.2977853
+  },
+  {
+    "id": 2102,
+    "conversation_id": 174,
+    "direction": "in",
+    "sender": "900000005",
+    "text": "#加入宗门 青云门",
+    "rich": null,
+    "created_at": 1787139136.5946748
+  },
+  {
+    "id": 2103,
+    "conversation_id": 174,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 你成功拜入『青云门』，成为外门弟子！",
+    "rich": [],
+    "created_at": 1787139136.6250148
+  },
+  {
+    "id": 2104,
+    "conversation_id": 174,
+    "direction": "in",
+    "sender": "900000005",
+    "text": "#退出宗门",
+    "rich": null,
+    "created_at": 1787139136.9135692
+  },
+  {
+    "id": 2105,
+    "conversation_id": 174,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 你已退出宗门『青云门』！",
+    "rich": [],
+    "created_at": 1787139136.948357
+  },
+  {
+    "id": 2106,
+    "conversation_id": 174,
+    "direction": "in",
+    "sender": "900000005",
+    "text": "#加入宗门 合欢宗",
+    "rich": null,
+    "created_at": 1787139137.2294734
+  },
+  {
+    "id": 2107,
+    "conversation_id": 174,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 『合欢宗』不再招收此境界的修士！（招收范围：练气二阶 ~ 练气六阶）",
+    "rich": [],
+    "created_at": 1787139137.251889
+  },
+  {
+    "id": 2108,
+    "conversation_id": 174,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000005 练气三阶",
+    "rich": null,
+    "created_at": 1787139137.5469666
+  },
+  {
+    "id": 2109,
+    "conversation_id": 174,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家5】的境界设置为「练气三阶」",
+    "rich": [],
+    "created_at": 1787139137.5708485
+  },
+  {
+    "id": 2110,
+    "conversation_id": 174,
+    "direction": "in",
+    "sender": "900000005",
+    "text": "#加入宗门 合欢宗",
+    "rich": null,
+    "created_at": 1787139137.858646
+  },
+  {
+    "id": 2111,
+    "conversation_id": 174,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 你成功拜入『合欢宗』，成为外门弟子！",
+    "rich": [],
+    "created_at": 1787139137.886875
+  }
+]
