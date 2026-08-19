@@ -1,0 +1,110 @@
+[
+  {
+    "id": 3018,
+    "conversation_id": 248,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置职位 900000002 0",
+    "rich": null,
+    "created_at": 1787149121.7753544
+  },
+  {
+    "id": 3019,
+    "conversation_id": 248,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的职位设置为「宗主」",
+    "rich": [],
+    "created_at": 1787149121.7983387
+  },
+  {
+    "id": 3020,
+    "conversation_id": 248,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我的宗门",
+    "rich": null,
+    "created_at": 1787149122.0868318
+  },
+  {
+    "id": 3021,
+    "conversation_id": 248,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：青云门\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：2500\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：宗主\n你的贡献：2500",
+    "rich": [],
+    "created_at": 1787149122.108153
+  },
+  {
+    "id": 3022,
+    "conversation_id": 248,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门晋升",
+    "rich": null,
+    "created_at": 1787149122.403443
+  },
+  {
+    "id": 3023,
+    "conversation_id": 248,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 你已是一宗之主，无需晋升！",
+    "rich": [],
+    "created_at": 1787149122.4241555
+  },
+  {
+    "id": 3024,
+    "conversation_id": 248,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置职位 900000002 亲传弟子",
+    "rich": null,
+    "created_at": 1787149122.7198472
+  },
+  {
+    "id": 3025,
+    "conversation_id": 248,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的职位设置为「亲传弟子」",
+    "rich": [],
+    "created_at": 1787149122.7429745
+  },
+  {
+    "id": 3026,
+    "conversation_id": 248,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门晋升",
+    "rich": null,
+    "created_at": 1787149123.032248
+  },
+  {
+    "id": 3027,
+    "conversation_id": 248,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 晋升【长老】未达门槛：\n贡献不足（2500/30000）\n境界不足（需达到练气九阶）",
+    "rich": [],
+    "created_at": 1787149123.0483553
+  },
+  {
+    "id": 3028,
+    "conversation_id": 248,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置职位 900000002 4",
+    "rich": null,
+    "created_at": 1787149123.3440213
+  },
+  {
+    "id": 3029,
+    "conversation_id": 248,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的职位设置为「外门弟子」",
+    "rich": [],
+    "created_at": 1787149123.3708565
+  }
+]

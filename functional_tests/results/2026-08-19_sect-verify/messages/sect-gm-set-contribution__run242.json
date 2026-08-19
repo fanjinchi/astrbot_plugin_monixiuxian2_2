@@ -1,0 +1,92 @@
+[
+  {
+    "id": 3008,
+    "conversation_id": 247,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置贡献 900000002 30000",
+    "rich": null,
+    "created_at": 1787149119.735068
+  },
+  {
+    "id": 3009,
+    "conversation_id": 247,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的宗门贡献设置为 30,000",
+    "rich": [],
+    "created_at": 1787149119.7574253
+  },
+  {
+    "id": 3010,
+    "conversation_id": 247,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000002 练气九阶",
+    "rich": null,
+    "created_at": 1787149120.046421
+  },
+  {
+    "id": 3011,
+    "conversation_id": 247,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的境界设置为「练气九阶」",
+    "rich": [],
+    "created_at": 1787149120.074435
+  },
+  {
+    "id": 3012,
+    "conversation_id": 247,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门晋升",
+    "rich": null,
+    "created_at": 1787149120.3629124
+  },
+  {
+    "id": 3013,
+    "conversation_id": 247,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎖️ 晋升成功！你已成为【内门弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+100 灵石\n商店折扣：9.5折\n传承解锁：heart_qy_001",
+    "rich": [],
+    "created_at": 1787149120.3912752
+  },
+  {
+    "id": 3014,
+    "conversation_id": 247,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门晋升",
+    "rich": null,
+    "created_at": 1787149120.6799934
+  },
+  {
+    "id": 3015,
+    "conversation_id": 247,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎖️ 晋升成功！你已成为【亲传弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+300 灵石\n商店折扣：9折\n传承解锁：wpn_qy_001",
+    "rich": [],
+    "created_at": 1787149120.702107
+  },
+  {
+    "id": 3016,
+    "conversation_id": 247,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门晋升",
+    "rich": null,
+    "created_at": 1787149120.9906654
+  },
+  {
+    "id": 3017,
+    "conversation_id": 247,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎖️ 晋升成功！你已成为【长老】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+800 灵石\n商店折扣：8.5折",
+    "rich": [],
+    "created_at": 1787149121.0187244
+  }
+]

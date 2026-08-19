@@ -1,0 +1,128 @@
+[
+  {
+    "id": 2966,
+    "conversation_id": 244,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "宗门建设",
+    "rich": null,
+    "created_at": 1787149112.123702
+  },
+  {
+    "id": 2967,
+    "conversation_id": 244,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏗️ 【青云门】宗门建设\n━━━━━━━━━━━━━━━\n建设度：100 | 宗门资材：500\n洞天：0/5 级（升级需资材 200）\n丹房：0/5 级（升级需资材 200）\n镇派功法：青云剑诀\n💡 升级：「宗门建设 洞天」/「宗门建设 丹房」",
+    "rich": [],
+    "created_at": 1787149112.1426995
+  },
+  {
+    "id": 2968,
+    "conversation_id": 244,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "宗门建设 洞天",
+    "rich": null,
+    "created_at": 1787149112.4380891
+  },
+  {
+    "id": 2969,
+    "conversation_id": 244,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏗️ 【青云门】洞天升级成功！\n消耗宗门资材：200（剩余 300）\n洞天等级：1/5\n全员闭关修为加成提升至 +2%！",
+    "rich": [],
+    "created_at": 1787149112.471804
+  },
+  {
+    "id": 2970,
+    "conversation_id": 244,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "宗门建设 丹房",
+    "rich": null,
+    "created_at": 1787149112.757771
+  },
+  {
+    "id": 2971,
+    "conversation_id": 244,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏗️ 【青云门】丹房升级成功！\n消耗宗门资材：200（剩余 100）\n丹房等级：1/5\n丹房现可领取：炼气丹！",
+    "rich": [],
+    "created_at": 1787149112.7865512
+  },
+  {
+    "id": 2972,
+    "conversation_id": 244,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "宗门丹房",
+    "rich": null,
+    "created_at": 1787149113.0734198
+  },
+  {
+    "id": 2973,
+    "conversation_id": 244,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏯 【青云门】宗门丹房\n━━━━━━━━━━━━━━━\n丹房等级：1/5\n今日可领：炼气丹（已解锁：炼气丹）\n领取状态：今日未领取\n💡 发送「宗门丹房 领取」领取今日丹药。",
+    "rich": [],
+    "created_at": 1787149113.0965614
+  },
+  {
+    "id": 2974,
+    "conversation_id": 244,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "宗门丹房 领取",
+    "rich": null,
+    "created_at": 1787149113.3931835
+  },
+  {
+    "id": 2975,
+    "conversation_id": 244,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏯 你从宗门丹房领取了【炼气丹】x1，已存入丹药背包！\n（丹房 1 级，每日可领取一次）",
+    "rich": [],
+    "created_at": 1787149113.4276366
+  },
+  {
+    "id": 2976,
+    "conversation_id": 244,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "宗门丹房 领取",
+    "rich": null,
+    "created_at": 1787149113.7129488
+  },
+  {
+    "id": 2977,
+    "conversation_id": 244,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 你今日已在丹房领取过丹药，请明日再来！",
+    "rich": [],
+    "created_at": 1787149113.73896
+  },
+  {
+    "id": 2978,
+    "conversation_id": 244,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "宗门任务",
+    "rich": null,
+    "created_at": 1787149114.0346777
+  },
+  {
+    "id": 2979,
+    "conversation_id": 244,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 完成建设任务【输财助宗】！\n捐献灵石：-500（宗门建设度 +5000）\n获得贡献：+40",
+    "rich": [],
+    "created_at": 1787149114.0615184
+  }
+]

@@ -1,0 +1,286 @@
+{
+  "id": 249,
+  "case_name": "sect-rejoin-retain",
+  "run_index": 14,
+  "status": "passed",
+  "conversation_id": 254,
+  "steps_result": [
+    {
+      "index": 0,
+      "type": "send",
+      "note": "出师",
+      "ok": true,
+      "detail": "已注入（消息 #3100）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #3101：✨ 你已退出宗门『青云门』！\n宗门之宝【青云镇山剑】已归还宗门。）",
+      "actual": [
+        "✨ 你已退出宗门『青云门』！\n宗门之宝【青云镇山剑】已归还宗门。"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "改投合欢宗（练气二阶在区间 [2,6] 内）",
+      "ok": true,
+      "detail": "已注入（消息 #3102）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 3,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #3103：✨ 你成功拜入『合欢宗』，成为外门弟子！）",
+      "actual": [
+        "✨ 你已退出宗门『青云门』！\n宗门之宝【青云镇山剑】已归还宗门。",
+        "✨ 你成功拜入『合欢宗』，成为外门弟子！"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 4,
+      "type": "send",
+      "note": "当前宗门已切换",
+      "ok": true,
+      "detail": "已注入（消息 #3104）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 5,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #3105：🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：合欢宗\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：）",
+      "actual": [
+        "✨ 你已退出宗门『青云门』！\n宗门之宝【青云镇山剑】已归还宗门。",
+        "✨ 你成功拜入『合欢宗』，成为外门弟子！",
+        "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：合欢宗\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：9000\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：外门弟子\n你的贡献：0"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 6,
+      "type": "send",
+      "note": "原宗门绑定功法保留可用",
+      "ok": true,
+      "detail": "已注入（消息 #3106）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 7,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #3107：📜 我的功法\n━━━━━━━━━━━━━━━\n【已激活】0/4\n  暂无激活功法\n\n【已领悟】1个\n  • 青云剑诀 |）",
+      "actual": [
+        "✨ 你已退出宗门『青云门』！\n宗门之宝【青云镇山剑】已归还宗门。",
+        "✨ 你成功拜入『合欢宗』，成为外门弟子！",
+        "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：合欢宗\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：9000\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：外门弟子\n你的贡献：0",
+        "📜 我的功法\n━━━━━━━━━━━━━━━\n【已激活】0/4\n  暂无激活功法\n\n【已领悟】1个\n  • 青云剑诀 | 星级：1 | 来源：master_task\n\n【修习目标】无\n━━━━━━━━━━━━━━━"
+      ],
+      "duration": 0.3
+    },
+    {
+      "index": 8,
+      "type": "send",
+      "note": "宗门之宝不可转让属性在离宗后依然成立",
+      "ok": true,
+      "detail": "已注入（消息 #3108）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 9,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #3109：❌ 【青云镇山剑】乃宗门之物，不可外传！）",
+      "actual": [
+        "✨ 你已退出宗门『青云门』！\n宗门之宝【青云镇山剑】已归还宗门。",
+        "✨ 你成功拜入『合欢宗』，成为外门弟子！",
+        "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：合欢宗\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：9000\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：外门弟子\n你的贡献：0",
+        "📜 我的功法\n━━━━━━━━━━━━━━━\n【已激活】0/4\n  暂无激活功法\n\n【已领悟】1个\n  • 青云剑诀 | 星级：1 | 来源：master_task\n\n【修习目标】无\n━━━━━━━━━━━━━━━",
+        "❌ 【青云镇山剑】乃宗门之物，不可外传！"
+      ],
+      "duration": 0.3
+    }
+  ],
+  "case_snapshot": {
+    "name": "sect-rejoin-retain",
+    "description": "spec Requirement「拜入与出师」：改换门庭后原宗门绑定功法仍可使用；宗门之宝的不可转让属性在离宗后依然成立（配置级绑定）。",
+    "scenario": "fixture 预置青云门成员（绑定功法青云剑诀 + 宝物青云镇山剑）；出师后拜入合欢宗，我的宗门显示合欢宗，我的技能仍显示青云剑诀（原宗门功法保留可用）；尝试赠予青云镇山剑仍被绑定拦截（离宗后宝物已归还，绑定判定来自物品配置）。",
+    "tags": [
+      "sect"
+    ],
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_sect_007",
+      "pin_players": {
+        "p1": "900000002",
+        "p2": "900000003"
+      }
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#退出宗门",
+        "note": "出师"
+      },
+      {
+        "type": "expect",
+        "match": "re:已退出宗门『青云门』",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#加入宗门 合欢宗",
+        "note": "改投合欢宗（练气二阶在区间 [2,6] 内）"
+      },
+      {
+        "type": "expect",
+        "match": "re:成功拜入『合欢宗』，成为外门弟子",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#我的宗门",
+        "note": "当前宗门已切换"
+      },
+      {
+        "type": "expect",
+        "match": "re:宗门名称：合欢宗",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#我的技能",
+        "note": "原宗门绑定功法保留可用"
+      },
+      {
+        "type": "expect",
+        "match": "re:我的功法[\\s\\S]*青云剑诀",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#赠予 900000003 青云镇山剑",
+        "note": "宗门之宝不可转让属性在离宗后依然成立"
+      },
+      {
+        "type": "expect",
+        "match": "re:【青云镇山剑】乃宗门之物，不可外传",
+        "timeout": 10
+      }
+    ]
+  },
+  "run_messages": [
+    {
+      "id": 3100,
+      "conversation_id": 254,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#退出宗门",
+      "rich": null,
+      "created_at": 1787149135.9916584
+    },
+    {
+      "id": 3101,
+      "conversation_id": 254,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✨ 你已退出宗门『青云门』！\n宗门之宝【青云镇山剑】已归还宗门。",
+      "rich": [],
+      "created_at": 1787149136.0279882
+    },
+    {
+      "id": 3102,
+      "conversation_id": 254,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#加入宗门 合欢宗",
+      "rich": null,
+      "created_at": 1787149136.3021476
+    },
+    {
+      "id": 3103,
+      "conversation_id": 254,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✨ 你成功拜入『合欢宗』，成为外门弟子！",
+      "rich": [],
+      "created_at": 1787149136.3302252
+    },
+    {
+      "id": 3104,
+      "conversation_id": 254,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#我的宗门",
+      "rich": null,
+      "created_at": 1787149136.6191554
+    },
+    {
+      "id": 3105,
+      "conversation_id": 254,
+      "direction": "out",
+      "sender": "bot",
+      "text": "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：合欢宗\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：9000\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：外门弟子\n你的贡献：0",
+      "rich": [],
+      "created_at": 1787149136.6418974
+    },
+    {
+      "id": 3106,
+      "conversation_id": 254,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#我的技能",
+      "rich": null,
+      "created_at": 1787149136.935425
+    },
+    {
+      "id": 3107,
+      "conversation_id": 254,
+      "direction": "out",
+      "sender": "bot",
+      "text": "📜 我的功法\n━━━━━━━━━━━━━━━\n【已激活】0/4\n  暂无激活功法\n\n【已领悟】1个\n  • 青云剑诀 | 星级：1 | 来源：master_task\n\n【修习目标】无\n━━━━━━━━━━━━━━━",
+      "rich": [],
+      "created_at": 1787149136.9572775
+    },
+    {
+      "id": 3108,
+      "conversation_id": 254,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#赠予 900000003 青云镇山剑",
+      "rich": null,
+      "created_at": 1787149137.251883
+    },
+    {
+      "id": 3109,
+      "conversation_id": 254,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 【青云镇山剑】乃宗门之物，不可外传！",
+      "rich": [],
+      "created_at": 1787149137.267963
+    }
+  ],
+  "started_at": 1787149135.9544902,
+  "finished_at": 1787149137.562892
+}
