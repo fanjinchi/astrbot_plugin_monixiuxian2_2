@@ -23,6 +23,7 @@
 | `attribute-growth/` | 混合 | 属性成长与镜像战 TTK 调研：`xiuxian-*`、`worker-xiuxian-report.md` 为本插件蒙特卡洛模拟；`mybrute-*`、`qpet-*` 为竞品模拟；另含业界自动战斗游戏平衡方案网络调研（`auto-battle-balance-web-research.md`）。汇总分析入口 `attribute-growth-analysis.md`，本项目成长/加成平衡设计方案 `growth-balance-proposals.md`。 |
 | `content-design/` | 本项目 | 玩家侧内容设计工作区（武器/功法/心法定稿数值，最终产出 `config/weapons.json` / `skills.json` / `heart_methods.json`）；设计蓝本取自 `mybrute/`、`qpet-daledou/` 外部调研。 |
 | `level-exp-curve/` | 本项目 | 升级经验曲线蒙特卡洛模拟与平衡建议（基于本插件修炼收益假设，如 `core/cultivation_manager.py` 的闭关基础修为），产出 `exp-curve-report.md`、`sim_exp_curve.py`、`balance-recommendations.md`。 |
+| `sect-system-design.md` | 本项目 | **宗门系统扩展总设计**（2026-08-18 建立）：默认宗门（系统势力）配置化、宗门建设/师承任务线/职阶晋升（一期）、毁灭与重建（二期）、NPC 人格化预留（三期）；含策划配置速查表与架构改造清单。宗门玩法变更时同步本文。 |
 | `novel-research/` | 外部参考 | 修仙小说世界观素材提取库（openspec change `read-novels-extract-content` 产出）：**10 本小说世界观全收录**（境界突破/宗门情节/道具法宝/功法神通/丹药灵药/地名势力/事件奇遇/战斗描写/人物关系 9 维度 + 玩法映射标签），供修仙玩法设计取材。文件：`extract-fanren.md`（凡人修仙传，全本 2446 章）`extract-xianni.md`（仙逆，全本 2088+后记）`extract-zhetian.md`（遮天，全本 1822+大结局）`extract-zhuxian.md`（诛仙，全本 293 章）`extract-yinianyongheng.md`（一念永恒，精读 654 章+网络补足）`extract-woshixiongshizaitaiwenjianle.md`（我师兄实在太稳健了，采样精读 50 章）`extract-dafengdagengren.md`（大奉打更人，采样精读 44 章）`extract-guimizhizhu.md`（诡秘之主，采样精读 24 章）`extract-daoguiyixian.md`（道诡异仙，采样精读 33 章+网络补足）`extract-fubenshidao.md`（佛本是道，采样精读 25 章）。另含 3 本早期专项笔记（`01-fanren-xiuxian-chuan.md`、`02-xian-ni.md`）与**可复用模板清单**（`novel-research/README.md`，各维度玩法设计模板索引）。 |
 
 ## 使用约定
