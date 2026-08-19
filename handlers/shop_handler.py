@@ -196,7 +196,13 @@ class ShopHandler:
             )
             return
 
-        item_type = target_item["type"]
+        # 数据防御：商店物品恒应带 type；缺失时给出明确提示而非 KeyError 崩溃
+        item_type = target_item.get("type")
+        if not item_type:
+            yield event.plain_result(
+                f"❌ 商品【{target_item['name']}】数据异常（缺少类型信息），购买失败，请联系管理员。"
+            )
+            return
         result_lines = []
 
         await self.db.conn.execute("BEGIN IMMEDIATE")

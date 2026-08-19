@@ -4,8 +4,8 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.8.2  
-> **许可证:** AGPL-3.0  
+> **版本:** v3.9.2
+> **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
 
@@ -310,6 +310,14 @@ astrbot_plugin_monixiuxian2/
 ## 📝 更新日志
 
 ---
+
+### v3.9.2 - 商店购买健壮性修复
+
+**🔧 修复问题**
+- 「购买」指令对缺少 `type` 字段的商品不再抛异常导致失败，改为明确提示“商品数据异常（缺少类型信息）”（由宗门测试夹具的商店数据触发发现）
+
+**🧪 测试与文档**
+- 新增 `tests/test_shop_handler.py`：缺 type 防御分支不触碰数据库事务 + 正常丹药购买成功两条回归；全量 492 测试通过
 
 ### v3.9.1 - GM 宗门指令补全与师承链确定性测试支持
 

@@ -476,6 +476,8 @@ class SectManager:
         player = await self.db.get_player_by_id(user_id)
         if player:
             player.sect_contribution = 0
+            # 师承任务链进度与宗门绑定，离宗时一并清除，避免改投他派后仍显示原宗门任务链
+            player.set_sect_master_progress({})
             await self.db.update_player(player)
 
         msg = f"✨ 你已退出宗门『{sect_name}』！"
@@ -785,6 +787,8 @@ class SectManager:
         target = await self.db.get_player_by_id(target_id)
         if target:
             target.sect_contribution = 0
+            # 师承任务链进度与宗门绑定，被逐时一并清除
+            target.set_sect_master_progress({})
             await self.db.update_player(target)
 
         msg = f"✨ 已将 {target_name} 踢出宗门！"
