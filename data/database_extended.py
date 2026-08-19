@@ -91,8 +91,13 @@ class DatabaseExtended:
                 return Sect(**dict(row))
             return None
 
-    async def update_sect(self, sect: Sect):
-        """更新宗门信息"""
+    async def update_sect(self, sect: Sect, commit: bool = True):
+        """更新宗门信息
+
+        Args:
+            sect: 宗门对象
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         await self.conn.execute(
             """
             UPDATE sects SET
@@ -119,7 +124,8 @@ class DatabaseExtended:
                 sect.sect_id,
             ),
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
     async def delete_sect(self, sect_id: int):
         """删除宗门"""
@@ -135,7 +141,7 @@ class DatabaseExtended:
             return [Sect(**dict(row)) for row in rows]
 
     async def update_sect_materials(
-        self, sect_id: int, materials: int, operation: int = 1
+        self, sect_id: int, materials: int, operation: int = 1, commit: bool = True
     ):
         """更新宗门资材
 
@@ -143,6 +149,7 @@ class DatabaseExtended:
             sect_id: 宗门ID
             materials: 资材数量
             operation: 1=增加, 2=减少
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         if operation == 1:
             await self.conn.execute(
@@ -154,10 +161,20 @@ class DatabaseExtended:
                 "UPDATE sects SET sect_materials = sect_materials - ? WHERE sect_id = ?",
                 (materials, sect_id),
             )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
-    async def donate_to_sect(self, sect_id: int, stone_num: int, scale_ratio: int = 10):
-        """宗门捐献（增加灵石和建设度，建设度 = 灵石 × scale_ratio）"""
+    async def donate_to_sect(
+        self, sect_id: int, stone_num: int, scale_ratio: int = 10, commit: bool = True
+    ):
+        """宗门捐献（增加灵石和建设度，建设度 = 灵石 × scale_ratio）
+
+        Args:
+            sect_id: 宗门ID
+            stone_num: 捐献灵石数量
+            scale_ratio: 建设度换算比率
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         await self.conn.execute(
             """
             UPDATE sects SET
@@ -167,7 +184,8 @@ class DatabaseExtended:
             """,
             (stone_num, stone_num * scale_ratio, sect_id),
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
     # ===== BuffInfo 系统 CRUD =====
 
@@ -382,8 +400,13 @@ class DatabaseExtended:
 
     # ===== 用户CD系统 CRUD =====
 
-    async def create_user_cd(self, user_id: str):
-        """初始化用户CD信息"""
+    async def create_user_cd(self, user_id: str, commit: bool = True):
+        """初始化用户CD信息
+
+        Args:
+            user_id: 用户ID
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         await self.conn.execute(
             """
             INSERT INTO user_cd (user_id, type, create_time, scheduled_time)
@@ -391,7 +414,8 @@ class DatabaseExtended:
             """,
             (user_id,),
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
     async def get_user_cd(self, user_id: str) -> UserCd | None:
         """获取用户CD信息"""
@@ -427,6 +451,7 @@ class DatabaseExtended:
         busy_type: int,
         scheduled_time: int = 0,
         extra_data: dict = None,
+        commit: bool = True,
     ):
         """设置用户忙碌状态（无 user_cd 行时自动插入，保证双层状态检查一致）
 
@@ -435,6 +460,7 @@ class DatabaseExtended:
             busy_type: 0=空闲, 1=闭关, 2=历练, 3=探索秘境
             scheduled_time: 计划完成时间戳
             extra_data: 额外数据（如秘境ID等）
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         import time
 
@@ -451,7 +477,8 @@ class DatabaseExtended:
             """,
             (user_id, busy_type, int(time.time()), scheduled_time, extra_json),
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
     async def set_user_free(self, user_id: str):
         """设置用户为空闲状态"""
@@ -515,6 +542,7 @@ class DatabaseExtended:
         max_star_exp_compensation: int = 0,
         origin_sect_id: str | None = None,
         sect_bound: bool = False,
+        commit: bool = True,
     ) -> tuple[bool, int]:
         """Learn a new skill or increment the star level if already learned.
 
@@ -529,6 +557,11 @@ class DatabaseExtended:
                 on first learn; star-ups keep the original attribution).
             sect_bound: Whether the skill is inherently sect-bound (only
                 passable to members of the same sect); stored on first learn.
+            commit: When True (default), wrap the write in its own
+                ``BEGIN IMMEDIATE`` transaction and commit it. Pass False
+                when calling inside an outer transaction — no BEGIN is
+                issued, nothing is committed or rolled back here, and the
+                caller owns commit/rollback.
 
         Returns:
             (is_new_learn, new_star_level). If already at max_star,
@@ -537,7 +570,8 @@ class DatabaseExtended:
         import time
 
         now = int(time.time())
-        await self.conn.execute("BEGIN IMMEDIATE")
+        if commit:
+            await self.conn.execute("BEGIN IMMEDIATE")
         try:
             async with self.conn.execute(
                 "SELECT star_level FROM player_skills WHERE user_id = ? AND skill_id = ?",
@@ -564,7 +598,8 @@ class DatabaseExtended:
                         int(sect_bound),
                     ),
                 )
-                await self.conn.commit()
+                if commit:
+                    await self.conn.commit()
                 return True, 1
 
             current_star = row[0]
@@ -574,7 +609,8 @@ class DatabaseExtended:
                         "UPDATE players SET experience = experience + ? WHERE user_id = ?",
                         (max_star_exp_compensation, user_id),
                     )
-                await self.conn.commit()
+                if commit:
+                    await self.conn.commit()
                 return False, max_star
 
             new_star = current_star + 1
@@ -585,10 +621,12 @@ class DatabaseExtended:
                 """,
                 (new_star, source, now, user_id, skill_id),
             )
-            await self.conn.commit()
+            if commit:
+                await self.conn.commit()
             return False, new_star
         except Exception:
-            await self.conn.rollback()
+            if commit:
+                await self.conn.rollback()
             raise
 
     # ===== Player扩展字段更新方法 =====
@@ -601,14 +639,22 @@ class DatabaseExtended:
         await self.conn.commit()
 
     async def update_player_sect_info(
-        self, user_id: str, sect_id: int, sect_position: int
+        self, user_id: str, sect_id: int, sect_position: int, commit: bool = True
     ):
-        """更新玩家宗门信息"""
+        """更新玩家宗门信息
+
+        Args:
+            user_id: 用户ID
+            sect_id: 宗门ID
+            sect_position: 宗门职位
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         await self.conn.execute(
             "UPDATE players SET sect_id = ?, sect_position = ? WHERE user_id = ?",
             (sect_id, sect_position, user_id),
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
     async def update_player_sect_contribution(self, user_id: str, contribution: int):
         """更新玩家宗门贡献度"""
@@ -618,23 +664,42 @@ class DatabaseExtended:
         )
         await self.conn.commit()
 
-    async def increment_sect_task_count(self, user_id: str, count: int = 1):
-        """增加宗门任务完成次数"""
+    async def increment_sect_task_count(
+        self, user_id: str, count: int = 1, commit: bool = True
+    ):
+        """增加宗门任务完成次数
+
+        Args:
+            user_id: 用户ID
+            count: 增加次数
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         await self.conn.execute(
             "UPDATE players SET sect_task = sect_task + ? WHERE user_id = ?",
             (count, user_id),
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
-    async def reset_sect_tasks(self):
-        """重置所有用户的宗门任务次数（定时任务）"""
+    async def reset_sect_tasks(self, commit: bool = True):
+        """重置所有用户的宗门任务次数（定时任务）
+
+        Args:
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         await self.conn.execute("UPDATE players SET sect_task = 0")
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
-    async def reset_sect_elixir_get(self):
-        """重置所有用户的宗门丹药领取标记（定时任务）"""
+    async def reset_sect_elixir_get(self, commit: bool = True):
+        """重置所有用户的宗门丹药领取标记（定时任务）
+
+        Args:
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         await self.conn.execute("UPDATE players SET sect_elixir_get = 0")
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
     async def get_sect_members(self, sect_id: int) -> list:
         """获取宗门所有成员"""

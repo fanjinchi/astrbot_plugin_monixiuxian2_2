@@ -805,41 +805,50 @@ class SectManager:
 
         The cooldown uses the task's own ``cooldown`` field (default 1h) and
         keeps the existing ``user_cd`` busy-state write (SECT_TASK type).
-        The settlement section (deduct cost, grant rewards, bump counters,
-        set cooldown) runs inside a single ``BEGIN IMMEDIATE`` transaction
-        so a mid-settlement failure cannot charge the player without
-        granting rewards.
+        The whole read-check-settle section (player/cooldown reads, cost
+        deduction, reward grant, counter bumps, cooldown write) runs inside
+        a single ``BEGIN IMMEDIATE`` transaction — helpers are called with
+        ``commit=False`` so the first write cannot silently end the
+        transaction, and a mid-settlement failure cannot charge the player
+        without granting rewards.
         """
-        player = await self.db.get_player_by_id(user_id)
-        if not player or player.sect_id == 0:
-            return False, "❌ 你还未加入宗门！"
-
         tasks = (self.sect_tasks or {}).get("construction_tasks", [])
-        if not isinstance(tasks, list) or not tasks:
-            return False, "❌ 宗门暂无建设任务发布！"
 
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if not user_cd:
-            await self.db.ext.create_user_cd(user_id)
-            user_cd = await self.db.ext.get_user_cd(user_id)
-
-        current_time = int(time.time())
-        if (
-            user_cd.type == UserStatus.SECT_TASK
-            and current_time < user_cd.scheduled_time
-        ):
-            remaining = user_cd.scheduled_time - current_time
-            return False, f"❌ 宗门任务冷却中！还需 {remaining // 60} 分钟。"
-
-        task = random.choice(tasks)
-        task_name = task.get("name", "建设任务")
-        cost = task.get("cost", {}) if isinstance(task.get("cost"), dict) else {}
-        reward = task.get("reward", {}) if isinstance(task.get("reward"), dict) else {}
-        cooldown = int(task.get("cooldown", 3600) or 3600)
-        scale_ratio = self.config.get("scale_ratio", 10)
-
+        # 玩家/冷却读取在事务内进行，避免并发下读到旧快照
         await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
+            player = await self.db.get_player_by_id(user_id)
+            if not player or player.sect_id == 0:
+                await self.db.conn.rollback()
+                return False, "❌ 你还未加入宗门！"
+
+            if not isinstance(tasks, list) or not tasks:
+                await self.db.conn.rollback()
+                return False, "❌ 宗门暂无建设任务发布！"
+
+            user_cd = await self.db.ext.get_user_cd(user_id)
+            if not user_cd:
+                await self.db.ext.create_user_cd(user_id, commit=False)
+                user_cd = await self.db.ext.get_user_cd(user_id)
+
+            current_time = int(time.time())
+            if (
+                user_cd.type == UserStatus.SECT_TASK
+                and current_time < user_cd.scheduled_time
+            ):
+                remaining = user_cd.scheduled_time - current_time
+                await self.db.conn.rollback()
+                return False, f"❌ 宗门任务冷却中！还需 {remaining // 60} 分钟。"
+
+            task = random.choice(tasks)
+            task_name = task.get("name", "建设任务")
+            cost = task.get("cost", {}) if isinstance(task.get("cost"), dict) else {}
+            reward = (
+                task.get("reward", {}) if isinstance(task.get("reward"), dict) else {}
+            )
+            cooldown = int(task.get("cooldown", 3600) or 3600)
+            scale_ratio = self.config.get("scale_ratio", 10)
+
             # 灵石类任务前置校验（资材类任务由玩家外出采集，不消耗玩家货币）
             stones_cost = int(cost.get("stones", 0) or 0)
             if stones_cost > 0 and player.gold < stones_cost:
@@ -856,7 +865,7 @@ class SectManager:
                 player.gold -= stones_cost
                 # 灵石入宗门库房并按 scale_ratio 折算建设度
                 await self.db.ext.donate_to_sect(
-                    player.sect_id, stones_cost, scale_ratio
+                    player.sect_id, stones_cost, scale_ratio, commit=False
                 )
                 lines.append(
                     f"捐献灵石：-{stones_cost}（宗门建设度 +{stones_cost * scale_ratio}）"
@@ -866,7 +875,7 @@ class SectManager:
             if materials_gain > 0:
                 # 玩家为宗门采集/筹备资材，资材直接入宗门库房
                 await self.db.ext.update_sect_materials(
-                    player.sect_id, materials_gain, 1
+                    player.sect_id, materials_gain, 1, commit=False
                 )
                 lines.append(f"宗门资材：+{materials_gain}")
 
@@ -880,12 +889,12 @@ class SectManager:
                 player.experience += exp_gain
                 lines.append(f"获得修为：+{exp_gain}")
 
-            await self.db.update_player(player)
-            await self.db.ext.increment_sect_task_count(user_id)
+            await self.db.update_player(player, commit=False)
+            await self.db.ext.increment_sect_task_count(user_id, commit=False)
 
             # 冷却使用任务配置的 cooldown 字段，状态写法保持不变
             await self.db.ext.set_user_busy(
-                user_id, UserStatus.SECT_TASK, current_time + cooldown
+                user_id, UserStatus.SECT_TASK, current_time + cooldown, commit=False
             )
             await self.db.conn.commit()
         except Exception:
@@ -1054,7 +1063,7 @@ class SectManager:
             inventory[pill_name] = inventory.get(pill_name, 0) + 1
             player.set_pills_inventory(inventory)
             player.sect_elixir_get = 1
-            await self.db.update_player(player)
+            await self.db.update_player(player, commit=False)
 
             await self.db.conn.commit()
         except Exception:
@@ -1241,7 +1250,7 @@ class SectManager:
                     if unlocked
                     else "暂无新丹药解锁。"
                 )
-            await self.db.ext.update_sect(sect)
+            await self.db.ext.update_sect(sect, commit=False)
 
             await self.db.conn.commit()
         except Exception:
@@ -1388,7 +1397,9 @@ class SectManager:
                     f"❌ 晋升【{target_name}】未达门槛：\n" + "\n".join(gaps)
                 )
 
-            await self.db.ext.update_player_sect_info(user_id, player.sect_id, target)
+            await self.db.ext.update_player_sect_info(
+                user_id, player.sect_id, target, commit=False
+            )
             await self.db.conn.commit()
         except Exception:
             await self.db.conn.rollback()
@@ -1589,7 +1600,7 @@ class SectManager:
             player.set_storage_ring_items(items)
             claims.append(entry["id"])
             player.set_sect_treasure_claims(claims)
-            await self.db.update_player(player)
+            await self.db.update_player(player, commit=False)
             await self.db.conn.commit()
         except Exception:
             await self.db.conn.rollback()
@@ -1776,13 +1787,14 @@ class SectManager:
         reward draws one random skill from the named pool (learned via
         ``learn_or_star_up`` with sect attribution; max-star duplicates
         follow the existing exp-compensation rule), and the chain advances
-        to the next stage (or completes). The skill is granted FIRST and
-        the player row is then re-read before applying contribution/exp and
-        stage progress, so the atomic max-star exp compensation inside
-        ``learn_or_star_up`` is never overwritten by a stale full-row
-        update; if the skill grant fails, the stage is NOT marked complete
-        (stored progress is kept) so the next matching event retries the
-        settlement.
+        to the next stage (or completes). The whole settlement — skill
+        grant (``commit=False``), player re-read, contribution/exp and
+        stage progress write — runs inside a single ``BEGIN IMMEDIATE``
+        transaction, so a half-settled stage (skill granted but progress
+        not advanced, or vice versa) is impossible and a retry on the next
+        matching event is always safe; if the skill grant fails, the
+        transaction is rolled back and the stage is NOT marked complete
+        (stored progress is kept).
 
         Args:
             user_id: Player user ID.
@@ -1835,54 +1847,64 @@ class SectManager:
             await self.db.update_player(player)
             return f"\n\n📜 师承任务【{stage_name}】进度：{current}/{count}"
 
-        # ===== 阶段结算 =====
+        # ===== 阶段结算（单事务）=====
         elder = self._get_elder_name(faction)
         reward = stage.get("reward")
         reward = reward if isinstance(reward, dict) else {}
         reward_lines = []
 
-        # 先发功法（内部 try/except，失败记日志并返回 None）：learn_or_star_up
-        # 内部对满星折算修为做原子增量，必须在其完成后重新读取玩家再整行落库，
-        # 否则折算修为会被旧值覆盖。功法发放失败时阶段不标记完成（进度保持），
-        # 下次事件可重试结算。
+        # 功法发放（learn_or_star_up，含满星折算修为）+ 重新读取玩家 +
+        # 落贡献/修为/阶段进度（update_player）放进同一 BEGIN IMMEDIATE 事务，
+        # 全部 helper 传 commit=False、由本处统一 commit/rollback：
+        # "功法已发但进度未落"或反过来的分裂状态都不可能发生，重试天然安全
+        # （要么全成要么全不成）。功法发放失败时回滚事务、阶段不标记完成
+        # （进度保持），下次事件可重试结算。
         pool_name = reward.get("skill_learn_chance")
-        if pool_name:
-            skill_msg = await self._grant_master_skill(
-                user_id, str(pool_name), faction.get("id")
-            )
-            if skill_msg:
-                reward_lines.append(skill_msg)
-            else:
-                return (
-                    f"\n\n⚠️ 师承任务【{stage_name}】的功法传承发放失败，"
-                    "本次进度已保留，请再次触发对应行为重试结算。"
+        await self.db.conn.execute("BEGIN IMMEDIATE")
+        try:
+            if pool_name:
+                skill_msg = await self._grant_master_skill(
+                    user_id, str(pool_name), faction.get("id")
                 )
+                if skill_msg:
+                    reward_lines.append(skill_msg)
+                else:
+                    await self.db.conn.rollback()
+                    return (
+                        f"\n\n⚠️ 师承任务【{stage_name}】的功法传承发放失败，"
+                        "本次进度已保留，请再次触发对应行为重试结算。"
+                    )
 
-        # 功法发放可能已原子写入折算修为，重新读取玩家避免整行覆盖
-        player = await self.db.get_player_by_id(user_id)
-        if not player:
-            return None
+            # 功法发放可能已原子写入折算修为，事务内重新读取玩家避免整行覆盖
+            player = await self.db.get_player_by_id(user_id)
+            if not player:
+                await self.db.conn.rollback()
+                return None
 
-        contribution = int(reward.get("contribution", 0) or 0)
-        if contribution > 0:
-            player.sect_contribution += contribution
-            reward_lines.append(f"宗门贡献 +{contribution}")
-        exp_gain = int(reward.get("exp", 0) or 0)
-        if exp_gain > 0:
-            player.experience += exp_gain
-            reward_lines.append(f"修为 +{exp_gain}")
+            contribution = int(reward.get("contribution", 0) or 0)
+            if contribution > 0:
+                player.sect_contribution += contribution
+                reward_lines.append(f"宗门贡献 +{contribution}")
+            exp_gain = int(reward.get("exp", 0) or 0)
+            if exp_gain > 0:
+                player.experience += exp_gain
+                reward_lines.append(f"修为 +{exp_gain}")
 
-        next_index = stage_index + 1
-        finished = next_index >= len(stages)
-        player.set_sect_master_progress(
-            {
-                "chain_id": chain["id"],
-                "stage_index": stage_index if finished else next_index,
-                "progress": 0,
-                "done": finished,
-            }
-        )
-        await self.db.update_player(player)
+            next_index = stage_index + 1
+            finished = next_index >= len(stages)
+            player.set_sect_master_progress(
+                {
+                    "chain_id": chain["id"],
+                    "stage_index": stage_index if finished else next_index,
+                    "progress": 0,
+                    "done": finished,
+                }
+            )
+            await self.db.update_player(player, commit=False)
+            await self.db.conn.commit()
+        except Exception:
+            await self.db.conn.rollback()
+            raise
 
         lines = [f"📜 师承任务【{stage_name}】完成！"]
         if stage.get("text"):
@@ -1903,9 +1925,13 @@ class SectManager:
 
         The skill is recorded with ``origin_sect_id`` / ``sect_bound``
         attribution. A duplicate at max star follows the existing max-star
-        exp-compensation rule (same config keys as SkillManager). Database
+        exp-compensation rule (same config keys as SkillManager). Must be
+        called inside the caller's ``BEGIN IMMEDIATE`` transaction:
+        ``learn_or_star_up`` is invoked with ``commit=False`` so the grant
+        commits or rolls back together with the stage settlement. Database
         failures are caught and logged here; the method returns None so the
-        caller keeps the stage unsettled and retries on the next event.
+        caller rolls back, keeps the stage unsettled and retries on the
+        next event.
         """
         if not self.config_manager:
             return None
@@ -1952,6 +1978,7 @@ class SectManager:
                 max_star_exp_compensation=compensation,
                 origin_sect_id=faction_id,
                 sect_bound=True,
+                commit=False,
             )
         except Exception:
             logger.warning(

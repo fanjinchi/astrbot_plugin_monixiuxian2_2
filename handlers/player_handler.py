@@ -435,23 +435,30 @@ class PlayerHandler:
         # 跨日重置：宗门丹药领取标记与宗门任务计数（以日期变更为锚，
         # 由每日首位签到的玩家触发一次全局重置）。原子推进日期：
         # INSERT ... ON CONFLICT ... WHERE value != 今日，仅 rowcount > 0
-        # 的调用方执行重置，避免并发签到双重重置；失败不得影响签到主流程。
+        # 的调用方执行重置，避免并发签到双重重置；日期推进与重置在同一
+        # 事务内统一提交——重置失败则日期不推进，下次签到自动重试；
+        # 任何失败不得影响签到主流程。
         try:
             now_ts = int(time.time())
-            cursor = await self.db.conn.execute(
-                """
-                INSERT INTO system_config (key, value, updated_at)
-                VALUES ('sect_daily_reset_date', ?, ?)
-                ON CONFLICT(key) DO UPDATE SET
-                    value = excluded.value, updated_at = excluded.updated_at
-                WHERE system_config.value != excluded.value
-                """,
-                (today, now_ts),
-            )
-            await self.db.conn.commit()
-            if cursor.rowcount > 0:
-                await self.db.ext.reset_sect_elixir_get()
-                await self.db.ext.reset_sect_tasks()
+            await self.db.conn.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = await self.db.conn.execute(
+                    """
+                    INSERT INTO system_config (key, value, updated_at)
+                    VALUES ('sect_daily_reset_date', ?, ?)
+                    ON CONFLICT(key) DO UPDATE SET
+                        value = excluded.value, updated_at = excluded.updated_at
+                    WHERE system_config.value != excluded.value
+                    """,
+                    (today, now_ts),
+                )
+                if cursor.rowcount > 0:
+                    await self.db.ext.reset_sect_elixir_get(commit=False)
+                    await self.db.ext.reset_sect_tasks(commit=False)
+                await self.db.conn.commit()
+            except Exception:
+                await self.db.conn.rollback()
+                raise
         except Exception as e:
             logger.warning("【修仙插件】宗门每日重置失败（不影响签到）: %s", e)
 

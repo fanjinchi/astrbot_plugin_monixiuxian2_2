@@ -116,16 +116,18 @@ def bounty_manager_cls():
     sentinel = object()
     previous = getattr(data_pkg, "DataBase", sentinel)
     data_pkg.DataBase = DataBase
-    mod = load_package_module(
-        "managers/bounty_manager.py",
-        "astrbot_plugin_monixiuxian2_2.managers.bounty_manager_cl",
-    )
-    yield mod.BountyManager
-    sys.modules.pop("astrbot_plugin_monixiuxian2_2.managers.bounty_manager_cl", None)
-    if previous is sentinel:
-        del data_pkg.DataBase
-    else:
-        data_pkg.DataBase = previous
+    try:
+        mod = load_package_module(
+            "managers/bounty_manager.py",
+            "astrbot_plugin_monixiuxian2_2.managers.bounty_manager_cl",
+        )
+        yield mod.BountyManager
+    finally:
+        sys.modules.pop("astrbot_plugin_monixiuxian2_2.managers.bounty_manager_cl", None)
+        if previous is sentinel:
+            del data_pkg.DataBase
+        else:
+            data_pkg.DataBase = previous
 
 
 async def _make_player(db: DataBase, user_id: str, level_index: int = 1) -> Player:

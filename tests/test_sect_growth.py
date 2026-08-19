@@ -14,9 +14,11 @@ _data_mod = load_package_module(
 DataBase = _data_mod.DataBase
 
 Player = load_package_module("models.py", "astrbot_plugin_monixiuxian2_2.models").Player
-Sect = load_package_module(
+_models_extended = load_package_module(
     "models_extended.py", "astrbot_plugin_monixiuxian2_2.models_extended"
-).Sect
+)
+Sect = _models_extended.Sect
+UserStatus = _models_extended.UserStatus
 
 _sect_mod = load_package_module(
     "managers/sect_manager.py",
@@ -653,10 +655,6 @@ async def test_leave_sect_reclaims_equipped_treasure():
 
 # ===== OCR 评审修复回归（H2/H4/M6/M13/L16） =====
 
-import sys
-
-UserStatus = sys.modules["astrbot_plugin_monixiuxian2_2.models_extended"].UserStatus
-
 
 @pytest.mark.asyncio
 async def test_mainbuff_trigger_dedup_when_player_learned_same_skill():
@@ -691,7 +689,7 @@ async def test_claim_treasure_rolls_back_when_update_fails(monkeypatch):
     sect = await _join_qingyun(db, mgr, "u1", level_index=2)
     await db.ext.update_player_sect_info("u1", sect.sect_id, 3)
 
-    async def _boom(player):
+    async def _boom(player, commit=True):
         raise RuntimeError("simulated write failure")
 
     monkeypatch.setattr(db, "update_player", _boom)
@@ -716,7 +714,7 @@ async def test_perform_sect_task_rolls_back_on_first_write_failure(monkeypatch):
     sect = await _join_qingyun(db, mgr, "u1", level_index=2, gold=1000)
     scale_before = sect.sect_scale
 
-    async def _boom(sect_id, stone_num, scale_ratio=10):
+    async def _boom(sect_id, stone_num, scale_ratio=10, commit=True):
         raise RuntimeError("simulated write failure")
 
     monkeypatch.setattr(db.ext, "donate_to_sect", _boom)
@@ -732,6 +730,86 @@ async def test_perform_sect_task_rolls_back_on_first_write_failure(monkeypatch):
     assert sect_after.sect_scale == scale_before
     user_cd = await db.ext.get_user_cd("u1")
     assert user_cd is None or user_cd.type == UserStatus.IDLE
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_perform_sect_task_rolls_back_on_cooldown_write_failure(monkeypatch):
+    """Failure at the last settlement write (set_user_busy) also rolls back
+    gold, contribution, sect stores and task count — nothing half-settled."""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager())
+    await mgr.ensure_system_sects()
+    sect = await _join_qingyun(db, mgr, "u1", level_index=2, gold=1000)
+    scale_before = sect.sect_scale
+
+    async def _boom(user_id, busy_type, scheduled_time=0, extra_data=None, commit=True):
+        raise RuntimeError("simulated cooldown write failure")
+
+    monkeypatch.setattr(db.ext, "set_user_busy", _boom)
+
+    with pytest.raises(RuntimeError):
+        await mgr.perform_sect_task("u1")
+
+    monkeypatch.undo()
+    player = await db.get_player_by_id("u1")
+    assert player.gold == 1000
+    assert player.sect_contribution == 0
+    assert player.sect_task == 0
+    sect_after = await db.ext.get_sect_by_id(sect.sect_id)
+    assert sect_after.sect_scale == scale_before
+    user_cd = await db.ext.get_user_cd("u1")
+    assert user_cd is None or user_cd.type == UserStatus.IDLE
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_claim_elixir_rolls_back_when_update_fails(monkeypatch):
+    """A failed claim write persists neither the pill nor the daily flag."""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager())
+    await mgr.ensure_system_sects()
+    sect = await _join_qingyun(db, mgr, "u1")
+    sect.elixir_room_level = 1
+    await db.ext.update_sect(sect)
+
+    async def _boom(player, commit=True):
+        raise RuntimeError("simulated write failure")
+
+    monkeypatch.setattr(db, "update_player", _boom)
+
+    with pytest.raises(RuntimeError):
+        await mgr.claim_elixir("u1")
+
+    monkeypatch.undo()
+    player = await db.get_player_by_id("u1")
+    assert player.sect_elixir_get == 0
+    assert player.get_pills_inventory() == {}
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_upgrade_building_rolls_back_when_update_sect_fails(monkeypatch):
+    """A failed building write keeps sect materials and level unchanged."""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager())
+    await mgr.ensure_system_sects()
+    sect = await _join_qingyun(db, mgr, "u1")
+    sect.sect_materials = 1000
+    await db.ext.update_sect(sect)
+
+    async def _boom(sect, commit=True):
+        raise RuntimeError("simulated write failure")
+
+    monkeypatch.setattr(db.ext, "update_sect", _boom)
+
+    with pytest.raises(RuntimeError):
+        await mgr.upgrade_building("u1", "洞天")
+
+    monkeypatch.undo()
+    sect_after = await db.ext.get_sect_by_id(sect.sect_id)
+    assert sect_after.sect_materials == 1000
+    assert sect_after.sect_fairyland == 0
     await db.close()
 
 

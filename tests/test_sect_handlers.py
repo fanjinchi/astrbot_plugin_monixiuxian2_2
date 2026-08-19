@@ -122,6 +122,17 @@ def _last_msg(event) -> str:
     return event.plain_result.call_args[0][0]
 
 
+class _FrozenDateTime(datetime):
+    """Fixed clock for check-in tests so date assertions never race midnight."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return cls(2026, 8, 19, 12, 0, 0)
+
+
+FROZEN_TODAY = "2026-08-19"
+
+
 # ===== M9 查看分支放行 =====
 
 
@@ -175,12 +186,13 @@ async def test_busy_player_can_view_but_not_mutate_sect_panels():
 
 
 @pytest.mark.asyncio
-async def test_check_in_daily_reset_runs_once_per_day():
+async def test_check_in_daily_reset_runs_once_per_day(monkeypatch):
     """The first check-in of a day resets sect flags exactly once; later
     check-ins on the same day do not reset again."""
+    monkeypatch.setattr(_player_handler_mod, "datetime", _FrozenDateTime)
     db = await _make_db()
     handler = PlayerHandler(db, {"VALUES": {}}, FakeConfigManager())
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = FROZEN_TODAY
 
     await _make_player(db, "u1", check_in_date="2000-01-01")
     await _make_player(db, "u2", check_in_date="2000-01-01")
@@ -216,12 +228,13 @@ async def test_check_in_daily_reset_runs_once_per_day():
 @pytest.mark.asyncio
 async def test_check_in_daily_reset_failure_does_not_break_check_in(monkeypatch):
     """A failing sect daily reset is logged and swallowed; check-in succeeds."""
+    monkeypatch.setattr(_player_handler_mod, "datetime", _FrozenDateTime)
     db = await _make_db()
     handler = PlayerHandler(db, {"VALUES": {}}, FakeConfigManager())
 
     await _make_player(db, "u1", check_in_date="2000-01-01")
 
-    async def _boom():
+    async def _boom(commit=True):
         raise RuntimeError("simulated reset failure")
 
     monkeypatch.setattr(db.ext, "reset_sect_elixir_get", _boom)
@@ -231,8 +244,10 @@ async def test_check_in_daily_reset_failure_does_not_break_check_in(monkeypatch)
     assert "签到成功" in _last_msg(event)
 
     player = await db.get_player_by_id("u1")
-    today = datetime.now().strftime("%Y-%m-%d")
-    assert player.last_check_in_date == today
+    assert player.last_check_in_date == FROZEN_TODAY
     assert player.gold > 0
+
+    # 重置失败时日期不推进，下次签到可重试
+    assert await db.ext.get_system_config("sect_daily_reset_date") != FROZEN_TODAY
 
     await db.close()

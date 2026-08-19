@@ -499,3 +499,52 @@ async def test_max_star_compensation_not_overwritten_by_stage_settlement(db):
     assert player.experience == 500  # 折算修为未被整行 update 覆盖
     assert player.sect_contribution == 80
     assert player.get_sect_master_progress()["done"] is False  # 推进到第三阶段
+
+
+@pytest.mark.asyncio
+async def test_master_settlement_rolls_back_skill_when_progress_write_fails(
+    db, monkeypatch
+):
+    """Settlement is one transaction: when the final progress write fails,
+    the skill grant and rewards roll back too (no split state), and the
+    retry grants the skill exactly once."""
+    mgr = SectManager(db, FakeConfigManager())
+    await mgr.ensure_system_sects()
+    await _join(db, mgr, "u1", "青云门", level_index=1)
+
+    # 定位到第二阶段（采药历练，奖励含 skill_learn_chance）
+    player = await db.get_player_by_id("u1")
+    player.set_sect_master_progress(
+        {"chain_id": "chain_qy_01", "stage_index": 1, "progress": 0, "done": False}
+    )
+    await db.update_player(player)
+
+    async def _boom(player, commit=True):
+        raise RuntimeError("simulated progress write failure")
+
+    monkeypatch.setattr(db, "update_player", _boom)
+
+    with pytest.raises(RuntimeError):
+        await mgr.advance_master_progress("u1", "adventure_complete")
+
+    monkeypatch.undo()
+    player = await db.get_player_by_id("u1")
+    # 贡献/修为未发，阶段进度保持，功法也已回滚——无"功法已发但进度未落"
+    assert player.sect_contribution == 0
+    assert player.experience == 0
+    assert player.get_sect_master_progress() == {
+        "chain_id": "chain_qy_01",
+        "stage_index": 1,
+        "progress": 0,
+        "done": False,
+    }
+    assert await db.ext.get_learned_skills("u1") == []
+
+    # 重试结算：功法只发放一次
+    msg = await mgr.advance_master_progress("u1", "adventure_complete")
+    assert "【采药历练】完成" in msg
+    assert "领悟宗门功法【青云剑诀】" in msg
+    player = await db.get_player_by_id("u1")
+    assert player.sect_contribution == 80
+    skills = await db.ext.get_learned_skills("u1")
+    assert len(skills) == 1 and skills[0]["skill_id"] == "qy_001"

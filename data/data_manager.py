@@ -123,12 +123,18 @@ class DataBase:
                 return Player(**filtered_data)
             return None
 
-    async def update_player(self, player: Player):
-        """更新玩家信息（字段从 Player dataclass 动态生成，避免遗漏）"""
+    async def update_player(self, player: Player, commit: bool = True):
+        """更新玩家信息（字段从 Player dataclass 动态生成，避免遗漏）
+
+        Args:
+            player: 玩家对象
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         sql = _build_update_sql()
         params = _player_to_tuple(player, for_insert=False)
         await self.conn.execute(sql, params)
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
     async def delete_player(self, user_id: str):
         """删除玩家"""
