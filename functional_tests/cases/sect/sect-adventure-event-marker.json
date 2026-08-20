@@ -12,10 +12,10 @@
     "pin_players": {
       "gm": "900000001",
       "p1": "900000002"
-    },
-    "deterministic": true,
-    "seed": 42
+    }
   },
+  "deterministic": true,
+  "seed": 42,
   "steps": [
     {
       "type": "send",

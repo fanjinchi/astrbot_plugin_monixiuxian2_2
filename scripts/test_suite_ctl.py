@@ -215,6 +215,12 @@ def _validate_case(case: dict, path: Path) -> None:
         not isinstance(case["seed"], int) or isinstance(case["seed"], bool)
     ):
         raise CtlError(f"{path}: case.seed 必须是整数")
+    conversation = case.get("conversation") or {}
+    misplaced = [k for k in ("deterministic", "seed", "combine") if k in conversation]
+    if misplaced:
+        raise CtlError(
+            f"{path}: {misplaced} 必须放在 case 顶层，不能放在 conversation 内"
+        )
 
 
 def _load_source_cases(cases_root: Path) -> list[tuple[str, dict, Path]]:

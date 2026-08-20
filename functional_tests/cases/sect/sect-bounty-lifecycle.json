@@ -12,11 +12,12 @@
     "group_id": "webtest_sect_021",
     "pin_players": {
       "gm": "900000001",
-      "p1": "900000002"
-    },
-    "deterministic": true,
-    "seed": 42
+      "p1": "900000002",
+      "p2": "900000003"
+    }
   },
+  "deterministic": true,
+  "seed": 42,
   "steps": [
     {
       "type": "send",
@@ -49,6 +50,17 @@
     {
       "type": "expect",
       "match": "re:🏯 宗门悬赏 · 本宗委托[\\s\\S]*\\[307\\] 后山巡视（F级[\\s\\S]*\\[308\\] 执事堂派差（E级[\\s\\S]*💡 使用 /宗门 悬赏 接取 <编号> 接取任务",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#宗门 悬赏",
+      "note": "无宗门玩家尝试宗门悬赏入口，应被拒绝"
+    },
+    {
+      "type": "expect",
+      "match": "re:❌ 你还未加入宗门！",
       "timeout": 10
     },
     {
