@@ -22,4 +22,4 @@
 
 - [x] 4.1 `unify-sect-commands` 实施完成并热重载后，校对全部新/改用例的断言文案与最终实现一致
 - [x] 4.2 以 one-shot 管线执行：`case run-all --tag sect --quiet --sync-from ./cases --reload astrbot_plugin_monixiuxian2_2 --export ./results`（必要时单用例 `case run --repeat N --sync-from --reload` 聚合），全部通过
-- [ ] 4.3 归档 one-shot 导出的结果至 `functional_tests/results/<date>_sect-commands/`（含 summary.json 通过/失败清单）；发现的玩法 Bug 用 `bd` 登记
+- [x] 4.3 归档 one-shot 导出的结果至 `functional_tests/results/<date>_sect-commands/`（含 summary.json 通过/失败清单）；发现的玩法 Bug 用 `bd` 登记
