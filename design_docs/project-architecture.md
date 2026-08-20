@@ -1,6 +1,7 @@
 # 项目架构与系统功能设计总览
 
-> 生成：2026-08-07；复核更新：2026-08-11（效果引擎 v2、新增 2 篇 spec、时间线与 bd 清单回写）。
+> 生成：2026-08-07；复核更新：2026-08-11（效果引擎 v2、新增 2 篇 spec、时间线与 bd 清单回写）；
+> 2026-08-20（宗门变更 `add-default-sects-and-sect-growth` 回写：DB v31、指令 109、配置 ×22、spec 9 篇、时间线补 08-17/08-19 节点）。
 > 本文是**本项目（AstrBot 修仙插件）**的架构与功能设计总览，
 > 供开发者与 AI 助手在修改/新增功能时快速定位系统、理解设计意图、保持设计文档同步。
 > 详细数值以 `current-design-report.md` 为准，行为契约以 `openspec/specs/` 为准。
@@ -12,15 +13,15 @@
 - **形态**：AstrBot 插件（群聊文字修仙游戏），运行于宿主 `~/code/AstrBot/`（uv 环境，Python ≥3.12）
 - **入口**：`main.py` 的 `XiuXianPlugin`（`Star` 子类），AstrBot 插件加载器要求文件名必须是 main.py
 - **依赖**：仅 `Pillow>=9.0.0`（requirements.txt，加载时自动安装）
-- **数据**：SQLite（aiosqlite）`xiuxian_data_lite.db`，位于 `data/plugin_data/astrbot_plugin_monixiuxian2/`（AstrBot 数据目录，禁止写插件自身目录）；当前数据库版本 v27
-- **配置**：静态 `config/*.json` ×20（`config_manager.py` 加载，改后重启生效）；动态 `_conf_schema.json`（WebUI 可调：白名单、GM/Boss 管理员、灵根、数值、数据库文件名）
+- **数据**：SQLite（aiosqlite）`xiuxian_data_lite.db`，位于 `data/plugin_data/astrbot_plugin_monixiuxian2/`（AstrBot 数据目录，禁止写插件自身目录）；当前数据库版本 v31
+- **配置**：静态 `config/*.json` ×22（`config_manager.py` 加载，改后重启生效）；动态 `_conf_schema.json`（WebUI 可调：白名单、GM/Boss 管理员、灵根、数值、数据库文件名）
 - **测试**：pytest，`tests/helpers.py` 的 `load_module()` 绕过 managers/`__init__.py` 相对导入链
 
 ## 2. 分层架构
 
 ```
 用户指令
-  → main.py  @filter.command(CMD_XXX) 方法（约 103 个中文指令，@require_whitelist 内层）
+  → main.py  @filter.command(CMD_XXX) 方法（109 个中文指令，@require_whitelist 内层）
   → handlers/  指令处理层（26 文件；utils.py 提供 @player_required 双层状态检查 + 忙碌白名单）
   → managers/  业务逻辑层（17 管理器：战斗/宗门/Boss/银行/悬赏/秘境/历练/双修/传承/炼丹/洞天/灵田/灵眼…）
   → core/      通用系统层（9 模块：修炼/突破/丹药/装备/商店/储物戒/技能/GM/…）
@@ -31,16 +32,16 @@
 
 ```mermaid
 flowchart TD
-    U["群聊用户指令（中文，如 闭关/突破/切磋）"] --> M["main.py · XiuXianPlugin（Star 子类）<br/>103 个 @filter.command · @require_whitelist"]
+    U["群聊用户指令（中文，如 闭关/突破/切磋）"] --> M["main.py · XiuXianPlugin（Star 子类）<br/>109 个 @filter.command · @require_whitelist"]
     M --> H["handlers/ 指令处理层（26 文件）<br/>utils.py @player_required 双层状态检查 + 忙碌白名单"]
     H --> MG["managers/ 业务逻辑层（17 管理器）<br/>战斗 · 宗门 · Boss · 银行 · 悬赏 · 秘境 · 历练 · 双修 · 传承 · 炼丹 · 灵田/灵眼/洞天"]
     MG --> C["core/ 通用系统层（9 模块）<br/>修炼 · 突破 · 丹药 · 装备 · 商店 · 储物戒 · 技能 · GM"]
-    C --> D["data/ 数据层<br/>data_manager · database_extended · migration（v27）· default_configs"]
+    C --> D["data/ 数据层<br/>data_manager · database_extended · migration（v31）· default_configs"]
     D --> DB[("SQLite xiuxian_data_lite.db<br/>AstrBot data/plugin_data/ 下")]
-    CFG["config/*.json ×20<br/>config_manager.py（缺失自动建默认）"] -.-> C
+    CFG["config/*.json ×22<br/>config_manager.py（缺失自动建默认）"] -.-> C
     MD["models.py / models_extended.py<br/>Player · UserStatus · Sect · Boss · Rift"] -.-> MG
     T["定时任务 initialize()（指数退避重试）<br/>Boss 生成 · 贷款逾期 · 灵眼生成 · 悬赏过期"] -.-> MG
-    SPEC["openspec/specs/ 行为契约（8 篇）<br/>design_docs/ 设计基线"] -.-> MG
+    SPEC["openspec/specs/ 行为契约（9 篇）<br/>design_docs/ 设计基线"] -.-> MG
 ```
 
 **关键机制**（踩坑高发区）：
@@ -52,7 +53,7 @@ flowchart TD
 5. **消息发送**：普通 handler 用 `yield`，事件钩子（on_llm_request 等）用 `event.send()`。
 6. **静态配置加载**：config_manager 自动从 `data/default_configs.py` 创建缺失 JSON。
 
-## 3. 系统功能设计总览（20 个子系统）
+## 3. 系统功能设计总览（22 个子系统）
 
 > 括号内为入口/实现位置；关键数值为当前 config 默认值（以 `current-design-report.md` 为准）。
 
@@ -95,6 +96,7 @@ flowchart TD
 | `gm-commands` | 修仙GM 统一入口；GM_ADMINS 权限；目标解析优先级（@提及→数字 id→发送者）；属性修改/物品发放/强制结算/清除CD（需确认）/审计日志 500MB 滚动 |
 | `battle-status-effects` | 战斗持续状态（dot/buff/debuff/fatigue）回合级生命周期：回合开始计数衰减、到期移除、战斗结束全清不跨场；同名同源刷新（数值取新）、异源同型叠加上限默认 3 层（config 可调） |
 | `novel-reading-extraction` | 从修仙小说原文提取内容素材（宗门剧情/法宝/功法/突破事件）的工作流契约：免费可获取全文、来源失效可替换、按玩法维度组织、产出可直接喂给内容设定与文案 |
+| `functional-test-suite` | 功能测试套件契约：用例源文件存 `functional_tests/cases/`（平台兼容 JSON）、`sync-cases` 拍平同步到网页测试平台、运行结果归档 `results/<YYYY-MM-DD>_<target>/`（summary+逐用例+轨迹）、PvP fixture 固定测试 ID 验内容效果 |
 
 > ✅ **spec 滞后已回写（2026-08-07）**：attribute-numerics / combat-core 的护甲描述已改为
 > 百分比减伤 `armor/(armor+K)`（与代码一致，bd `qtk` 的实现），含伤害下限场景修正。
@@ -119,9 +121,11 @@ flowchart TD
 | 2026-08-09 | 技能池 v2 扩展 | 12 个新效果族技能入库（content-design → config） |
 | 2026-08-11 | `novel-reading-extraction` 归档 | 小说内容提取资料库建立 + spec 归档 |
 | 2026-08-16 | `skill-budget-audit-and-heart-route-mult` 归档 | dhh 预算审计闭环（validate_budget 全 PASS）、心法被动 route_multiplier 落地（f4t 关闭）、v3.8.1 |
-| 2026-08-19 | `add-default-sects-and-sect-growth` 落地 | 默认宗门（sect_factions.json 幂等播种、境界段拜入）+ 宗门成长（洞天/丹房/镇派功法/职阶晋升+福利/宝库/师承任务链）+ 离宗回收三路径与绑定物禁赠 + 悬赏/秘境/历练/领悟池宗门联动；DB v28-v30 |
+| 2026-08-17 | `add-functional-test-suite` / `fix-functional-test-bugs` 归档 | 功能测试套件落地（functional_tests/ 用例源+结果归档、sync/run/export 脚本）+ 配套 bug 修复 |
+| 2026-08-19 | `add-web-test-platform` 归档 | 网页测试平台（独立插件仓库）：模拟私聊/群聊走真实管线、消息流可见可批注、热重载闭环 |
+| 2026-08-19 | `add-default-sects-and-sect-growth` 落地 | 默认宗门（sect_factions.json 幂等播种、境界段拜入）+ 宗门成长（洞天/丹房/镇派功法/职阶晋升+福利/宝库/师承任务链）+ 离宗回收三路径与绑定物禁赠 + 悬赏/秘境/历练/领悟池宗门联动；DB v28-v31 |
 
-**数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底 → v28 默认宗门+功法归属（sects.is_system/faction_id、player_skills.sect_bound）→ v29 宝库领取记录 → v30 师承任务链进度（当前最新）。
+**数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底 → v28 默认宗门+功法归属（sects.is_system/faction_id、player_skills.sect_bound）→ v29 宝库领取记录 → v30 师承任务链进度 → v31 rifts 播种青云剑冢（id 6，宗门专属秘境，当前最新）。
 
 ## 6. 进行中的工作（bd open，设计相关）
 

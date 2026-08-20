@@ -435,6 +435,7 @@ class SectManager:
         """Format a [min, max] level_index range as realm names for display."""
 
         def level_name(idx: int) -> str:
+            """Resolve a level_index to its realm display name, falling back to 境界{idx}."""
             if self.config_manager and hasattr(self.config_manager, "get_level_name"):
                 name = self.config_manager.get_level_name(idx, "灵修")
                 if name:
@@ -1685,6 +1686,7 @@ class SectManager:
         """
 
         def stages_of(chain: dict) -> list:
+            """Return the chain's stage list, or [] when stages is missing or malformed."""
             stages = chain.get("stages")
             return stages if isinstance(stages, list) else []
 

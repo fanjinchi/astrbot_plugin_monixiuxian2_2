@@ -227,13 +227,14 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 | `design_docs/project-architecture.md` | 架构与系统功能设计总览（分层架构+mermaid 图、20 子系统设计表、openspec 契约、里程碑时间线、bd 对照） | 新增/修改功能、理解系统边界 | 新增子系统、架构变更、openspec spec 增删、里程碑节点 |
 | `design_docs/current-design-report.md` | 数值/机制设计活基线（含 `file:line` 引用） | 改数值、改战斗/技能/成长 | 任何影响玩法的修改（同 §关键开发规范-14） |
 | `design_docs/README.md` | design_docs 全部资料清单与类型标注 | 找专题资料（成长/曲线/内容设计/竞品） | 新增 design_docs 资料时登记 |
-| `openspec/specs/` | 行为契约（8 篇，What/Why 与 Accept 公式） | 改技能/战斗/装备/数值前 | 走 OpenSpec 提案流程（见 §关键开发规范-14） |
+| `openspec/specs/` | 行为契约（9 篇，What/Why 与 Accept 公式） | 改技能/战斗/装备/数值前 | 走 OpenSpec 提案流程（见 §关键开发规范-14） |
 
 **注释约定**：
 
-- 运行时代码（main.py、handlers/、managers/、core/、data/、utils/）非 dunder 函数/类均有 docstring（design_docs/ 下的调研脚本除外）；**新代码一律用英文 Google 风格 docstring**（存量中文 docstring 保留，不强制改写），用户可见输出仍为中文。
+- 运行时代码（main.py、handlers/、managers/、core/、data/、utils/）非 dunder 函数/类均有 docstring（含方法内的嵌套辅助函数；design_docs/ 下的调研脚本除外）；**新代码一律用英文 Google 风格 docstring**（存量中文 docstring 保留，不强制改写），用户可见输出仍为中文。
 - main.py 的 109 个路由方法 docstring 遵循固定格式：`"""Command 「指令名」- 描述; routes to xxx_handler.handle_yyy."""`（描述段与下游调用按实际填写）——新指令照此格式写，它是 AI 定位的第一跳。
 - 修改函数行为时同步更新其 docstring；docstring 与实现不一致视为 bug。
+- **新增/修改代码时必须同步做好行内注释**：注释解释"为什么"而非复述代码——非显然逻辑必须注释，包括数值公式/阈值的出处（config 键或 design_docs 引用）、平台/框架陷阱的 workaround（如 aiocqhttp strip 用零宽空格）、事务与并发约束、有意为之的取舍；改动涉及的存量注释若已过时，一并修正或删除，过时注释与过时 docstring 同视为 bug。
 
 ## Issue Tracking with bd (beads)
 

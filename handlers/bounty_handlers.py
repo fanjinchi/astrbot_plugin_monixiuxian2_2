@@ -24,6 +24,7 @@ class BountyHandlers:
         bounties = await self.bounty_mgr.get_bounty_list(player)
 
         def _format(b: dict) -> str:
+            """Render one bounty entry as a multi-line display block."""
             reward = b.get("reward", {})
             return (
                 f"[{b['id']}] {b['name']}（{b.get('difficulty_name', '未知')}·{b.get('category', '任务')}）\n"
