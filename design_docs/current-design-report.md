@@ -17,7 +17,7 @@
 
 - **类型**：AstrBot 插件（群聊文字修仙游戏），Python 异步，无独立构建系统
 - **宿主**：运行于 `~/code/AstrBot/data/plugins/` 下，依赖 AstrBot 提供的 `Context`、`filter`、`Star` API
-- **数据库**：SQLite（aiosqlite），文件为 `xiuxian_data_lite.db`，存放于 `data/plugin_data/astrbot_plugin_monixiuxian2/`
+- **数据库**：SQLite（aiosqlite），文件为 `xiuxian_data_lite.db`，存放于 `data/plugin_data/astrbot_plugin_monixiuxian2_2_2/`
 - **第三方依赖**：仅 `Pillow>=9.0.0`（图片生成）
 - **静态配置**：22 个 JSON 文件（`config/`），由 `config_manager.py` 加载，修改后需重启生效
 - **动态配置**：`_conf_schema.json` 暴露给 AstrBot WebUI（白名单、数值、灵根、数据库文件名）

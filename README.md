@@ -235,7 +235,7 @@
 
 ## ⚙️ 配置说明
 
-插件首次运行后，将在 `data/plugins/astrbot_plugin_monixiuxian2/config/` 目录下自动生成默认配置文件：
+插件首次运行后，将在 `data/plugins/astrbot_plugin_monixiuxian2_2/config/` 目录下自动生成默认配置文件：
 
 | 配置文件 | 作用 |
 |---------|------|
@@ -272,7 +272,7 @@
 ## 📁 项目结构
 
 ```
-astrbot_plugin_monixiuxian2/
+astrbot_plugin_monixiuxian2_2/
 ├── main.py              # 插件入口
 ├── models.py            # 数据模型
 ├── config_manager.py    # 配置管理

@@ -89,7 +89,7 @@ uv run python scripts/test_suite_ctl.py fixture --profile pvp
 ```bash
 # 同步 + 热重载被测插件 + 跑 pvp 域 + 结果落盘 summary.json（plugin 名用平台注册名，非仓库名）
 uv run python scripts/test_suite_ctl.py run --tag pvp --sync \
-  --reload astrbot_plugin_monixiuxian2 --export /tmp/pvp-out --quiet
+  --reload astrbot_plugin_monixiuxian2_2 --export /tmp/pvp-out --quiet
 # 然后按既有流程归档为 date_target 目录：
 uv run python scripts/test_suite_ctl.py export --target pvp-effects
 ```
@@ -103,7 +103,7 @@ uv run python $CLI case run-all --tag <tag> --sync-from <dir> --reload <plugin> 
 uv run python $CLI case check --source <flat_dir>   # 源与平台副本语义比对（注意：非递归 *.json，源须为拍平目录）
 ```
 
-> 平台 CLI 的 `--sync-from`/`check --source` 使用**非递归** `*.json` glob，只能处理拍平目录；`functional_tests/cases/` 下的源用例是分域子目录，因此**同步必须走 `scripts/test_suite_ctl.py sync-cases`**（递归扫描+拍平），`--reload` 的插件名为平台注册名 `astrbot_plugin_monixiuxian2`（不是仓库目录名 `_2` 后缀）。
+> 平台 CLI 的 `--sync-from`/`check --source` 使用**非递归** `*.json` glob，只能处理拍平目录；`functional_tests/cases/` 下的源用例是分域子目录，因此**同步必须走 `scripts/test_suite_ctl.py sync-cases`**（递归扫描+拍平），`--reload` 的插件名为平台注册名 `astrbot_plugin_monixiuxian2_2`。
 
 ## 结果归档约定
 

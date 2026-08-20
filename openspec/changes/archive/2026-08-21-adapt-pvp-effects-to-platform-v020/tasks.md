@@ -17,7 +17,7 @@
 ## 3. 执行与归档
 
 - [x] 3.1 `uv run python scripts/test_suite_ctl.py sync-cases` 同步用例，随后 `case check --source` 确认源与平台副本一致（防漏 sync 跑旧用例）
-- [x] 3.2 执行 one-shot 回归：`uv run python scripts/test_suite_ctl.py run --tag pvp --sync --reload astrbot_plugin_monixiuxian2 --fixture --fixture-profile pvp --export <dir> --quiet`（插件名用平台注册名 `astrbot_plugin_monixiuxian2`，非仓库目录名 `_2` 后缀；见 1.2 文档化），全部通过
+- [x] 3.2 执行 one-shot 回归：`uv run python scripts/test_suite_ctl.py run --tag pvp --sync --reload astrbot_plugin_monixiuxian2_2 --fixture --fixture-profile pvp --export <dir> --quiet`（插件名用平台注册名 `astrbot_plugin_monixiuxian2_2`），全部通过
 - [x] 3.3 归档 one-shot 导出结果至 `functional_tests/results/<date>_pvp-effects/`（含 summary.json 通过/失败清单）；新增发现的玩法 Bug 用 `bd` 登记
 
 ## 4. 收尾
@@ -29,4 +29,4 @@
 
 - **2.4 expect_not 扫描结果**：pvp 域唯一候选是 `pvp-effect-unavoidable`（以「躲过了」为反向证据）。但 `managers/combat_manager.py` 中 `next_attack_unavoidable` 为**一次性消耗标记**（`_resolve_attack` 内取用后即清空，仅豁免首击闪避/格挡/反击），窗口后半段可能合法闪避；整窗 `expect_not` 对「躲过了」会误判。故保留采样反证（`--repeat` 多次观察）而非转 `expect_not`，已同步 gap 报告「反向（不存在）断言」行。
 - **1.3 基线漂移清单**：平台侧 `daily-checkin-basic`（源缺失，已知）、`smoke-test`、`verify-char-creation`（历史孤儿）——均不改动源文件；20 个 pvp 用例在基线时与平台副本不一致（刚完成迁移，待 3.1 同步）。
-- **3.2 执行结果**：`run --tag pvp --sync --reload astrbot_plugin_monixiuxian2 --fixture --fixture-profile pvp --repeat 1 --export` → **23/23 全部通过**。首轮失败 `pvp-weapon-trigger`（GM 设置境界步骤 30s 超时窗口内仅见过期「我要修仙」回复）——因 run-all 连续 23 个用例插件事件队列拥塞，已将全部 expect 超时由 30s 提到 60s 后通过。结果归档 `functional_tests/results/2026-08-21_pvp-effects/`（含 summary.json + summary.md，23 pass）。未发现新玩法 bug，无需 `bd` 登记。
+- **3.2 执行结果**：`run --tag pvp --sync --reload astrbot_plugin_monixiuxian2_2 --fixture --fixture-profile pvp --repeat 1 --export` → **23/23 全部通过**。首轮失败 `pvp-weapon-trigger`（GM 设置境界步骤 30s 超时窗口内仅见过期「我要修仙」回复）——因 run-all 连续 23 个用例插件事件队列拥塞，已将全部 expect 超时由 30s 提到 60s 后通过。结果归档 `functional_tests/results/2026-08-21_pvp-effects/`（含 summary.json + summary.md，23 pass）。未发现新玩法 bug，无需 `bd` 登记。

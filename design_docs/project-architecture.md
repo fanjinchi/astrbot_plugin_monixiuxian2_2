@@ -13,7 +13,7 @@
 - **形态**：AstrBot 插件（群聊文字修仙游戏），运行于宿主 `~/code/AstrBot/`（uv 环境，Python ≥3.12）
 - **入口**：`main.py` 的 `XiuXianPlugin`（`Star` 子类），AstrBot 插件加载器要求文件名必须是 main.py
 - **依赖**：仅 `Pillow>=9.0.0`（requirements.txt，加载时自动安装）
-- **数据**：SQLite（aiosqlite）`xiuxian_data_lite.db`，位于 `data/plugin_data/astrbot_plugin_monixiuxian2/`（AstrBot 数据目录，禁止写插件自身目录）；当前数据库版本 v31
+- **数据**：SQLite（aiosqlite）`xiuxian_data_lite.db`，位于 `data/plugin_data/astrbot_plugin_monixiuxian2_2_2/`（AstrBot 数据目录，禁止写插件自身目录）；当前数据库版本 v31
 - **配置**：静态 `config/*.json` ×22（`config_manager.py` 加载，改后重启生效）；动态 `_conf_schema.json`（WebUI 可调：白名单、GM/Boss 管理员、灵根、数值、数据库文件名）
 - **测试**：pytest，`tests/helpers.py` 的 `load_module()` 绕过 managers/`__init__.py` 相对导入链
 

@@ -17,7 +17,7 @@ Examples:
     uv run python scripts/test_suite_ctl.py run --tag pvp --repeat 3
   WEBTEST_URL=http://127.0.0.1:8765 WEBTEST_TOKEN=secret \\
     uv run python scripts/test_suite_ctl.py run --tag pvp --sync \\
-      --reload astrbot_plugin_monixiuxian2 --export /tmp/pvp-out --quiet
+      --reload astrbot_plugin_monixiuxian2_2 --export /tmp/pvp-out --quiet
   WEBTEST_URL=http://127.0.0.1:8765 WEBTEST_TOKEN=secret \\
     uv run python scripts/test_suite_ctl.py export --target pvp-effects
   uv run python scripts/test_suite_ctl.py fixture --profile pvp --yes
@@ -648,11 +648,11 @@ def _default_plugin_db_path() -> Path:
     home = Path.home()
     candidates = [
         home
-        / "code/AstrBot/data/plugin_data/astrbot_plugin_monixiuxian2/xiuxian_data_v2.db",
+        / "code/AstrBot/data/plugin_data/astrbot_plugin_monixiuxian2_2/xiuxian_data_v2.db",
         home
-        / "code/AstrBot/data/plugin_data/astrbot_plugin_monixiuxian2/xiuxian_data_lite.db",
+        / "code/AstrBot/data/plugin_data/astrbot_plugin_monixiuxian2_2/xiuxian_data_lite.db",
         home
-        / ".astrbot/data/plugin_data/astrbot_plugin_monixiuxian2/xiuxian_data_v2.db",
+        / ".astrbot/data/plugin_data/astrbot_plugin_monixiuxian2_2/xiuxian_data_v2.db",
     ]
     for path in candidates:
         if path.exists():
