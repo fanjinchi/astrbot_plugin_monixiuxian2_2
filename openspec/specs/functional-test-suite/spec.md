@@ -71,3 +71,22 @@ The repository SHALL maintain a platform capability gap report under `functional
 #### Scenario: A new contributor follows the documented process
 - **WHEN** a contributor reads the AGENTS.md testing section after completing a gameplay change
 - **THEN** they can determine where to add a case, which tag to use, how to run the case, and where the result folder will be created
+
+### Requirement: 宗门系统功能测试覆盖
+
+功能测试套件 SHALL 包含 `sect` 域标签的用例，覆盖默认宗门玩法的完整玩家链路：默认宗门在「宗门列表」可见且不可被玩家创建同名宗门；拜入（含境界区间校验拒绝）、师承任务链的阶段推进与奖励、宗门建设任务与建筑升级生效、职阶晋升的贡献+境界双门槛及签到福利加发、出师时宗门之宝回收且已习得宗门功法保留可用、绑定功法不可赠予他人、改换门庭后原宗门功法仍可使用、宗门悬赏/秘境/历练内容的成员过滤、商店职阶折扣结算。用例 SHALL 存放于 `functional_tests/cases/sect/` 并兼容测试平台校验，执行结果 SHALL 归档至 `functional_tests/results/<date>_<target>/`。需要平台不支持能力的断言 SHALL 记录到平台能力差距报告并采用替代断言策略。
+
+#### Scenario: 宗门域回归执行
+
+- **WHEN** 宗门功能变更后执行 `run --tag sect`
+- **THEN** 全部宗门域用例经测试平台真实消息管线执行，逐用例给出通过/失败结果
+
+#### Scenario: 拜入与出师回收链路验证
+
+- **WHEN** 测试玩家依次执行加入默认宗门、完成师承阶段、退出宗门
+- **THEN** 用例断言各步骤消息反馈符合预期，且退出后宗门之宝回收的提示出现、已习得绑定功法仍可正常使用
+
+#### Scenario: 受限能力断言有替代策略
+
+- **WHEN** 某验证点需要平台不支持的能力（如直接设置玩家贡献点）
+- **THEN** 用例改用可达路径铺底（如 GM 指令或捐献指令累积），并将该限制登记到 `functional_tests/platform-gap-report.md`
