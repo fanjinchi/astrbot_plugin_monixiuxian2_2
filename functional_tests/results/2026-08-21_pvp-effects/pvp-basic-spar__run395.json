@@ -1,0 +1,10 @@
+{
+  "case_name": "pvp-basic-spar",
+  "run_id": 395,
+  "status": "passed",
+  "started_at": 1787241760.3225284,
+  "finished_at": 1787241761.9735806,
+  "evidence": {
+    "pierce": 19
+  }
+}

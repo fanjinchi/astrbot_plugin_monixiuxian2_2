@@ -1,0 +1,18 @@
+{
+  "case_name": "pvp-effect-dot",
+  "run_id": 402,
+  "status": "passed",
+  "started_at": 1787241829.7972023,
+  "finished_at": 1787241880.9879477,
+  "evidence": {
+    "heal": 44,
+    "vampire": 44,
+    "dot": 88,
+    "buff": 12,
+    "debuff": 12,
+    "unavoidable": 8,
+    "pierce": 153,
+    "reflect": 24,
+    "fatigue": 12
+  }
+}

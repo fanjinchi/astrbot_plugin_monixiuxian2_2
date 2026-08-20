@@ -1,0 +1,15 @@
+{
+  "case_name": "pvp-ultimate-damage",
+  "run_id": 412,
+  "status": "passed",
+  "started_at": 1787242008.9065583,
+  "finished_at": 1787242060.251927,
+  "evidence": {
+    "unavoidable": 18,
+    "pierce": 299,
+    "reflect": 44,
+    "ultimate_damage": 4,
+    "ultimate_heal": 4,
+    "ultimate_dot": 4
+  }
+}

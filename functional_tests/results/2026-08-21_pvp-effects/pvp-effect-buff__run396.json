@@ -1,0 +1,15 @@
+{
+  "case_name": "pvp-effect-buff",
+  "run_id": 396,
+  "status": "passed",
+  "started_at": 1787241762.3680978,
+  "finished_at": 1787241764.9331253,
+  "evidence": {
+    "buff": 36,
+    "debuff": 36,
+    "unavoidable": 8,
+    "pierce": 167,
+    "reflect": 24,
+    "fatigue": 36
+  }
+}

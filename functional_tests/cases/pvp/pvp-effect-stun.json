@@ -1,13 +1,15 @@
 {
   "name": "pvp-effect-stun",
   "description": "验证 stun 眩晕：震山锤「震山一击」使对方下回合无法出手。",
-  "scenario": "固定群聊双玩家，p1 激活震山锤后决斗 p2；断言「被眩晕，下回合无法出手」或至少战斗开始，概率触发需 --repeat。",
+  "scenario": "固定群聊双玩家，p1 激活震山锤后决斗 p2；断言「被眩晕，下回合无法出手」或至少战斗开始，声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。",
   "tags": [
     "pvp",
     "effect-matrix",
     "content-design",
     "sampled"
   ],
+  "deterministic": true,
+  "seed": 42,
   "conversation": {
     "kind": "group",
     "group_id": "webtest_pvp_001",

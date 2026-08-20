@@ -1,0 +1,12 @@
+{
+  "case_name": "pvp-effect-reflect",
+  "run_id": 406,
+  "status": "passed",
+  "started_at": 1787241940.3428738,
+  "finished_at": 1787241942.9346685,
+  "evidence": {
+    "unavoidable": 8,
+    "pierce": 167,
+    "reflect": 116
+  }
+}

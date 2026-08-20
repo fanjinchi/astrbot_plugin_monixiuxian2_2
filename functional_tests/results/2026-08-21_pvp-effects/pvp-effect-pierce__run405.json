@@ -1,0 +1,12 @@
+{
+  "case_name": "pvp-effect-pierce",
+  "run_id": 405,
+  "status": "passed",
+  "started_at": 1787241888.1364162,
+  "finished_at": 1787241940.0134535,
+  "evidence": {
+    "unavoidable": 12,
+    "pierce": 215,
+    "reflect": 30
+  }
+}

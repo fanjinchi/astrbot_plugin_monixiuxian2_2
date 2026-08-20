@@ -1,7 +1,7 @@
 # 网页测试平台能力差距报告
 
 > 对着 `astrbot_plugin_testplatform`（webtest）实际 REST 能力与首批功能测试用例需求整理。
-> 更新日期：2026-08-20。范围：`add-functional-test-suite` 第一批 28 条用例 + `add-sect-functional-tests` 9 条宗门用例 + `update-sect-functional-tests`（宗门指令统一后）新/改用例。映射平台 v0.2.0（`deterministic`/`seed`、`expect_not`、`combine`、one-shot 编排 CLI）。
+> 更新日期：2026-08-20。范围：`add-functional-test-suite` 第一批 28 条用例 + `add-sect-functional-tests` 9 条宗门用例 + `update-sect-functional-tests`（宗门指令统一后）新/改用例 + `adapt-pvp-effects-to-platform-v020`（PvP 随机效果用例 deterministic/seed 化）。映射平台 v0.2.0（`deterministic`/`seed`、`expect_not`、`combine`、one-shot 编排 CLI）。
 
 ## Supported（可直接依赖）
 
@@ -28,7 +28,7 @@
 |---|---|---|---|
 | 群聊指令触发 | AstrBot 全局 `wake_prefix` 为 `#`，群聊必须带唤醒前缀 | 不带 `#` 时事件不会进入插件 Filter | 用例中所有群聊 `send` 统一加 `#` 前缀（已落地） |
 | GM 身份 | 由插件 `ACCESS_CONTROL.GM_ADMINS` 控制，平台只负责投递 `user_id` | 必须先在 AstrBot 插件配置中加入固定 GM ID 并重载插件 | 测试实例已把 `900000001` 加入 `GM_ADMINS`；随环境配置文档记录 |
-| 随机/概率效果验证 | 随机效果单次运行不保证触发；`deterministic`+`seed` 为尽力而为（宿主可能仍有异步活动耗掉 RNG） | 极端情况下同 seed 仍不可复现 | `--repeat N --fixture` 聚合文本证据，`_count_evidence` 统计触发次数；用例优先声明 `deterministic: true` 并保留 `--repeat` 兑底 |
+| 随机/概率效果验证 | 随机效果单次运行不保证触发；`deterministic`+`seed` 为尽力而为（宿主可能仍有异步活动耗掉 RNG） | 极端情况下同 seed 仍不可复现 | **PvP 20 个 sampled 效果用例已全部声明 `deterministic: true` + `seed: 42`**（seed 在每个 send 注入前重置，固定行为）；必要时 `--repeat N --fixture` 聚合文本证据，`_count_evidence` 统计触发次数；宗门随机池/事件用例同此策略；`--repeat` 仅在确定性不可靠时兑底 |
 | 技能/功法授予 | 平台无“直接授予已学技能”命令 | 只能通过聊天命令学习，路径长且随机 | fixture 脚本直接写 `player_skills` 表，固定 `skill_id` 与星级 |
 | 心法/功法装配 | 插件 GM `给予装备` 的 `_item_exists` 不识别 `heart_methods.json` | 无法用 GM 命令把心法放储物戒 | fixture 直接把 `长春功`/`疾风迅雷功` 写入 `storage_ring_items`；用例不再依赖 GM 给心法 |
 | `@` 目标选择 | 平台只注入 `Plain` 文本，没有结构化 `At` 消息段 | GM 命令无法走 `@目标` 分支 | 用例使用纯数字 ID 参数，走 `_resolve_target` 数字分支 |
@@ -39,7 +39,7 @@
 | 师承链进度推进 | 插件 GM `触发秘境结算`/`触发历练结算`（`core/gm_manager.py` `cmd_force_rift`/`cmd_force_adventure`）**v3.9.1 起**强制结算与正常完成流程一致追加 `sect_manager.advance_master_progress`（adventure_complete 必然推进；win_pve 受 PvE 遭遇概率限制），并新增 GM「师承推进」（`cmd_advance_master`，事件 战斗/历练/突破/捐献）确定性直推 | PvE 遭遇战为概率事件（`pve_combat_manager._should_trigger_combat` adventure low 30% / rift low 50-95%），真实结算的 win_pve 计数不保证递增 | `sect-master-chain-gm` 用例用「师承推进」确定性覆盖三阶段全链（win_pve×3→adventure_complete→breakthrough）；真实历练结算只断言 adventure_complete 阶段（与 PvE 胜负无关） |
 | 悬赏冷却清理 | 放弃悬赏写 `system_config.bounty_abandon_cd_<uid>`（30 分钟 CD）；进行中悬赏存 `player_bounties`；既有 GM「清除CD」只清 `user_cd`，不覆盖这两处 | 仅靠原清除CD 无法归零悬赏状态，跨用例会因冷却/活跃残留互相污染 | 插件新增 GM「清除悬赏」（`core/gm_manager.py` `cmd_clear_bounty`，命令末尾追加「确认」），同时清活跃悬赏与放弃冷却；`sect-bounty-lifecycle`/`sect-bounty-split` 首尾用它清洗（依赖 `unify-sect-commands` 任务 2.5） |
 | 随机选择池（悬赏/任务） | 悬赏普通池（301-306）与宗门池（307/308）按难度加权随机出单，单轮无法断定具体条目；且**宗门专属悬赏与本宗成员不保证出现在悬赏令中**（仅当随机抽中 307/308 时才有『宗门悬赏』分区，bd `astrbot_plugin_monixiuxian2_2-80t`），宗门建设任务随机三选一 | 「宗门 悬赏」列表按 faction 确定性返回（境界 <7 见 easy/normal，qingyun 各难度仅一模板 → 307/308 必现）；宗门专属悬赏统一走宗门入口不依赖全局悬赏令；悬赏 target 用循环推进覆盖区间 + `deterministic: true`（seed 固定）；建设任务断言 `完成建设任务【.+】|获得贡献：\\+\\d+` 与 `--repeat 2` 稳定性证据 || `sect-content-filter` 改用确定性闸门：非成员 `接取悬赏 307/308` → 必现拒绝文本『该悬赏为宗门专属委托，仅面向本宗弟子发布』（sect 校验先于列表缓存校验）；普通断言编号区间（`[30[0-9]]`）；建设任务断言 `完成建设任务【.+】|获得贡献：\\+\\d+` 与 `--repeat 2` 稳定性证据 |
-| 反向（不存在）断言 | `expect_not` 为尽力而为（若宿主并行写入其他回复，可能误判窗口内容） | 不能 100% 保证“窗口内确实无匹配” | 优先 `expect_not`（非成员列表不含 `青云剑冢`）；对关键“不可见”再用探索入口的拒绝文案作正向兑底；成员宗门悬赏必现性仍无法验证（bd 80t） |
+| 反向（不存在）断言 | `expect_not` 为尽力而为（若宿主并行写入其他回复，可能误判窗口内容） | 不能 100% 保证“窗口内确实无匹配” | 优先 `expect_not`（非成员列表不含 `青云剑冢`）；对关键“不可见”再用探索入口的拒绝文案作正向兑底；成员宗门悬赏必现性仍无法验证（bd 80t）；PvP `pvp-effect-unavoidable` 的“躲过了”反向证据因 unavoidable 是一次性消耗标记，窗口后半段可能合法闪避，故保留采样方式不转 `expect_not` |
 | 秘境 ID 与 DB 配置漂移 | 秘境表由迁移脚本 `INSERT OR IGNORE` 播种（v31 新增青云剑冢=id 6），**仅改配置不重播种**；被配置移除的旧秘境（玄冰地宫 id4/上古遗迹 id5）仍留在库中 | 断言必须按测试库真实 rifts 表 ID 编写，且新增秘境需重载插件 | 用例对青云剑冢断言使用 `(ID:6)`（测试库 v31 迁移后实际值）；重载插件后再跑用例 |
 | 功法赠予无通道 | 游戏无“赠予已学技能”指令，宗门绑定**功法**的不可赠予性无法直接覆盖 | 只能验证物品类绑定物 | 用宗门之宝青云镇山剑（配置 `treasure+sect_id` 标记，`core/storage_ring_manager.py:64` `is_sect_bound_item` 按配置判定）作代理：赠予被拒在持有与离宗后均成立；功法保留可用改由 `我的技能` 断言
 

@@ -1,0 +1,12 @@
+{
+  "case_name": "pvp-heart-passive",
+  "run_id": 411,
+  "status": "passed",
+  "started_at": 1787242004.720989,
+  "finished_at": 1787242008.5960603,
+  "evidence": {
+    "unavoidable": 14,
+    "pierce": 233,
+    "reflect": 28
+  }
+}

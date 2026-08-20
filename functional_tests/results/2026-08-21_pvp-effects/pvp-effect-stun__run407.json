@@ -1,0 +1,14 @@
+{
+  "case_name": "pvp-effect-stun",
+  "run_id": 407,
+  "status": "passed",
+  "started_at": 1787241943.3891714,
+  "finished_at": 1787241946.5740397,
+  "evidence": {
+    "stun": 4,
+    "counter": 4,
+    "unavoidable": 8,
+    "pierce": 169,
+    "reflect": 20
+  }
+}

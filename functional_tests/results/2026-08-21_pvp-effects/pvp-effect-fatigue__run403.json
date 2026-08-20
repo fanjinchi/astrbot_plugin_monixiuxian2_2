@@ -1,0 +1,15 @@
+{
+  "case_name": "pvp-effect-fatigue",
+  "run_id": 403,
+  "status": "passed",
+  "started_at": 1787241881.0311792,
+  "finished_at": 1787241884.632977,
+  "evidence": {
+    "buff": 36,
+    "debuff": 36,
+    "unavoidable": 10,
+    "pierce": 173,
+    "reflect": 24,
+    "fatigue": 36
+  }
+}

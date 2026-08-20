@@ -1,13 +1,15 @@
 {
   "name": "pvp-ultimate-damage",
   "description": "验证伤害大招：万剑归宗在条件满足后施展。",
-  "scenario": "固定群聊双玩家，p1 激活万剑归宗并与高气血 p2 长线战斗，断言「施展大招【万剑归宗】，天地变色！」；需确保战斗超过 3 回合且 p2 血量跌破 40%。",
+  "scenario": "固定群聊双玩家，p1 激活万剑归宗并与高气血 p2 长线战斗，断言「施展大招【万剑归宗】，天地变色！」；需确保战斗超过 3 回合且 p2 血量跌破 40%；声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。",
   "tags": [
     "pvp",
     "effect-matrix",
     "content-design",
     "sampled"
   ],
+  "deterministic": true,
+  "seed": 42,
   "conversation": {
     "kind": "group",
     "group_id": "webtest_pvp_001",

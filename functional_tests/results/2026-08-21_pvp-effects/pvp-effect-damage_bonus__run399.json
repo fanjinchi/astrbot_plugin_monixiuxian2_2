@@ -1,0 +1,15 @@
+{
+  "case_name": "pvp-effect-damage_bonus",
+  "run_id": 399,
+  "status": "passed",
+  "started_at": 1787241820.1470544,
+  "finished_at": 1787241823.3592813,
+  "evidence": {
+    "damage_bonus": 12,
+    "combo": 12,
+    "counter": 12,
+    "unavoidable": 8,
+    "pierce": 165,
+    "reflect": 24
+  }
+}

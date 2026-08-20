@@ -1,13 +1,15 @@
 {
   "name": "pvp-effect-buff",
   "description": "验证 buff：凝神诀「凝神蓄锐」增益自身属性。",
-  "scenario": "固定群聊双玩家，p1 激活凝神诀后决斗 p2；断言「【凝神蓄锐】作用于…」，概率触发需 --repeat。",
+  "scenario": "固定群聊双玩家，p1 激活凝神诀后决斗 p2；断言「【凝神蓄锐】作用于…」，声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。",
   "tags": [
     "pvp",
     "effect-matrix",
     "content-design",
     "sampled"
   ],
+  "deterministic": true,
+  "seed": 42,
   "conversation": {
     "kind": "group",
     "group_id": "webtest_pvp_001",

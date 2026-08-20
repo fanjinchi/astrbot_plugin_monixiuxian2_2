@@ -1,0 +1,13 @@
+{
+  "case_name": "pvp-effect-counter",
+  "run_id": 398,
+  "status": "passed",
+  "started_at": 1787241768.4528658,
+  "finished_at": 1787241819.8128755,
+  "evidence": {
+    "counter": 36,
+    "unavoidable": 8,
+    "pierce": 167,
+    "reflect": 42
+  }
+}

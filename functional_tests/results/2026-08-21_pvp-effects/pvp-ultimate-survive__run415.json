@@ -1,0 +1,17 @@
+{
+  "case_name": "pvp-ultimate-survive",
+  "run_id": 415,
+  "status": "passed",
+  "started_at": 1787242067.3611507,
+  "finished_at": 1787242070.088076,
+  "evidence": {
+    "counter": 2,
+    "unavoidable": 4,
+    "pierce": 65,
+    "survive": 4,
+    "ultimate_damage": 4,
+    "ultimate_heal": 4,
+    "ultimate_dot": 4,
+    "ultimate_survive": 4
+  }
+}

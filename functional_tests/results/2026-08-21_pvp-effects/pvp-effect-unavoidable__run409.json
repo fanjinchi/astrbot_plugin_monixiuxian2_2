@@ -1,0 +1,12 @@
+{
+  "case_name": "pvp-effect-unavoidable",
+  "run_id": 409,
+  "status": "passed",
+  "started_at": 1787241949.980535,
+  "finished_at": 1787242001.6300662,
+  "evidence": {
+    "unavoidable": 46,
+    "pierce": 229,
+    "reflect": 34
+  }
+}

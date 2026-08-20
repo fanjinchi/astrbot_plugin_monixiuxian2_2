@@ -1,0 +1,15 @@
+{
+  "case_name": "pvp-weapon-trigger",
+  "run_id": 416,
+  "status": "passed",
+  "started_at": 1787242070.3985627,
+  "finished_at": 1787242184.3919933,
+  "evidence": {
+    "damage_bonus": 8,
+    "combo": 8,
+    "counter": 8,
+    "unavoidable": 34,
+    "pierce": 219,
+    "reflect": 45
+  }
+}

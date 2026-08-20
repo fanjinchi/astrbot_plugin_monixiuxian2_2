@@ -1,0 +1,19 @@
+{
+  "case_name": "pvp-ultimate-heal",
+  "run_id": 414,
+  "status": "passed",
+  "started_at": 1787242063.7636564,
+  "finished_at": 1787242066.963543,
+  "evidence": {
+    "counter": 2,
+    "heal": 4,
+    "vampire": 2,
+    "dot": 2,
+    "unavoidable": 6,
+    "pierce": 117,
+    "reflect": 14,
+    "ultimate_damage": 4,
+    "ultimate_heal": 4,
+    "ultimate_dot": 4
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "case_name": "pvp-effect-damage_reduction",
+  "run_id": 400,
+  "status": "passed",
+  "started_at": 1787241823.703862,
+  "finished_at": 1787241826.2782102,
+  "evidence": {
+    "counter": 22,
+    "damage_reduction": 22,
+    "unavoidable": 12,
+    "pierce": 189,
+    "reflect": 26
+  }
+}

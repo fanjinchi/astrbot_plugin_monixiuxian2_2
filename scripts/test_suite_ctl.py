@@ -16,6 +16,9 @@ Examples:
   WEBTEST_URL=http://127.0.0.1:8765 WEBTEST_TOKEN=secret \\
     uv run python scripts/test_suite_ctl.py run --tag pvp --repeat 3
   WEBTEST_URL=http://127.0.0.1:8765 WEBTEST_TOKEN=secret \\
+    uv run python scripts/test_suite_ctl.py run --tag pvp --sync \\
+      --reload astrbot_plugin_monixiuxian2 --export /tmp/pvp-out --quiet
+  WEBTEST_URL=http://127.0.0.1:8765 WEBTEST_TOKEN=secret \\
     uv run python scripts/test_suite_ctl.py export --target pvp-effects
   uv run python scripts/test_suite_ctl.py fixture --profile pvp --yes
   uv run python scripts/test_suite_ctl.py run --tag sect --fixture --fixture-profile sect
@@ -359,7 +362,34 @@ def _count_evidence(run: dict) -> dict[str, int]:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    """Implement ``run``: start case runs, poll, and save a local manifest."""
+    """Implement ``run``: start case runs, poll, and save a local manifest.
+
+    When ``--sync`` is given, canonical cases are deployed to the platform
+    first (same as ``sync-cases``). When ``--reload`` is given, the plugin under
+    test is hot-reloaded before the run (one-shot orchestration mirroring the
+    platform CLI ``case run/run-all --sync-from --reload``). ``--export DIR``
+    writes a machine-readable ``summary.json`` plus one JSON file per run into
+    ``DIR`` (mirrors platform ``--export``); ``--quiet`` prints only the total
+    and failure summary.
+    """
+    if args.sync:
+        sync_args = argparse.Namespace(
+            cases_root=args.cases_root,
+            platform_cases_dir=args.platform_cases_dir,
+        )
+        cmd_sync_cases(sync_args)
+    if args.reload:
+        try:
+            _request(
+                args.url,
+                args.token,
+                "POST",
+                "/api/ops/plugin-reload",
+                {"plugin_name": args.reload},
+            )
+            print(f"已热重载插件: {args.reload}")
+        except CtlError as exc:
+            raise CtlError(f"热重载失败: {exc}") from exc
     cases = _select_cases(args, args.url, args.token)
     manifest_runs: list[dict] = []
     failed_runs = 0
@@ -388,11 +418,12 @@ def cmd_run(args: argparse.Namespace) -> int:
             if not ok:
                 failed_runs += 1
             evidence = _count_evidence(run)
-            print(
-                f"[{run_index}/{total_runs}] {name} (repeat {repeat}): "
-                f"{run.get('status')}{' ✓' if ok else ' ✗'}"
-            )
-            if evidence:
+            if not args.quiet:
+                print(
+                    f"[{run_index}/{total_runs}] {name} (repeat {repeat}): "
+                    f"{run.get('status')}{' ✓' if ok else ' ✗'}"
+                )
+            if evidence and not args.quiet:
                 print(f"    证据: {evidence}")
             manifest_runs.append(
                 {
@@ -421,11 +452,39 @@ def cmd_run(args: argparse.Namespace) -> int:
         encoding="utf-8",
     )
     print(f"运行清单已写入 {LAST_RUN_MANIFEST}")
+    if args.export:
+        _write_export_dir(args.export, manifest_runs)
     if failed_runs:
-        print(f"失败运行数: {failed_runs}/{total_runs}", file=sys.stderr)
+        if not args.quiet:
+            print(f"失败运行数: {failed_runs}/{total_runs}", file=sys.stderr)
         return 1
     print(f"全部通过：{total_runs} 次运行")
     return 0
+
+
+def _write_export_dir(export_dir: str, manifest_runs: list[dict]) -> None:
+    """Write one JSON file per run plus a machine-readable summary.json.
+
+    Args:
+        export_dir: Destination directory.
+        manifest_runs: Run records collected by ``cmd_run``.
+    """
+    out = Path(export_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    summary = {
+        "total": len(manifest_runs),
+        "passed": sum(1 for r in manifest_runs if r["status"] == "passed"),
+        "failed": [r["case_name"] for r in manifest_runs if r["status"] != "passed"],
+        "errors": [r["case_name"] for r in manifest_runs if r["status"] == "error"],
+        "runs": manifest_runs,
+    }
+    (out / "summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    for r in manifest_runs:
+        fname = out / f"{r['case_name']}__run{r['run_id']}.json"
+        fname.write_text(json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"结果已导出: {out}（{len(manifest_runs)} 条 run + summary.json）")
 
 
 # ---------------------------------------------------------------------------
@@ -997,6 +1056,20 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--tag", help="按标签运行")
     run.add_argument("--repeat", type=int, default=1, help="每个用例重复运行次数")
     run.add_argument(
+        "--sync",
+        action="store_true",
+        help="跑前先同步用例到平台（等价 sync-cases，one-shot 编排）",
+    )
+    run.add_argument(
+        "--reload", default=None, help="跑前热重载被测插件（one-shot 编排）"
+    )
+    run.add_argument(
+        "--export",
+        default=None,
+        help="结果落盘目录：写 run JSON + summary.json（one-shot 编排）",
+    )
+    run.add_argument("--quiet", action="store_true", help="只输出汇总与失败摘要")
+    run.add_argument(
         "--fixture",
         action="store_true",
         help="每轮重复前执行 fixture（用于随机效果采样/固定基线）",
@@ -1008,6 +1081,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="--fixture 使用的 profile（默认 pvp）",
     )
     run.add_argument("--db", default=None, help="fixture 使用的插件数据库路径")
+    run.add_argument(
+        "--cases-root",
+        default=str(FUNCTIONAL_TESTS_DIR / "cases"),
+        help="--sync 的用例源目录（默认 functional_tests/cases）",
+    )
+    run.add_argument(
+        "--platform-cases-dir",
+        default=str(
+            Path.home()
+            / "code/AstrBot/data/plugin_data/astrbot_plugin_testplatform/cases"
+        ),
+        help="--sync 的平台顶层 cases 目录",
+    )
     run.set_defaults(func=cmd_run)
 
     export = sub.add_parser("export", help="导出最近运行结果")

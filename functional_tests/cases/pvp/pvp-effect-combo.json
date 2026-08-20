@@ -1,13 +1,15 @@
 {
   "name": "pvp-effect-combo",
   "description": "验证 combo 连击：狂风诀「惊风连击」与伤害倍率。",
-  "scenario": "固定群聊双玩家，p1 激活狂风诀后决斗 p2；combo 与 damage_bonus 共用「攻势更盛！」日志，概率触发需 --repeat。",
+  "scenario": "固定群聊双玩家，p1 激活狂风诀后决斗 p2；combo 与 damage_bonus 共用「攻势更盛！」日志，声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。",
   "tags": [
     "pvp",
     "effect-matrix",
     "content-design",
     "sampled"
   ],
+  "deterministic": true,
+  "seed": 42,
   "conversation": {
     "kind": "group",
     "group_id": "webtest_pvp_001",

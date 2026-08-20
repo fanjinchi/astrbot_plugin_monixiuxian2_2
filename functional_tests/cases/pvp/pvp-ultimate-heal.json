@@ -1,13 +1,15 @@
 {
   "name": "pvp-ultimate-heal",
   "description": "验证治疗大招：回天圣手恢复气血。",
-  "scenario": "固定群聊双玩家，p1 激活回天圣手与 p2 长线战斗，断言「施展大招【回天圣手】，天地变色！」；min_action_index=3，需 --repeat 观察。",
+  "scenario": "固定群聊双玩家，p1 激活回天圣手与 p2 长线战斗，断言「施展大招【回天圣手】，天地变色！」；min_action_index=3，声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。",
   "tags": [
     "pvp",
     "effect-matrix",
     "content-design",
     "sampled"
   ],
+  "deterministic": true,
+  "seed": 42,
   "conversation": {
     "kind": "group",
     "group_id": "webtest_pvp_001",

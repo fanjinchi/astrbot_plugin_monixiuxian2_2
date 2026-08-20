@@ -1,13 +1,15 @@
 {
   "name": "pvp-effect-survive",
   "description": "验证 survive：涅槃诀「涅槃重生」提供免死庇护。",
-  "scenario": "固定群聊双玩家，p1 激活涅槃诀并与高气血 p2 长线战斗，目标在第5回合后触发「获得【涅槃重生】庇护！」；需 --repeat 观察。",
+  "scenario": "固定群聊双玩家，p1 激活涅槃诀并与高气血 p2 长线战斗，目标在第5回合后触发「获得【涅槃重生】庇护！」；声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。",
   "tags": [
     "pvp",
     "effect-matrix",
     "content-design",
     "sampled"
   ],
+  "deterministic": true,
+  "seed": 42,
   "conversation": {
     "kind": "group",
     "group_id": "webtest_pvp_001",

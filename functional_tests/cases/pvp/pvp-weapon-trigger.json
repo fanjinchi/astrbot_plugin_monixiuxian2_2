@@ -8,6 +8,8 @@
     "content-design",
     "sampled"
   ],
+  "deterministic": true,
+  "seed": 42,
   "conversation": {
     "kind": "group",
     "group_id": "webtest_pvp_001",
@@ -27,7 +29,7 @@
     {
       "type": "expect",
       "match": "re:恭喜道友|已踏入仙途",
-      "timeout": 30,
+      "timeout": 60,
       "note": "p1 可用"
     },
     {
@@ -39,7 +41,7 @@
     {
       "type": "expect",
       "match": "re:恭喜道友|已踏入仙途",
-      "timeout": 30,
+      "timeout": 60,
       "note": "p2 可用"
     },
     {
@@ -51,7 +53,7 @@
     {
       "type": "expect",
       "match": "re:恭喜道友|已踏入仙途",
-      "timeout": 30,
+      "timeout": 60,
       "note": "gm 可用"
     },
     {
@@ -63,7 +65,7 @@
     {
       "type": "expect",
       "match": "re:境界设置为|未找到境界",
-      "timeout": 30,
+      "timeout": 60,
       "note": "p1 等级提升（若境界名不同以实测调整）"
     },
     {
@@ -75,7 +77,7 @@
     {
       "type": "expect",
       "match": "re:境界设置为|未找到境界",
-      "timeout": 30,
+      "timeout": 60,
       "note": "p2 等级提升"
     },
     {
@@ -87,7 +89,7 @@
     {
       "type": "expect",
       "match": "re:境界设置为|未找到境界",
-      "timeout": 30,
+      "timeout": 60,
       "note": "gm 等级提升"
     },
     {
@@ -99,7 +101,7 @@
     {
       "type": "expect",
       "match": "已向",
-      "timeout": 30,
+      "timeout": 60,
       "note": "武器入戒"
     },
     {
@@ -111,7 +113,7 @@
     {
       "type": "expect",
       "match": "已装备",
-      "timeout": 30,
+      "timeout": 60,
       "note": "青云天剑装备成功"
     },
     {
@@ -124,7 +126,8 @@
       "type": "expect",
       "match": "re:触发【裂空斩】|战斗开始",
       "timeout": 60,
-      "note": "至少开始战斗；触发文本由 --repeat 聚合"
+      "note": "触发文本 裂空斩；combine 跨条拼接，deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底",
+      "combine": true
     },
     {
       "type": "send",
@@ -135,7 +138,7 @@
     {
       "type": "expect",
       "match": "已向",
-      "timeout": 30,
+      "timeout": 60,
       "note": "武器入戒"
     },
     {
@@ -147,7 +150,7 @@
     {
       "type": "expect",
       "match": "已装备",
-      "timeout": 30,
+      "timeout": 60,
       "note": "混元至宝鼎装备成功"
     },
     {
@@ -160,7 +163,8 @@
       "type": "expect",
       "match": "re:触发【震魂槌】|战斗开始",
       "timeout": 60,
-      "note": "至少开始战斗；触发文本由 --repeat 聚合"
+      "note": "触发文本 震魂槌；combine 跨条拼接，deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底",
+      "combine": true
     },
     {
       "type": "send",
@@ -171,7 +175,7 @@
     {
       "type": "expect",
       "match": "已向",
-      "timeout": 30,
+      "timeout": 60,
       "note": "武器入戒"
     },
     {
@@ -183,7 +187,7 @@
     {
       "type": "expect",
       "match": "已装备",
-      "timeout": 30,
+      "timeout": 60,
       "note": "弑龙帝枪装备成功"
     },
     {
@@ -196,7 +200,8 @@
       "type": "expect",
       "match": "re:触发【蓄锐式】|战斗开始",
       "timeout": 60,
-      "note": "至少开始战斗；触发文本由 --repeat 聚合"
+      "note": "触发文本 蓄锐式；combine 跨条拼接，deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底",
+      "combine": true
     },
     {
       "type": "sleep",

@@ -1,0 +1,16 @@
+{
+  "case_name": "pvp-effect-heal",
+  "run_id": 404,
+  "status": "passed",
+  "started_at": 1787241885.0764718,
+  "finished_at": 1787241887.7506177,
+  "evidence": {
+    "counter": 12,
+    "heal": 24,
+    "vampire": 12,
+    "dot": 12,
+    "unavoidable": 8,
+    "pierce": 167,
+    "reflect": 24
+  }
+}

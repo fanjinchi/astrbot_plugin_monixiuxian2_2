@@ -1,13 +1,15 @@
 {
   "name": "pvp-effect-reflect",
   "description": "验证 reflect：铁棘功「铁棘反震」反弹伤害。",
-  "scenario": "固定群聊双玩家，p2 激活铁棘功，p1 决斗 p2；断言「反弹 N 点伤害！」，概率触发需 --repeat。",
+  "scenario": "固定群聊双玩家，p2 激活铁棘功，p1 决斗 p2；断言「反弹 N 点伤害！」，声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。",
   "tags": [
     "pvp",
     "effect-matrix",
     "content-design",
     "sampled"
   ],
+  "deterministic": true,
+  "seed": 42,
   "conversation": {
     "kind": "group",
     "group_id": "webtest_pvp_001",

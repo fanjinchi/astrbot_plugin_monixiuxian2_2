@@ -1,13 +1,15 @@
 {
   "name": "pvp-effect-vampire",
   "description": "验证 vampire 吸血：噬血剑意「噬血」按伤害回血。",
-  "scenario": "固定群聊双玩家，p1 激活噬血剑意后决斗 p2；断言「吸取 N 气血！」，概率触发需 --repeat。",
+  "scenario": "固定群聊双玩家，p1 激活噬血剑意后决斗 p2；断言「吸取 N 气血！」，声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。",
   "tags": [
     "pvp",
     "effect-matrix",
     "content-design",
     "sampled"
   ],
+  "deterministic": true,
+  "seed": 42,
   "conversation": {
     "kind": "group",
     "group_id": "webtest_pvp_001",

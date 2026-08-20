@@ -1,0 +1,15 @@
+{
+  "case_name": "pvp-effect-debuff",
+  "run_id": 401,
+  "status": "passed",
+  "started_at": 1787241826.7505536,
+  "finished_at": 1787241829.3230162,
+  "evidence": {
+    "buff": 42,
+    "debuff": 42,
+    "unavoidable": 8,
+    "pierce": 167,
+    "reflect": 24,
+    "fatigue": 42
+  }
+}

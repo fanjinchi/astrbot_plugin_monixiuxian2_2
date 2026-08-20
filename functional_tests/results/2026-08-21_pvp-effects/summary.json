@@ -1,0 +1,345 @@
+{
+  "total": 23,
+  "passed": 23,
+  "failed": [],
+  "errors": [],
+  "runs": [
+    {
+      "case_name": "pvp-basic-duel",
+      "run_id": 394,
+      "status": "passed",
+      "started_at": 1787241757.7753928,
+      "finished_at": 1787241760.0554752,
+      "evidence": {
+        "pierce": 27
+      }
+    },
+    {
+      "case_name": "pvp-basic-spar",
+      "run_id": 395,
+      "status": "passed",
+      "started_at": 1787241760.3225284,
+      "finished_at": 1787241761.9735806,
+      "evidence": {
+        "pierce": 19
+      }
+    },
+    {
+      "case_name": "pvp-effect-buff",
+      "run_id": 396,
+      "status": "passed",
+      "started_at": 1787241762.3680978,
+      "finished_at": 1787241764.9331253,
+      "evidence": {
+        "buff": 36,
+        "debuff": 36,
+        "unavoidable": 8,
+        "pierce": 167,
+        "reflect": 24,
+        "fatigue": 36
+      }
+    },
+    {
+      "case_name": "pvp-effect-combo",
+      "run_id": 397,
+      "status": "passed",
+      "started_at": 1787241765.403876,
+      "finished_at": 1787241767.9847543,
+      "evidence": {
+        "damage_bonus": 12,
+        "combo": 12,
+        "counter": 12,
+        "unavoidable": 8,
+        "pierce": 153,
+        "reflect": 24
+      }
+    },
+    {
+      "case_name": "pvp-effect-counter",
+      "run_id": 398,
+      "status": "passed",
+      "started_at": 1787241768.4528658,
+      "finished_at": 1787241819.8128755,
+      "evidence": {
+        "counter": 36,
+        "unavoidable": 8,
+        "pierce": 167,
+        "reflect": 42
+      }
+    },
+    {
+      "case_name": "pvp-effect-damage_bonus",
+      "run_id": 399,
+      "status": "passed",
+      "started_at": 1787241820.1470544,
+      "finished_at": 1787241823.3592813,
+      "evidence": {
+        "damage_bonus": 12,
+        "combo": 12,
+        "counter": 12,
+        "unavoidable": 8,
+        "pierce": 165,
+        "reflect": 24
+      }
+    },
+    {
+      "case_name": "pvp-effect-damage_reduction",
+      "run_id": 400,
+      "status": "passed",
+      "started_at": 1787241823.703862,
+      "finished_at": 1787241826.2782102,
+      "evidence": {
+        "counter": 22,
+        "damage_reduction": 22,
+        "unavoidable": 12,
+        "pierce": 189,
+        "reflect": 26
+      }
+    },
+    {
+      "case_name": "pvp-effect-debuff",
+      "run_id": 401,
+      "status": "passed",
+      "started_at": 1787241826.7505536,
+      "finished_at": 1787241829.3230162,
+      "evidence": {
+        "buff": 42,
+        "debuff": 42,
+        "unavoidable": 8,
+        "pierce": 167,
+        "reflect": 24,
+        "fatigue": 42
+      }
+    },
+    {
+      "case_name": "pvp-effect-dot",
+      "run_id": 402,
+      "status": "passed",
+      "started_at": 1787241829.7972023,
+      "finished_at": 1787241880.9879477,
+      "evidence": {
+        "heal": 44,
+        "vampire": 44,
+        "dot": 88,
+        "buff": 12,
+        "debuff": 12,
+        "unavoidable": 8,
+        "pierce": 153,
+        "reflect": 24,
+        "fatigue": 12
+      }
+    },
+    {
+      "case_name": "pvp-effect-fatigue",
+      "run_id": 403,
+      "status": "passed",
+      "started_at": 1787241881.0311792,
+      "finished_at": 1787241884.632977,
+      "evidence": {
+        "buff": 36,
+        "debuff": 36,
+        "unavoidable": 10,
+        "pierce": 173,
+        "reflect": 24,
+        "fatigue": 36
+      }
+    },
+    {
+      "case_name": "pvp-effect-heal",
+      "run_id": 404,
+      "status": "passed",
+      "started_at": 1787241885.0764718,
+      "finished_at": 1787241887.7506177,
+      "evidence": {
+        "counter": 12,
+        "heal": 24,
+        "vampire": 12,
+        "dot": 12,
+        "unavoidable": 8,
+        "pierce": 167,
+        "reflect": 24
+      }
+    },
+    {
+      "case_name": "pvp-effect-pierce",
+      "run_id": 405,
+      "status": "passed",
+      "started_at": 1787241888.1364162,
+      "finished_at": 1787241940.0134535,
+      "evidence": {
+        "unavoidable": 12,
+        "pierce": 215,
+        "reflect": 30
+      }
+    },
+    {
+      "case_name": "pvp-effect-reflect",
+      "run_id": 406,
+      "status": "passed",
+      "started_at": 1787241940.3428738,
+      "finished_at": 1787241942.9346685,
+      "evidence": {
+        "unavoidable": 8,
+        "pierce": 167,
+        "reflect": 116
+      }
+    },
+    {
+      "case_name": "pvp-effect-stun",
+      "run_id": 407,
+      "status": "passed",
+      "started_at": 1787241943.3891714,
+      "finished_at": 1787241946.5740397,
+      "evidence": {
+        "stun": 4,
+        "counter": 4,
+        "unavoidable": 8,
+        "pierce": 169,
+        "reflect": 20
+      }
+    },
+    {
+      "case_name": "pvp-effect-survive",
+      "run_id": 408,
+      "status": "passed",
+      "started_at": 1787241946.9368908,
+      "finished_at": 1787241949.8094199,
+      "evidence": {
+        "counter": 2,
+        "unavoidable": 4,
+        "pierce": 65,
+        "survive": 4,
+        "ultimate_damage": 4,
+        "ultimate_heal": 4,
+        "ultimate_dot": 4,
+        "ultimate_survive": 4
+      }
+    },
+    {
+      "case_name": "pvp-effect-unavoidable",
+      "run_id": 409,
+      "status": "passed",
+      "started_at": 1787241949.980535,
+      "finished_at": 1787242001.6300662,
+      "evidence": {
+        "unavoidable": 46,
+        "pierce": 229,
+        "reflect": 34
+      }
+    },
+    {
+      "case_name": "pvp-effect-vampire",
+      "run_id": 410,
+      "status": "passed",
+      "started_at": 1787242001.6770852,
+      "finished_at": 1787242004.67501,
+      "evidence": {
+        "heal": 12,
+        "vampire": 24,
+        "dot": 12,
+        "unavoidable": 8,
+        "pierce": 167,
+        "reflect": 24
+      }
+    },
+    {
+      "case_name": "pvp-heart-passive",
+      "run_id": 411,
+      "status": "passed",
+      "started_at": 1787242004.720989,
+      "finished_at": 1787242008.5960603,
+      "evidence": {
+        "unavoidable": 14,
+        "pierce": 233,
+        "reflect": 28
+      }
+    },
+    {
+      "case_name": "pvp-ultimate-damage",
+      "run_id": 412,
+      "status": "passed",
+      "started_at": 1787242008.9065583,
+      "finished_at": 1787242060.251927,
+      "evidence": {
+        "unavoidable": 18,
+        "pierce": 299,
+        "reflect": 44,
+        "ultimate_damage": 4,
+        "ultimate_heal": 4,
+        "ultimate_dot": 4
+      }
+    },
+    {
+      "case_name": "pvp-ultimate-dot",
+      "run_id": 413,
+      "status": "passed",
+      "started_at": 1787242060.63321,
+      "finished_at": 1787242063.5414999,
+      "evidence": {
+        "heal": 8,
+        "vampire": 8,
+        "dot": 16,
+        "buff": 2,
+        "debuff": 2,
+        "unavoidable": 18,
+        "pierce": 279,
+        "reflect": 56,
+        "fatigue": 2,
+        "ultimate_damage": 4,
+        "ultimate_heal": 4,
+        "ultimate_dot": 4
+      }
+    },
+    {
+      "case_name": "pvp-ultimate-heal",
+      "run_id": 414,
+      "status": "passed",
+      "started_at": 1787242063.7636564,
+      "finished_at": 1787242066.963543,
+      "evidence": {
+        "counter": 2,
+        "heal": 4,
+        "vampire": 2,
+        "dot": 2,
+        "unavoidable": 6,
+        "pierce": 117,
+        "reflect": 14,
+        "ultimate_damage": 4,
+        "ultimate_heal": 4,
+        "ultimate_dot": 4
+      }
+    },
+    {
+      "case_name": "pvp-ultimate-survive",
+      "run_id": 415,
+      "status": "passed",
+      "started_at": 1787242067.3611507,
+      "finished_at": 1787242070.088076,
+      "evidence": {
+        "counter": 2,
+        "unavoidable": 4,
+        "pierce": 65,
+        "survive": 4,
+        "ultimate_damage": 4,
+        "ultimate_heal": 4,
+        "ultimate_dot": 4,
+        "ultimate_survive": 4
+      }
+    },
+    {
+      "case_name": "pvp-weapon-trigger",
+      "run_id": 416,
+      "status": "passed",
+      "started_at": 1787242070.3985627,
+      "finished_at": 1787242184.3919933,
+      "evidence": {
+        "damage_bonus": 8,
+        "combo": 8,
+        "counter": 8,
+        "unavoidable": 34,
+        "pierce": 219,
+        "reflect": 45
+      }
+    }
+  ]
+}

@@ -1,13 +1,15 @@
 {
   "name": "pvp-effect-pierce",
   "description": "验证 pierce：破军诀「破军一击」穿透护甲。",
-  "scenario": "固定群聊双玩家，p2 装备泰坦之铠，p1 激活破军诀后决斗；引擎无穿透专用文本，结果依赖伤害数值与原始轨迹，需 --repeat 聚合。",
+  "scenario": "固定群聊双玩家，p2 装备泰坦之铠，p1 激活破军诀后决斗；引擎无穿透专用文本，结果依赖伤害数值与原始轨迹，声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。",
   "tags": [
     "pvp",
     "effect-matrix",
     "content-design",
     "sampled"
   ],
+  "deterministic": true,
+  "seed": 42,
   "conversation": {
     "kind": "group",
     "group_id": "webtest_pvp_001",

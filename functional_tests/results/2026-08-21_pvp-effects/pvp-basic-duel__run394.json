@@ -1,0 +1,10 @@
+{
+  "case_name": "pvp-basic-duel",
+  "run_id": 394,
+  "status": "passed",
+  "started_at": 1787241757.7753928,
+  "finished_at": 1787241760.0554752,
+  "evidence": {
+    "pierce": 27
+  }
+}

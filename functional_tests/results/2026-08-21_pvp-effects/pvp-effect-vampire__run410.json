@@ -1,0 +1,15 @@
+{
+  "case_name": "pvp-effect-vampire",
+  "run_id": 410,
+  "status": "passed",
+  "started_at": 1787242001.6770852,
+  "finished_at": 1787242004.67501,
+  "evidence": {
+    "heal": 12,
+    "vampire": 24,
+    "dot": 12,
+    "unavoidable": 8,
+    "pierce": 167,
+    "reflect": 24
+  }
+}

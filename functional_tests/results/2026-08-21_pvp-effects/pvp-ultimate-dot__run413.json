@@ -1,0 +1,21 @@
+{
+  "case_name": "pvp-ultimate-dot",
+  "run_id": 413,
+  "status": "passed",
+  "started_at": 1787242060.63321,
+  "finished_at": 1787242063.5414999,
+  "evidence": {
+    "heal": 8,
+    "vampire": 8,
+    "dot": 16,
+    "buff": 2,
+    "debuff": 2,
+    "unavoidable": 18,
+    "pierce": 279,
+    "reflect": 56,
+    "fatigue": 2,
+    "ultimate_damage": 4,
+    "ultimate_heal": 4,
+    "ultimate_dot": 4
+  }
+}
