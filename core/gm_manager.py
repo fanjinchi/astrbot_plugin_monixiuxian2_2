@@ -100,6 +100,7 @@ class GMManager:
             "卸下装备": self.cmd_unequip,
             "清除cd": self.cmd_clear_cd,
             "清除CD": self.cmd_clear_cd,
+            "清除悬赏": self.cmd_clear_bounty,
             "触发历练结算": self.cmd_force_adventure,
             "触发秘境结算": self.cmd_force_rift,
             "生成boss": self.cmd_spawn_boss,
@@ -300,6 +301,7 @@ class GMManager:
             "\n"
             "⏱ 状态与结算\n"
             "  清除CD [@玩家/ID] 确认\n"
+            "  清除悬赏 [@玩家/ID] 确认 （进行中悬赏+放弃冷却）\n"
             "  触发历练结算 [@玩家/ID]\n"
             "  触发秘境结算 [@玩家/ID]\n"
             "\n"
@@ -654,6 +656,54 @@ class GMManager:
         await self.db.update_player(player)
 
         return True, f"✅ 已清除【{player.user_name or target_id}】的忙碌状态"
+
+    async def cmd_clear_bounty(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """清除玩家悬赏状态：进行中悬赏记录（不结算奖励）+ 放弃冷却键。
+
+        供功能测试与运营清理悬赏状态；「清除CD」只清 user_cd 忙碌状态，
+        不覆盖悬赏存储（bounty_tasks 表与 system_config.bounty_abandon_cd_<uid>）。
+        冷却通过写入过期时间戳 "0" 失效（db 层无 delete_system_config）。
+        """
+        confirmed, remaining = self._pop_confirmation(args)
+        if not confirmed:
+            return (
+                False,
+                "⚠️ 清除悬赏 为破坏性操作，请在命令末尾追加「确认」以执行。\n"
+                "例如：/修仙GM 清除悬赏 @玩家 确认",
+            )
+
+        # 确认后通常只剩一个目标ID（或@），优先识别纯数字ID
+        remaining_tokens = remaining.split() if remaining else []
+        if len(remaining_tokens) == 1 and remaining_tokens[0].isdigit():
+            target_id = remaining_tokens[0]
+        else:
+            target_id, _ = self._resolve_target(event, remaining)
+        player = await self._get_player(target_id)
+        if not player:
+            return False, "❌ 目标玩家尚未踏入修仙之路！"
+
+        cleared = []
+        active = await self.db.ext.get_active_bounty(target_id)
+        if active:
+            await self.db.ext.cancel_bounty(target_id)
+            cleared.append(f"进行中悬赏【{active['bounty_name']}】")
+
+        cd_key = f"bounty_abandon_cd_{target_id}"
+        if await self.db.ext.get_system_config(cd_key):
+            await self.db.ext.set_system_config(cd_key, "0")
+            cleared.append("放弃冷却")
+
+        if not cleared:
+            return (
+                False,
+                f"❌ 【{player.user_name or target_id}】没有可清除的悬赏状态！",
+            )
+        return (
+            True,
+            f"✅ 已清除【{player.user_name or target_id}】的{'、'.join(cleared)}",
+        )
 
     async def cmd_force_adventure(
         self, event: "AstrMessageEvent", args: str

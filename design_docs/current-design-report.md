@@ -2,7 +2,7 @@
 
 > **文档状态**：
 > - 创建：**2026-07-29**（重设计起点，与 `redesign-combat-skills` 变更同批，commit 8fa47f7）
-> - 最近更新：**2026-08-19**（`add-default-sects-and-sect-growth`：§4.8 宗门节重写，DB 基线升至 v30）
+> - 最近更新：**2026-08-20**（`unify-sect-commands`：宗门功能收敛为「宗门」单入口子命令，宗门悬赏/商店/秘境可见性独立）
 > - 定位：**数值细节基线（活文档，非归档）**——架构总览见 `project-architecture.md`，行为契约见
 >   `openspec/specs/`；本文是数值/公式/数据库的权威基线，被 `project-architecture.md` §1/§3 引用。
 > - 维护义务：内容必须与代码同步（插件根 `AGENTS.md` §14，影响玩法的修改须同步修正本文）；
@@ -52,7 +52,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 ### 2.2 关键机制
 
-1. **命令注册**：`main.py` 中定义 `CMD_XXX` 中文常量 + `@filter.command(CMD_XXX)`，内层 `@require_whitelist`。全部为纯中文无空格指令（约 103 个，覆盖：修仙/闭关/突破/丹药/装备/商店/储物戒/宗门/Boss/排行/决斗切磋/秘境/历练/炼丹/传承/银行/悬赏/洞天/灵田/双修/灵眼/GM 等）。
+1. **命令注册**：`main.py` 中定义 `CMD_XXX` 中文常量 + `@filter.command(CMD_XXX)`，内层 `@require_whitelist`。全部为纯中文无空格指令（92 个，覆盖：修仙/闭关/突破/丹药/装备/商店/储物戒/宗门/Boss/排行/决斗切磋/秘境/历练/炼丹/传承/银行/悬赏/洞天/灵田/双修/灵眼/GM 等）。宗门功能例外：全部收敛为「宗门」单顶层指令 + 子命令分发（sect_handlers.handle_sect_entry），原 18 个宗门顶层指令已删除。
 2. **状态双层维护**（易踩坑）：
    - `player.state`（字符串："空闲"/"修炼中"/"历练中"…）
    - `user_cd` 表 `type` 字段（`UserStatus` 枚举：0 空闲 / 1 闭关中 / 2 历练中 / 3 探索秘境中 / 4 宗门任务中）
@@ -229,7 +229,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **宗门宝库**：默认宗门按 faction `treasures`/`heart_methods` 生成传承列表（玩家宗门为空），领取按 min_position 或 benefits.unlocks 校验，`sect_treasure_claims` 记录已领取 id 防重复领取（跨退宗/重入生效）（sect_manager.py:1415/1454）
 - **师承任务链**：默认宗门专属，`sect_tasks.json` master_chains 按境界段匹配，已存储的链优先于境界段重新匹配（sect_manager.py:1567）；阶段目标挂钩 PvE 胜场/历练完成/突破成功/捐献，进度存 players.sect_master_progress；阶段奖励贡献/修为/宗门功法领悟机会
 - **离宗回收**（退出 sect_manager.py:446 / 踢出 :729 / 弃道重修 handlers/player_handler.py:537-542 三路径统一走 `reclaim_sect_treasures` :211）：`treasure` 宝物（含装备槽）回收归还宗门；`sect_bound` 功法/心法不回收不封印、离宗保留可用；储物戒赠予路径拦截一切宗门绑定物（core/storage_ring_manager.py:64，handlers/storage_ring_handler.py:271）
-- **内容联动**：悬赏模板带 `sect_id` 仅对应宗门成员可见/可接（managers/bounty_manager.py:147/189）；秘境 `sect_id`+`access=sect_member` 仅本宗成员准入、列表标注（managers/rift_manager.py:145）；历练按权重 15 追加本宗事件组（managers/adventure_manager.py:50）；功法领悟全渠道注入宗门池并打 origin_sect_id/sect_bound 归属标记（core/skill_manager.py:94-105）
+- **宗门商店**：「宗门 商店 [购买 <名称>]」，贡献点结算（非灵石），商品池配在 faction `shop` 字段（`{id, price, min_position}`，id 引用 weapons.json/heart_methods.json，min_position 缺省 4=全员），购买走 `buy_sect_shop_item`（BEGIN IMMEDIATE 事务，先职阶门槛后贡献校验，物品入储物戒）（sect_manager.py §6.3）
+- **内容联动**：宗门悬赏与全局悬赏全生命周期独立——「宗门 悬赏」子命令组处理 sect_id 悬赏，全局悬赏指令只处理公共悬赏，分流校验先于缓存/冷却/活跃检查，悬赏缓存按 scope 分键（managers/bounty_manager.py scope 参数）；秘境 `sect_id`+`access=sect_member` 仅本宗成员可见（列表直接过滤，不再 🔒 标注）且准入校验不变（managers/rift_manager.py:145）；历练按权重 15 追加本宗事件组、结算消息带「🏯 宗门际遇」前缀标记（managers/adventure_manager.py:50/:331）；功法领悟全渠道注入宗门池并打 origin_sect_id/sect_bound 归属标记（core/skill_manager.py:94-105）
 
 ### 4.9 银行（managers/bank_manager.py；game_config.json bank 区）
 

@@ -7,6 +7,7 @@ Covers:
 """
 
 import sys
+import time
 
 import pytest
 import pytest_asyncio
@@ -216,52 +217,71 @@ async def test_bounty_list_hides_sect_template_for_non_member(db, bounty_manager
 
 @pytest.mark.asyncio
 async def test_bounty_list_shows_sect_template_for_member(db, bounty_manager_cls):
-    """A qingyun member's list can include the qingyun sect template."""
+    """Member: sect-scope list holds the sect template; global list never does."""
     sect_mgr = await _make_sect_mgr(db)
     bounty_mgr = _make_bounty_mgr(db, bounty_manager_cls)
 
-    # Sect-only pool: members see it, non-members get nothing from it.
+    # Sect-only pool: members see it in sect scope, global scope stays empty.
     bounty_mgr.templates_by_diff = {"easy": [_sect_template()]}
     player = await _join(db, sect_mgr, "b2", "青云门")
-    bounties = await bounty_mgr.get_bounty_list(player)
+    bounties = await bounty_mgr.get_bounty_list(player, scope="sect")
     assert len(bounties) == 1
     assert bounties[0]["id"] == 901
     assert bounties[0]["sect_id"] == "qingyun"
+    assert await bounty_mgr.get_bounty_list(player, scope="global") == []
 
-    # Mixed pool: both templates are eligible for the member.
+    # Mixed pool: global scope only picks public templates, sect scope only sect ones.
     bounty_mgr2 = _make_bounty_mgr(db, bounty_manager_cls)
-    seen = {bounty_mgr2._pick_template("easy", "qingyun")["id"] for _ in range(100)}
-    assert seen == {901, 902}
+    seen_global = {
+        bounty_mgr2._pick_template("easy", "qingyun")["id"] for _ in range(100)
+    }
+    assert seen_global == {902}
+    seen_sect = {
+        bounty_mgr2._pick_template("easy", "qingyun", scope="sect")["id"]
+        for _ in range(100)
+    }
+    assert seen_sect == {901}
 
 
 @pytest.mark.asyncio
-async def test_bounty_accept_rejects_non_member(db, bounty_manager_cls):
-    """Accepting a sect bounty as a non-member is rejected with a hint."""
+async def test_bounty_accept_scope_split(db, bounty_manager_cls):
+    """Scope split: global entry rejects sect bounties, sect entry rejects global/other-sect bounties."""
     sect_mgr = await _make_sect_mgr(db)
     bounty_mgr = _make_bounty_mgr(db, bounty_manager_cls)
 
+    # 全局入口接宗门悬赏（含非成员与他宗成员）：分流提示走 /宗门 悬赏
     outsider = await _make_player(db, "b3")
     success, msg = await bounty_mgr.accept_bounty(outsider, 901)
     assert not success
-    assert "仅面向本宗弟子" in msg
+    assert "宗门专属委托" in msg and "/宗门 悬赏" in msg
 
     other_sect = await _join(db, sect_mgr, "b4", "合欢宗", level_index=3)
     success, msg = await bounty_mgr.accept_bounty(other_sect, 901)
     assert not success
-    assert "仅面向本宗弟子" in msg
+    assert "/宗门 悬赏" in msg
+
+    # 宗门入口接他宗悬赏：拒绝
+    success, msg = await bounty_mgr.accept_bounty(other_sect, 901, scope="sect")
+    assert not success
+    assert "其他宗门" in msg
+
+    # 宗门入口接公共悬赏：分流提示走 /接取悬赏
+    success, msg = await bounty_mgr.accept_bounty(other_sect, 902, scope="sect")
+    assert not success
+    assert "公共委托" in msg and "/接取悬赏" in msg
 
 
 @pytest.mark.asyncio
 async def test_bounty_accept_allows_member(db, bounty_manager_cls):
-    """A qingyun member can accept the sect bounty (full accept flow)."""
+    """A qingyun member can accept the sect bounty via the sect scope (full accept flow)."""
     sect_mgr = await _make_sect_mgr(db)
     bounty_mgr = _make_bounty_mgr(db, bounty_manager_cls)
 
     player = await _join(db, sect_mgr, "b5", "青云门")
     # Sect-only pool so the cached list deterministically holds the sect bounty.
     bounty_mgr.templates_by_diff = {"easy": [_sect_template()]}
-    await bounty_mgr.get_bounty_list(player)  # populate the accept cache
-    success, msg = await bounty_mgr.accept_bounty(player, 901)
+    await bounty_mgr.get_bounty_list(player, scope="sect")  # populate the accept cache
+    success, msg = await bounty_mgr.accept_bounty(player, 901, scope="sect")
     assert success, msg
     active = await db.ext.get_active_bounty("b5")
     assert active is not None
@@ -277,6 +297,53 @@ async def test_bounty_accept_normal_template_unchanged(db, bounty_manager_cls):
     await bounty_mgr.get_bounty_list(player)
     success, msg = await bounty_mgr.accept_bounty(player, 902)
     assert success, msg
+
+
+@pytest.mark.asyncio
+async def test_bounty_scope_mismatch_on_status_complete_abandon(
+    db, bounty_manager_cls
+):
+    """Status/complete/abandon reject cross-scope operations with guidance to the other entry."""
+    sect_mgr = await _make_sect_mgr(db)
+    bounty_mgr = _make_bounty_mgr(db, bounty_manager_cls)
+
+    # 宗门悬赏进行中：全局入口状态/完成/放弃均引导到 /宗门 悬赏
+    member = await _join(db, sect_mgr, "b7", "青云门")
+    bounty_mgr.templates_by_diff = {"easy": [_sect_template()]}
+    await bounty_mgr.get_bounty_list(member, scope="sect")
+    success, msg = await bounty_mgr.accept_bounty(member, 901, scope="sect")
+    assert success, msg
+
+    success, msg = await bounty_mgr.check_bounty_status(member, scope="global")
+    assert not success and "宗门悬赏" in msg and "/宗门 悬赏" in msg
+    success, msg = await bounty_mgr.complete_bounty(member, scope="global")
+    assert not success and "宗门悬赏" in msg
+    success, msg = await bounty_mgr.abandon_bounty(member, scope="global")
+    assert not success and "宗门悬赏" in msg
+
+    # 本宗入口正常可见状态
+    success, msg = await bounty_mgr.check_bounty_status(member, scope="sect")
+    assert success and "后山巡守" in msg and "/宗门 悬赏 完成" in msg
+
+    # 完成后（进度满）经宗门入口结算
+    has_progress, hint = await bounty_mgr.add_bounty_progress(
+        member, "adventure_scout", 1
+    )
+    assert has_progress and "/宗门 悬赏 完成" in hint
+    success, msg = await bounty_mgr.complete_bounty(member, scope="sect")
+    assert success, msg
+
+    # 公共悬赏进行中：宗门入口引导到全局指令
+    player = await _make_player(db, "b8")
+    bounty_mgr2 = _make_bounty_mgr(db, bounty_manager_cls)
+    bounty_mgr2.templates_by_diff = {"easy": [_normal_template()]}
+    await bounty_mgr2.get_bounty_list(player, scope="global")
+    success, msg = await bounty_mgr2.accept_bounty(player, 902, scope="global")
+    assert success, msg
+    success, msg = await bounty_mgr2.check_bounty_status(player, scope="sect")
+    assert not success and "公共悬赏" in msg and "/悬赏状态" in msg
+    success, msg = await bounty_mgr2.abandon_bounty(player, scope="sect")
+    assert not success and "公共悬赏" in msg
 
 
 # ===== 7.2 秘境准入 =====
@@ -319,25 +386,21 @@ async def test_rift_access_allows_member_and_normal_rift(db):
 
 
 @pytest.mark.asyncio
-async def test_rift_list_annotates_locked_sect_rift(db):
-    """The rift list marks sect-exclusive rifts locked for non-members only."""
+async def test_rift_list_hides_sect_rift_for_non_member(db):
+    """Sect-exclusive rifts are hidden from non-members; members see the 🏯 mark."""
     sect_mgr = await _make_sect_mgr(db)
     rift_mgr = RiftManager(db, FakeConfigManager())
 
     await _make_player(db, "r5")
     success, msg = await rift_mgr.list_rifts("r5")
     assert success
-    rift1_block = msg.split("(ID:1)")[1].split("(ID:2)")[0]
-    assert "🔒" in rift1_block
-    assert "仅本宗弟子可进" in rift1_block
-    rift2_block = msg.split("(ID:2)")[1].split("(ID:3)")[0]
-    assert "🔒" not in rift2_block
+    assert "(ID:1)" not in msg, "sect-exclusive rift hidden from non-member"
+    assert "(ID:2)" in msg, "normal rift still visible"
 
     await _join(db, sect_mgr, "r6", "青云门")
     success, msg = await rift_mgr.list_rifts("r6")
     assert success
     rift1_block = msg.split("(ID:1)")[1].split("(ID:2)")[0]
-    assert "🔒" not in rift1_block
     assert "🏯 宗门专属秘境" in rift1_block
 
 
@@ -413,3 +476,53 @@ async def test_adventure_faction_resolution_from_player_sect(db):
 
     sectless = await _make_player(db, "a2")
     assert await adv_mgr._get_player_faction_id(sectless) is None
+
+
+@pytest.mark.asyncio
+async def test_adventure_settlement_marks_sect_event(db, monkeypatch):
+    """Settlement prefixes 「🏯 宗门际遇 · 事件名」 for sect events; normal events unchanged."""
+    adv_mgr = AdventureManager(db)
+
+    async def _finish_with_event(user_id: str, event: dict) -> str:
+        monkeypatch.setattr(
+            adv_mgr, "_trigger_route_event", lambda route, faction_id=None: event
+        )
+        # 与 GM 强制结算一致：把计划完成时间提前到当前，立即结算
+        user_cd = await db.ext.get_user_cd(user_id)
+        user_cd.scheduled_time = int(time.time())
+        await db.ext.update_user_cd(user_cd)
+        success, msg, _ = await adv_mgr.finish_adventure(user_id)
+        assert success, msg
+        return msg
+
+    sect_event = {
+        "key": "elder_guidance",
+        "name": "长老传功",
+        "desc": "传功长老路过点拨。",
+        "exp_mult": 1.0,
+        "gold_mult": 1.0,
+        "item_chance": 0,
+        "sect_id": "qingyun",
+    }
+    normal_event = {
+        "key": "steady_path",
+        "name": "平稳推进",
+        "desc": "历练顺风顺水。",
+        "exp_mult": 1.0,
+        "gold_mult": 1.0,
+        "item_chance": 0,
+    }
+
+    await _make_player(db, "m1")
+    success, _ = await adv_mgr.start_adventure("m1", "巡山")
+    assert success
+    msg = await _finish_with_event("m1", sect_event)
+    assert "🏯 宗门际遇 · 长老传功" in msg
+    assert "传功长老路过点拨。" in msg
+
+    await _make_player(db, "m2")
+    success, _ = await adv_mgr.start_adventure("m2", "巡山")
+    assert success
+    msg = await _finish_with_event("m2", normal_event)
+    assert "宗门际遇" not in msg
+    assert "历练顺风顺水。" in msg

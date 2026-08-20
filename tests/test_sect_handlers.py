@@ -59,7 +59,16 @@ class FakeConfigManager:
     """Minimal ConfigManager stub with the qingyun system sect."""
 
     def __init__(self):
-        self.sect_config = {"positions": {}, "scale_ratio": 10}
+        self.sect_config = {
+            "positions": {
+                "0": {"name": "宗主", "permission": 10},
+                "1": {"name": "长老", "permission": 8},
+                "2": {"name": "亲传弟子", "permission": 5},
+                "3": {"name": "内门弟子", "permission": 2},
+                "4": {"name": "外门弟子", "permission": 0},
+            },
+            "scale_ratio": 10,
+        }
         self.sect_factions = {
             "factions": [
                 {
@@ -69,6 +78,10 @@ class FakeConfigManager:
                     "elders": [{"name": "玄诚子", "title": "传功长老"}],
                     "heart_methods": ["heart_qy_001"],
                     "treasures": [],
+                    "shop": [
+                        {"id": "sword_006", "price": 1500, "min_position": 3},
+                        {"id": "heart_qy_001", "price": 500},
+                    ],
                 }
             ]
         }
@@ -77,6 +90,10 @@ class FakeConfigManager:
         self.heart_methods_data = {
             "青云心典": {"id": "heart_qy_001", "name": "青云心典"}
         }
+        self.weapons_data = {
+            "青云天剑": {"id": "sword_006", "name": "青云天剑", "rank": "天阶"}
+        }
+        self.items_data = {}
 
     def get_level_name(self, level_index: int, cultivation_type: str = "灵修") -> str:
         return f"境界{level_index}"
@@ -249,5 +266,163 @@ async def test_check_in_daily_reset_failure_does_not_break_check_in(monkeypatch)
 
     # 重置失败时日期不推进，下次签到可重试
     assert await db.ext.get_system_config("sect_daily_reset_date") != FROZEN_TODAY
+
+    await db.close()
+
+
+# ===== /宗门 统一入口分发器 =====
+
+
+@pytest.mark.asyncio
+async def test_sect_entry_navigation_and_unknown_subcommand():
+    """无参数与未知子命令均输出导航帮助；带唤醒前缀也能正确解析。"""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager())
+    handlers = SectHandlers(db, mgr, bounty_mgr=MagicMock())
+    await _make_player(db, "n1")
+
+    event = _make_event("n1", "宗门")
+    await _collect(handlers.handle_sect_entry(event))
+    assert "指令导航" in _last_msg(event)
+    assert "悬赏" in _last_msg(event) and "商店" in _last_msg(event)
+
+    event = _make_event("n1", "/宗门")
+    await _collect(handlers.handle_sect_entry(event))
+    assert "指令导航" in _last_msg(event)
+
+    event = _make_event("n1", "宗门 不存在的东西")
+    await _collect(handlers.handle_sect_entry(event))
+    assert "未识别的宗门子命令" in _last_msg(event)
+    assert "指令导航" in _last_msg(event)
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_sect_entry_missing_arg_usage_hints():
+    """缺参子命令输出各自用法示例。"""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager())
+    handlers = SectHandlers(db, mgr, bounty_mgr=MagicMock())
+    await _make_player(db, "n2")
+
+    event = _make_event("n2", "宗门 捐献")
+    await _collect(handlers.handle_sect_entry(event))
+    assert "/宗门 捐献 1000" in _last_msg(event)
+
+    event = _make_event("n2", "宗门 创建")
+    await _collect(handlers.handle_sect_entry(event))
+    assert "/宗门 创建 逍遥门" in _last_msg(event)
+
+    event = _make_event("n2", "宗门 捐献 abc")
+    await _collect(handlers.handle_sect_entry(event))
+    assert "/宗门 捐献 1000" in _last_msg(event)
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_sect_entry_membership_gates():
+    """悬赏/商店/信息子命令对无宗门玩家的拒绝提示。"""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager())
+    await mgr.ensure_system_sects()
+    handlers = SectHandlers(db, mgr, bounty_mgr=MagicMock())
+    await _make_player(db, "n3")
+
+    event = _make_event("n3", "宗门 悬赏")
+    await _collect(handlers.handle_sect_entry(event))
+    assert "你还未加入宗门" in _last_msg(event)
+
+    event = _make_event("n3", "宗门 商店")
+    await _collect(handlers.handle_sect_entry(event))
+    assert "你还未加入宗门" in _last_msg(event)
+
+    event = _make_event("n3", "宗门 信息")
+    await _collect(handlers.handle_sect_entry(event))
+    assert "还未加入宗门" in _last_msg(event) or "未加入宗门" in _last_msg(event)
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_sect_entry_busy_player_blocked():
+    """「宗门」不在忙碌白名单：忙碌时所有子命令（含查看类）被拒，与旧独立指令行为一致。"""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager())
+    await mgr.ensure_system_sects()
+    handlers = SectHandlers(db, mgr, bounty_mgr=MagicMock())
+    await _make_player(db, "n4")
+    success, msg = await mgr.join_sect("n4", "青云门")
+    assert success, msg
+
+    await db.ext.set_user_busy("n4", UserStatus.EXPLORING, 9999999999)
+    event = _make_event("n4", "宗门 信息")
+    await _collect(handlers.handle_sect_entry(event))
+    assert "无法分心他顾" in _last_msg(event)
+
+    await db.close()
+
+
+# ===== 宗门商店 =====
+
+
+@pytest.mark.asyncio
+async def test_sect_shop_list_and_position_gate():
+    """商店列表展示贡献价与职阶锁定标注。"""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager())
+    await mgr.ensure_system_sects()
+    await _make_player(db, "s1")
+    success, msg = await mgr.join_sect("s1", "青云门")
+    assert success, msg
+
+    success, msg = await mgr.get_sect_shop_info("s1")
+    assert success, msg
+    assert "宗门商店" in msg
+    assert "青云天剑" in msg and "1500 贡献" in msg
+    assert "🔒需内门弟子及以上" in msg  # 外门弟子(4) > min_position(3)
+    assert "青云心典" in msg and "500 贡献" in msg
+    assert "🔒" not in msg.split("青云心典")[1]
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_sect_shop_buy_flow():
+    """购买成功扣贡献并发货；贡献不足与职阶不足分别拒绝。"""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager())
+    await mgr.ensure_system_sects()
+    await _make_player(db, "s2")
+    success, msg = await mgr.join_sect("s2", "青云门")
+    assert success, msg
+
+    player = await db.get_player_by_id("s2")
+    player.sect_contribution = 1000
+    await db.update_player(player)
+
+    # 职阶门槛：外门弟子买 min_position=3 的青云天剑被拒
+    success, msg = await mgr.buy_sect_shop_item("s2", "青云天剑")
+    assert not success and "职阶不足" in msg
+
+    # 贡献不足：买 1500 的剑（先晋升到内门弟子）
+    player = await db.get_player_by_id("s2")
+    player.sect_position = 3
+    await db.update_player(player)
+    success, msg = await mgr.buy_sect_shop_item("s2", "青云天剑")
+    assert not success and "贡献点不足" in msg and "1500" in msg
+
+    # 正常购买：青云心典 500 贡献
+    success, msg = await mgr.buy_sect_shop_item("s2", "青云心典")
+    assert success, msg
+    assert "购买成功" in msg and "剩余 500" in msg
+    player = await db.get_player_by_id("s2")
+    assert player.sect_contribution == 500
+    assert player.get_storage_ring_items().get("青云心典") == 1
+
+    # 未知商品
+    success, msg = await mgr.buy_sect_shop_item("s2", "不存在的东西")
+    assert not success and "没有" in msg
 
     await db.close()

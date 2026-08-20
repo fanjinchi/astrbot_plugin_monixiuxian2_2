@@ -155,7 +155,7 @@ class RiftManager:
 
     async def list_rifts(self, user_id: str = "") -> tuple[bool, str]:
         """
-        列出所有秘境（宗门专属秘境对非本宗成员标注锁定）
+        列出秘境（宗门专属秘境仅本宗成员可见，非本宗成员列表直接过滤）
 
         Returns:
             (成功标志, 消息)
@@ -171,22 +171,35 @@ class RiftManager:
             if player:
                 faction_id = await self._get_player_faction_id(player)
 
+        # 宗门专属秘境（sect_id + access=sect_member）仅本宗成员可见；
+        # 非本宗直接过滤不展示，准入校验 _check_rift_access 仍作兜底
+        visible_rifts = []
+        for rift in rifts:
+            entry = self._get_rift_config_entry(rift.rift_id)
+            if (
+                entry
+                and entry.get("sect_id")
+                and entry.get("access") == "sect_member"
+                and faction_id != entry.get("sect_id")
+            ):
+                continue
+            visible_rifts.append((rift, entry))
+
+        if not visible_rifts:
+            return False, "❌ 当前没有开放的秘境！"
+
         msg = "🌀 秘境列表\n"
         msg += "━━━━━━━━━━━━━━━\n"
 
-        for rift in rifts:
+        for rift, entry in visible_rifts:
             rewards_dict = rift.get_rewards()
             exp_range = rewards_dict.get("exp", [0, 0])
             gold_range = rewards_dict.get("gold", [0, 0])
             level_name = self._get_level_name(rift.required_level)
 
             msg += f"【{rift.rift_name}】(ID:{rift.rift_id})\n"
-            entry = self._get_rift_config_entry(rift.rift_id)
             if entry and entry.get("sect_id") and entry.get("access") == "sect_member":
-                if faction_id == entry.get("sect_id"):
-                    msg += "  🏯 宗门专属秘境\n"
-                else:
-                    msg += "  🔒 宗门专属秘境（仅本宗弟子可进）\n"
+                msg += "  🏯 宗门专属秘境\n"
             if rift.required_level == 0:
                 msg += "  等级要求：无限制\n"
             else:

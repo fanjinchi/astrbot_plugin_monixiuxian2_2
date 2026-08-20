@@ -112,23 +112,8 @@ CMD_ACTIVATE_TECHNIQUE = "激活功法"
 CMD_DEACTIVATE_TECHNIQUE = "卸下功法"
 CMD_MY_SKILLS = "我的技能"
 
-# 宗门系统指令
-CMD_CREATE_SECT = "创建宗门"
-CMD_JOIN_SECT = "加入宗门"
-CMD_LEAVE_SECT = "退出宗门"
-CMD_MY_SECT = "我的宗门"
-CMD_SECT_LIST = "宗门列表"
-CMD_SECT_DONATE = "宗门捐献"
-CMD_SECT_KICK = "踢出成员"
-CMD_SECT_TRANSFER = "宗主传位"
-CMD_SECT_TASK = "宗门任务"
-CMD_SECT_POSITION = "职位变更"
-CMD_SECT_ELIXIR = "宗门丹房"
-CMD_SECT_CONSTRUCTION = "宗门建设"
-CMD_SECT_MAINBUFF = "镇派功法"
-CMD_SECT_PROMOTE = "宗门晋升"
-CMD_SECT_TREASURY = "宗门宝库"
-CMD_MASTER_TASK = "师承任务"
+# 宗门系统指令（统一入口：/宗门 <子命令>，子命令路由见 sect_handlers.handle_sect_entry）
+CMD_SECT = "宗门"
 
 # Boss系统指令
 CMD_BOSS_INFO = "世界Boss"
@@ -139,9 +124,7 @@ CMD_SPAWN_BOSS = "生成Boss"
 CMD_RANK_LEVEL = "境界排行"
 CMD_RANK_POWER = "战力排行"
 CMD_RANK_WEALTH = "灵石排行"
-CMD_RANK_SECT = "宗门排行"
 CMD_RANK_DEPOSIT = "存款排行"
-CMD_RANK_CONTRIBUTION = "贡献排行"
 
 # 战斗指令
 CMD_DUEL = "决斗"
@@ -321,7 +304,8 @@ class XiuXianPlugin(Star):
         )
 
         # 初始化新功能处理器
-        self.sect_handlers = SectHandlers(self.db, self.sect_mgr)
+        # ranking_handlers 在其后构造，统一入口分发器需要排行路由，故构造后回填
+        self.sect_handlers = SectHandlers(self.db, self.sect_mgr, self.bounty_mgr)
         self.boss_handlers = BossHandlers(self.db, self.boss_mgr)
         self.combat_handlers = CombatHandlers(
             self.db, self.combat_mgr, self.config_manager
@@ -330,6 +314,7 @@ class XiuXianPlugin(Star):
             self.db, self.config_manager, self.skill_manager, self.storage_ring_mgr
         )
         self.ranking_handlers = RankingHandlers(self.db, self.rank_mgr)
+        self.sect_handlers.ranking_handlers = self.ranking_handlers
         self.rift_handlers = RiftHandlers(self.db, self.rift_mgr)
         self.adventure_handlers = AdventureHandlers(self.db, self.adventure_mgr)
         self.alchemy_handlers = AlchemyHandlers(self.db, self.alchemy_mgr)
@@ -1071,140 +1056,13 @@ class XiuXianPlugin(Star):
         async for r in self.storage_ring_handler.handle_retrieve_all(event, category):
             yield r
 
-    # ===== 宗门系统指令 =====
+    # ===== 宗门系统指令（统一入口） =====
 
-    @filter.command(CMD_CREATE_SECT, "创建宗门")
+    @filter.command(CMD_SECT, "宗门统一入口")
     @require_whitelist
-    async def handle_create_sect(self, event: AstrMessageEvent, name: str = ""):
-        """Command 「创建宗门」- 创建宗门; routes to sect_handlers.handle_create_sect."""
-        if not name:
-            yield event.plain_result(f"请输入宗门名称，例如：/{CMD_CREATE_SECT} 逍遥门")
-            return
-        async for r in self.sect_handlers.handle_create_sect(event, name):
-            yield r
-
-    @filter.command(CMD_JOIN_SECT, "加入宗门")
-    @require_whitelist
-    async def handle_join_sect(self, event: AstrMessageEvent, name: str = ""):
-        """Command 「加入宗门」- 加入宗门; routes to sect_handlers.handle_join_sect."""
-        if not name:
-            yield event.plain_result(
-                f"请输入要加入的宗门名称，例如：/{CMD_JOIN_SECT} 逍遥门"
-            )
-            return
-        async for r in self.sect_handlers.handle_join_sect(event, name):
-            yield r
-
-    @filter.command(CMD_LEAVE_SECT, "退出当前宗门")
-    @require_whitelist
-    async def handle_leave_sect(self, event: AstrMessageEvent):
-        """Command 「退出宗门」- 退出当前宗门; routes to sect_handlers.handle_leave_sect."""
-        async for r in self.sect_handlers.handle_leave_sect(event):
-            yield r
-
-    @filter.command(CMD_MY_SECT, "查看我的宗门信息")
-    @require_whitelist
-    async def handle_my_sect(self, event: AstrMessageEvent):
-        """Command 「我的宗门」- 查看我的宗门信息; routes to sect_handlers.handle_my_sect."""
-        async for r in self.sect_handlers.handle_my_sect(event):
-            yield r
-
-    @filter.command(CMD_SECT_TASK, "执行宗门任务")
-    @require_whitelist
-    async def handle_sect_task(self, event: AstrMessageEvent):
-        """Command 「宗门任务」- 执行宗门任务; routes to sect_handlers.handle_sect_task."""
-        async for r in self.sect_handlers.handle_sect_task(event):
-            yield r
-
-    @filter.command(CMD_SECT_LIST, "查看宗门列表")
-    @require_whitelist
-    async def handle_sect_list(self, event: AstrMessageEvent):
-        """Command 「宗门列表」- 查看宗门列表; routes to sect_handlers.handle_sect_list."""
-        async for r in self.sect_handlers.handle_sect_list(event):
-            yield r
-
-    @filter.command(CMD_SECT_DONATE, "宗门捐献")
-    @require_whitelist
-    async def handle_sect_donate(self, event: AstrMessageEvent, amount: int = 0):
-        """Command 「宗门捐献」- 宗门捐献; routes to sect_handlers.handle_donate."""
-        if amount <= 0:
-            yield event.plain_result(f"请输入捐献数量，例如：/{CMD_SECT_DONATE} 1000")
-            return
-        async for r in self.sect_handlers.handle_donate(event, amount):
-            yield r
-
-    @filter.command(CMD_SECT_KICK, "踢出宗门成员")
-    @require_whitelist
-    async def handle_sect_kick(self, event: AstrMessageEvent, target: str = ""):
-        """Command 「踢出成员」- 踢出宗门成员; routes to sect_handlers.handle_kick_member."""
-        async for r in self.sect_handlers.handle_kick_member(event, target):
-            yield r
-
-    @filter.command(CMD_SECT_TRANSFER, "宗主传位")
-    @require_whitelist
-    async def handle_sect_transfer(self, event: AstrMessageEvent, target: str = ""):
-        """Command 「宗主传位」- 宗主传位; routes to sect_handlers.handle_transfer."""
-        async for r in self.sect_handlers.handle_transfer(event, target):
-            yield r
-
-    @filter.command(CMD_SECT_POSITION, "变更成员职位")
-    @require_whitelist
-    async def handle_sect_position(
-        self, event: AstrMessageEvent, target: str = "", position: int = -1
-    ):
-        """Command 「职位变更」- 变更成员职位; routes to sect_handlers.handle_position_change."""
-        if position < 0:
-            yield event.plain_result(
-                f"请输入目标和职位ID(0-4)，例如：/{CMD_SECT_POSITION} @某人 1"
-            )
-            return
-        async for r in self.sect_handlers.handle_position_change(
-            event, target, position
-        ):
-            yield r
-
-    @filter.command(CMD_SECT_ELIXIR, "宗门丹房领取丹药")
-    @require_whitelist
-    async def handle_sect_elixir(self, event: AstrMessageEvent, action: str = ""):
-        """Command 「宗门丹房」- 查看丹房状态或领取丹药（「宗门丹房 领取」）; routes to sect_handlers.handle_sect_elixir."""
-        async for r in self.sect_handlers.handle_sect_elixir(event, action):
-            yield r
-
-    @filter.command(CMD_SECT_CONSTRUCTION, "宗门建设与建筑升级")
-    @require_whitelist
-    async def handle_sect_construction(
-        self, event: AstrMessageEvent, building: str = ""
-    ):
-        """Command 「宗门建设」- 查看建筑状态或升级建筑（「宗门建设 洞天/丹房」）; routes to sect_handlers.handle_sect_construction."""
-        async for r in self.sect_handlers.handle_sect_construction(event, building):
-            yield r
-
-    @filter.command(CMD_SECT_MAINBUFF, "查看或镶嵌镇派功法")
-    @require_whitelist
-    async def handle_sect_mainbuff(self, event: AstrMessageEvent, skill_ref: str = ""):
-        """Command 「镇派功法」- 查看镇派功法或宗主镶嵌功法（「镇派功法 <功法ID>」）; routes to sect_handlers.handle_sect_mainbuff."""
-        async for r in self.sect_handlers.handle_sect_mainbuff(event, skill_ref):
-            yield r
-
-    @filter.command(CMD_SECT_PROMOTE, "宗门职阶晋升")
-    @require_whitelist
-    async def handle_sect_promote(self, event: AstrMessageEvent):
-        """Command 「宗门晋升」- 贡献+境界双门槛晋升职阶; routes to sect_handlers.handle_sect_promote."""
-        async for r in self.sect_handlers.handle_sect_promote(event):
-            yield r
-
-    @filter.command(CMD_SECT_TREASURY, "宗门宝库领取传承")
-    @require_whitelist
-    async def handle_sect_treasury(self, event: AstrMessageEvent, item_ref: str = ""):
-        """Command 「宗门宝库」- 查看本宗传承或领取宝物/心法（「宗门宝库 <名称>」）; routes to sect_handlers.handle_sect_treasury."""
-        async for r in self.sect_handlers.handle_sect_treasury(event, item_ref):
-            yield r
-
-    @filter.command(CMD_MASTER_TASK, "查看师承任务进度")
-    @require_whitelist
-    async def handle_master_task(self, event: AstrMessageEvent):
-        """Command 「师承任务」- 查看师承任务链与阶段进度; routes to sect_handlers.handle_master_task."""
-        async for r in self.sect_handlers.handle_master_task(event):
+    async def handle_sect(self, event: AstrMessageEvent):
+        """Command 「宗门」- 宗门统一入口，子命令路由（创建/加入/悬赏/商店等）; routes to sect_handlers.handle_sect_entry."""
+        async for r in self.sect_handlers.handle_sect_entry(event):
             yield r
 
     # ===== Boss系统指令 =====
@@ -1281,25 +1139,11 @@ class XiuXianPlugin(Star):
         async for r in self.ranking_handlers.handle_rank_wealth(event):
             yield r
 
-    @filter.command(CMD_RANK_SECT, "查看宗门排行榜")
-    @require_whitelist
-    async def handle_rank_sect(self, event: AstrMessageEvent):
-        """Command 「宗门排行」- 查看宗门排行榜; routes to ranking_handlers.handle_rank_sect."""
-        async for r in self.ranking_handlers.handle_rank_sect(event):
-            yield r
-
     @filter.command(CMD_RANK_DEPOSIT, "查看存款排行榜")
     @require_whitelist
     async def handle_rank_deposit(self, event: AstrMessageEvent):
         """Command 「存款排行」- 查看存款排行榜; routes to ranking_handlers.handle_rank_deposit."""
         async for r in self.ranking_handlers.handle_rank_deposit(event):
-            yield r
-
-    @filter.command(CMD_RANK_CONTRIBUTION, "查看宗门贡献排行榜")
-    @require_whitelist
-    async def handle_rank_contribution(self, event: AstrMessageEvent):
-        """Command 「贡献排行」- 查看宗门贡献排行榜; routes to ranking_handlers.handle_rank_sect_contribution."""
-        async for r in self.ranking_handlers.handle_rank_sect_contribution(event):
             yield r
 
     # ===== 战斗指令 =====

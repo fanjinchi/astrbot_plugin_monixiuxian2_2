@@ -120,6 +120,20 @@ The system SHALL provide a GM sub-command to clear a player's busy state. Destru
 - **WHEN** a GM sends `修仙GM 清除CD @玩家` without the `确认` argument
 - **THEN** the system replies with a warning asking the GM to append `确认` and performs no change
 
+### Requirement: Clear bounty state
+
+The system SHALL provide a GM sub-command `清除悬赏` that clears a target player's bounty-related state: the active bounty record (removed with abandon semantics, no rewards settled) and the post-abandon re-accept cooldown (the `bounty_abandon_cd_<user_id>` key in `system_config`). The sub-command SHALL follow the existing GM constraints: restricted to authorized `GM_ADMINS` users, requiring the `确认` confirmation convention for destructive operations, and supporting numeric ID target resolution. When the target has neither an active bounty nor a cooldown, the system SHALL reply with a clear notice and produce no side effects.
+
+#### Scenario: Clear active bounty and cooldown
+
+- **WHEN** a GM sends `修仙GM 清除悬赏 <玩家ID> 确认` for a player holding an active bounty and an abandon cooldown
+- **THEN** the player's active bounty is removed (no rewards granted) and the abandon cooldown key is cleared, so the player can immediately accept a new bounty
+
+#### Scenario: Nothing to clear
+
+- **WHEN** a GM sends `清除悬赏` for a player with no active bounty and no cooldown
+- **THEN** the system replies that the target has no bounty state to clear and the player data is unchanged
+
 ### Requirement: Log rotation
 
 The system SHALL rotate the GM audit log file when it reaches 500 MB, creating a new dated log file and preserving the old one.

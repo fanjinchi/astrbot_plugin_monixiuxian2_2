@@ -640,3 +640,61 @@ class TestDispatchLogging:
         assert entry["gm_user_id"] == "gm_001"
         assert entry["command"] == ""
         assert entry["success"] is False
+
+
+class TestClearBounty:
+    """GM「清除悬赏」：清除进行中悬赏记录与放弃冷却（system_config 键置过期）。"""
+
+    @pytest.mark.asyncio
+    async def test_clear_bounty_requires_confirmation(self, gm_manager, mock_db):
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+        # 确认门槛必须阻断一切副作用，防门槛回归后"假拒绝真清除"——先装好探针再触发
+        mock_db.ext.cancel_bounty = AsyncMock()
+        mock_db.ext.set_system_config = AsyncMock()
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_clear_bounty(event, "12345")
+
+        assert success is False
+        assert "确认" in msg
+        mock_db.ext.cancel_bounty.assert_not_awaited()
+        mock_db.ext.set_system_config.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_clear_bounty_clears_active_and_cooldown(self, gm_manager, mock_db):
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+        mock_db.ext.get_active_bounty = AsyncMock(
+            return_value={"bounty_id": 901, "bounty_name": "后山巡视"}
+        )
+        mock_db.ext.cancel_bounty = AsyncMock()
+        mock_db.ext.get_system_config = AsyncMock(return_value="9999999999")
+        mock_db.ext.set_system_config = AsyncMock()
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_clear_bounty(event, "12345 确认")
+
+        assert success is True
+        assert "后山巡视" in msg and "放弃冷却" in msg
+        mock_db.ext.cancel_bounty.assert_awaited_once_with("12345")
+        mock_db.ext.set_system_config.assert_awaited_once_with(
+            "bounty_abandon_cd_12345", "0"
+        )
+
+    @pytest.mark.asyncio
+    async def test_clear_bounty_nothing_to_clear(self, gm_manager, mock_db):
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+        mock_db.ext.get_active_bounty = AsyncMock(return_value=None)
+        mock_db.ext.cancel_bounty = AsyncMock()
+        mock_db.ext.get_system_config = AsyncMock(return_value=None)
+        mock_db.ext.set_system_config = AsyncMock()
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_clear_bounty(event, "12345 确认")
+
+        assert success is False
+        assert "没有可清除" in msg
+        mock_db.ext.cancel_bounty.assert_not_awaited()
+        mock_db.ext.set_system_config.assert_not_awaited()

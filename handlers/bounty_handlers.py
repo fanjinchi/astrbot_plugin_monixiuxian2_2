@@ -20,8 +20,8 @@ class BountyHandlers:
 
     @player_required
     async def handle_bounty_list(self, player: Player, event: AstrMessageEvent):
-        """显示悬赏列表（宗门专属委托单列分区）"""
-        bounties = await self.bounty_mgr.get_bounty_list(player)
+        """显示全局悬赏列表（仅无 sect_id 的公共悬赏；宗门悬赏走 /宗门 悬赏）"""
+        bounties = await self.bounty_mgr.get_bounty_list(player, scope="global")
 
         def _format(b: dict) -> str:
             """Render one bounty entry as a multi-line display block."""
@@ -33,17 +33,10 @@ class BountyHandlers:
                 f"  - 说明：{b.get('description', '')}"
             )
 
-        normal = [b for b in bounties if not b.get("sect_id")]
-        sect_only = [b for b in bounties if b.get("sect_id")]
-
         lines = ["📜 悬赏令 · 今日委托", "━━━━━━━━━━━━━━━"]
-        lines.extend(_format(b) for b in normal)
-        if sect_only:
-            lines.append("━━━━━━━━━━━━━━━")
-            lines.append("🏯 宗门悬赏")
-            lines.extend(_format(b) for b in sect_only)
+        lines.extend(_format(b) for b in bounties)
         lines.append("━━━━━━━━━━━━━━━")
-        lines.append("💡 使用 /接取悬赏 <编号> 接取任务")
+        lines.append("💡 使用 /接取悬赏 <编号> 接取任务；宗门悬赏请使用 /宗门 悬赏")
 
         yield event.plain_result("\n".join(lines))
 

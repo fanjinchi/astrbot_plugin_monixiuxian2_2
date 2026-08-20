@@ -1011,14 +1011,14 @@ class SectManager:
         ]
         if sect.elixir_room_level <= 0:
             lines.append("丹房尚未建成，暂无可领取的丹药。")
-            lines.append("💡 可通过「宗门建设 丹房」升级丹房。")
+            lines.append("💡 可通过「宗门 建设 丹房」升级丹房。")
         elif not unlocked:
             lines.append("当前等级未配置可领取的丹药。")
         else:
             lines.append(f"今日可领：{unlocked[-1]}（已解锁：{'、'.join(unlocked)}）")
             lines.append("领取状态：今日已领取" if claimed else "领取状态：今日未领取")
             if not claimed:
-                lines.append("💡 发送「宗门丹房 领取」领取今日丹药。")
+                lines.append("💡 发送「宗门 丹房 领取」领取今日丹药。")
         return True, "\n".join(lines)
 
     async def claim_elixir(self, user_id: str) -> tuple[bool, str]:
@@ -1045,7 +1045,7 @@ class SectManager:
                 await self.db.conn.rollback()
                 return (
                     False,
-                    "❌ 宗门丹房尚未建成！可通过「宗门建设 丹房」升级丹房。",
+                    "❌ 宗门丹房尚未建成！可通过「宗门 建设 丹房」升级丹房。",
                 )
             if player.sect_elixir_get:
                 await self.db.conn.rollback()
@@ -1139,7 +1139,7 @@ class SectManager:
 
         mainbuff_names = self._format_buff_list(sect.get_mainbuff_list())
         lines.append(f"镇派功法：{mainbuff_names}")
-        lines.append("💡 升级：「宗门建设 洞天」/「宗门建设 丹房」")
+        lines.append("💡 升级：「宗门 建设 洞天」/「宗门 建设 丹房」")
         return True, "\n".join(lines)
 
     def _format_upgrade_cost(self, cfg: dict, current_level: int) -> str:
@@ -1237,7 +1237,7 @@ class SectManager:
                 return (
                     False,
                     f"❌ 宗门资材不足！升级需 {cost} 资材，当前仅有 {sect.sect_materials}。"
-                    f"\n💡 可通过「宗门任务」积累资材。",
+                    f"\n💡 可通过「宗门 任务」积累资材。",
                 )
 
             sect.sect_materials -= cost
@@ -1314,7 +1314,7 @@ class SectManager:
                 f"辅镇派功法：{secbuff}\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"镇派功法的触发技将加持全体弟子的战斗。\n"
-                f"💡 宗主可用「镇派功法 <功法ID或名称>」更换主镇派功法。"
+                f"💡 宗主可用「宗门 镇派功法 <功法ID或名称>」更换主镇派功法。"
             )
 
         if sect.is_system:
@@ -1536,7 +1536,7 @@ class SectManager:
                 )
             )
             lines.append(f"· 【{entry['name']}】{kind_label}｜需{gate}{status}")
-        lines.append("💡 领取：「宗门宝库 <名称>」（宝物每人限领一次，离宗归还）")
+        lines.append("💡 领取：「宗门 宝库 <名称>」（宝物每人限领一次，离宗归还）")
         return True, "\n".join(lines)
 
     async def claim_treasure(self, user_id: str, item_ref: str) -> tuple[bool, str]:
@@ -1563,7 +1563,7 @@ class SectManager:
             ref = (item_ref or "").strip()
             if not ref:
                 await self.db.conn.rollback()
-                return False, "❌ 请指定要领取的传承，例如：宗门宝库 青云镇山剑"
+                return False, "❌ 请指定要领取的传承，例如：宗门 宝库 青云镇山剑"
 
             entries = self._get_treasury_entries(sect)
             entry = next(
@@ -1619,6 +1619,128 @@ class SectManager:
         return True, (
             f"🎁 你从宗门宝库领取了镇派心法【{entry['name']}】，已存入储物戒！\n"
             f"💡 使用「装备 {entry['name']}」即可主修此心法。"
+        )
+
+    # ===== 6.3 宗门商店（贡献点结算） =====
+
+    def _get_shop_entries(self, sect: Sect) -> list[dict]:
+        """Build the sect shop listing from the faction config ``shop`` field.
+
+        Returns entries of ``{"id", "name", "rank", "price", "min_position"}``.
+        ``price`` 以宗门贡献点结算；``min_position`` 缺省为 4（外门弟子，
+        即全体成员可购），数值越小门槛越高（与宝库 min_position 语义一致）。
+        玩家自建宗门无 faction 配置，商店为空。
+        """
+        faction = self._get_faction(sect.faction_id) if sect else None
+        if not faction:
+            return []
+        entries = []
+        for item in faction.get("shop", []) or []:
+            if not isinstance(item, dict) or not item.get("id"):
+                continue
+            price = item.get("price")
+            if not isinstance(price, int) or isinstance(price, bool) or price <= 0:
+                continue
+            config = self._find_item_config_by_id(item["id"])
+            raw_min = item.get("min_position", 4)
+            entries.append(
+                {
+                    "id": item["id"],
+                    "name": (config or {}).get("name", item["id"]),
+                    "rank": (config or {}).get("rank", ""),
+                    "price": price,
+                    "min_position": 4 if raw_min is None else int(raw_min),
+                }
+            )
+        return entries
+
+    async def get_sect_shop_info(self, user_id: str) -> tuple[bool, str]:
+        """Show the sect shop: contribution-priced goods with position gates."""
+        player = await self.db.get_player_by_id(user_id)
+        if not player or player.sect_id == 0:
+            return False, "❌ 你还未加入宗门！加入宗门后可使用「宗门 商店」。"
+        sect = await self.db.ext.get_sect_by_id(player.sect_id)
+        if not sect:
+            return False, "❌ 宗门信息异常！"
+
+        entries = self._get_shop_entries(sect)
+        if not entries:
+            return False, f"❌ 【{sect.sect_name}】商店暂未上架货品！"
+
+        lines = [
+            f"🏪 【{sect.sect_name}】宗门商店",
+            "━━━━━━━━━━━━━━━",
+            f"你的贡献：{player.sect_contribution}｜职阶：{self.get_position_name(player.sect_position)}",
+        ]
+        for entry in entries:
+            locked = player.sect_position > entry["min_position"]
+            gate = (
+                f"｜🔒需{self.get_position_name(entry['min_position'])}及以上"
+                if locked
+                else ""
+            )
+            rank = f"[{entry['rank']}] " if entry["rank"] else ""
+            lines.append(f"· {rank}【{entry['name']}】{entry['price']} 贡献{gate}")
+        lines.append("💡 购买：「宗门 商店 购买 <名称>」")
+        return True, "\n".join(lines)
+
+    async def buy_sect_shop_item(self, user_id: str, item_ref: str) -> tuple[bool, str]:
+        """Buy a sect shop entry with sect contribution (transactional).
+
+        读-校验-扣减-发放全程在 ``BEGIN IMMEDIATE`` 事务内，防止并发购买
+        重复扣费或超扣贡献。商品按名称存入储物戒（与宝库领取一致）。
+        """
+        await self.db.conn.execute("BEGIN IMMEDIATE")
+        try:
+            player = await self.db.get_player_by_id(user_id)
+            if not player or player.sect_id == 0:
+                await self.db.conn.rollback()
+                return False, "❌ 你还未加入宗门！加入宗门后可使用「宗门 商店」。"
+            sect = await self.db.ext.get_sect_by_id(player.sect_id)
+            if not sect:
+                await self.db.conn.rollback()
+                return False, "❌ 宗门信息异常！"
+
+            ref = (item_ref or "").strip()
+            if not ref:
+                await self.db.conn.rollback()
+                return False, "❌ 请指定要购买的商品，例如：宗门 商店 购买 青云天剑"
+
+            entries = self._get_shop_entries(sect)
+            entry = next(
+                (e for e in entries if e["id"] == ref or e["name"] == ref), None
+            )
+            if not entry:
+                await self.db.conn.rollback()
+                return False, f"❌ 宗门商店中没有【{ref}】！"
+
+            if player.sect_position > entry["min_position"]:
+                await self.db.conn.rollback()
+                return False, (
+                    f"❌ 你的职阶不足以购买【{entry['name']}】"
+                    f"（需{self.get_position_name(entry['min_position'])}及以上）！"
+                )
+
+            if player.sect_contribution < entry["price"]:
+                await self.db.conn.rollback()
+                return False, (
+                    f"❌ 贡献点不足！购买【{entry['name']}】需 {entry['price']} 贡献，"
+                    f"你当前有 {player.sect_contribution} 贡献。"
+                )
+
+            player.sect_contribution -= entry["price"]
+            items = player.get_storage_ring_items()
+            items[entry["name"]] = items.get(entry["name"], 0) + 1
+            player.set_storage_ring_items(items)
+            await self.db.update_player(player, commit=False)
+            await self.db.conn.commit()
+        except Exception:
+            await self.db.conn.rollback()
+            raise
+
+        return True, (
+            f"🏪 购买成功！【{entry['name']}】已存入储物戒。\n"
+            f"消耗贡献：-{entry['price']}（剩余 {player.sect_contribution}）"
         )
 
     # ===== 5. 师承任务链 =====

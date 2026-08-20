@@ -10,10 +10,15 @@ Covers:
 
 import json
 import random
+from pathlib import Path
 
 import pytest
 
 from tests.helpers import load_module
+
+# Resolve repo-relative files against the plugin root so the suite passes
+# regardless of pytest's invocation cwd (plugin dir or AstrBot root).
+PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 
 # Load modules that are free of runtime relative imports
 _models = load_module("models_test", "models.py")
@@ -152,7 +157,7 @@ class TestPlayerModel:
 
 class TestGameConfigKeys:
     def test_skill_system_has_expected_keys(self):
-        with open("config/game_config.json", encoding="utf-8") as f:
+        with open(PLUGIN_ROOT / "config/game_config.json", encoding="utf-8") as f:
             cfg = json.load(f)
         ss = cfg["skill_system"]
         assert "random_growth_step" in ss
@@ -163,19 +168,19 @@ class TestGameConfigKeys:
         assert "breakthrough_pity_guarantee" in ss
 
     def test_growth_weights_sum_to_one(self):
-        with open("config/game_config.json", encoding="utf-8") as f:
+        with open(PLUGIN_ROOT / "config/game_config.json", encoding="utf-8") as f:
             cfg = json.load(f)
         weights = cfg["skill_system"]["growth_weights"]
         assert set(weights.keys()) == {"damage", "agility", "speed"}
         assert sum(weights.values()) == pytest.approx(1.0, abs=0.001)
 
     def test_hp_growth_step_positive(self):
-        with open("config/game_config.json", encoding="utf-8") as f:
+        with open(PLUGIN_ROOT / "config/game_config.json", encoding="utf-8") as f:
             cfg = json.load(f)
         assert cfg["skill_system"]["hp_growth_step"] > 0
 
     def test_pity_guarantee_reasonable(self):
-        with open("config/game_config.json", encoding="utf-8") as f:
+        with open(PLUGIN_ROOT / "config/game_config.json", encoding="utf-8") as f:
             cfg = json.load(f)
         ss = cfg["skill_system"]
         assert 0 < ss["breakthrough_pity_step"] <= 0.1
@@ -191,7 +196,7 @@ class TestMigrationV27:
     def test_migration_script_exists(self):
         import ast
 
-        with open("data/migration.py", encoding="utf-8") as f:
+        with open(PLUGIN_ROOT / "data/migration.py", encoding="utf-8") as f:
             source = f.read()
         tree = ast.parse(source)
         decorators = [
@@ -205,6 +210,6 @@ class TestMigrationV27:
         assert 27 in decorators, "Migration v27 must be registered"
 
     def test_latest_version_bumped(self):
-        with open("data/migration.py", encoding="utf-8") as f:
+        with open(PLUGIN_ROOT / "data/migration.py", encoding="utf-8") as f:
             source = f.read()
         assert "LATEST_DB_VERSION = 31" in source

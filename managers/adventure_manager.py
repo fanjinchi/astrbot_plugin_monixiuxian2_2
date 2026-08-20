@@ -328,10 +328,14 @@ class AdventureManager:
 
         fatigue_hint = f"\n⏳ 该路线休整：{fatigue // 60} 分钟" if fatigue else ""
         display_minutes = effective_duration // 60
+        # 宗门专属事件（带 sect_id）在结算消息中显性标记，普通事件文案不变
+        event_line = event["desc"]
+        if event.get("sect_id"):
+            event_line = f"🏯 宗门际遇 · {event.get('name', '')}\n{event['desc']}"
         msg = (
             f"🚶 历练归来 · {route['name']}\n"
             f"━━━━━━━━━━━━━━━\n"
-            f"{event['desc']}"
+            f"{event_line}"
             f"{combat_msg}\n\n"
             f"本次历练：{display_minutes} 分钟\n"
             f"获得修为：+{rewards['exp']:,}\n"

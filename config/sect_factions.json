@@ -23,6 +23,17 @@
           "min_position": 2
         }
       ],
+      "shop": [
+        {
+          "id": "sword_006",
+          "price": 1500,
+          "min_position": 3
+        },
+        {
+          "id": "heart_201",
+          "price": 1000
+        }
+      ],
       "buildings": {
         "fairyland": {
           "max_level": 5,
@@ -111,6 +122,17 @@
       ],
       "heart_methods": [],
       "treasures": [],
+      "shop": [
+        {
+          "id": "dagger_005",
+          "price": 1500,
+          "min_position": 3
+        },
+        {
+          "id": "heart_301",
+          "price": 1000
+        }
+      ],
       "buildings": {
         "fairyland": {
           "max_level": 5,

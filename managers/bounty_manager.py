@@ -129,23 +129,29 @@ class BountyManager:
 
     # -------- 列表 & 缓存 --------
 
-    def _get_cached_bounties(self, user_id: str) -> list[dict] | None:
-        """Return the user's cached bounty list while still within BOUNTY_CACHE_DURATION."""
-        cache = self._bounty_cache.get(user_id)
+    def _get_cached_bounties(
+        self, user_id: str, scope: str = "global"
+    ) -> list[dict] | None:
+        """Return the user's cached bounty list for the scope while still within BOUNTY_CACHE_DURATION."""
+        cache = self._bounty_cache.get(f"{user_id}:{scope}")
         if cache and cache["expire_time"] > int(time.time()):
             return cache["bounties"]
         return None
 
-    def _set_cached_bounties(self, user_id: str, bounties: list[dict]):
-        """Cache a user's generated bounty list with an expiry timestamp."""
-        self._bounty_cache[user_id] = {
+    def _set_cached_bounties(
+        self, user_id: str, bounties: list[dict], scope: str = "global"
+    ):
+        """Cache a user's generated bounty list for the scope with an expiry timestamp."""
+        self._bounty_cache[f"{user_id}:{scope}"] = {
             "bounties": bounties,
             "expire_time": int(time.time()) + self.BOUNTY_CACHE_DURATION,
         }
 
-    async def get_bounty_list(self, player: Player) -> list[dict]:
-        """获取悬赏列表（带 sect_id 的宗门模板仅对对应宗门成员出现）"""
-        cached = self._get_cached_bounties(player.user_id)
+    async def get_bounty_list(
+        self, player: Player, scope: str = "global"
+    ) -> list[dict]:
+        """获取悬赏列表。scope="global" 仅公共悬赏（无 sect_id）；scope="sect" 仅玩家所属宗门的专属悬赏。"""
+        cached = self._get_cached_bounties(player.user_id, scope)
         if cached:
             return cached
 
@@ -153,11 +159,11 @@ class BountyManager:
         plan = self._get_difficulty_plan(player.level_index)
         bounties: list[dict] = []
         for diff in plan:
-            entry = self._build_bounty_entry(diff, player, faction_id)
+            entry = self._build_bounty_entry(diff, player, faction_id, scope)
             if entry:
                 bounties.append(entry)
 
-        self._set_cached_bounties(player.user_id, bounties)
+        self._set_cached_bounties(player.user_id, bounties, scope)
         return bounties
 
     async def _get_player_faction_id(self, player: Player) -> str | None:
@@ -182,18 +188,25 @@ class BountyManager:
         return [diff for diff in plan if diff in self.difficulties]
 
     def _pick_template(
-        self, difficulty: str, faction_id: str | None = None
+        self, difficulty: str, faction_id: str | None = None, scope: str = "global"
     ) -> dict | None:
         """Weighted-random pick of a bounty template within a difficulty tier.
 
-        Templates carrying ``sect_id`` are sect-exclusive: they are only
-        eligible when the player's sect faction matches.
+        scope="global": only public templates (no ``sect_id``); scope="sect":
+        only templates whose ``sect_id`` matches the player's sect faction.
         """
-        templates = [
-            tpl
-            for tpl in self.templates_by_diff.get(difficulty, [])
-            if not tpl.get("sect_id") or tpl.get("sect_id") == faction_id
-        ]
+        if scope == "sect":
+            templates = [
+                tpl
+                for tpl in self.templates_by_diff.get(difficulty, [])
+                if tpl.get("sect_id") and tpl.get("sect_id") == faction_id
+            ]
+        else:
+            templates = [
+                tpl
+                for tpl in self.templates_by_diff.get(difficulty, [])
+                if not tpl.get("sect_id")
+            ]
         if not templates:
             return None
         total = sum(max(1, tpl.get("weight", 1)) for tpl in templates)
@@ -206,10 +219,14 @@ class BountyManager:
         return templates[0]
 
     def _build_bounty_entry(
-        self, difficulty: str, player: Player, faction_id: str | None = None
+        self,
+        difficulty: str,
+        player: Player,
+        faction_id: str | None = None,
+        scope: str = "global",
     ) -> dict | None:
         """Build one bounty list entry: rolled target count, scaled reward, calibrated time limit, progress tags."""
-        template = self._pick_template(difficulty, faction_id)
+        template = self._pick_template(difficulty, faction_id, scope)
         if not template:
             return None
         diff_cfg = self.difficulties.get(difficulty, {})
@@ -273,10 +290,39 @@ class BountyManager:
             return None
         return max(60, min(durations))
 
+    def _active_bounty_is_sect(self, active: dict) -> bool | None:
+        """Classify the active bounty by its template's ``sect_id``; None when the template is gone from config."""
+        template = self.templates_by_id.get(active["bounty_id"])
+        if template is None:
+            return None
+        return bool(template.get("sect_id"))
+
+    def _scope_mismatch_message(
+        self, is_sect: bool | None, scope: str, global_action: str, sect_action: str
+    ) -> str | None:
+        """Return a cross-scope rejection for status/complete/abandon, guiding to the other entry; None when the operation may proceed."""
+        if is_sect is None:
+            # 模板已从配置移除时不阻断，避免玩家悬赏卡死
+            return None
+        if scope == "sect" and not is_sect:
+            # 宗门入口直接渲染消息（自带 ❌），全局入口由 handler 统一加 ❌ 前缀，勿重复
+            return f"❌ 你当前进行中的悬赏为公共悬赏，请使用 /{global_action} 操作。"
+        if scope == "global" and is_sect:
+            return (
+                f"你当前进行中的悬赏为宗门悬赏，请使用 /宗门 悬赏 {sect_action} 操作。"
+            )
+        return None
+
     # -------- 接取与状态 --------
 
-    async def accept_bounty(self, player: Player, bounty_id: int) -> tuple[bool, str]:
-        """Accept a bounty from the player's cached list (transactional; one active bounty at a time, enforces the post-abandon cooldown)."""
+    async def accept_bounty(
+        self, player: Player, bounty_id: int, scope: str = "global"
+    ) -> tuple[bool, str]:
+        """Accept a bounty from the player's cached list (transactional; one active bounty at a time, enforces the post-abandon cooldown).
+
+        scope="global" 只接受公共悬赏，scope="sect" 只接受本宗专属悬赏；
+        类型/归属校验先于缓存与冷却检查，保证两个入口的分流提示确定可见。
+        """
         if bounty_id <= 0:
             return False, "无效的悬赏编号。"
 
@@ -284,20 +330,27 @@ class BountyManager:
         if not template:
             return False, "该悬赏已失效，请刷新列表。"
 
-        # 宗门专属悬赏：仅本宗成员可接取
+        # 入口分流校验（先于缓存/冷却检查，确保提示确定）
         template_sect = template.get("sect_id")
-        if template_sect:
+        if scope == "sect":
+            if not template_sect:
+                return False, "❌ 该悬赏为公共委托，请发送 /接取悬赏 接取。"
             faction_id = await self._get_player_faction_id(player)
             if faction_id != template_sect:
-                return False, "该悬赏为宗门专属委托，仅面向本宗弟子发布。"
+                return False, "❌ 该悬赏为其他宗门的专属委托，仅面向其门下弟子发布。"
+        elif template_sect:
+            # 全局 handler 失败时统一加 ❌ 前缀，此处不内联，避免出现 "❌ ❌"
+            return False, "该悬赏为宗门专属委托，请发送 /宗门 悬赏 查看与接取。"
 
         diff_key = template.get("difficulty", "easy")
         self.difficulties.get(diff_key, {})
-        cached_bounties = self._get_cached_bounties(player.user_id)
+        cached_bounties = self._get_cached_bounties(player.user_id, scope)
         cached = None
         if cached_bounties:
             cached = next((b for b in cached_bounties if b["id"] == bounty_id), None)
         if not cached:
+            if scope == "sect":
+                return False, "⚠️ 请先发送 /宗门 悬赏 查看列表后再接取。"
             return False, "⚠️ 悬赏列表已刷新，请先发送 /悬赏令 重新查看后再接取。"
 
         now = int(time.time())
@@ -371,14 +424,26 @@ class BountyManager:
             f"时限：{time_limit // 60} 分钟"
         )
 
-    async def check_bounty_status(self, player: Player) -> tuple[bool, str]:
-        """Format the player's active bounty progress and remaining time for display."""
+    async def check_bounty_status(
+        self, player: Player, scope: str = "global"
+    ) -> tuple[bool, str]:
+        """Format the player's active bounty progress and remaining time for display (scope 分流：跨类型引导到对方入口)。"""
         active = await self.db.ext.get_active_bounty(player.user_id)
         if not active:
+            hint = "/宗门 悬赏" if scope == "sect" else "/悬赏令"
             return (
                 False,
-                "你当前没有进行中的悬赏任务。\n使用 /悬赏令 查看可接取的任务。",
+                f"你当前没有进行中的悬赏任务。\n使用 {hint} 查看可接取的任务。",
             )
+
+        mismatch = self._scope_mismatch_message(
+            self._active_bounty_is_sect(active),
+            scope,
+            "悬赏状态",
+            "进度",
+        )
+        if mismatch:
+            return False, mismatch
 
         rewards = json.loads(active["rewards"])
         remaining = max(0, active["expire_time"] - int(time.time()))
@@ -387,6 +452,7 @@ class BountyManager:
 
         diff_name = rewards.get("difficulty_name", rewards.get("difficulty", "未知"))
         desc = rewards.get("description", "")
+        complete_hint = "/宗门 悬赏 完成" if scope == "sect" else "/完成悬赏"
 
         return True, (
             f"📜 当前悬赏（{diff_name}）\n"
@@ -397,10 +463,12 @@ class BountyManager:
             f"奖励：{rewards.get('stone', 0):,} 灵石 + {rewards.get('exp', 0):,} 修为\n"
             f"剩余时间：{remaining // 60} 分钟\n"
             f"━━━━━━━━━━━━━━━\n"
-            f"💡 完成后使用 /完成悬赏 领取奖励"
+            f"💡 完成后使用 {complete_hint} 领取奖励"
         )
 
-    async def complete_bounty(self, player: Player) -> tuple[bool, str]:
+    async def complete_bounty(
+        self, player: Player, scope: str = "global"
+    ) -> tuple[bool, str]:
         """Settle a finished bounty transactionally (stone/exp into players, status -> done), then roll item drops into the storage ring (best-effort)."""
         await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
@@ -408,6 +476,16 @@ class BountyManager:
             if not active:
                 await self.db.conn.rollback()
                 return False, "你当前没有进行中的悬赏任务。"
+
+            mismatch = self._scope_mismatch_message(
+                self._active_bounty_is_sect(active),
+                scope,
+                "完成悬赏",
+                "完成",
+            )
+            if mismatch:
+                await self.db.conn.rollback()
+                return False, mismatch
 
             if int(time.time()) > active["expire_time"]:
                 await self.db.conn.execute(
@@ -485,12 +563,22 @@ class BountyManager:
             f"获得修为：+{rewards.get('exp', 0):,}{item_msg}"
         )
 
-    async def abandon_bounty(self, player: Player) -> tuple[bool, str]:
-        """Cancel the active bounty and set a 30-minute re-accept cooldown in system_config."""
+    async def abandon_bounty(
+        self, player: Player, scope: str = "global"
+    ) -> tuple[bool, str]:
+        """Cancel the active bounty and set a 30-minute re-accept cooldown in system_config (scope 分流：跨类型引导到对方入口)。"""
         active = await self.db.ext.get_active_bounty(player.user_id)
         if not active:
             return False, "你当前没有进行中的悬赏任务。"
 
+        mismatch = self._scope_mismatch_message(
+            self._active_bounty_is_sect(active),
+            scope,
+            "放弃悬赏",
+            "放弃",
+        )
+        if mismatch:
+            return False, mismatch
         await self.db.ext.cancel_bounty(player.user_id)
         abandon_cooldown = int(time.time()) + 1800
         await self.db.ext.set_system_config(
@@ -579,9 +667,15 @@ class BountyManager:
             await self.db.conn.commit()
 
             if new_progress >= target:
+                # 完成提示按悬赏类型指向对应入口（宗门悬赏走 /宗门 悬赏 完成）
+                complete_cmd = (
+                    "/宗门 悬赏 完成"
+                    if template and template.get("sect_id")
+                    else "/完成悬赏"
+                )
                 return (
                     True,
-                    f"\n\n📜 悬赏【{active['bounty_name']}】已完成！使用 /完成悬赏 领取奖励",
+                    f"\n\n📜 悬赏【{active['bounty_name']}】已完成！使用 {complete_cmd} 领取奖励",
                 )
             return True, f"\n\n📜 悬赏进度：{new_progress}/{target}"
         except Exception:

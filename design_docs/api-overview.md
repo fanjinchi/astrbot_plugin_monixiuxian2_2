@@ -52,12 +52,12 @@
 | `PillHandler` | 服用丹药/丹药背包/丹药信息 | → `core/PillManager` |
 | `ShopHandler` | 丹阁/器阁/百宝阁/购买/物品信息 | 含 `parse_qty` 数量解析；购买结算读宗门职阶折扣 |
 | `StorageRingHandler` | 储物戒/取出/丢弃/赠予/接收/拒绝/更换储物戒/搜索物品/取出所有 | → `core/StorageRingManager`；手动存入已禁用；赠予拦截宗门绑定物 |
-| `SectHandlers` | 创建/加入/退出宗门、我的宗门、捐献、踢人、传位、职位、宗门任务、宗门丹房/建设/镇派功法/晋升/宝库、师承任务 | 「加入宗门」统一入口分流系统/玩家宗门；新六指令均为薄封装 |
+| `SectHandlers` | 「宗门」单入口 `handle_sect_entry` 子命令分发（信息/列表/创建/加入/退出/捐献/任务/丹房/建设/镇派功法/晋升/宝库/师承/商店/悬赏/排行/贡献排行 + 管理类 踢出/传位/职位） | 原 18 个宗门顶层指令已删除，子命令自行解析消息文本；悬赏/商店子命令组委托 BountyManager/SectManager |
 | `CombatHandlers` | 切磋/决斗 | `_get_target_id` 解析 @提及/数字目标；各自冷却 |
 | `BossHandlers` | 世界Boss/挑战Boss/生成Boss | 挑战走 `BossManager.challenge_boss` |
 | `RiftHandlers` | 秘境列表/探索秘境/完成探索/退出秘境 | |
 | `AdventureHandlers` | 历练信息/开始历练/完成历练/历练状态 | |
-| `BountyHandlers` | 悬赏令/接取/状态/完成/放弃悬赏 | |
+| `BountyHandlers` | 悬赏令/接取/状态/完成/放弃悬赏 | 仅处理公共悬赏（无 sect_id）；宗门专属悬赏走「宗门 悬赏」子命令组 |
 | `AlchemyHandlers` | 丹药配方/炼丹 | |
 | `BankHandlers` | 银行/存取/利息/贷款/还款/流水/突破贷款 | |
 | `BlessedLandHandlers` | 我的洞天/购买/升级/洞天收取 | |
@@ -77,8 +77,8 @@
 | `CombatEngine`（combat_manager.py） | `resolve_combat(fighter1, fighter2, combat_type="spar", merge_count=None)` / `build_fighter_from_player(player, ...)` | **统一战斗引擎**：回合制 PvP/PvE 共用；触发技 `EFFECT_HANDLERS` 注册表分发 14 种效果键（13 个处理函数，combo 复用 damage_bonus）、持续状态（dot/buff/debuff/fatigue）生命周期、大招必放。配 `FighterState/StatusEffect/CombatResult` |
 | `CombatManager`（同文件） | `player_vs_player` / `player_vs_boss` | 旧接口适配器，全部委托 `CombatEngine`；`calculate_*` 系列为 deprecated 兼容保留 |
 | `BossManager` | `spawn_boss` / `challenge_boss` / `get_boss_info` / `auto_spawn_boss` | 世界 Boss 生成（`auto_spawn_boss` 供定时任务）、挑战、奖励 |
-| `BountyManager` | `get_bounty_list` / `accept_bounty` / `complete_bounty` / `abandon_bounty` / `add_bounty_progress` / `check_and_expire_bounties` | 悬赏列表按境界分难度、10 分钟缓存；接取/结算均 `BEGIN IMMEDIATE` 事务；`add_bounty_progress` 由历练/秘境回调推进进度 |
-| `SectManager` | `create_sect` / `join_sect` / `donate_to_sect` / `kick_member` / `transfer_ownership` / `perform_sect_task` / `handle_owner_death`；宗门成长：`ensure_system_sects` / `reclaim_sect_treasures` / `get_fairyland_exp_bonus` / `claim_elixir` / `upgrade_building` / `manage_sect_buff` / `promote_position` / `get_treasury_info` / `claim_treasure` / `get_master_task_status` / `get_position_benefits` | 宗门全生命周期；宗主死亡自动传位/解散；默认宗门播种、离宗回收、洞天/丹房/镇派功法/晋升/宝库/师承任务链（详见 current-design-report.md §4.8） |
+| `BountyManager` | `get_bounty_list` / `accept_bounty` / `complete_bounty` / `abandon_bounty` / `add_bounty_progress` / `check_and_expire_bounties` | 悬赏列表按境界分难度、10 分钟缓存（按 scope 分键 `user:global|sect`）；前四者带 `scope` 参数分流公共/宗门悬赏，分流校验先于缓存/冷却/活跃检查；接取/结算均 `BEGIN IMMEDIATE` 事务；`add_bounty_progress` 由历练/秘境回调推进进度 |
+| `SectManager` | `create_sect` / `join_sect` / `donate_to_sect` / `kick_member` / `transfer_ownership` / `perform_sect_task` / `handle_owner_death`；宗门成长：`ensure_system_sects` / `reclaim_sect_treasures` / `get_fairyland_exp_bonus` / `claim_elixir` / `upgrade_building` / `manage_sect_buff` / `promote_position` / `get_treasury_info` / `claim_treasure` / `get_master_task_status` / `get_position_benefits` / `get_sect_shop_info` / `buy_sect_shop_item` | 宗门全生命周期；宗主死亡自动传位/解散；默认宗门播种、离宗回收、洞天/丹房/镇派功法/晋升/宝库/师承任务链、宗门商店（贡献点结算，商品池读 faction `shop` 字段）（详见 current-design-report.md §4.8） |
 | `BankManager` | `deposit` / `withdraw` / `borrow` / `repay` / `claim_interest` / `check_and_process_overdue_loans` | 银行存贷；**逾期贷款追杀致死**（定时任务入口 `check_and_process_overdue_loans`） |
 | `RiftManager` | `list_rifts` / `enter_rift` / `finish_exploration` / `exit_rift` | 秘境探索与结算 |
 | `AdventureManager` | `start_adventure` / `finish_adventure` / `check_adventure_status` / `get_route_overview` | 历练路线（config 驱动事件权重/掉落表），结算时联动悬赏进度 |
@@ -103,7 +103,7 @@
 | `PillManager` | `use_pill` / `handle_resurrection` / `calculate_pill_attribute_effects` / `get_breakthrough_modifiers` / `consume_breakthrough_effects` | 丹药服用/回生丹复活/属性乘算加成/突破临时加成生命周期 |
 | `StorageRingManager` | `store_item` / `retrieve_item` / `discard_item` / `upgrade_ring` / `has_item` / `is_sect_bound_item` | 储物戒存取（事务保护，每物品占 1 格）；**所有物品发放的统一入口**；`is_sect_bound_item` 识别宗门绑定物（treasure/sect_bound/sect_id）供赠予拦截 |
 | `ShopManager` | `generate_shop_items` / `should_refresh_shop` / `get_item_details` / `get_sect_shop_discount` / 三阁展示方法 | 商店刷新（库存+折扣）、丹阁/器阁/百宝阁展示；`get_sect_shop_discount` 读宗门职阶 benefits.shop_discount |
-| `GMManager` | `dispatch` / `cmd_set_*` / `cmd_give_*` / `cmd_force_adventure|rift` / `cmd_advance_master` / `cmd_clear_cd` / `cmd_spawn_boss` | GM 子命令分发（目标解析 @提及→数字id→发送者）；全操作写审计日志（500MB 滚动）；`cmd_set_mp/atk/mental_power` 为废弃属性别名；`设置贡献/设置职位` 写宗门字段；`师承推进`（战斗/历练/突破/捐献）确定性推进师承链；强制结算与正常流程一致追加师承链推进并清除历练休整冷却
+| `GMManager` | `dispatch` / `cmd_set_*` / `cmd_give_*` / `cmd_force_adventure|rift` / `cmd_advance_master` / `cmd_clear_cd` / `cmd_clear_bounty` / `cmd_spawn_boss` | GM 子命令分发（目标解析 @提及→数字id→发送者）；全操作写审计日志（500MB 滚动）；`cmd_set_mp/atk/mental_power` 为废弃属性别名；`设置贡献/设置职位` 写宗门字段；`师承推进`（战斗/历练/突破/捐献）确定性推进师承链；`清除悬赏` 清进行中悬赏+放弃冷却（供测试环境重置悬赏状态）；强制结算与正常流程一致追加师承链推进并清除历练休整冷却
 | （`breakthrough_fortune.py`） | 模块级函数 | 突破运势文案 |
 
 ## 6. data/ 数据层

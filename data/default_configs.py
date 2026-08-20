@@ -282,6 +282,11 @@ SECT_FACTIONS = {
             "mainbuff": ["qy_001"],
             "heart_methods": ["heart_qy_001"],
             "treasures": [{"type": "weapon", "id": "wpn_qy_001", "min_position": 2}],
+            # 宗门商店：贡献点结算；min_position 缺省 4（全员可购），数值越小门槛越高
+            "shop": [
+                {"id": "sword_006", "price": 1500, "min_position": 3},
+                {"id": "heart_201", "price": 1000},
+            ],
             "buildings": {
                 "fairyland": {
                     "max_level": 5,
@@ -314,6 +319,10 @@ SECT_FACTIONS = {
             "mainbuff": ["hx_001"],
             "heart_methods": [],
             "treasures": [],
+            "shop": [
+                {"id": "dagger_005", "price": 1500, "min_position": 3},
+                {"id": "heart_301", "price": 1000},
+            ],
             "buildings": {
                 "fairyland": {
                     "max_level": 5,
