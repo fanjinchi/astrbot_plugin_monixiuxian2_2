@@ -2,20 +2,72 @@
   "name": "sect-promotion",
   "description": "spec Requirement「职阶晋升与福利」：晋升双门槛（贡献+境界）达标晋升成功并展示职阶福利（签到俸禄/商店折扣），缺任一项即拒绝并列出缺失项；签到发放职阶俸禄。",
   "scenario": "fixture 预置青云门成员（贡献 2500，境界 2）；GM 抬至练气五阶后第一次宗门晋升达标（内门弟子：贡献 2000/4 级）成功；第二次晋升亲传弟子（贡献 8000/6 级）双缺失被拒；随后签到获得内门弟子俸禄 +100 灵石。",
-  "tags": ["sect"],
+  "tags": [
+    "sect"
+  ],
   "conversation": {
     "kind": "group",
     "group_id": "webtest_sect_005",
-    "pin_players": { "gm": "900000001", "p1": "900000002" }
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002"
+    }
   },
   "steps": [
-    { "type": "send", "player": "gm", "text": "#修仙GM 设置境界 900000002 练气五阶", "note": "满足内门弟子境界门槛（4 级）" },
-    { "type": "expect", "match": "re:境界设置为「练气五阶」", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#宗门晋升", "note": "达标晋升：贡献 2500≥2000，境界 5≥4" },
-    { "type": "expect", "match": "re:晋升成功！你已成为【内门弟子】！[\\s\\S]*每日签到俸禄：\\+100 灵石[\\s\\S]*商店折扣：9.5折", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#宗门晋升", "note": "双缺失拒绝：贡献 2500<8000、境界 5<6" },
-    { "type": "expect", "match": "re:晋升【亲传弟子】未达门槛：[\\s\\S]*贡献不足（2500/8000）[\\s\\S]*境界不足（需达到练气六阶）", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#签到", "note": "职阶俸禄加发" },
-    { "type": "expect", "match": "re:签到成功！[\\s\\S]*宗门俸禄（内门弟子）：\\+100 灵石", "timeout": 10 }
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除CD 900000002 确认",
+      "note": "清理忙碌状态（防 run-all 跨用例污染）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已清除【测试玩家1】的忙碌状态|不在任何忙碌状态",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置境界 900000002 练气五阶",
+      "note": "满足内门弟子境界门槛（4 级）"
+    },
+    {
+      "type": "expect",
+      "match": "re:境界设置为「练气五阶」",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 晋升",
+      "note": "达标晋升：贡献 2500≥2000，境界 5≥4"
+    },
+    {
+      "type": "expect",
+      "match": "re:晋升成功！你已成为【内门弟子】！[\\s\\S]*每日签到俸禄：\\+100 灵石[\\s\\S]*商店折扣：9.5折",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 晋升",
+      "note": "双缺失拒绝：贡献 2500<8000、境界 5<6"
+    },
+    {
+      "type": "expect",
+      "match": "re:晋升【亲传弟子】未达门槛：[\\s\\S]*贡献不足（2500/8000）[\\s\\S]*境界不足（需达到练气六阶）",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#签到",
+      "note": "职阶俸禄加发"
+    },
+    {
+      "type": "expect",
+      "match": "re:签到成功！[\\s\\S]*宗门俸禄（内门弟子）：\\+100 灵石",
+      "timeout": 10
+    }
   ]
 }

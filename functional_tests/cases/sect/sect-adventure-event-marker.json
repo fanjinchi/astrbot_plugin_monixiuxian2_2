@@ -1,0 +1,109 @@
+{
+  "name": "sect-adventure-event-marker",
+  "description": "spec Requirement「宗门内容联动·历练事件」：宗门专属历练事件（长老传功/执事堂派差，sect_id=qingyun，权重组 sect_qingyun）在结算消息中以「🏯 宗门际遇 · 事件名」显性标记。平台无 RNG 彻底可控（宿主异步消耗 random），宗门际遇为概率事件（权重 15/115）：本用例断言历练结算链路结构正确，宗门际遇标记的出现作为概率证据由 --repeat ≥10 + _count_evidence(sect_event) 采样统计（见 platform-gap-report 随机池）。",
+  "scenario": "青云门成员设置境界后开始历练 巡山（scout），GM 触发历练结算：断言结算消息结构（🚶 历练归来 · 巡山问道 + 修为/灵石到账）；若本次命中 sect_qingyun 组则出现「🏯 宗门际遇 · 长老传功/执事堂派差」标记。用例本身做 3 次历练结算以增加单次运行命中面，仍以 --repeat 采样为权威。",
+  "tags": [
+    "sect",
+    "deterministic"
+  ],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_sect_024",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002"
+    },
+    "deterministic": true,
+    "seed": 42
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除CD 900000002 确认",
+      "note": "清理忙碌状态"
+    },
+    {
+      "type": "expect",
+      "match": "re:已清除【测试玩家1】的忙碌状态|不在任何忙碌状态",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置境界 900000002 练气三阶",
+      "note": "确保达到历练最低等级"
+    },
+    {
+      "type": "expect",
+      "match": "re:已将【测试玩家1】的境界设置为「练气三阶」",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#开始历练 巡山",
+      "note": "scout 路线（safe/standard/risky+sect_qingyun 池）"
+    },
+    {
+      "type": "expect",
+      "match": "re:你选择了「巡山问道」|你踏上了历练之路|历练开始",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 触发历练结算 900000002",
+      "note": "强制结算：命中宗门事件则出现 🏯 宗门际遇 标记"
+    },
+    {
+      "type": "expect",
+      "match": "re:🚶 历练归来 · 巡山问道[\\s\\S]*🏯 宗门际遇 · [^\\n]+|🚶 历练归来 · 巡山问道[\\s\\S]*获得修为：\\+[\\d,]+[\\s\\S]*获得灵石：\\+[\\d,]+",
+      "timeout": 15
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#开始历练 巡山",
+      "note": "scout 路线（safe/standard/risky+sect_qingyun 池）"
+    },
+    {
+      "type": "expect",
+      "match": "re:你选择了「巡山问道」|你踏上了历练之路|历练开始",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 触发历练结算 900000002",
+      "note": "强制结算：命中宗门事件则出现 🏯 宗门际遇 标记"
+    },
+    {
+      "type": "expect",
+      "match": "re:🚶 历练归来 · 巡山问道[\\s\\S]*🏯 宗门际遇 · [^\\n]+|🚶 历练归来 · 巡山问道[\\s\\S]*获得修为：\\+[\\d,]+[\\s\\S]*获得灵石：\\+[\\d,]+",
+      "timeout": 15
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#开始历练 巡山",
+      "note": "scout 路线（safe/standard/risky+sect_qingyun 池）"
+    },
+    {
+      "type": "expect",
+      "match": "re:你选择了「巡山问道」|你踏上了历练之路|历练开始",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 触发历练结算 900000002",
+      "note": "强制结算：命中宗门事件则出现 🏯 宗门际遇 标记"
+    },
+    {
+      "type": "expect",
+      "match": "re:🚶 历练归来 · 巡山问道[\\s\\S]*🏯 宗门际遇 · [^\\n]+|🚶 历练归来 · 巡山问道[\\s\\S]*获得修为：\\+[\\d,]+[\\s\\S]*获得灵石：\\+[\\d,]+",
+      "timeout": 15
+    }
+  ]
+}

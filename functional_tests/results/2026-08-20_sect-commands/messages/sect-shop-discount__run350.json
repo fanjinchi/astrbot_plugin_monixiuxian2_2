@@ -1,0 +1,92 @@
+[
+  {
+    "id": 4252,
+    "conversation_id": 355,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除CD 900000002 确认",
+    "rich": null,
+    "created_at": 1787226097.3257027
+  },
+  {
+    "id": 4253,
+    "conversation_id": 355,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 目标玩家当前不在任何忙碌状态！",
+    "rich": [],
+    "created_at": 1787226097.3407972
+  },
+  {
+    "id": 4254,
+    "conversation_id": 355,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000002 练气五阶",
+    "rich": null,
+    "created_at": 1787226097.6357012
+  },
+  {
+    "id": 4255,
+    "conversation_id": 355,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的境界设置为「练气五阶」",
+    "rich": [],
+    "created_at": 1787226097.6638265
+  },
+  {
+    "id": 4256,
+    "conversation_id": 355,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 晋升",
+    "rich": null,
+    "created_at": 1787226097.9524653
+  },
+  {
+    "id": 4257,
+    "conversation_id": 355,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎖️ 晋升成功！你已成为【内门弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+100 灵石\n商店折扣：9.5折\n传承解锁：heart_qy_001",
+    "rich": [],
+    "created_at": 1787226097.9803104
+  },
+  {
+    "id": 4258,
+    "conversation_id": 355,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#购买 筑基丹",
+    "rich": null,
+    "created_at": 1787226098.2687619
+  },
+  {
+    "id": 4259,
+    "conversation_id": 355,
+    "direction": "out",
+    "sender": "bot",
+    "text": "成功购买【筑基丹】x1，已添加到背包。\n花费灵石: 4750，剩余: 95250\n🏛️ 宗门职阶折扣已生效（9.5折）\n剩余库存: 4",
+    "rich": [],
+    "created_at": 1787226098.3043358
+  },
+  {
+    "id": 4260,
+    "conversation_id": 355,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#签到",
+    "rich": null,
+    "created_at": 1787226098.5858655
+  },
+  {
+    "id": 4261,
+    "conversation_id": 355,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 签到成功！\n━━━━━━━━━━━━━━━\n💰 获得灵石：331\n🏛️ 宗门俸禄（内门弟子）：+100 灵石\n💎 当前灵石：95681\n━━━━━━━━━━━━━━━\n明日再来，莫要忘记哦~",
+    "rich": [],
+    "created_at": 1787226098.6132812
+  }
+]

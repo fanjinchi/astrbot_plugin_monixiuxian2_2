@@ -2,22 +2,72 @@
   "name": "sect-rejoin-retain",
   "description": "spec Requirement「拜入与出师」：改换门庭后原宗门绑定功法仍可使用；宗门之宝的不可转让属性在离宗后依然成立（配置级绑定）。",
   "scenario": "fixture 预置青云门成员（绑定功法青云剑诀 + 宝物青云镇山剑）；出师后拜入合欢宗，我的宗门显示合欢宗，我的技能仍显示青云剑诀（原宗门功法保留可用）；尝试赠予青云镇山剑仍被绑定拦截（离宗后宝物已归还，绑定判定来自物品配置）。",
-  "tags": ["sect"],
+  "tags": [
+    "sect"
+  ],
   "conversation": {
     "kind": "group",
     "group_id": "webtest_sect_007",
-    "pin_players": { "p1": "900000002", "p2": "900000003" }
+    "pin_players": {
+      "p1": "900000002",
+      "p2": "900000003"
+    }
   },
   "steps": [
-    { "type": "send", "player": "p1", "text": "#退出宗门", "note": "出师" },
-    { "type": "expect", "match": "re:已退出宗门『青云门』", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#加入宗门 合欢宗", "note": "改投合欢宗（练气二阶在区间 [2,6] 内）" },
-    { "type": "expect", "match": "re:成功拜入『合欢宗』，成为外门弟子", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#我的宗门", "note": "当前宗门已切换" },
-    { "type": "expect", "match": "re:宗门名称：合欢宗", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#我的技能", "note": "原宗门绑定功法保留可用" },
-    { "type": "expect", "match": "re:我的功法[\\s\\S]*青云剑诀", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#赠予 900000003 青云镇山剑", "note": "宗门之宝不可转让属性在离宗后依然成立" },
-    { "type": "expect", "match": "re:【青云镇山剑】乃宗门之物，不可外传", "timeout": 10 }
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 退出",
+      "note": "出师"
+    },
+    {
+      "type": "expect",
+      "match": "re:已退出宗门『青云门』",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 加入 合欢宗",
+      "note": "改投合欢宗（练气二阶在区间 [2,6] 内）"
+    },
+    {
+      "type": "expect",
+      "match": "re:成功拜入『合欢宗』，成为外门弟子",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 信息",
+      "note": "当前宗门已切换"
+    },
+    {
+      "type": "expect",
+      "match": "re:宗门名称：合欢宗",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的技能",
+      "note": "原宗门绑定功法保留可用"
+    },
+    {
+      "type": "expect",
+      "match": "re:我的功法[\\s\\S]*青云剑诀",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#赠予 900000003 青云镇山剑",
+      "note": "宗门之宝不可转让属性在离宗后依然成立"
+    },
+    {
+      "type": "expect",
+      "match": "re:【青云镇山剑】乃宗门之物，不可外传",
+      "timeout": 10
+    }
   ]
 }

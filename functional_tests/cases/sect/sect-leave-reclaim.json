@@ -2,22 +2,72 @@
   "name": "sect-leave-reclaim",
   "description": "spec Requirement「宗门绑定物归属与回收」：宗门之宝不可赠予、出师时自动归还宗门；已习得宗门绑定功法离宗后保留可用；贡献清零。",
   "scenario": "fixture 预置青云门成员（储物戒含宗门之宝青云镇山剑、已习得绑定功法青云剑诀、贡献 2500）；储物戒可见宝物 → 赠予被拒（宗门之物不可外传）→ 退出宗门（宝物归还、贡献清零）→ 无宗门 → 我的技能仍显示青云剑诀。",
-  "tags": ["sect"],
+  "tags": [
+    "sect"
+  ],
   "conversation": {
     "kind": "group",
     "group_id": "webtest_sect_006",
-    "pin_players": { "p1": "900000002", "p2": "900000003" }
+    "pin_players": {
+      "p1": "900000002",
+      "p2": "900000003"
+    }
   },
   "steps": [
-    { "type": "send", "player": "p1", "text": "#储物戒", "note": "宗门之宝在储物戒中" },
-    { "type": "expect", "match": "re:储物戒[\\s\\S]*青云镇山剑", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#赠予 900000003 青云镇山剑", "note": "宗门之宝不可赠予" },
-    { "type": "expect", "match": "re:【青云镇山剑】乃宗门之物，不可外传", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#退出宗门", "note": "出师：宝物归还 + 贡献清零" },
-    { "type": "expect", "match": "re:已退出宗门『青云门』！[\\s\\S]*宗门之宝【青云镇山剑】已归还宗门", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#我的宗门", "note": "已无宗门" },
-    { "type": "expect", "match": "re:你还未加入宗门", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#我的技能", "note": "已习得绑定功法保留可用" },
-    { "type": "expect", "match": "re:我的功法[\\s\\S]*青云剑诀", "timeout": 10 }
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#储物戒",
+      "note": "宗门之宝在储物戒中"
+    },
+    {
+      "type": "expect",
+      "match": "re:储物戒[\\s\\S]*青云镇山剑",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#赠予 900000003 青云镇山剑",
+      "note": "宗门之宝不可赠予"
+    },
+    {
+      "type": "expect",
+      "match": "re:【青云镇山剑】乃宗门之物，不可外传",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 退出",
+      "note": "出师：宝物归还 + 贡献清零"
+    },
+    {
+      "type": "expect",
+      "match": "re:已退出宗门『青云门』！[\\s\\S]*宗门之宝【青云镇山剑】已归还宗门",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 信息",
+      "note": "已无宗门"
+    },
+    {
+      "type": "expect",
+      "match": "re:你还未加入宗门",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的技能",
+      "note": "已习得绑定功法保留可用"
+    },
+    {
+      "type": "expect",
+      "match": "re:我的功法[\\s\\S]*青云剑诀",
+      "timeout": 10
+    }
   ]
 }

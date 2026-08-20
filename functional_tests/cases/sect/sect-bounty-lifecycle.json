@@ -1,0 +1,165 @@
+{
+  "name": "sect-bounty-lifecycle",
+  "description": "spec Requirement「宗门内容联动·悬赏」完整生命周期：宗门专属悬赏 307（target=randint(2,4)）从列表→接取→推进（巡山路线，GM 触发历练结算每次清除休整）→显式完成领取灵石/修为。推进循环覆盖 target 上限 4 次保证达标，确定性在「完成领取」步骤。",
+  "scenario": "青云门成员清悬赏后查看宗门悬赏列表（确定性得到 307 后山巡视+308）；接取 307；循环 4 次「开始历练 巡山 + GM 触发历练结算」（adventure_scout 匹配 307 progress_tags，每次强制结算清除休整），覆盖随机 target∈[2,4] 保证达标；显式 /宗门 悬赏 完成 领取奖励。",
+  "tags": [
+    "sect",
+    "bounty",
+    "deterministic"
+  ],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_sect_021",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002"
+    },
+    "deterministic": true,
+    "seed": 42
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除CD 900000002 确认",
+      "note": "清理忙碌状态"
+    },
+    {
+      "type": "expect",
+      "match": "re:已清除【测试玩家1】的忙碌状态|不在任何忙碌状态",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除悬赏 900000002 确认",
+      "note": "清理悬赏状态"
+    },
+    {
+      "type": "expect",
+      "match": "re:✅ 已清除|没有可清除的悬赏状态",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 悬赏",
+      "note": "查看宗门悬赏列表"
+    },
+    {
+      "type": "expect",
+      "match": "re:🏯 宗门悬赏 · 本宗委托[\\s\\S]*\\[307\\] 后山巡视（F级[\\s\\S]*\\[308\\] 执事堂派差（E级[\\s\\S]*💡 使用 /宗门 悬赏 接取 <编号> 接取任务",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 悬赏 接取 307",
+      "note": "接取宗门专属悬赏 307"
+    },
+    {
+      "type": "expect",
+      "match": "re:🎯 接取悬赏成功！[\\s\\S]*任务：后山巡视（F级）[\\s\\S]*目标：完成 \\d+ 次[\\s\\S]*奖励：\\d+ 灵石 \\+ [\\d,]+ 修为",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#开始历练 巡山",
+      "note": "开始 scout 路线（adventure_scout 匹配 307 progress_tags）"
+    },
+    {
+      "type": "expect",
+      "match": "re:你选择了「巡山问道」|你踏上了历练之路|历练开始",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 触发历练结算 900000002",
+      "note": "强制结算推进 307（清除休整）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已强制结算【测试玩家1】的历练|悬赏进度：\\d+/\\d+|已完成！使用 /宗门 悬赏 完成",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#开始历练 巡山",
+      "note": "开始 scout 路线（adventure_scout 匹配 307 progress_tags）"
+    },
+    {
+      "type": "expect",
+      "match": "re:你选择了「巡山问道」|你踏上了历练之路|历练开始",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 触发历练结算 900000002",
+      "note": "强制结算推进 307（清除休整）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已强制结算【测试玩家1】的历练|悬赏进度：\\d+/\\d+|已完成！使用 /宗门 悬赏 完成",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#开始历练 巡山",
+      "note": "开始 scout 路线（adventure_scout 匹配 307 progress_tags）"
+    },
+    {
+      "type": "expect",
+      "match": "re:你选择了「巡山问道」|你踏上了历练之路|历练开始",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 触发历练结算 900000002",
+      "note": "强制结算推进 307（清除休整）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已强制结算【测试玩家1】的历练|悬赏进度：\\d+/\\d+|已完成！使用 /宗门 悬赏 完成",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#开始历练 巡山",
+      "note": "开始 scout 路线（adventure_scout 匹配 307 progress_tags）"
+    },
+    {
+      "type": "expect",
+      "match": "re:你选择了「巡山问道」|你踏上了历练之路|历练开始",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 触发历练结算 900000002",
+      "note": "强制结算推进 307（清除休整）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已强制结算【测试玩家1】的历练|悬赏进度：\\d+/\\d+|已完成！使用 /宗门 悬赏 完成",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 悬赏 完成",
+      "note": "达标后显式领取奖励（4 次推进必达 target∈[2,4]）"
+    },
+    {
+      "type": "expect",
+      "match": "re:✅ 悬赏完成（F级）！[\\s\\S]*任务：后山巡视[\\s\\S]*获得灵石：\\+\\d+[\\s\\S]*获得修为：\\+[\\d,]+",
+      "timeout": 10
+    }
+  ]
+}

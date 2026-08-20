@@ -1,0 +1,21 @@
+{
+  "name": "sect-command-entry",
+  "description": "spec Requirement「宗门指令统一」入口导航与错误处理：无参数展示指令导航；未知子命令报错并回显导航；缺参给出对应用法提示（以创建为例）。",
+  "scenario": "新建玩家在群聊依次发送：宗门（无参）→得到导航；宗门 未知子命令→未识别报错+导航；宗门 创建（缺参）→创建用法提示。",
+  "tags": ["sect"],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_sect_020",
+    "pin_players": { "p1": "900000008" }
+  },
+  "steps": [
+    { "type": "send", "player": "p1", "text": "#我要修仙 灵修", "note": "新建玩家" },
+    { "type": "expect", "match": "re:恭喜道友|已踏入仙途", "timeout": 30 },
+    { "type": "send", "player": "p1", "text": "#宗门", "note": "无参数：展示指令导航" },
+    { "type": "expect", "match": "re:🏯 宗门 · 指令导航[\\s\\S]*入门：宗门 创建 <名称>｜宗门 加入 <名称>｜宗门 退出[\\s\\S]*悬赏：宗门 悬赏 [接取 <编号>|进度|完成|放弃][\\s\\S]*管理：宗门 踢出 <@成员|ID>｜宗门 传位 <@成员|ID>｜宗门 职位 <@成员|ID> <0-4>", "timeout": 10 },
+    { "type": "send", "player": "p1", "text": "#宗门 未知子命令", "note": "未知子命令：报错+回显导航" },
+    { "type": "expect", "match": "re:❌ 未识别的宗门子命令「未知子命令」[\\s\\S]*🏯 宗门 · 指令导航", "timeout": 10 },
+    { "type": "send", "player": "p1", "text": "#宗门 创建", "note": "缺参：给出创建用法提示" },
+    { "type": "expect", "match": "re:❌ 请输入宗门名称，例如：/宗门 创建 逍遥门", "timeout": 10 }
+  ]
+}

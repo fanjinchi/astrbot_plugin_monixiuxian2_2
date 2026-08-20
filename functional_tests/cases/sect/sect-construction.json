@@ -8,19 +8,19 @@
     "pin_players": { "p1": "900000002" }
   },
   "steps": [
-    { "type": "send", "player": "p1", "text": "宗门建设", "note": "初始建设状态" },
+    { "type": "send", "player": "p1", "text": "宗门 建设", "note": "初始建设状态" },
     { "type": "expect", "match": "re:【青云门】宗门建设[\\s\\S]*建设度：100[\\s\\S]*宗门资材：500[\\s\\S]*洞天：0/5 级[\\s\\S]*升级需资材 200[\\s\\S]*丹房：0/5 级", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "宗门建设 洞天", "note": "升级洞天 0→1" },
+    { "type": "send", "player": "p1", "text": "宗门 建设 洞天", "note": "升级洞天 0→1" },
     { "type": "expect", "match": "re:【青云门】洞天升级成功！[\\s\\S]*消耗宗门资材：200[\\s\\S]*全员闭关修为加成提升至 \\+2%！", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "宗门建设 丹房", "note": "升级丹房 0→1" },
+    { "type": "send", "player": "p1", "text": "宗门 建设 丹房", "note": "升级丹房 0→1" },
     { "type": "expect", "match": "re:【青云门】丹房升级成功！[\\s\\S]*消耗宗门资材：200[\\s\\S]*丹房现可领取：炼气丹！", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "宗门丹房", "note": "丹房状态" },
+    { "type": "send", "player": "p1", "text": "宗门 丹房", "note": "丹房状态" },
     { "type": "expect", "match": "re:【青云门】宗门丹房[\\s\\S]*丹房等级：1/5[\\s\\S]*今日可领：炼气丹", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "宗门丹房 领取", "note": "领取今日丹药" },
+    { "type": "send", "player": "p1", "text": "宗门 丹房 领取", "note": "领取今日丹药" },
     { "type": "expect", "match": "re:你从宗门丹房领取了【炼气丹】x1，已存入丹药背包", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "宗门丹房 领取", "note": "重复领取被拦截" },
+    { "type": "send", "player": "p1", "text": "宗门 丹房 领取", "note": "重复领取被拦截" },
     { "type": "expect", "match": "re:你今日已在丹房领取过丹药，请明日再来", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "宗门任务", "note": "建设任务结算（随机任务之一）" },
+    { "type": "send", "player": "p1", "text": "宗门 任务", "note": "建设任务结算（随机任务之一）" },
     { "type": "expect", "match": "re:完成建设任务【[^】]+】！[\\s\\S]*获得贡献：\\+\\d+", "timeout": 10 }
   ]
 }

@@ -2,30 +2,128 @@
   "name": "sect-master-task-chain",
   "description": "spec Requirement「师承任务链」：任务链阶段顺序展示与推进、奖励结算消息、长老署名文案。实时可触发的捐赠型阶段（投名状）走真实结算；PvE 胜利型阶段以视图断言（平台无法强制推进师承进度，见 platform-gap-report）。",
   "scenario": "青云门成员的师承链（chain_qy_01）按区间锁定并展示阶段顺序/署名（玄诚子）；另一新建玩家经 GM 抬境界后拜入合欢宗，通过宗门捐献（1000 灵石）真实完成投名状阶段并收到奖励结算（宗门贡献+80、修为+500）与下一阶段解锁（见血）。",
-  "tags": ["sect"],
+  "tags": [
+    "sect"
+  ],
   "conversation": {
     "kind": "group",
     "group_id": "webtest_sect_003",
-    "pin_players": { "gm": "900000001", "p1": "900000002", "p2": "900000006" }
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000006"
+    }
   },
   "steps": [
-    { "type": "send", "player": "p1", "text": "#师承任务", "note": "青云门成员：chain_qy_01 视图" },
-    { "type": "expect", "match": "re:师承任务 · 青云门[\\s\\S]*【入门演武】[\\s\\S]*历练/秘境战斗胜利：0/3[\\s\\S]*玄诚子[\\s\\S]*🔒 【采药历练】未解锁[\\s\\S]*🔒 【破境之礼】未解锁", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#退出宗门", "note": "出师（预置宗门之宝回收）" },
-    { "type": "expect", "match": "re:已退出宗门『青云门』！[\\s\\S]*宗门之宝【青云镇山剑】已归还宗门", "timeout": 10 },
-    { "type": "send", "player": "p2", "text": "#我要修仙 灵修", "note": "新建玩家" },
-    { "type": "expect", "match": "re:恭喜道友|已踏入仙途", "timeout": 30 },
-    { "type": "send", "player": "gm", "text": "#修仙GM 设置境界 900000006 练气三阶", "note": "抬入合欢宗区间 [2,4]" },
-    { "type": "expect", "match": "re:境界设置为「练气三阶」", "timeout": 10 },
-    { "type": "send", "player": "gm", "text": "#修仙GM 设置灵石 900000006 100000", "note": "准备捐献" },
-    { "type": "expect", "match": "re:灵石设置为 100,000|灵石设置为[\\s\\S]*100,?000", "timeout": 10 },
-    { "type": "send", "player": "p2", "text": "#加入宗门 合欢宗", "note": "拜入合欢宗" },
-    { "type": "expect", "match": "re:成功拜入『合欢宗』，成为外门弟子", "timeout": 10 },
-    { "type": "send", "player": "p2", "text": "#师承任务", "note": "合欢宗链 chain_hx_01：投名状（捐献型）" },
-    { "type": "expect", "match": "re:师承任务 · 合欢宗[\\s\\S]*【投名状】[\\s\\S]*宗门捐献（灵石）：0/1000[\\s\\S]*花妩娘[\\s\\S]*奖励：贡献\\+80、修为\\+500[\\s\\S]*🔒 【见血】未解锁", "timeout": 10 },
-    { "type": "send", "player": "p2", "text": "#宗门捐献 1000", "note": "真实推进投名状阶段并结算奖励" },
-    { "type": "expect", "match": "re:捐献成功！消耗 1000 灵石[\\s\\S]*师承任务【投名状】完成！[\\s\\S]*奖励：宗门贡献 \\+80、修为 \\+500[\\s\\S]*下一阶段：【见血】", "timeout": 10 },
-    { "type": "send", "player": "p2", "text": "#师承任务", "note": "阶段顺序推进：投名状已完成、见血解锁" },
-    { "type": "expect", "match": "re:✅ 【投名状】已完成[\\s\\S]*【见血】[\\s\\S]*历练/秘境战斗胜利：0/5[\\s\\S]*厉无欢", "timeout": 10 }
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除CD 900000002 确认",
+      "note": "清理忙碌状态（防 run-all 跨用例污染）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已清除【测试玩家1】的忙碌状态|不在任何忙碌状态",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 师承",
+      "note": "青云门成员：chain_qy_01 视图"
+    },
+    {
+      "type": "expect",
+      "match": "re:师承任务 · 青云门[\\s\\S]*【入门演武】[\\s\\S]*历练/秘境战斗胜利：0/3[\\s\\S]*玄诚子[\\s\\S]*🔒 【采药历练】未解锁[\\s\\S]*🔒 【破境之礼】未解锁",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 退出",
+      "note": "出师（预置宗门之宝回收）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已退出宗门『青云门』！[\\s\\S]*宗门之宝【青云镇山剑】已归还宗门",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#我要修仙 灵修",
+      "note": "新建玩家"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置境界 900000006 练气三阶",
+      "note": "抬入合欢宗区间 [2,4]"
+    },
+    {
+      "type": "expect",
+      "match": "re:境界设置为「练气三阶」",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置灵石 900000006 100000",
+      "note": "准备捐献"
+    },
+    {
+      "type": "expect",
+      "match": "re:灵石设置为 100,000|灵石设置为[\\s\\S]*100,?000",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#宗门 加入 合欢宗",
+      "note": "拜入合欢宗"
+    },
+    {
+      "type": "expect",
+      "match": "re:成功拜入『合欢宗』，成为外门弟子",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#宗门 师承",
+      "note": "合欢宗链 chain_hx_01：投名状（捐献型）"
+    },
+    {
+      "type": "expect",
+      "match": "re:师承任务 · 合欢宗[\\s\\S]*【投名状】[\\s\\S]*宗门捐献（灵石）：0/1000[\\s\\S]*花妩娘[\\s\\S]*奖励：贡献\\+80、修为\\+500[\\s\\S]*🔒 【见血】未解锁",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#宗门 捐献 1000",
+      "note": "真实推进投名状阶段并结算奖励"
+    },
+    {
+      "type": "expect",
+      "match": "re:捐献成功！消耗 1000 灵石[\\s\\S]*师承任务【投名状】完成！[\\s\\S]*奖励：宗门贡献 \\+80、修为 \\+500[\\s\\S]*下一阶段：【见血】",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#宗门 师承",
+      "note": "阶段顺序推进：投名状已完成、见血解锁"
+    },
+    {
+      "type": "expect",
+      "match": "re:✅ 【投名状】已完成[\\s\\S]*【见血】[\\s\\S]*历练/秘境战斗胜利：0/5[\\s\\S]*厉无欢",
+      "timeout": 10
+    }
   ]
 }

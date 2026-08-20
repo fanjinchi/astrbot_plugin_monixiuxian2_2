@@ -11,15 +11,15 @@
   "steps": [
     { "type": "send", "player": "p1", "text": "#我要修仙 灵修", "note": "新建玩家" },
     { "type": "expect", "match": "re:恭喜道友|已踏入仙途", "timeout": 30 },
-    { "type": "send", "player": "p1", "text": "#宗门列表", "note": "默认宗门可见（顺序依建设度不固定，双序断言）" },
+    { "type": "send", "player": "p1", "text": "#宗门 列表", "note": "默认宗门可见（顺序依建设度不固定，双序断言）" },
     { "type": "expect", "match": "re:宗门列表[\\s\\S]*【青云门】[\\s\\S]*【合欢宗】|宗门列表[\\s\\S]*【合欢宗】[\\s\\S]*【青云门】", "timeout": 10 },
     { "type": "send", "player": "gm", "text": "#修仙GM 设置境界 900000004 练气三阶", "note": "满足建宗等级门槛" },
     { "type": "expect", "match": "re:境界设置为「练气三阶」", "timeout": 10 },
     { "type": "send", "player": "gm", "text": "#修仙GM 设置灵石 900000004 50000", "note": "满足建宗灵石门槛" },
     { "type": "expect", "match": "re:灵石设置为 50,000|灵石设置为[\\s\\S]*50,?000", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#创建宗门 青云门", "note": "系统名保留：不可同名建宗" },
+    { "type": "send", "player": "p1", "text": "#宗门 创建 青云门", "note": "系统名保留：不可同名建宗" },
     { "type": "expect", "match": "re:『青云门』乃天下名门，不可用作宗门名称", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#创建宗门 合欢宗", "note": "系统名保留：不可同名建宗" },
+    { "type": "send", "player": "p1", "text": "#宗门 创建 合欢宗", "note": "系统名保留：不可同名建宗" },
     { "type": "expect", "match": "re:『合欢宗』乃天下名门，不可用作宗门名称", "timeout": 10 }
   ]
 }

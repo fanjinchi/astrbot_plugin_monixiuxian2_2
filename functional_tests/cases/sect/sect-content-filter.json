@@ -1,29 +1,85 @@
 {
   "name": "sect-content-filter",
-  "description": "spec Requirement「宗门内容联动」：宗门专属悬赏仅本宗成员可接取（非成员接取被拒）；宗门专属秘境仅成员可见可入（非成员列表锁定 + 探索被拒）。用例只断言确定性不变量：成员悬赏令为随机池抽样，宗门悬赏分区是否出现不可断言（见 bd 与 platform-gap-report）。",
-  "scenario": "群聊中青云门成员（900000002）与非成员（900000003）对照：非成员接取宗门悬赏 307 被拒（确定性闸门）；秘境列表非成员见青云剑冢锁定行（🔒 仅本宗弟子可进）且探索被拒，成员见 🏯 宗门专属秘境并可进入。",
-  "tags": ["sect"],
+  "description": "spec Requirement「宗门内容联动」：宗门专属秘境仅本宗成员可见可入——非本宗成员在秘境列表被直接过滤（不可见），探索入口兜底拒绝；宗门专属悬赏仅本宗成员可接取（接取分流见 sect-bounty-split）。",
+  "scenario": "群聊中青云门成员（900000002）与非成员（900000003）对照：非成员秘境列表用 expect_not 断言不含青云剑冢（列表直接过滤）+ 探索被拒兜底；成员秘境列表可见 🏯 宗门专属秘境并可进入。",
+  "tags": [
+    "sect"
+  ],
   "conversation": {
     "kind": "group",
     "group_id": "webtest_sect_008",
-    "pin_players": { "gm": "900000001", "p1": "900000002", "p2": "900000003" }
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000003"
+    }
   },
   "steps": [
-    { "type": "send", "player": "p1", "text": "#悬赏令", "note": "成员：可查看悬赏令（列表内容为随机池抽样，宗门悬赏分区不保证出现，仅断言标题栏与接取提示）" },
-    { "type": "expect", "match": "re:悬赏令 · 今日委托[\\s\\S]*接取悬赏", "timeout": 10 },
-    { "type": "send", "player": "p2", "text": "#接取悬赏 307", "note": "非成员接取宗门专属悬赏（307=后山巡视，sect_id=qingyun），sect 校验先于列表缓存校验 → 确定性拒绝" },
-    { "type": "expect", "match": "re:该悬赏为宗门专属委托，仅面向本宗弟子发布", "timeout": 10 },
-    { "type": "send", "player": "p2", "text": "#接取悬赏 308", "note": "非成员接取另一宗门悬赏（308=执事堂派差）同样被拒" },
-    { "type": "expect", "match": "re:该悬赏为宗门专属委托，仅面向本宗弟子发布", "timeout": 10 },
-    { "type": "send", "player": "p2", "text": "#秘境列表", "note": "非成员：宗门专属秘境显示锁定" },
-    { "type": "expect", "match": "re:【青云剑冢】\\(ID:6\\)[\\s\\S]*🔒 宗门专属秘境（仅本宗弟子可进）", "timeout": 10 },
-    { "type": "send", "player": "p2", "text": "#探索秘境 6", "note": "非成员探索被拒" },
-    { "type": "expect", "match": "re:【青云剑冢】仅对本宗弟子开放", "timeout": 10 },
-    { "type": "send", "player": "gm", "text": "#修仙GM 设置境界 900000002 练气三阶", "note": "成员提升境界以满足青云剑冢要求（3 级）" },
-    { "type": "expect", "match": "re:境界设置为「练气三阶」", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#秘境列表", "note": "成员：宗门专属秘境正常展示" },
-    { "type": "expect", "match": "re:【青云剑冢】\\(ID:6\\)[\\s\\S]*🏯 宗门专属秘境", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#探索秘境 6", "note": "成员可进入宗门专属秘境" },
-    { "type": "expect", "match": "re:你进入了『青云剑冢』", "timeout": 10 }
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除CD 900000002 确认",
+      "note": "清理忙碌状态（防 run-all 跨用例污染）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已清除【测试玩家1】的忙碌状态|不在任何忙碌状态",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#秘境列表",
+      "note": "非成员：宗门专属秘境被直接过滤，列表不应含青云剑冢（expect_not 负向断言）"
+    },
+    {
+      "type": "expect_not",
+      "match": "re:青云剑冢",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#探索秘境 6",
+      "note": "非成员探索入口兜底拒绝（ID:6=青云剑冢）"
+    },
+    {
+      "type": "expect",
+      "match": "re:【青云剑冢】仅对本宗弟子开放",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置境界 900000002 练气三阶",
+      "note": "成员提升境界以满足青云剑冢要求（3 级）"
+    },
+    {
+      "type": "expect",
+      "match": "re:境界设置为「练气三阶」",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#秘境列表",
+      "note": "成员：宗门专属秘境正常展示"
+    },
+    {
+      "type": "expect",
+      "match": "re:【青云剑冢】\\(ID:6\\)[\\s\\S]*🏯 宗门专属秘境",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#探索秘境 6",
+      "note": "成员可进入宗门专属秘境"
+    },
+    {
+      "type": "expect",
+      "match": "re:你进入了『青云剑冢』",
+      "timeout": 10
+    }
   ]
 }

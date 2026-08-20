@@ -1,0 +1,128 @@
+[
+  {
+    "id": 4262,
+    "conversation_id": 356,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除CD 900000002 确认",
+    "rich": null,
+    "created_at": 1787226099.3711064
+  },
+  {
+    "id": 4263,
+    "conversation_id": 356,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 目标玩家当前不在任何忙碌状态！",
+    "rich": [],
+    "created_at": 1787226099.3893814
+  },
+  {
+    "id": 4264,
+    "conversation_id": 356,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 商店",
+    "rich": null,
+    "created_at": 1787226099.6826885
+  },
+  {
+    "id": 4265,
+    "conversation_id": 356,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏪 【青云门】宗门商店\n━━━━━━━━━━━━━━━\n你的贡献：2500｜职阶：外门弟子\n· [天品] 【青云天剑】1500 贡献｜🔒需内门弟子及以上\n· [地品] 【金罡诀】1000 贡献\n💡 购买：「宗门 商店 购买 <名称>」",
+    "rich": [],
+    "created_at": 1787226099.7043817
+  },
+  {
+    "id": 4266,
+    "conversation_id": 356,
+    "direction": "in",
+    "sender": "900000003",
+    "text": "#宗门 商店",
+    "rich": null,
+    "created_at": 1787226099.9988432
+  },
+  {
+    "id": 4267,
+    "conversation_id": 356,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 你还未加入宗门！加入宗门后可使用「宗门 商店」。",
+    "rich": [],
+    "created_at": 1787226100.01925
+  },
+  {
+    "id": 4268,
+    "conversation_id": 356,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 商店 购买 青云天剑",
+    "rich": null,
+    "created_at": 1787226100.3150833
+  },
+  {
+    "id": 4269,
+    "conversation_id": 356,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 你的职阶不足以购买【青云天剑】（需内门弟子及以上）！",
+    "rich": [],
+    "created_at": 1787226100.3361259
+  },
+  {
+    "id": 4270,
+    "conversation_id": 356,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 商店 购买 金罡诀",
+    "rich": null,
+    "created_at": 1787226100.632614
+  },
+  {
+    "id": 4271,
+    "conversation_id": 356,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏪 购买成功！【金罡诀】已存入储物戒。\n消耗贡献：-1000（剩余 1500）",
+    "rich": [],
+    "created_at": 1787226100.6611178
+  },
+  {
+    "id": 4272,
+    "conversation_id": 356,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置职位 900000002 3",
+    "rich": null,
+    "created_at": 1787226100.9489963
+  },
+  {
+    "id": 4273,
+    "conversation_id": 356,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的职位设置为「内门弟子」",
+    "rich": [],
+    "created_at": 1787226100.9770083
+  },
+  {
+    "id": 4274,
+    "conversation_id": 356,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 商店 购买 青云天剑",
+    "rich": null,
+    "created_at": 1787226101.2651548
+  },
+  {
+    "id": 4275,
+    "conversation_id": 356,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏪 购买成功！【青云天剑】已存入储物戒。\n消耗贡献：-1500（剩余 0）",
+    "rich": [],
+    "created_at": 1787226101.2937956
+  }
+]

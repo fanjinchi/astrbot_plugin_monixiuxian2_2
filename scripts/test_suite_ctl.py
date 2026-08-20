@@ -191,18 +191,30 @@ def _validate_case(case: dict, path: Path) -> None:
         )
     if not isinstance(case["steps"], list) or not case["steps"]:
         raise CtlError(f"{path}: steps 必须是非空数组")
-    valid_types = ("send", "expect", "sleep")
+    valid_types = ("send", "expect", "expect_not", "sleep")
     for i, step in enumerate(case["steps"]):
         if not isinstance(step, dict) or step.get("type") not in valid_types:
             raise CtlError(f"{path}: steps[{i}] 缺少合法的 type 字段（{valid_types}）")
         if step["type"] == "send" and not (step.get("player") and step.get("text")):
             raise CtlError(f"{path}: steps[{i}] send 必填 player/text")
-        if step["type"] == "expect" and not (step.get("match") and step.get("timeout")):
-            raise CtlError(f"{path}: steps[{i}] expect 必填 match/timeout")
+        if step["type"] in ("expect", "expect_not") and not (
+            step.get("match") and step.get("timeout")
+        ):
+            raise CtlError(f"{path}: steps[{i}] {step['type']} 必填 match/timeout")
+        if step.get("combine") is not None and not isinstance(step["combine"], bool):
+            raise CtlError(f"{path}: steps[{i}].combine 必须是布尔值")
         if step["type"] == "sleep" and not (
             step.get("seconds") and step["seconds"] > 0
         ):
             raise CtlError(f"{path}: steps[{i}] sleep.seconds 必须是正数")
+    if case.get("deterministic") is not None and not isinstance(
+        case["deterministic"], bool
+    ):
+        raise CtlError(f"{path}: case.deterministic 必须是布尔值")
+    if case.get("seed") is not None and (
+        not isinstance(case["seed"], int) or isinstance(case["seed"], bool)
+    ):
+        raise CtlError(f"{path}: case.seed 必须是整数")
 
 
 def _load_source_cases(cases_root: Path) -> list[tuple[str, dict, Path]]:
@@ -310,6 +322,7 @@ EFFECT_EVIDENCE_PATTERNS: dict[str, tuple[str, ...]] = {
     "ultimate_heal": ("施展大招【", "】，天地变色！"),
     "ultimate_dot": ("施展大招【", "】，天地变色！"),
     "ultimate_survive": ("获得【", "】庇护！"),
+    "sect_event": ("🏯 宗门际遇",),
 }
 
 

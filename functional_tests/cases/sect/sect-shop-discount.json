@@ -2,20 +2,72 @@
   "name": "sect-shop-discount",
   "description": "spec Requirement「职阶晋升与福利」：职阶商店折扣在购买结算中生效并展示折扣消息，价格为折后价。",
   "scenario": "fixture 预置青云门成员（贡献 2500/境界 2）并预置丹阁固定上架筑基丹（原价 5000）以绕开随机库存；GM 抬境界至练气五阶，宗门晋升至内门弟子（折扣 9.5 折）后购买筑基丹，断言折后总价 4750 与折扣提示；签到核验职阶俸禄。",
-  "tags": ["sect"],
+  "tags": [
+    "sect"
+  ],
   "conversation": {
     "kind": "group",
     "group_id": "webtest_sect_009",
-    "pin_players": { "gm": "900000001", "p1": "900000002" }
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002"
+    }
   },
   "steps": [
-    { "type": "send", "player": "gm", "text": "#修仙GM 设置境界 900000002 练气五阶", "note": "满足内门弟子境界门槛" },
-    { "type": "expect", "match": "re:境界设置为「练气五阶」", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#宗门晋升", "note": "晋升内门弟子（折扣 0.95）" },
-    { "type": "expect", "match": "re:晋升成功！你已成为【内门弟子】！[\\s\\S]*商店折扣：9.5折", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#购买 筑基丹", "note": "原价 5000，9.5 折 → 4750" },
-    { "type": "expect", "match": "re:成功购买【筑基丹】x1，已添加到背包[\\s\\S]*花费灵石: 4750[\\s\\S]*宗门职阶折扣已生效（9.5折）", "timeout": 10 },
-    { "type": "send", "player": "p1", "text": "#签到", "note": "职阶俸禄加发" },
-    { "type": "expect", "match": "re:签到成功！[\\s\\S]*宗门俸禄（内门弟子）：\\+100 灵石", "timeout": 10 }
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除CD 900000002 确认",
+      "note": "清理忙碌状态（防 run-all 跨用例污染）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已清除【测试玩家1】的忙碌状态|不在任何忙碌状态",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置境界 900000002 练气五阶",
+      "note": "满足内门弟子境界门槛"
+    },
+    {
+      "type": "expect",
+      "match": "re:境界设置为「练气五阶」",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#宗门 晋升",
+      "note": "晋升内门弟子（折扣 0.95）"
+    },
+    {
+      "type": "expect",
+      "match": "re:晋升成功！你已成为【内门弟子】！[\\s\\S]*商店折扣：9.5折",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#购买 筑基丹",
+      "note": "原价 5000，9.5 折 → 4750"
+    },
+    {
+      "type": "expect",
+      "match": "re:成功购买【筑基丹】x1，已添加到背包[\\s\\S]*花费灵石: 4750[\\s\\S]*宗门职阶折扣已生效（9.5折）",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#签到",
+      "note": "职阶俸禄加发"
+    },
+    {
+      "type": "expect",
+      "match": "re:签到成功！[\\s\\S]*宗门俸禄（内门弟子）：\\+100 灵石",
+      "timeout": 10
+    }
   ]
 }

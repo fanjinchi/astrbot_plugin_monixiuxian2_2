@@ -1,0 +1,182 @@
+[
+  {
+    "id": 4074,
+    "conversation_id": 342,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除CD 900000002 确认",
+    "rich": null,
+    "created_at": 1787226055.77782
+  },
+  {
+    "id": 4075,
+    "conversation_id": 342,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 目标玩家当前不在任何忙碌状态！",
+    "rich": [],
+    "created_at": 1787226055.7935174
+  },
+  {
+    "id": 4076,
+    "conversation_id": 342,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除悬赏 900000002 确认",
+    "rich": null,
+    "created_at": 1787226056.088903
+  },
+  {
+    "id": 4077,
+    "conversation_id": 342,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 【测试玩家1】没有可清除的悬赏状态！",
+    "rich": [],
+    "created_at": 1787226056.1047688
+  },
+  {
+    "id": 4078,
+    "conversation_id": 342,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000002 练气三阶",
+    "rich": null,
+    "created_at": 1787226056.4003336
+  },
+  {
+    "id": 4079,
+    "conversation_id": 342,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的境界设置为「练气三阶」",
+    "rich": [],
+    "created_at": 1787226056.4277914
+  },
+  {
+    "id": 4080,
+    "conversation_id": 342,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除悬赏 900000002 确认",
+    "rich": null,
+    "created_at": 1787226056.7171855
+  },
+  {
+    "id": 4081,
+    "conversation_id": 342,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 【测试玩家1】没有可清除的悬赏状态！",
+    "rich": [],
+    "created_at": 1787226056.738689
+  },
+  {
+    "id": 4082,
+    "conversation_id": 342,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 悬赏",
+    "rich": null,
+    "created_at": 1787226057.034263
+  },
+  {
+    "id": 4083,
+    "conversation_id": 342,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏯 宗门悬赏 · 本宗委托\n━━━━━━━━━━━━━━━\n[307] 后山巡视（F级·巡山）\n  - 目标：完成 4 次 | 时限：157 分钟\n  - 奖励：400 灵石 + 3,600 修为\n  - 说明：为本门巡视后山灵脉，驱逐窥探的外人。\n[308] 执事堂派差（E级·采集）\n  - 目标：完成 3 次 | 时限：245 分钟\n  - 奖励：384 灵石 + 3,360 修为\n  - 说明：执事堂征调弟子下山采买宗门用度，顺带历练。\n━━━━━━━━━━━━━━━\n💡 使用 /宗门 悬赏 接取 <编号> 接取任务",
+    "rich": [],
+    "created_at": 1787226057.0553467
+  },
+  {
+    "id": 4084,
+    "conversation_id": 342,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#接取悬赏 307",
+    "rich": null,
+    "created_at": 1787226057.3515277
+  },
+  {
+    "id": 4085,
+    "conversation_id": 342,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 该悬赏为宗门专属委托，请发送 /宗门 悬赏 查看与接取。",
+    "rich": [],
+    "created_at": 1787226057.3724551
+  },
+  {
+    "id": 4086,
+    "conversation_id": 342,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 悬赏 接取 307",
+    "rich": null,
+    "created_at": 1787226057.6675553
+  },
+  {
+    "id": 4087,
+    "conversation_id": 342,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎯 接取悬赏成功！\n任务：后山巡视（F级）\n目标：完成 4 次\n奖励：400 灵石 + 3,600 修为\n时限：157 分钟",
+    "rich": [],
+    "created_at": 1787226057.6967058
+  },
+  {
+    "id": 4088,
+    "conversation_id": 342,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 悬赏 接取 308",
+    "rich": null,
+    "created_at": 1787226057.984186
+  },
+  {
+    "id": 4089,
+    "conversation_id": 342,
+    "direction": "out",
+    "sender": "bot",
+    "text": "你已有进行中的悬赏：后山巡视，请先完成或放弃。",
+    "rich": [],
+    "created_at": 1787226058.0040894
+  },
+  {
+    "id": 4090,
+    "conversation_id": 342,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#悬赏状态",
+    "rich": null,
+    "created_at": 1787226058.2997687
+  },
+  {
+    "id": 4091,
+    "conversation_id": 342,
+    "direction": "out",
+    "sender": "bot",
+    "text": "你当前进行中的悬赏为宗门悬赏，请使用 /宗门 悬赏 进度 操作。",
+    "rich": [],
+    "created_at": 1787226058.3204112
+  },
+  {
+    "id": 4092,
+    "conversation_id": 342,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除悬赏 900000002 确认",
+    "rich": null,
+    "created_at": 1787226058.6166482
+  },
+  {
+    "id": 4093,
+    "conversation_id": 342,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已清除【测试玩家1】的进行中悬赏【后山巡视】",
+    "rich": [],
+    "created_at": 1787226058.644368
+  }
+]
