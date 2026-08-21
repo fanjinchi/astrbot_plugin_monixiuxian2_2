@@ -13,7 +13,8 @@ functional_tests/
 │   ├── equipment/                # 装备、武器、心法
 │   ├── economy/                  # 丹药、商店、储物戒、银行、悬赏
 │   ├── pve/                      # Boss、历练、秘境
-│   ├── social/                   # 宗门、双修、洞天、灵田、灵眼
+│   ├── sect/                     # 宗门（默认宗门/建设/师承/晋升/出师回收/指令统一/悬赏分流/商店/事件标记）
+│   ├── social/                   # 双修、洞天、灵田、灵眼（宗门已独立到 sect/）
 │   ├── pvp/                      # 切磋、决斗、传承PK、效果验证
 │   └── gm/                       # GM 工具
 └── results/
@@ -52,7 +53,7 @@ functional_tests/
   - 群聊 `group_id` 使用 `webtest_pvp_001`；
   - `pin_players` 固定：`gm=900000001`、`p1=900000002`、`p2=900000003`；
   - 若测试实例开了白名单，需把该群加入 `WHITELIST_GROUPS`；GM 命令需要 `900000001` 在 `GM_ADMINS`。
-- 每个用例至少有一个功能域 `tag`（如 `player`、`equipment`、`pvp`、`pve`、`gm`、`economy`、`social`），便于 `run-all --tag <tag>` 定向回归。
+- 每个用例至少有一个功能域 `tag`（如 `player`、`equipment`、`pvp`、`pve`、`gm`、`economy`、`sect`、`social`），便于 `run-all --tag <tag>` 定向回归。
 - 随机/概率效果用例在 `description` 或 `scenario` 中写明“抽样验证”，并配合 `--repeat N` 聚合证据。
 
 ## 同步 / 运行 / 导出流程

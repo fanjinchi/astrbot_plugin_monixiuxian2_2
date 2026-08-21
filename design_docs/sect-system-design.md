@@ -1,6 +1,6 @@
 # 宗门系统扩展设计：默认宗门·建设师承·毁灭重建·职阶晋升
 
-> **文档状态**：设计基线（2026-08-18 建立，与玩家拍板后的决策记录）。
+> **文档状态**：设计基线（2026-08-18 建立，与玩家拍板后的决策记录；2026-08-21 回写 `unify-sect-commands` 指令收敛）。
 > 本文是"宗门系统扩展"的总设计文档；正式变更提案走 OpenSpec（`openspec/changes/`）。
 > 标注 **[策划可配]** 的条目表示策划可通过 JSON 配置直接调整，无需改代码。
 > 现状分析依据：`managers/sect_manager.py`、`config/sect_config.json`、`models_extended.py:35-81`、`data/migration.py`（sects 表）。
@@ -11,8 +11,9 @@
 
 | 期 | 内容 | 对应 OpenSpec change |
 |---|---|---|
-| **一期（本次实施）** | 默认宗门配置化（1-2 个做功能验证）、宗门建设（接线预留字段）、师承任务线、职阶晋升（基础版）、第一/二梯队联动（宗门功法池/宗门悬赏/宗门秘境/宗门历练事件组） | `add-default-sects-and-sect-growth`（拟） |
-| 一期配套 | 上述功能的功能测试用例（测试平台） | 独立测试 change（交其他 agent 实施） |
+| **一期（已实施）** | 默认宗门配置化（1-2 个做功能验证）、宗门建设（接线预留字段）、师承任务线、职阶晋升（基础版）、第一/二梯队联动（宗门功法池/宗门悬赏/宗门秘境/宗门历练事件组） | `add-default-sects-and-sect-growth`（已归档） |
+| 一期配套 | 上述功能的功能测试用例（测试平台） | `add-sect-functional-tests` / `update-sect-functional-tests`（已归档） |
+| 一期收口 | 宗门功能收敛为「宗门」单入口 + 子命令（删 18 旧指令）、宗门悬赏独立入口、宗门商店、秘境仅本宗可见、历练事件显性标记 | `unify-sect-commands`（已归档） |
 | **二期** | 宗门毁灭与重建（剧情线/世界事件触发、散落物去向、回忆/寻回/重建任务）、Boss 名称与掉落配置化（前置改造）、世界事件调度抽象 | 待立项 |
 | **三期（仅预留扩展点）** | 宗门 NPC 人格化（对话/关系）、分宗、正魔阵营对抗、宗门大比 | 待立项 |
 
@@ -137,13 +138,15 @@
 
 悬赏模板增加可选字段 `"sect_id"`（该模板仅在对应宗门悬赏榜出现）。文案已支持叙事描述，直接写宗门主题悬赏（"为本门巡视后山"等）。
 
+> 入口说明（`unify-sect-commands` 落地后）：带 `sect_id` 的悬赏全生命周期（查看/接取/进度/完成/放弃）只在「宗门 悬赏」子命令组下闭环；全局悬赏指令（悬赏令/接取悬赏等）只处理公共悬赏，跨类型操作被分流校验拒绝（先于冷却/活跃检查）。「单活跃悬赏」约束仍全局共享。
+
 ### 3.6 `config/rift_config.json`（扩展）**[策划可配]**
 
-秘境条目增加可选字段 `"sect_id"` + `"access": "sect_member"`（宗门专属秘境，仅本宗成员可探索）。
+秘境条目增加可选字段 `"sect_id"` + `"access": "sect_member"`（宗门专属秘境，仅本宗成员可探索）。`unify-sect-commands` 起对非本宗成员在秘境列表中**直接隐藏**（不再 🔒 标注）：列表渲染前按 faction_id 过滤，准入校验 `_check_sect_access` 保留作为兜底。
 
 ### 3.7 `config/adventure_config.json`（扩展）**[策划可配]**
 
-事件组增加可选 `"sect_id"` 过滤——宗门主题历练事件（"长老传功""执事堂派差"），仅本宗成员历练时可能触发。
+事件组增加可选 `"sect_id"` 过滤——宗门主题历练事件（"长老传功""执事堂派差"），仅本宗成员历练时可能触发。`unify-sect-commands` 起结算消息对带 `sect_id` 的事件加「🏯 宗门际遇 · {事件名}」前缀标记（抽取/过滤逻辑不变）。
 
 ### 3.8 `config/sect_config.json`（扩展）**[策划可配]**
 
@@ -206,7 +209,7 @@
 
 ### 4.1 拜入与出师（一期）
 
-- 新玩家境界在 faction 的 `join_level_range` 内可拜入默认宗门。「加入宗门」为统一入口，按目标宗门 `is_system` 分流校验逻辑（默认宗门校验境界区间，玩家宗门保持现有自由加入）。
+- 新玩家境界在 faction 的 `join_level_range` 内可拜入默认宗门。`unify-sect-commands` 起宗门全部功能收敛为「宗门」单指令，拜入入口为「宗门 加入」（按目标宗门 `is_system` 分流校验：默认宗门校验境界区间，玩家宗门保持现有自由加入）。
 - 默认宗门**无宗主职位**，玩家最高可升至长老之下（亲传/执事类）。权限统一读 `sect_config.json` 的 positions.permission（实施时已删除 `sect_manager.py` 硬编码 `POSITION_PERMISSIONS`，两套定义合并为配置单一真源）。
 - 「出师」= 退出默认宗门：自由离开，已习得的宗门功法/心法**保留且正常使用**（其不可转让的固有属性不变），宗门之宝回收归还宗门，贡献清零（与现有退出语义一致）。
 - 玩家宗门不受 `join_level_range` 限制（保持现有自由加入）。
@@ -232,7 +235,7 @@
 
 ### 4.4 职阶晋升（一期基础版）
 
-- 晋升条件：`promotion.contribution`（贡献点）+ `promotion.level_index`（境界）双门槛，玩家主动「宗门晋升」指令触发校验。
+- 晋升条件：`promotion.contribution`（贡献点）+ `promotion.level_index`（境界）双门槛，玩家主动「宗门 晋升」子命令触发校验（原「宗门晋升」顶层指令已并入）。
 - 福利（`benefits`）：每日灵石（并入「签到」按职阶加发）、宗门商店折扣、解锁传承内容（心法/功法/宝物的获取资格）。
 - 玩家宗门仍保留宗主任命/传位的现有操作；默认宗门只能走晋升通道。
 
@@ -277,13 +280,14 @@
 
 ### 5.5 悬赏/秘境/历练联动（一期）
 
-- 悬赏榜按 `sect_id` 过滤出"宗门悬赏"分区（`bounty_manager.py` 列表与接取逻辑加过滤参数）。
-- 秘境准入校验加 `sect_member` 检查（`rift_manager.py`）。
-- 历练事件组抽取时按玩家宗门追加过滤（`adventure_manager.py`）。
+- 悬赏按 `sect_id` 分流（`unify-sect-commands` 落地后）：`BountyManager` 列表/接取/状态/完成/放弃均带类型维度（全局视图只出公共悬赏、宗门视图按 `sect_id` 过滤），宗门悬赏只在「宗门 悬赏」子命令下操作，跨类型拒绝先于冷却/活跃校验；「单活跃悬赏」约束全局共享。
+- 秘境准入校验加 `sect_member` 检查（`rift_manager.py`）；列表对非本宗成员直接隐藏宗门专属秘境（不 🔒 标注）。
+- 历练事件组抽取时按玩家宗门追加过滤（`adventure_manager.py`，宗门事件组固定权重 15）；结算消息带「🏯 宗门际遇 · {事件名}」标记。
 
-### 5.6 商店折扣（一期，最小实现）
+### 5.6 商店折扣与宗门商店（一期，最小实现）
 
-- `core/shop_manager.py` 购买结算时读玩家职阶 `shop_discount`；宗门限定货架（"宗门宝库"）可后置到二期。
+- `core/shop_manager.py` 购买结算时读玩家职阶 `shop_discount`（全局商店按职阶折扣）。
+- **宗门商店**（`unify-sect-commands` 落地，不再后置到二期）：「宗门 商店 [购买 <名称>]」贡献点结算，商品池配在 `sect_factions.json` 各宗门 `shop` 字段（`{id, price, min_position}`，id 引用 weapons.json/heart_methods.json），购买走 `SectManager.buy_sect_shop_item`（先职阶门槛后贡献校验，BEGIN IMMEDIATE 事务，物品入储物戒）；职阶折扣不作用于贡献商品（价格策划配死），避免双重经济参数。
 
 ### 5.7 NPC 扩展点（预留，一期不实现人格化）
 
@@ -336,15 +340,16 @@
 | 宗门之宝 | `weapons.json`/`items.json` | `sect_id`/`treasure`/`min_position` |
 | 晋升门槛与福利 | `sect_config.json` | `positions.*.promotion`/`benefits` |
 | 建设/师承任务 | `sect_tasks.json` | `construction_tasks`/`master_task_chains` |
-| 宗门悬赏 | `bounty_templates.json` | 模板加 `sect_id` |
-| 宗门秘境 | `rift_config.json` | `sect_id`/`access` |
-| 宗门历练事件 | `adventure_config.json` | 事件组加 `sect_id` |
+| 宗门悬赏 | `bounty_templates.json` | 模板加 `sect_id`（入口为「宗门 悬赏」，全局悬赏指令不处理） |
+| 宗门秘境 | `rift_config.json` | `sect_id`/`access`（非本宗成员列表不可见） |
+| 宗门历练事件 | `adventure_config.json` | 事件组加 `sect_id`（结算带 🏯 标记） |
+| 宗门商店商品 | `sect_factions.json` | 各宗门 `shop` 字段（`{id, price, min_position}`，贡献点结算） |
 | 毁灭档位与丢失比例 | `sect_factions.json` | `destruction.loss_profiles`（二期生效） |
 
 ## 8. 开放问题（已拍板，2026-08-18）
 
 1. **一期是否含职阶晋升？** ✅ 含基础版（贡献+境界门槛+灵石/折扣/传承解锁三类福利）。
-2. **「拜入宗门」与现有「加入宗门」指令** ✅ 合并为一个入口，按目标宗门类型（`is_system`）分流校验逻辑。
+2. **「拜入宗门」与现有「加入宗门」指令** ✅ 合并为一个入口（现为「宗门 加入」子命令），按目标宗门类型（`is_system`）分流校验逻辑。
 3. **出师后能否再拜入其他默认宗门？** ✅ 允许改换门庭，贡献清零；已习得的原宗门功法/心法保留可用（固有不可转让属性不变），宗门之宝已在离宗时回收。
 4. **每日灵石福利发放方式** ✅ 并入「签到」，按职阶加发，不设独立指令。
 5. **默认宗门一期示例数量与风格** ✅ 2 个：一个正派学院风新手引导向（暂名"青云门"）、一个风格迥异（暂名魔道/散修联盟向），验证配置的差异表达能力；具体名称文案属配置，策划后续可改。

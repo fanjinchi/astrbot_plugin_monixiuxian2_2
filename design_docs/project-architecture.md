@@ -1,7 +1,7 @@
 # 项目架构与系统功能设计总览
 
 > 生成：2026-08-07；复核更新：2026-08-11（效果引擎 v2、新增 2 篇 spec、时间线与 bd 清单回写）；
-> 2026-08-20（宗门变更 `add-default-sects-and-sect-growth` 回写：DB v31、指令 109、配置 ×22、spec 9 篇、时间线补 08-17/08-19 节点）。
+> 2026-08-21（宗门变更回写：`add-default-sects-and-sect-growth` + `unify-sect-commands`——DB v31、指令 92、配置 ×22、spec 11 篇、时间线补 08-17~08-21 节点）。
 > 本文是**本项目（AstrBot 修仙插件）**的架构与功能设计总览，
 > 供开发者与 AI 助手在修改/新增功能时快速定位系统、理解设计意图、保持设计文档同步。
 > 详细数值以 `current-design-report.md` 为准，行为契约以 `openspec/specs/` 为准。
@@ -41,7 +41,7 @@ flowchart TD
     CFG["config/*.json ×22<br/>config_manager.py（缺失自动建默认）"] -.-> C
     MD["models.py / models_extended.py<br/>Player · UserStatus · Sect · Boss · Rift"] -.-> MG
     T["定时任务 initialize()（指数退避重试）<br/>Boss 生成 · 贷款逾期 · 灵眼生成 · 悬赏过期"] -.-> MG
-    SPEC["openspec/specs/ 行为契约（9 篇）<br/>design_docs/ 设计基线"] -.-> MG
+    SPEC["openspec/specs/ 行为契约（11 篇）<br/>design_docs/ 设计基线"] -.-> MG
 ```
 
 **关键机制**（踩坑高发区）：
@@ -68,9 +68,9 @@ flowchart TD
 | 技能/领悟 | 「领悟/修习」 | 挂载制（无独立技能栏）；触发技引擎契约四键 `trigger_timing/effect_type/trigger_rate/effect_value`，EFFECT_HANDLERS 注册表分发 14 种效果键（13 个处理函数，combo 复用 damage_bonus 处理器；damage_bonus/combo/stun/counter/damage_reduction + heal/dot/buff/debuff/pierce/unavoidable/survive/reflect/fatigue），功法武器共用；持续状态机制：同名同源刷新、异源同型叠加上限默认 3 层（config 可调）、战斗结束全清（battle-status-effects spec）；大招**必放制**（注入 rate=1.0，config 不填概率）+ 解锁门槛（min_action_index + 血量阈值）；升星 3 星封顶、×(1.1)^(星级-1) 乘法、满星补偿 50% 修为；领悟池=配套池（系数加权）+修习目标+（仅突破）通用池 5%；**装备=已领悟表（player_skills）唯一依据**，储物戒秘籍仅作领悟凭据（物品名=技能名，商店 4011/4012 可购，掉落掉具体秘籍；旧 4001-4010 已 legacy 下架） |
 | PvE 敌人 | 历练/秘境遭遇 | 过渡方案：level_data shim 合成 exp_needed 派生属性（damage≈exp//10、hp≈exp//2）× 模板系数（0.85/1.0/1.2）× 难度系数 ±10%；**待重做**：独立境界基准表（bd 9u2） |
 | 世界 Boss | 「世界Boss」 | 8 档境界 hp_mult 1.0→6.0，数值同走 level_data 派生；Boss 会心 30%；败者安慰奖=经验×总伤害/max_hp；自动刷 base_exp=全服平均×1.2 |
-| 宗门 | 「宗门」 | 创建 1万灵石+L3；捐献 1灵石→+1贡献+`scale_ratio`(10)建设度；建设任务从 sect_tasks.json 抽（cost/reward/cooldown 按任务配置）；**默认宗门**（sect_factions.json，启动幂等播种，加入校验境界段）；建筑：洞天全员闭关加成/丹房每日领丹（签到日重置）；镇派功法位全员被动；职阶晋升双门槛（贡献+境界，读 positions.promotion）+ 福利（签到俸禄/商店折扣/宝库 unlocks）；师承任务链（默认宗门专属，进度存 players.sect_master_progress）；离宗三路径回收 treasure 宝物、sect_bound 功法保留可用、绑定物禁赠；悬赏/秘境/历练/领悟池按宗门过滤注入；宗主死亡自动传位 |
+| 宗门 | 「宗门」 | 单入口 + 子命令（创建/加入/退出/信息/列表/捐献/任务/丹房/建设/镇派功法/晋升/宝库/师承/踢出/传位/职位/排行/贡献排行/悬赏/商店）；创建 1万灵石+L3；捐献 1灵石→+1贡献+`scale_ratio`(10)建设度；建设任务从 sect_tasks.json 抽（cost/reward/cooldown 按任务配置）；**默认宗门**（sect_factions.json，启动幂等播种，加入校验境界段）；建筑：洞天全员闭关加成/丹房每日领丹（签到日重置）；镇派功法位全员被动；职阶晋升双门槛（贡献+境界，读 positions.promotion）+ 福利（签到俸禄/商店折扣/宝库 unlocks）；师承任务链（默认宗门专属，进度存 players.sect_master_progress）；离宗三路径回收 treasure 宝物、sect_bound 功法保留可用、绑定物禁赠；宗门悬赏独立入口（「宗门 悬赏」）、宗门专属秘境仅本宗可见、历练宗门事件带 🏯 标记、领悟池注入宗门池；宗门商店贡献点结算（faction shop 池）；宗主死亡自动传位 |
 | 银行/贷款 | 「银行」 | 存款复利 0.1%/日、上限 1000 万；普通贷 0.5%/7d、突破贷 0.8%/3d；还款单利；**逾期删号** |
-| 悬赏 | 「悬赏」 | 难度解锁（hard L7/elite L12）；奖励=base×scale×(target/min)×(1+max(0,L-3)×0.06)；时限、70% 掉 1 件、放弃 1800s CD |
+| 悬赏 | 「悬赏」 | 难度解锁（hard L7/elite L12）；奖励=base×scale×(target/min)×(1+max(0,L-3)×0.06)；时限、70% 掉 1 件、放弃 1800s CD；宗门专属悬赏（sect_id）走「宗门 悬赏」入口，全局指令只处理公共悬赏 |
 | 历练 | 「历练」 | 纯收益玩法（不受 pve 开关影响）；exp/gold 按分钟+等级加成+完成奖励×事件倍率；事件组 safe 1.1×/standard 1.2×/risky 0.7×+受伤；休整=疲劳 300s |
 | 秘境 | 「秘境」 | 5 层预置（青云→上古遗迹）；1800s 探索；掉落按 drop_tables 权重；稀有丹 1/2/3 层 3%/5%/10% |
 | 洞天福地 | 「洞天」 | 5 档（1万~100万灵石）；exp_bonus 5%~50%、灵石/时 100~1万；≥1h 可收、累计 24h 上限 |
@@ -96,7 +96,9 @@ flowchart TD
 | `gm-commands` | 修仙GM 统一入口；GM_ADMINS 权限；目标解析优先级（@提及→数字 id→发送者）；属性修改/物品发放/强制结算/清除CD（需确认）/审计日志 500MB 滚动 |
 | `battle-status-effects` | 战斗持续状态（dot/buff/debuff/fatigue）回合级生命周期：回合开始计数衰减、到期移除、战斗结束全清不跨场；同名同源刷新（数值取新）、异源同型叠加上限默认 3 层（config 可调） |
 | `novel-reading-extraction` | 从修仙小说原文提取内容素材（宗门剧情/法宝/功法/突破事件）的工作流契约：免费可获取全文、来源失效可替换、按玩法维度组织、产出可直接喂给内容设定与文案 |
-| `functional-test-suite` | 功能测试套件契约：用例源文件存 `functional_tests/cases/`（平台兼容 JSON）、`sync-cases` 拍平同步到网页测试平台、运行结果归档 `results/<YYYY-MM-DD>_<target>/`（summary+逐用例+轨迹）、PvP fixture 固定测试 ID 验内容效果 |
+| `sect-system` | 配置驱动默认宗门（sect_factions.json 幂等播种/拜入境界段校验/自由出师）、绑定物归属与回收（treasure 离宗回收、sect_bound 功法保留可用）、宗门建设（洞天/丹房/镇派功法）、师承任务链、职阶晋升与福利、宗门内容联动（悬赏/秘境/历练/领悟池过滤） |
+| `sect-commands` | 「宗门」单指令 + 子命令路由（原 18 独立指令移除、导航帮助）；宗门悬赏与全局悬赏全生命周期独立分流（跨类型拒绝先于冷却/活跃校验）；宗门专属秘境仅本宗可见；宗门商店（贡献点结算，faction shop 池）；历练宗门事件显性标记；GM「清除悬赏」 |
+| `functional-test-suite` | 功能测试套件契约：用例源文件存 `functional_tests/cases/`（平台兼容 JSON）、`sync-cases` 拍平同步到网页测试平台、运行结果归档 `results/<YYYY-MM-DD>_<target>/`（summary+逐用例+轨迹）、PvP fixture 固定测试 ID 验内容效果；宗门域用例（`cases/sect/`，`--tag sect`）覆盖默认宗门/建设/师承/晋升/出师回收/指令统一/悬赏分流/商店/事件标记 |
 
 > ✅ **spec 滞后已回写（2026-08-07）**：attribute-numerics / combat-core 的护甲描述已改为
 > 百分比减伤 `armor/(armor+K)`（与代码一致，bd `qtk` 的实现），含伤害下限场景修正。
@@ -124,6 +126,8 @@ flowchart TD
 | 2026-08-17 | `add-functional-test-suite` / `fix-functional-test-bugs` 归档 | 功能测试套件落地（functional_tests/ 用例源+结果归档、sync/run/export 脚本）+ 配套 bug 修复 |
 | 2026-08-19 | `add-web-test-platform` 归档 | 网页测试平台（独立插件仓库）：模拟私聊/群聊走真实管线、消息流可见可批注、热重载闭环 |
 | 2026-08-19 | `add-default-sects-and-sect-growth` 落地 | 默认宗门（sect_factions.json 幂等播种、境界段拜入）+ 宗门成长（洞天/丹房/镇派功法/职阶晋升+福利/宝库/师承任务链）+ 离宗回收三路径与绑定物禁赠 + 悬赏/秘境/历练/领悟池宗门联动；DB v28-v31 |
+| 2026-08-20 | `unify-sect-commands` 落地 | 宗门功能收敛为「宗门」单入口+子命令（删 18 旧顶层指令）；宗门悬赏独立入口与全局悬赏分流；宗门商店（贡献点结算，faction shop 池）；宗门专属秘境仅本宗可见；历练宗门事件 🏯 标记；GM「清除悬赏」；v3.10.0 |
+| 2026-08-20 | `update-sect-functional-tests` / `adapt-pvp-effects-to-platform-v020` 归档 | sect 域用例全量迁移 `/宗门` 子命令并补新功能用例（商店/悬赏分流/事件标记/入口导航）；PvP 效果用例 deterministic/seed 化；平台 v0.2.0（expect_not/deterministic/combine/one-shot 编排） |
 
 **数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底 → v28 默认宗门+功法归属（sects.is_system/faction_id、player_skills.sect_bound）→ v29 宝库领取记录 → v30 师承任务链进度 → v31 rifts 播种青云剑冢（id 6，宗门专属秘境，当前最新）。
 

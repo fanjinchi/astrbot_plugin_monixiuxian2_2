@@ -218,13 +218,13 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 ### 4.8 宗门（managers/sect_manager.py；config/sect_config.json + sect_factions.json + sect_tasks.json）
 
 - 创建：10000 灵石 + level_index ≥ 3；初始建设度/资材各 100；默认宗门名为禁用名
-- **默认（系统）宗门**：`ensure_system_sects()`（sect_manager.py:156）启动时按 `sect_factions.json` 幂等播种（is_system=1 + faction_id，main.py:440 调用）；「加入宗门」统一入口按 is_system 分流——默认宗门校验 `join_level_range` 境界段，玩家宗门走原有逻辑（sect_manager.py:374）
+- **默认（系统）宗门**：`ensure_system_sects()`（sect_manager.py:156）启动时按 `sect_factions.json` 幂等播种（is_system=1 + faction_id，main.py:440 调用）；「宗门 加入」子命令统一入口按 is_system 分流——默认宗门校验 `join_level_range` 境界段，玩家宗门走原有逻辑（sect_manager.py:374）
 - **权限统一**：职位名称/权限/入口职位全部读 `sect_config.json` positions（sect_manager.py:41 起），旧硬编码 POSITION_PERMISSIONS 已删除
 - **捐献**：每灵石 +1 贡献、+`scale_ratio`（默认 10）建设度（sect_manager.py:486，比值读配置）
 - **宗门任务**：从 `sect_tasks.json` construction_tasks 随机抽取，按任务 `cost`/`reward` 结算——`cost.stones` 扣玩家灵石入宗门库房（按 scale_ratio 折建设度）、`cost.materials` 直接增加宗门资材（玩家外出采集语义，不消耗玩家货币）、`reward.contribution/exp` 发玩家；冷却用任务自带 `cooldown` 字段（默认 3600s），busy 状态写法不变（sect_manager.py:795）
 - **建筑**（sect_config.json buildings）：洞天 `sect_fairyland` 每级 +`exp_bonus_per_level`（默认 2%）全员闭关修为，出关结算点读取（sect_manager.py:910，handlers/player_handler.py:365-374）；丹房 `elixir_room_level` 按 `unlock_pills_per_level` 解锁每日领取（sect_manager.py:995），领取标记 `sect_elixir_get` 随「签到」日重置（handlers/player_handler.py:439）；升级消耗宗门资材，默认宗门任意成员可升级、玩家宗门需长老及以上（sect_manager.py:1125）
 - **镇派功法**：`mainbuff` 位由宗主镶嵌（sect_manager.py:1223），全员战斗装配时注入被动触发（core/skill_manager.py:696-705）
-- **职阶晋升**：「宗门晋升」自助晋升，双门槛（贡献 + 境界）读 positions.`promotion`（sect_manager.py:1276）；`promotion: null`（宗主档）不设晋升通道，默认宗门无宗主晋升，玩家宗主保留任命/传位；宗主死亡自动按（职位, -贡献）传位
+- **职阶晋升**：「宗门 晋升」自助晋升，双门槛（贡献 + 境界）读 positions.`promotion`（sect_manager.py:1276）；`promotion: null`（宗主档）不设晋升通道，默认宗门无宗主晋升，玩家宗主保留任命/传位；宗主死亡自动按（职位, -贡献）传位
 - **职阶福利**（positions.`benefits`）：`daily_stones` 每日俸禄并入「签到」加发（handlers/player_handler.py:459-474）；`shop_discount` 商店结算折扣（core/shop_manager.py:430，handlers/shop_handler.py:188）；`unlocks`/`min_position` 控制宝库领取资格
 - **宗门宝库**：默认宗门按 faction `treasures`/`heart_methods` 生成传承列表（玩家宗门为空），领取按 min_position 或 benefits.unlocks 校验，`sect_treasure_claims` 记录已领取 id 防重复领取（跨退宗/重入生效）（sect_manager.py:1415/1454）
 - **师承任务链**：默认宗门专属，`sect_tasks.json` master_chains 按境界段匹配，已存储的链优先于境界段重新匹配（sect_manager.py:1567）；阶段目标挂钩 PvE 胜场/历练完成/突破成功/捐献，进度存 players.sect_master_progress；阶段奖励贡献/修为/宗门功法领悟机会
