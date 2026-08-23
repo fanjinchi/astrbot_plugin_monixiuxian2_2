@@ -69,7 +69,7 @@ async def test_fresh_install_reaches_latest_version():
     async with aiosqlite.connect(":memory:") as db_conn2:
         await MigrationManager(db_conn2, DummyConfigManager()).migrate()
         tables = await _all_tables(db_conn2)
-        assert {
+        expected_tables = {
             "db_info",
             "players",
             "shop",
@@ -94,7 +94,8 @@ async def test_fresh_install_reaches_latest_version():
             "combat_cooldowns",
             "player_skills",
             "system_config",
-        } <= tables, f"Missing tables: {expected_tables - tables}"
+        }
+        assert expected_tables <= tables, f"Missing tables: {expected_tables - tables}"
 
         # 旧的 impart_info 表已彻底移除
         assert "impart_info" not in tables
@@ -213,6 +214,32 @@ async def test_migrate_is_idempotent_on_fresh():
             assert (await cursor.fetchone())[0] == 1
         async with db_conn.execute("SELECT COUNT(*) FROM legacy_instances") as cursor:
             assert (await cursor.fetchone())[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_newer_db_version_raises_without_touching_data():
+    """Version above LATEST must raise (no silent downgrade) and leave the DB intact."""
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        # 预置一条玩家数据，断言 raise 后数据库未被改动
+        await db_conn.execute(
+            "INSERT INTO players (user_id, user_name, spiritual_root) VALUES ('u1', 'T', '天灵根')"
+        )
+        await db_conn.execute(
+            "UPDATE db_info SET version = ?", (LATEST_DB_VERSION + 1,)
+        )
+        await db_conn.commit()
+
+        with pytest.raises(RuntimeError, match="不允许降级运行"):
+            await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        # 版本号与数据均未被改动
+        async with db_conn.execute("SELECT version FROM db_info") as cursor:
+            assert (await cursor.fetchone())[0] == LATEST_DB_VERSION + 1
+        async with db_conn.execute(
+            "SELECT COUNT(*) FROM players WHERE user_id = 'u1'"
+        ) as cursor:
+            assert (await cursor.fetchone())[0] == 1
 
 
 @pytest.mark.asyncio

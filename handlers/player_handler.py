@@ -392,17 +392,38 @@ class PlayerHandler:
                 )
 
         # 传承值累积：仅激活中的传承实例（每配置间隔分钟+1点，默认15分钟），随出关一次结算。
-        # 放在状态收尾之前：即使结算异常（try/except 已降级为日志），也不消耗本次闭关会话
+        # 顺序调换：先提交状态收尾、后结算传承值——若收尾失败可直接报错返回且传承值
+        # 尚未写入，重试出关不会按同一 effective_minutes 二次累积（双计窗口）；
+        # 传承结算失败仅降级为日志，修为照发、会话正常结束（不吞闭关会话）。
         legacy_line = ""
+
+        # 配置解析与 DB 操作分离：配置损坏只回退默认间隔，不影响传承结算主流程
+        every_minutes = 15
+        impart_cfg = getattr(self.config_manager, "impart_config", None) or {}
         try:
-            # config_manager 运行时必为完整 ConfigManager（含 impart_config）；
-            # getattr 防御测试 stub 等缺键环境
-            impart_cfg = getattr(self.config_manager, "impart_config", None) or {}
             every_minutes = max(
                 1, int(impart_cfg.get("cultivation_points_every_minutes", 15))
             )
-            if self.impart_mgr is not None and effective_minutes >= every_minutes:
-                points = effective_minutes // every_minutes
+        except (TypeError, ValueError):
+            logger.warning("出关传承值累积间隔配置非法，回退默认 15 分钟。")
+
+        # 更新玩家状态（先提交：失败则报错返回，传承值尚未写入，无双计）
+        player.state = "空闲"
+        player.cultivation_start_time = 0
+        try:
+            await self.db.update_player(player)
+            await self.db.ext.set_user_free(player.user_id)
+        except Exception as exc:
+            logger.exception("出关状态收尾失败: %s", exc)
+            yield event.plain_result(
+                "⚠️ 出关状态更新失败，请稍后再试（本次闭关未消耗）。"
+            )
+            return
+
+        # 传承值累积（后结算：失败仅日志，不阻塞出关完成）
+        if self.impart_mgr is not None and effective_minutes >= every_minutes:
+            points = effective_minutes // every_minutes
+            try:
                 legacy_msg = await self.impart_mgr.add_active_impart_value(
                     player, points
                 )
@@ -418,14 +439,8 @@ class PlayerHandler:
                             "\n\n💡 你持有传承但未激活，本次闭关未累积传承值。\n"
                             "使用「激活传承 <编号>」激活后再闭关。"
                         )
-        except Exception as exc:
-            logger.error(f"出关传承值结算失败: {exc}")
-
-        # 更新玩家状态
-        player.state = "空闲"
-        player.cultivation_start_time = 0
-        await self.db.update_player(player)
-        await self.db.ext.set_user_free(player.user_id)
+            except Exception as exc:
+                logger.exception("出关传承值结算失败: %s", exc)
 
         # 计算闭关时长显示
         hours = duration_minutes // 60

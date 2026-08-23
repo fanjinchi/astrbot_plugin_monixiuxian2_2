@@ -686,6 +686,68 @@ async def test_sect_legacy_claim_failure_keeps_quota():
 
 
 @pytest.mark.asyncio
+async def test_sect_legacy_transaction_rejects_after_leaving_sect():
+    """退宗窗口：守护战斗期间玩家已退宗/转会，事务内归属复核必须拒绝
+    （战前快照守卫对战中退宗无能为力，靠 fresh_player 重查兜底）。"""
+    db = await _make_db()
+    config = LegacySectConfig()
+    mgr, _ = _make_legacy_mgr(db, config, won=True)
+    await mgr.ensure_system_sects()
+
+    await _make_player(db, "u1", level_index=2)
+    await _join_as_inner(db, mgr, "u1")
+    sect = await db.ext.get_sect_by_faction_id("qingyun")
+    player = await db.get_player_by_id("u1")
+    entry = {
+        "kind": "legacy",
+        "id": "青云门传承",
+        "name": "青云门传承",
+        "min_position": 2,
+    }
+
+    # 模拟战斗中退宗：DB 中 sect_id 已清空，内存 player（战前快照）仍是旧宗门
+    await db.ext.update_player_sect_info("u1", 0, 0)
+    success, msg = await mgr._claim_sect_legacy(player, sect, entry)
+    assert not success
+    assert "你当前已不在该宗门" in msg
+    # 未创建实例、未占名额
+    assert await db.ext.list_legacy_instances_by_owner("u1") == []
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_sect_legacy_transaction_blocks_duplicate_sect_instance():
+    """并发双开不同 entry：战前预检基于旧快照，事务内必须重查已持有的
+    sect 实例并拒绝，防止绕过「已持有本宗传承不可重复领取」。"""
+    db = await _make_db()
+    config = LegacySectConfig()
+    mgr, _ = _make_legacy_mgr(db, config, won=True)
+    await mgr.ensure_system_sects()
+
+    await _make_player(db, "u1", level_index=2)
+    await _join_as_inner(db, mgr, "u1")
+    # 先正常领取一条（战前预检通过后完成）
+    success, msg = await mgr.claim_treasure("u1", "青云门传承")
+    assert success, msg
+
+    sect = await db.ext.get_sect_by_faction_id("qingyun")
+    player = await db.get_player_by_id("u1")
+    # 直接调事务内函数模拟并发第二开（绕过战前预检：另一 entry id）
+    entry = {
+        "kind": "legacy",
+        "id": "青云门传承-第二门",
+        "name": "青云门传承-第二门",
+        "min_position": 2,
+    }
+    success, msg = await mgr._claim_sect_legacy(player, sect, entry)
+    assert not success
+    assert "已持有本宗传承" in msg
+    # 仍只有一条实例，未重复创建
+    assert len(await db.ext.list_legacy_instances_by_owner("u1")) == 1
+    await db.close()
+
+
+@pytest.mark.asyncio
 async def test_leave_sect_reclaims_sect_legacy():
     """Leaving the sect removes the player's sect-bound legacy instances."""
     db = await _make_db()

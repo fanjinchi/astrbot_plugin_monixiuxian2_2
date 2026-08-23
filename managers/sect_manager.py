@@ -1708,14 +1708,29 @@ class SectManager:
             if fresh_player is None:
                 await self.db.conn.rollback()
                 return False, "❌ 玩家数据不存在，请稍后再试。"
+            # 归属复核：战斗期间玩家可能已退宗/转会，必须以事务内最新状态为准；
+            # 战斗前的守卫（str(player.sect_id) != str(sect.sect_id)）用的是
+            # 战前快照，无法覆盖此窗口
+            if str(fresh_player.sect_id) != str(sect.sect_id):
+                await self.db.conn.rollback()
+                return False, "❌ 你当前已不在该宗门，无法领取宗门传承。"
             claims = fresh_player.get_sect_treasure_claims()
             if entry["id"] in claims:
                 await self.db.conn.rollback()
                 return False, f"❌ 你已领取过【{entry['name']}】！"
+            # 同宗门已持有 sect 实例则拒绝（防并发双开不同 entry 绕过
+            # 「已持有本宗传承不可重复领取」——战前预检基于旧快照，事务内需重查）
+            held = await self.db.ext.list_legacy_instances_by_owner(player.user_id)
+            if any(
+                i.legacy_type == "sect" and str(i.sect_id) == str(sect.sect_id)
+                for i in held
+            ):
+                await self.db.conn.rollback()
+                return False, "❌ 你已持有本宗传承，无需重复领取！"
             instance = await self.impart_mgr.create_legacy(
                 fresh_player.user_id,
                 "sect",
-                sect_id=fresh_player.sect_id,
+                sect_id=sect.sect_id,
                 activate=False,
                 commit=False,
             )
