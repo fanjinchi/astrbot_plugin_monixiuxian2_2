@@ -11,6 +11,7 @@ import time
 from astrbot.api import logger
 
 from ..data.data_manager import DataBase
+from ..models import Player
 from ..models_extended import Sect, UserStatus
 
 SECT_NAME_MIN_LENGTH = 2
@@ -30,6 +31,9 @@ class SectManager:
         self.config = getattr(config_manager, "sect_config", None) or {}
         self.sect_factions = getattr(config_manager, "sect_factions", None) or {}
         self.sect_tasks = getattr(config_manager, "sect_tasks", None) or {}
+        # 传承/PvE 管理器：可选注入（main.py 装配后），用于宗门传承领取
+        self.impart_mgr = None
+        self.pve_combat_mgr = None
 
     # ===== 职位配置辅助（唯一事实源：sect_config.json 的 positions） =====
 
@@ -272,6 +276,17 @@ class SectManager:
             player.set_storage_ring_items(items)
             await self.db.update_player(player)
             logger.info(f"【修仙插件】玩家 {user_id} 离宗，回收宗门之宝: {reclaimed}")
+
+        # 宗门传承回收：sect 类型且绑定本宗的实例移除（激活态自动清除）
+        if self.impart_mgr:
+            deleted = await self.db.ext.delete_legacy_instances_by_owner_sect(
+                user_id, sect_id
+            )
+            if deleted:
+                logger.info(
+                    f"【修仙插件】玩家 {user_id} 离宗，回收宗门传承 {deleted} 条"
+                )
+                reclaimed.append(f"宗门传承 x{deleted}")
         return reclaimed
 
     def _find_item_config(self, item_name: str) -> dict | None:
@@ -1486,6 +1501,22 @@ class SectManager:
                     "min_position": 99 if raw_min is None else int(raw_min),
                 }
             )
+        # 宗门传承（legacies 独立列表）：领取需先战胜守护者，不可 PK 夺取
+        for legacy in faction.get("legacies", []) or []:
+            if not isinstance(legacy, dict):
+                continue
+            legacy_id = legacy.get("id") or legacy.get("name")
+            if not legacy_id:
+                continue
+            raw_min = legacy.get("min_position", 99)
+            entries.append(
+                {
+                    "kind": "legacy",
+                    "id": str(legacy_id),
+                    "name": legacy.get("name", str(legacy_id)),
+                    "min_position": 99 if raw_min is None else int(raw_min),
+                }
+            )
         return entries
 
     def _can_claim_entry(self, entry: dict, position: int) -> bool:
@@ -1520,7 +1551,11 @@ class SectManager:
             f"你的职阶：{self.get_position_name(player.sect_position)}",
         ]
         for entry in entries:
-            kind_label = "镇派心法" if entry["kind"] == "heart_method" else "宗门之宝"
+            kind_label = {
+                "heart_method": "镇派心法",
+                "treasure": "宗门之宝",
+                "legacy": "宗门传承",
+            }.get(entry["kind"], "宗门之宝")
             gate = (
                 f"{self.get_position_name(entry['min_position'])}及以上"
                 if entry["min_position"] < 99
@@ -1582,6 +1617,27 @@ class SectManager:
                 await self.db.conn.rollback()
                 return False, f"❌ 你的职阶不足以领取【{entry['name']}】（{gate}）！"
 
+            # 宗门传承：守护挑战须在事务外进行（异步战斗不可入事务），
+            # 此处仅做预检，实际挑战与创建在事务提交后执行
+            if entry["kind"] == "legacy":
+                claims = player.get_sect_treasure_claims()
+                if entry["id"] in claims:
+                    await self.db.conn.rollback()
+                    return (
+                        False,
+                        f"❌ 你已领取过【{entry['name']}】，宗门传承每人限领一次！",
+                    )
+                # 已持有本宗传承则不可重复领取
+                held = await self.db.ext.list_legacy_instances_by_owner(user_id)
+                if any(
+                    i.legacy_type == "sect" and i.sect_id == player.sect_id
+                    for i in held
+                ):
+                    await self.db.conn.rollback()
+                    return False, f"❌ 你已持有【{entry['name']}】，无需重复领取！"
+                await self.db.conn.commit()
+                return await self._claim_sect_legacy(player, sect, entry)
+
             claims = player.get_sect_treasure_claims()
             items = player.get_storage_ring_items()
 
@@ -1619,6 +1675,57 @@ class SectManager:
         return True, (
             f"🎁 你从宗门宝库领取了镇派心法【{entry['name']}】，已存入储物戒！\n"
             f"💡 使用「装备 {entry['name']}」即可主修此心法。"
+        )
+
+    async def _claim_sect_legacy(
+        self, player: Player, sect: Sect, entry: dict
+    ) -> tuple[bool, str]:
+        """领取宗门传承：先战胜守护者，再于事务内创建实例并占名额。
+
+        守护挑战是异步战斗（不可入事务），失败不占「每人限领一次」名额，
+        可再次尝试；胜利后才开事务创建 sect 类型实例并记录 claims。
+        """
+        if not self.impart_mgr or not self.pve_combat_mgr:
+            return False, "❌ 传承系统未就绪，请稍后再试。"
+
+        won, battle_msg = await self.pve_combat_mgr.challenge_legacy_guardian(player)
+        if not won:
+            return False, (
+                f"🗿 领取【{entry['name']}】需先战胜传承之地守护者。\n"
+                f"{battle_msg}\n"
+                f"此次未领取成功，不占用领取名额，可择日再试。"
+            )
+
+        # 守护挑战胜利后，事务内创建实例 + 占名额（防并发重复领取）
+        await self.db.conn.execute("BEGIN IMMEDIATE")
+        try:
+            claims = player.get_sect_treasure_claims()
+            if entry["id"] in claims:
+                await self.db.conn.rollback()
+                return False, f"❌ 你已领取过【{entry['name']}】！"
+            instance = await self.impart_mgr.create_legacy(
+                player.user_id,
+                "sect",
+                sect_id=player.sect_id,
+                activate=False,
+                commit=False,
+            )
+            if not instance:
+                await self.db.conn.rollback()
+                return False, "❌ 传承实例创建失败，请稍后再试。"
+            claims.append(entry["id"])
+            player.set_sect_treasure_claims(claims)
+            await self.db.update_player(player, commit=False)
+            await self.db.conn.commit()
+        except Exception:
+            await self.db.conn.rollback()
+            raise
+
+        return True, (
+            f"🗿 你战胜了守护者！\n{battle_msg}\n"
+            f"🌟 获得宗门传承【{entry['name']}】#{instance.id}！\n"
+            f"⚠️ 宗门传承不可被夺取，但离宗时将自动归还宗门。\n"
+            f"💡 发送「激活传承 {instance.id}」开始修炼解锁等阶奖励。"
         )
 
     # ===== 6.3 宗门商店（贡献点结算） =====

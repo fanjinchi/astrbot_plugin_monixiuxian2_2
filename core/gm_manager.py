@@ -38,6 +38,17 @@ except ImportError:
     _models_extended = _load_module("models_extended", "models_extended.py")
     UserStatus = _models_extended.UserStatus
 
+try:
+    from ..managers.impart_manager import LEGACY_TYPE_NAMES
+except ImportError:
+    # 独立测试环境降级：与 managers/impart_manager.py 保持一致的最小映射
+    LEGACY_TYPE_NAMES = {
+        "common": "通用传承",
+        "sect": "宗门传承",
+        "adventure": "历练传承",
+        "rift": "秘境传承",
+    }
+
 if TYPE_CHECKING:
     from astrbot.api.event import AstrMessageEvent
 
@@ -69,6 +80,7 @@ class GMManager:
         plugin_data_path: Path = None,
         broadcast_callback=None,
         sect_manager=None,
+        impart_manager=None,
     ):
         self.db = db
         self.config_manager = config_manager
@@ -79,6 +91,7 @@ class GMManager:
         self.boss_manager = boss_manager
         self.bounty_manager = bounty_manager
         self.sect_manager = sect_manager
+        self.impart_manager = impart_manager
         self.plugin_data_path = plugin_data_path
         self.broadcast_callback = broadcast_callback
 
@@ -98,6 +111,9 @@ class GMManager:
             "给予装备": self.cmd_give_equipment,
             "给予物品": self.cmd_give_item,
             "卸下装备": self.cmd_unequip,
+            "给予传承": self.cmd_give_legacy,
+            "清除传承": self.cmd_clear_legacy,
+            "清除传承状态": self.cmd_clear_legacy_state,
             "清除cd": self.cmd_clear_cd,
             "清除CD": self.cmd_clear_cd,
             "清除悬赏": self.cmd_clear_bounty,
@@ -299,6 +315,11 @@ class GMManager:
             "  给予物品 [@玩家/ID] <物品名> [数量]\n"
             "  卸下装备 [@玩家/ID] <槽位/名称>\n"
             "\n"
+            "✨ 传承\n"
+            "  给予传承 [@玩家/ID] [类型] （common/sect/adventure/rift 或中文别名，默认 common）\n"
+            "  清除传承 [@玩家/ID] [编号/全部] （无编号或「全部」清除该玩家全部）\n"
+            "  清除传承状态 [@玩家/ID] （清除挑战冷却与夺后保护期）\n"
+            "\n"
             "⏱ 状态与结算\n"
             "  清除CD [@玩家/ID] 确认\n"
             "  清除悬赏 [@玩家/ID] 确认 （进行中悬赏+放弃冷却）\n"
@@ -312,6 +333,101 @@ class GMManager:
             "💡 带 [] 的参数可省略，<> 为必填。"
         )
         return True, help_text
+
+    async def cmd_give_legacy(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """给予传承实例：给予传承 [@玩家/ID] [类型]，类型默认 common（支持中文别名）。
+
+        仅用于功能测试与数据修复：创建的实例为未激活态、传承值 0，
+        sect 类型自动绑定目标玩家当前所在宗门。
+        """
+        target_id, remaining = self._resolve_target(event, args)
+        player = await self._get_player(target_id)
+        if not player:
+            return False, "❌ 目标玩家尚未踏入修仙之路！"
+        if not self.impart_manager:
+            return False, "❌ 传承系统未就绪！"
+
+        type_arg = remaining.strip() or "common"
+        # 中文别名：同时接受全名（秘境传承）与短名（秘境）
+        alias = {v: k for k, v in LEGACY_TYPE_NAMES.items()}
+        alias.update({v.replace("传承", ""): k for k, v in LEGACY_TYPE_NAMES.items()})
+        legacy_type = alias.get(type_arg, type_arg)
+        if legacy_type not in LEGACY_TYPE_NAMES:
+            options = "、".join(f"{v}/{k}" for k, v in LEGACY_TYPE_NAMES.items())
+            return False, f"❌ 未知传承类型【{type_arg}】，可选：{options}"
+
+        sect_id = player.sect_id if legacy_type == "sect" and player.sect_id else None
+        instance = await self.impart_manager.create_legacy(
+            target_id, legacy_type, sect_id=sect_id, activate=False
+        )
+        if not instance:
+            return False, "❌ 传承实例创建失败，请查看日志！"
+        name = self.impart_manager.get_type_name(legacy_type)
+        return True, (
+            f"✅ 已为 {player.user_name} 创建【{name}】传承 #{instance.id}\n"
+            f"（未激活，传承值 0；发送「激活传承 {instance.id}」开始累积）"
+        )
+
+    async def cmd_clear_legacy(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """清除传承：清除传承 [@玩家/ID] [编号]，无编号时删除该玩家全部传承实例。"""
+        target_id, remaining = self._resolve_target(event, args)
+        player = await self._get_player(target_id)
+        if not player:
+            return False, "❌ 目标玩家尚未踏入修仙之路！"
+        if not self.impart_manager:
+            return False, "❌ 传承系统未就绪！"
+
+        instances = await self.db.ext.list_legacy_instances_by_owner(target_id)
+        if not instances:
+            return False, f"❌ {player.user_name} 未持有任何传承！"
+
+        arg = remaining.strip().lstrip("#")
+        if arg and arg != "全部":
+            if not arg.isdigit():
+                return (
+                    False,
+                    "❌ 编号须为数字或「全部」，例如：/修仙GM 清除传承 900000002 3",
+                )
+            iid = int(arg)
+            if not any(i.id == iid for i in instances):
+                return False, f"❌ {player.user_name} 未持有编号 {iid} 的传承！"
+            await self.db.ext.delete_legacy_instance(iid)
+            return True, f"✅ 已删除 {player.user_name} 的传承 #{iid}"
+
+        for inst in instances:
+            await self.db.ext.delete_legacy_instance(inst.id)
+        return (
+            True,
+            f"✅ 已删除 {player.user_name} 的全部传承（共 {len(instances)} 条）",
+        )
+
+    async def cmd_clear_legacy_state(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """清除传承状态：清除挑战冷却与被夺保护期，用于测试重入与数据修复。
+
+        同时清掉该玩家作为挑战者的全部冷却记录（对不同目标的），
+        以及作为被夺者的保护期。注意：不删除传承实例本身。
+        """
+        target_id, remaining = self._resolve_target(event, args)
+        player = await self._get_player(target_id)
+        if not player:
+            return False, "❌ 目标玩家尚未踏入修仙之路！"
+        if not self.impart_manager:
+            return False, "❌ 传承系统未就绪！"
+
+        cooldown_deleted = await self.db.ext.delete_impart_pk_cooldowns(target_id)
+        protection_deleted = await self.db.ext.delete_impart_snatch_protection(
+            target_id
+        )
+        return True, (
+            f"✅ 已清除 {player.user_name} 的传承状态："
+            f"挑战冷却 {cooldown_deleted} 条、保护期 {protection_deleted} 条"
+        )
 
     async def cmd_set_level(
         self, event: "AstrMessageEvent", args: str

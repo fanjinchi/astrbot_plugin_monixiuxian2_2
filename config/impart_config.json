@@ -1,54 +1,232 @@
 {
-  "tiers": [
-    {
-      "tier": 1,
-      "impart_value_required": 20,
-      "rewards": [
+  "cultivation_points_every_minutes": 15,
+  "guardian": {
+    "enemy_group": "legacy_guardian"
+  },
+  "types": {
+    "common": {
+      "name": "通用传承",
+      "description": "旧版传承迁移而来的遗留类型，无新增获取途径",
+      "tiers": [
         {
-          "type": "heart_method",
-          "id": "传承心法·吐纳"
+          "tier": 1,
+          "impart_value_required": 20,
+          "rewards": [
+            {
+              "type": "heart_method",
+              "id": "传承心法·吐纳"
+            }
+          ]
+        },
+        {
+          "tier": 2,
+          "impart_value_required": 40,
+          "rewards": [
+            {
+              "type": "heart_method",
+              "id": "传承心法·归元"
+            }
+          ]
+        },
+        {
+          "tier": 3,
+          "impart_value_required": 60,
+          "rewards": [
+            {
+              "type": "technique",
+              "id": "impart_skill_001"
+            }
+          ]
+        },
+        {
+          "tier": 4,
+          "impart_value_required": 80,
+          "rewards": [
+            {
+              "type": "technique",
+              "id": "impart_skill_002"
+            }
+          ]
+        },
+        {
+          "tier": 5,
+          "impart_value_required": 100,
+          "rewards": [
+            {
+              "type": "level_up",
+              "amount": 1
+            }
+          ]
         }
       ]
     },
-    {
-      "tier": 2,
-      "impart_value_required": 40,
-      "rewards": [
+    "sect": {
+      "name": "宗门传承",
+      "description": "宗门宝库领取，不可被传承挑战夺取，离宗时被宗门收回",
+      "tiers": [
         {
-          "type": "heart_method",
-          "id": "传承心法·归元"
+          "tier": 1,
+          "impart_value_required": 20,
+          "rewards": [
+            {
+              "type": "heart_method",
+              "id": "传承心法·吐纳"
+            }
+          ]
+        },
+        {
+          "tier": 2,
+          "impart_value_required": 40,
+          "rewards": [
+            {
+              "type": "heart_method",
+              "id": "传承心法·归元"
+            }
+          ]
+        },
+        {
+          "tier": 3,
+          "impart_value_required": 60,
+          "rewards": [
+            {
+              "type": "technique",
+              "id": "impart_skill_001"
+            }
+          ]
+        },
+        {
+          "tier": 4,
+          "impart_value_required": 80,
+          "rewards": [
+            {
+              "type": "technique",
+              "id": "impart_skill_002"
+            }
+          ]
+        },
+        {
+          "tier": 5,
+          "impart_value_required": 100,
+          "rewards": [
+            {
+              "type": "level_up",
+              "amount": 1
+            }
+          ]
         }
       ]
     },
-    {
-      "tier": 3,
-      "impart_value_required": 60,
-      "rewards": [
+    "adventure": {
+      "name": "历练传承",
+      "description": "历练途中偶遇传承之地，战胜守护者后获得",
+      "tiers": [
         {
-          "type": "technique",
-          "id": "impart_skill_001"
+          "tier": 1,
+          "impart_value_required": 20,
+          "rewards": [
+            {
+              "type": "heart_method",
+              "id": "传承心法·吐纳"
+            }
+          ]
+        },
+        {
+          "tier": 2,
+          "impart_value_required": 40,
+          "rewards": [
+            {
+              "type": "heart_method",
+              "id": "传承心法·归元"
+            }
+          ]
+        },
+        {
+          "tier": 3,
+          "impart_value_required": 60,
+          "rewards": [
+            {
+              "type": "technique",
+              "id": "impart_skill_001"
+            }
+          ]
+        },
+        {
+          "tier": 4,
+          "impart_value_required": 80,
+          "rewards": [
+            {
+              "type": "technique",
+              "id": "impart_skill_002"
+            }
+          ]
+        },
+        {
+          "tier": 5,
+          "impart_value_required": 100,
+          "rewards": [
+            {
+              "type": "level_up",
+              "amount": 1
+            }
+          ]
         }
       ]
     },
-    {
-      "tier": 4,
-      "impart_value_required": 80,
-      "rewards": [
+    "rift": {
+      "name": "秘境传承",
+      "description": "秘境探索触发传承之地，战胜守护者后获得",
+      "tiers": [
         {
-          "type": "technique",
-          "id": "impart_skill_002"
-        }
-      ]
-    },
-    {
-      "tier": 5,
-      "impart_value_required": 100,
-      "rewards": [
+          "tier": 1,
+          "impart_value_required": 20,
+          "rewards": [
+            {
+              "type": "heart_method",
+              "id": "传承心法·吐纳"
+            }
+          ]
+        },
         {
-          "type": "level_up",
-          "amount": 1
+          "tier": 2,
+          "impart_value_required": 40,
+          "rewards": [
+            {
+              "type": "heart_method",
+              "id": "传承心法·归元"
+            }
+          ]
+        },
+        {
+          "tier": 3,
+          "impart_value_required": 60,
+          "rewards": [
+            {
+              "type": "technique",
+              "id": "impart_skill_001"
+            }
+          ]
+        },
+        {
+          "tier": 4,
+          "impart_value_required": 80,
+          "rewards": [
+            {
+              "type": "technique",
+              "id": "impart_skill_002"
+            }
+          ]
+        },
+        {
+          "tier": 5,
+          "impart_value_required": 100,
+          "rewards": [
+            {
+              "type": "level_up",
+              "amount": 1
+            }
+          ]
         }
       ]
     }
-  ]
+  }
 }

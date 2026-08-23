@@ -698,3 +698,159 @@ class TestClearBounty:
         assert "没有可清除" in msg
         mock_db.ext.cancel_bounty.assert_not_awaited()
         mock_db.ext.set_system_config.assert_not_awaited()
+
+
+# ===== GM 传承子命令（给予传承 / 清除传承） =====
+
+
+class _FakeLegacyInstance:
+    """Minimal legacy instance stub for GM legacy tests."""
+
+    def __init__(self, id, owner_id, legacy_type="common", sect_id=None):
+        self.id = id
+        self.owner_id = owner_id
+        self.legacy_type = legacy_type
+        self.sect_id = sect_id
+        self.is_active = 0
+
+
+class _FakeImpartManager:
+    """Stub ImpartManager: create_legacy + get_type_name."""
+
+    def __init__(self):
+        self._next_id = 1
+        self.created = []
+
+    async def create_legacy(
+        self, owner_id, legacy_type, sect_id=None, activate=False, commit=True
+    ):
+        inst = _FakeLegacyInstance(self._next_id, owner_id, legacy_type, sect_id)
+        self._next_id += 1
+        self.created.append(inst)
+        return inst
+
+    def get_type_name(self, legacy_type):
+        return {
+            "common": "通用传承",
+            "sect": "宗门传承",
+            "adventure": "历练传承",
+            "rift": "秘境传承",
+        }[legacy_type]
+
+
+def _wire_legacy(gm_manager, mock_db, storage=None):
+    """Attach a fake impart manager and an in-memory legacy store to the GM fixture."""
+    gm_manager.impart_manager = _FakeImpartManager()
+    store = storage if storage is not None else []
+    gm_manager.impart_manager.created = store  # create_legacy 与 DAO 共用同一存储
+
+    async def _list_by_owner(owner_id):
+        return [i for i in store if i.owner_id == owner_id]
+
+    async def _delete(instance_id):
+        store[:] = [i for i in store if i.id != instance_id]
+
+    mock_db.ext.list_legacy_instances_by_owner = AsyncMock(side_effect=_list_by_owner)
+    mock_db.ext.delete_legacy_instance = AsyncMock(side_effect=_delete)
+    return store
+
+
+@pytest.mark.asyncio
+async def test_give_legacy_default_and_typed(gm_manager, mock_db):
+    """给予传承：默认 common；指定 adventure 生效；中文别名生效；非法类型拒绝。"""
+    store = _wire_legacy(gm_manager, mock_db)
+    mock_db.get_player_by_id.return_value = make_player(user_id="900000002")
+    event = make_event("给予传承 900000002")
+
+    # 省略目标与类型：作用于发送者自身，默认 common
+    ok, msg = await gm_manager.cmd_give_legacy(make_event(sender_id="900000002"), "")
+    assert ok and "通用传承" in msg and store[-1].legacy_type == "common"
+
+    ok, msg = await gm_manager.cmd_give_legacy(event, "900000002 adventure")
+    assert ok and "历练传承" in msg and store[-1].legacy_type == "adventure"
+
+    ok, msg = await gm_manager.cmd_give_legacy(event, "900000002 秘境")
+    assert ok and store[-1].legacy_type == "rift"
+
+    ok, msg = await gm_manager.cmd_give_legacy(event, "900000002 foo")
+    assert not ok and "可选" in msg
+
+
+@pytest.mark.asyncio
+async def test_give_sect_legacy_binds_current_sect(gm_manager, mock_db):
+    """给予 sect 类型时自动绑定目标玩家当前宗门。"""
+    store = _wire_legacy(gm_manager, mock_db)
+    player = make_player(user_id="900000002")
+    player.sect_id = 7
+    mock_db.get_player_by_id.return_value = player
+    event = make_event("给予传承 900000002 sect")
+
+    ok, msg = await gm_manager.cmd_give_legacy(event, "900000002 sect")
+    assert ok
+    assert store[-1].legacy_type == "sect" and store[-1].sect_id == 7
+
+
+@pytest.mark.asyncio
+async def test_clear_legacy_state(gm_manager, mock_db):
+    """清除传承状态：删除挑战冷却与保护期，返回条数。"""
+    mock_db.get_player_by_id.return_value = make_player(user_id="900000002")
+    gm_manager.impart_manager = _FakeImpartManager()
+    mock_db.ext.delete_impart_pk_cooldowns = AsyncMock(return_value=2)
+    mock_db.ext.delete_impart_snatch_protection = AsyncMock(return_value=1)
+    event = make_event(sender_id="gm_001")
+
+    # 数字目标需两个 token（单 token 数字被解析为数值参数、目标=发送者）
+    ok, msg = await gm_manager.cmd_clear_legacy_state(event, "900000002 all")
+    assert ok and "挑战冷却 2 条" in msg and "保护期 1 条" in msg
+    mock_db.ext.delete_impart_pk_cooldowns.assert_awaited_once_with("900000002")
+    mock_db.ext.delete_impart_snatch_protection.assert_awaited_once_with("900000002")
+
+    # 无目标（省略）时作用于发送者
+    mock_db.ext.delete_impart_pk_cooldowns.reset_mock()
+    mock_db.ext.delete_impart_snatch_protection.reset_mock()
+    mock_db.get_player_by_id.reset_mock()
+    mock_db.get_player_by_id.return_value = make_player(user_id="gm_001")
+    ok, msg = await gm_manager.cmd_clear_legacy_state(event, "")
+    assert ok
+    mock_db.ext.delete_impart_pk_cooldowns.assert_awaited_once_with("gm_001")
+
+
+@pytest.mark.asyncio
+async def test_clear_legacy_all_and_by_id(gm_manager, mock_db):
+    """清除传承：无编号删全部；指定编号只删该条；非本人编号拒绝。"""
+    mock_db.get_player_by_id.return_value = make_player(user_id="900000002")
+    store = _wire_legacy(
+        gm_manager,
+        mock_db,
+        storage=[
+            _FakeLegacyInstance(1, "900000002"),
+            _FakeLegacyInstance(2, "900000002", "adventure"),
+            _FakeLegacyInstance(3, "other_user"),
+        ],
+    )
+    event = make_event("清除传承 900000002")
+
+    # 删除指定编号
+    ok, msg = await gm_manager.cmd_clear_legacy(event, "900000002 1")
+    assert ok and "#1" in msg
+    assert [i.id for i in store] == [2, 3]
+
+    # 非本人编号拒绝且不产生变更
+    ok, msg = await gm_manager.cmd_clear_legacy(event, "900000002 3")
+    assert not ok and "未持有" in msg
+    assert [i.id for i in store] == [2, 3]
+
+    # 「全部」关键字删该玩家全部
+    ok, msg = await gm_manager.cmd_clear_legacy(event, "900000002 全部")
+    assert ok and "共 1 条" in msg
+    assert [i.id for i in store] == [3]
+
+    # 先还原一条再测无编号删全部
+    store.append(_FakeLegacyInstance(4, "900000002"))
+    ok, msg = await gm_manager.cmd_clear_legacy(make_event(sender_id="900000002"), "")
+    assert ok and "共 1 条" in msg
+    assert [i.id for i in store] == [3]
+
+    # 空持有拒绝
+    ok, msg = await gm_manager.cmd_clear_legacy(make_event(sender_id="900000002"), "")
+    assert not ok and "未持有任何传承" in msg

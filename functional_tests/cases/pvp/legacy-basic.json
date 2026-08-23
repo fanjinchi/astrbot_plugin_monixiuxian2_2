@@ -1,0 +1,236 @@
+{
+  "name": "legacy-basic",
+  "description": "验证传承系统端到端路径：GM 给予传承→传承信息多实例展示→传承挑战夺取（最新非宗门实例）→被夺方 3 日保护期→挑战失败 5 天冷却→GM 清除传承。",
+  "scenario": "前置条件：群聊 webtest_pvp_001 已白名单，GM_ADMINS 含 900000001。流程：GM 给 p2 预置两条传承（common+adventure），p1 设置高属性后挑战 p2 夺取最新一条（adventure）；随后验证 p2 的 3 日保护期拒绝、p2 反向挑战失败触发 5 天冷却并在再挑战时被冷却拒绝；最后 GM 清除 p1 全部传承回到空态。",
+  "tags": [
+    "pvp",
+    "legacy"
+  ],
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000003"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p1（已建则提示已踏入）"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p1 可用"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#我要修仙 灵修",
+      "note": "创建 p2"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p2 可用"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除传承状态 900000002 all",
+      "note": "清除 p1 挑战冷却与保护期（保证用例可重入）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已清除.*传承状态",
+      "timeout": 30,
+      "note": "p1 状态已清"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除传承状态 900000003 all",
+      "note": "清除 p2 挑战冷却与保护期（保证用例可重入）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已清除.*传承状态",
+      "timeout": 30,
+      "note": "p2 状态已清"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 给予传承 900000003 common",
+      "note": "GM 给 p2 预置通用传承"
+    },
+    {
+      "type": "expect",
+      "match": "re:已为.*创建【通用传承】",
+      "timeout": 30,
+      "note": "创建成功并返回实例编号"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 给予传承 900000003 adventure",
+      "note": "GM 给 p2 再预置历练传承（更新，将成为被夺目标）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已为.*创建【历练传承】",
+      "timeout": 30,
+      "note": "创建成功"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#传承信息",
+      "note": "p2 查看传承（应持两条）"
+    },
+    {
+      "type": "expect",
+      "match": "re:历练传承[\\s\\S]*通用传承|通用传承[\\s\\S]*历练传承",
+      "timeout": 30,
+      "note": "面板同时列出历练与通用两条实例"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置攻击 900000002 99999",
+      "note": "p1 设高攻击（挑战必胜）"
+    },
+    {
+      "type": "expect",
+      "match": "re:攻击设置为[^\\n]*99,?999",
+      "timeout": 30,
+      "note": "p1 攻击已设置"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置气血 900000002 99999",
+      "note": "p1 设高气血确保不败"
+    },
+    {
+      "type": "expect",
+      "match": "re:气血设置为[^\\n]*99,?999",
+      "timeout": 30,
+      "note": "p1 气血已设置"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置攻击 900000003 100",
+      "note": "p2 设低攻击（必败）"
+    },
+    {
+      "type": "expect",
+      "match": "re:攻击设置为[^\\n]*100",
+      "timeout": 30,
+      "note": "p2 攻击已设置"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#传承挑战 900000003",
+      "note": "p1 挑战 p2，应夺取最新的 adventure 实例"
+    },
+    {
+      "type": "expect",
+      "match": "re:传承挑战胜利[\\s\\S]*夺走了对方的【历练传承】",
+      "timeout": 60,
+      "note": "胜利并夺走历练传承；提示进度清零重新修炼"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#传承信息",
+      "note": "p1 查看（夺来的传承未激活、值 0）"
+    },
+    {
+      "type": "expect",
+      "match": "re:历练传承[\\s\\S]*未激活",
+      "timeout": 30,
+      "note": "夺来的传承未激活，不累积"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#激活传承",
+      "note": "无参列出可激活实例"
+    },
+    {
+      "type": "expect",
+      "match": "re:激活传承 <编号>|历练传承",
+      "timeout": 30,
+      "note": "列出含编号与用法提示"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#传承挑战 900000003",
+      "note": "p2 刚被夺，处于 3 日保护期"
+    },
+    {
+      "type": "expect",
+      "match": "re:保护期",
+      "timeout": 30,
+      "note": "保护期内拒绝挑战"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#传承挑战 900000002",
+      "note": "p2 弱属性反向挑战 p1（必败，触发 5 天冷却）"
+    },
+    {
+      "type": "expect",
+      "match": "re:传承挑战失败[\\s\\S]*5天内不得再次",
+      "timeout": 60,
+      "note": "失败扣 1% 修为并进入 5 天冷却"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#传承挑战 900000002",
+      "note": "冷却期内再次挑战同一目标"
+    },
+    {
+      "type": "expect",
+      "match": "re:仍需冷却|冷却",
+      "timeout": 30,
+      "note": "冷却拒绝并提示剩余时间"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除传承 900000002 全部",
+      "note": "GM 清除 p1 全部传承（夺来的 adventure）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已删除.*全部传承",
+      "timeout": 30,
+      "note": "清除成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#传承信息",
+      "note": "清除后回到空态"
+    },
+    {
+      "type": "expect",
+      "match": "re:尚未持有任何传承",
+      "timeout": 30,
+      "note": "空态面板"
+    }
+  ]
+}

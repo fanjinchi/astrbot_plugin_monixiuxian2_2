@@ -133,6 +133,7 @@ BOSS_CONFIG = {
 
 RIFT_CONFIG = {
     "default_duration": 1800,  # 30分钟
+    "legacy_chance": 0.10,  # 探索完成触发秘境传承机缘的概率（0 关闭）
     "rifts": [
         # id 1-5 的内容以 rifts 表 DB 种子为准（migration v15），此处仅保留
         # 与 DB 一致的基础信息 + 宗门准入字段（sect_id/access），避免双写漂移
@@ -181,6 +182,46 @@ RIFT_CONFIG = {
             "access": "sect_member",  # 仅本宗成员可探索（7.2 接线准入校验）
         },
     ],
+}
+
+# 传承系统等阶奖励默认配置（impart_config.json 缺失时兜底）
+# types 按传承类型分组；首版四类共享 20/40/60/80/100 阈值。
+_IMPART_TIERS = [
+    {
+        "tier": 1,
+        "impart_value_required": 20,
+        "rewards": [{"type": "heart_method", "id": "传承心法·吐纳"}],
+    },
+    {
+        "tier": 2,
+        "impart_value_required": 40,
+        "rewards": [{"type": "heart_method", "id": "传承心法·归元"}],
+    },
+    {
+        "tier": 3,
+        "impart_value_required": 60,
+        "rewards": [{"type": "technique", "id": "impart_skill_001"}],
+    },
+    {
+        "tier": 4,
+        "impart_value_required": 80,
+        "rewards": [{"type": "technique", "id": "impart_skill_002"}],
+    },
+    {
+        "tier": 5,
+        "impart_value_required": 100,
+        "rewards": [{"type": "level_up", "amount": 1}],
+    },
+]
+IMPART_CONFIG = {
+    "cultivation_points_every_minutes": 15,
+    "guardian": {"enemy_group": "legacy_guardian"},
+    "types": {
+        "common": {"name": "通用传承", "tiers": _IMPART_TIERS},
+        "sect": {"name": "宗门传承", "tiers": _IMPART_TIERS},
+        "adventure": {"name": "历练传承", "tiers": _IMPART_TIERS},
+        "rift": {"name": "秘境传承", "tiers": _IMPART_TIERS},
+    },
 }
 
 ALCHEMY_CONFIG = {

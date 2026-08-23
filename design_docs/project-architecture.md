@@ -77,7 +77,7 @@ flowchart TD
 | 灵田 | 「灵田」 | 开垦 1 万；5 作物（灵草 1h → 九叶灵芝 24h）；成熟 48h 枯萎；田地 5 级（3~20 格） |
 | 灵眼 | 「灵眼」 | 7200s 生成；权重 50/30/15/5；产出 500/2000/8000/30000 修为/h；每人限 1 个 |
 | 双修 | 「双修」 | 3600s 冷却、请求 300s 过期、修为差 ≤3 倍；**定额收益**=K(2)h×100×60×灵根×f(大境界)（不再按对方总修为） |
-| 传承/传道 PK | 「传承」 | 传道 PK 累积 impart_value → 等阶阈值自动发奖励；PK 走统一引擎 |
+| 传承系统 | 「传承」 | 修炼出关累积传承值（15min/点，仅激活实例）；PK 夺取制（胜者夺最新非宗门实例+3日保护，败者扣1%修为+5天冷却）；宗门传承不可夺、离宗回收；等阶奖励自动发放 |
 | 炼丹 | 「炼丹」 | 成功率=min(95, 配方 50 + (L-要求)×2)；失败材料全损 |
 | GM 工具 | 「修仙GM/修仙GM帮助」 | GM_ADMINS 独立权限；属性修改/给装备物品/卸装/清除CD（需确认）/强制结算/生成Boss；JSON 审计日志 500MB 滚动 |
 | 内容同步管道 | scripts/sync_content_to_config.py | weapons/heart_methods/skills CSV→config（name 键控、契约校验、预算闸门） |
@@ -129,7 +129,7 @@ flowchart TD
 | 2026-08-20 | `unify-sect-commands` 落地 | 宗门功能收敛为「宗门」单入口+子命令（删 18 旧顶层指令）；宗门悬赏独立入口与全局悬赏分流；宗门商店（贡献点结算，faction shop 池）；宗门专属秘境仅本宗可见；历练宗门事件 🏯 标记；GM「清除悬赏」；v3.10.0 |
 | 2026-08-20 | `update-sect-functional-tests` / `adapt-pvp-effects-to-platform-v020` 归档 | sect 域用例全量迁移 `/宗门` 子命令并补新功能用例（商店/悬赏分流/事件标记/入口导航）；PvP 效果用例 deterministic/seed 化；平台 v0.2.0（expect_not/deterministic/combine/one-shot 编排） |
 
-**数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底 → v28 默认宗门+功法归属（sects.is_system/faction_id、player_skills.sect_bound）→ v29 宝库领取记录 → v30 师承任务链进度 → v31 rifts 播种青云剑冢（id 6，宗门专属秘境，当前最新）。
+**数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底 → v28 默认宗门+功法归属（sects.is_system/faction_id、player_skills.sect_bound）→ v29 宝库领取记录 → v30 师承任务链进度 → v31 rifts 播种青云剑冢（id 6，宗门专属秘境）→ v32 传承改版（legacy_instances/impart_pk_cooldown/impart_snatch_protection 三表，当前最新）。
 
 ## 6. 进行中的工作（bd open，设计相关）
 

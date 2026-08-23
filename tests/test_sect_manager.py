@@ -250,7 +250,9 @@ async def test_leave_sect_reclaims_treasure_and_keeps_personal_items():
         "u1", "qy_001", "test", origin_sect_id="qingyun", sect_bound=True
     )
     # 进行中的师承任务链进度
-    player.set_sect_master_progress({"chain_id": "chain_qy_01", "stage_index": 0, "progress": 1})
+    player.set_sect_master_progress(
+        {"chain_id": "chain_qy_01", "stage_index": 0, "progress": 1}
+    )
     await db.update_player(player)
 
     success, msg = await mgr.leave_sect("u1")
@@ -292,7 +294,9 @@ async def test_kick_member_reclaims_treasure():
     member = await db.get_player_by_id("member")
     member.set_storage_ring_items({"青云镇山剑": 1})
     member.sect_contribution = 50
-    member.set_sect_master_progress({"chain_id": "chain_qy_01", "stage_index": 1, "progress": 2})
+    member.set_sect_master_progress(
+        {"chain_id": "chain_qy_01", "stage_index": 1, "progress": 2}
+    )
     await db.update_player(member)
 
     success, msg = await mgr.kick_member("leader", "member")
@@ -536,3 +540,193 @@ async def test_gift_normal_item_not_blocked_by_sect_check():
     assert any("储物戒中没有【铁剑】" in str(o) for o in outputs)
     assert not any("乃宗门之物" in str(o) for o in outputs)
     await db.close()
+
+
+# ===== 8.3 宗门传承：领取（守护挑战）与离宗回收 =====
+
+_impart_mod = load_package_module(
+    "managers/impart_manager.py",
+    "astrbot_plugin_monixiuxian2_2.managers.impart_manager",
+)
+ImpartManager = _impart_mod.ImpartManager
+
+_SECT_LEGACY_TIERS = [
+    {
+        "tier": 1,
+        "impart_value_required": 20,
+        "rewards": [{"type": "heart_method", "id": "传承心法·吐纳"}],
+    },
+]
+
+
+class LegacySectConfig(FakeConfigManager):
+    """FakeConfigManager with a sect legacy entry + impart type config."""
+
+    def __init__(self):
+        super().__init__()
+        self.sect_factions["factions"][0]["legacies"] = [
+            {
+                "name": "青云门传承",
+                "legacy_type": "sect",
+                "min_position": 2,
+                "description": "青云门镇派传承",
+            }
+        ]
+        self.impart_config = {
+            "cultivation_points_every_minutes": 15,
+            "types": {
+                "common": {
+                    "name": "通用传承",
+                    "tiers": [dict(t) for t in _SECT_LEGACY_TIERS],
+                },
+                "sect": {
+                    "name": "宗门传承",
+                    "tiers": [dict(t) for t in _SECT_LEGACY_TIERS],
+                },
+            },
+        }
+        self.heart_methods_data["传承心法·吐纳"] = {
+            "id": "heart_impart_001",
+            "name": "传承心法·吐纳",
+            "passive_bonus": {},
+            "skill_pool": [],
+            "route": "通用",
+        }
+        self.level_data = [{"level": i, "level_name": f"L{i}"} for i in range(10)]
+        self.body_level_data = self.level_data
+
+    def get_max_level(self, cultivation_type="灵修"):
+        return len(self.level_data) - 1
+
+
+class _StubPveCombat:
+    """Stub PVECombatManager returning a fixed guardian-challenge outcome."""
+
+    def __init__(self, won: bool):
+        self.won = won
+        self.calls = 0
+
+    async def challenge_legacy_guardian(self, player):
+        self.calls += 1
+        return self.won, ("战胜守护者" if self.won else "败于守护者")
+
+
+def _make_legacy_mgr(db, config, won=True):
+    """SectManager wired with a real ImpartManager and a stub guardian fight."""
+    mgr = SectManager(db, config)
+    impart = ImpartManager(db, config)
+    mgr.impart_mgr = impart
+    mgr.pve_combat_mgr = _StubPveCombat(won)
+    return mgr, impart
+
+
+async def _join_as_inner(db, mgr, user_id):
+    """Join 青云门 then promote to 亲传弟子 (position 2) to pass the legacy gate."""
+    await mgr.join_sect(user_id, "青云门")
+    sect = await db.ext.get_sect_by_faction_id("qingyun")
+    await db.ext.update_player_sect_info(user_id, sect.sect_id, 2)
+
+
+@pytest.mark.asyncio
+async def test_sect_legacy_claim_success_occupies_quota():
+    """Winning the guardian fight creates a sect instance and consumes the quota."""
+    db = await _make_db()
+    config = LegacySectConfig()
+    mgr, impart = _make_legacy_mgr(db, config, won=True)
+    await mgr.ensure_system_sects()
+
+    await _make_player(db, "u1", level_index=2)
+    await _join_as_inner(db, mgr, "u1")
+
+    success, msg = await mgr.claim_treasure("u1", "青云门传承")
+    assert success, msg
+    assert "战胜" in msg and "宗门传承" in msg
+
+    # 实例已创建，type=sect 且绑定本宗
+    instances = await db.ext.list_legacy_instances_by_owner("u1")
+    assert len(instances) == 1
+    assert instances[0].legacy_type == "sect"
+    sect = await db.ext.get_sect_by_faction_id("qingyun")
+    assert instances[0].sect_id == sect.sect_id
+
+    # 名额已占：再次领取被拒绝
+    success, msg = await mgr.claim_treasure("u1", "青云门传承")
+    assert not success and ("限领一次" in msg or "无需重复领取" in msg)
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_sect_legacy_claim_failure_keeps_quota():
+    """Losing the guardian fight does not consume the claim quota (retryable)."""
+    db = await _make_db()
+    config = LegacySectConfig()
+    mgr, impart = _make_legacy_mgr(db, config, won=False)
+    await mgr.ensure_system_sects()
+
+    await _make_player(db, "u1", level_index=2)
+    await _join_as_inner(db, mgr, "u1")
+
+    success, msg = await mgr.claim_treasure("u1", "青云门传承")
+    assert not success
+    assert "不占用领取名额" in msg
+    # 未创建实例、未占名额
+    assert await db.ext.list_legacy_instances_by_owner("u1") == []
+    player = await db.get_player_by_id("u1")
+    assert "青云门传承" not in player.get_sect_treasure_claims()
+
+    # 可重试：换成必胜守护者后领取成功
+    mgr.pve_combat_mgr = _StubPveCombat(True)
+    success, msg = await mgr.claim_treasure("u1", "青云门传承")
+    assert success, msg
+    assert len(await db.ext.list_legacy_instances_by_owner("u1")) == 1
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_leave_sect_reclaims_sect_legacy():
+    """Leaving the sect removes the player's sect-bound legacy instances."""
+    db = await _make_db()
+    config = LegacySectConfig()
+    mgr, impart = _make_legacy_mgr(db, config, won=True)
+    await mgr.ensure_system_sects()
+
+    await _make_player(db, "u1", level_index=2)
+    await _join_as_inner(db, mgr, "u1")
+    success, _ = await mgr.claim_treasure("u1", "青云门传承")
+    assert success
+    assert len(await db.ext.list_legacy_instances_by_owner("u1")) == 1
+
+    success, msg = await mgr.leave_sect("u1")
+    assert success, msg
+    # 离宗后宗门传承实例被回收
+    assert await db.ext.list_legacy_instances_by_owner("u1") == []
+    await db.close()
+
+
+# ===== 8.3 legacy_chance=0 不触发 =====
+
+
+@pytest.mark.asyncio
+async def test_adventure_zero_legacy_chance_never_triggers():
+    """legacy_chance=0 → the adventure settlement never rolls a legacy."""
+    _adv_mod = load_package_module(
+        "managers/adventure_manager.py",
+        "astrbot_plugin_monixiuxian2_2.managers.adventure_manager",
+    )
+
+    class _ProbeImpart:
+        called = False
+
+        async def create_legacy(self, *a, **k):
+            _ProbeImpart.called = True
+
+    adv = _adv_mod.AdventureManager.__new__(_adv_mod.AdventureManager)
+    adv.impart_mgr = _ProbeImpart()
+    adv.legacy_chance = 0.0
+    adv.legacy_type = "adventure"
+
+    # 直接调机缘判定：chance=0 时 random()>=0 恒真，返回空串且不创建实例
+    player = Player(user_id="u1", user_name="t", spiritual_root="天灵根")
+    msg = await adv._maybe_trigger_legacy(player)
+    assert msg == ""
+    assert not _ProbeImpart.called

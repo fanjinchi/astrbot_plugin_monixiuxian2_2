@@ -124,16 +124,22 @@ class AdventureManager:
         db: DataBase,
         storage_ring_manager: "StorageRingManager" = None,
         pve_combat_mgr: PVECombatManager = None,
+        impart_mgr=None,
     ):
         self.db = db
         self.storage_ring_manager = storage_ring_manager
         self.pve_combat_mgr = pve_combat_mgr
+        # 传承管理器：可选注入（main.py 装配后），用于历练触发传承机缘
+        self.impart_mgr = impart_mgr
         self._route_cooldowns: dict[str, dict[str, int]] = {}
         self.routes: dict[str, dict] = {}
         self.route_alias_index: dict[str, str] = {}
         self.event_groups: dict[str, list[dict]] = {}
         self.drop_tables: dict[str, list[dict]] = {}
         self.default_route_key: str = "scout"
+        # 传承机缘触发概率与传承类型（config 顶层 legacy_chance/legacy_type）
+        self.legacy_chance: float = 0.0
+        self.legacy_type: str = "adventure"
         self.reload_config()
 
     # -------- 配置加载 --------
@@ -143,6 +149,8 @@ class AdventureManager:
         config = self._load_config_file()
         self.routes = {route["key"]: route for route in config.get("routes", [])}
         self.default_route_key = next(iter(self.routes.keys()), "scout")
+        self.legacy_chance = float(config.get("legacy_chance", 0.0))
+        self.legacy_type = config.get("legacy_type", "adventure")
 
         self.route_alias_index = {}
         for key, route in self.routes.items():
@@ -309,6 +317,11 @@ class AdventureManager:
         else:
             dropped_items, item_msg = [], ""
 
+        # 传承机缘：按概率触发守护挑战，胜利则获得历练传承实例
+        legacy_msg = ""
+        if self.impart_mgr and self.legacy_chance > 0:
+            legacy_msg = await self._maybe_trigger_legacy(player)
+
         player.experience += rewards.get("exp", 0)
         if rewards.get("bonus_exp", 0) > 0:
             player.experience += rewards["bonus_exp"]
@@ -341,6 +354,7 @@ class AdventureManager:
             f"获得修为：+{rewards['exp']:,}\n"
             f"获得灵石：+{rewards['gold']:,}"
             f"{item_msg}"
+            f"{legacy_msg}"
             f"\n━━━━━━━━━━━━━━━\n"
             f"当前修为：{player.experience:,}\n"
             f"当前灵石：{player.gold:,}"
@@ -363,6 +377,30 @@ class AdventureManager:
             "pve_won": bool(rewards.get("pve_won", False)),
         }
         return True, msg, reward_data
+
+    async def _maybe_trigger_legacy(self, player: Player) -> str:
+        """按配置概率触发传承机缘：守护挑战胜利则发放历练传承实例。
+
+        Returns:
+            追加到结算消息的文本（未触发/未配置/失败时为空串）。
+        """
+        if random.random() >= self.legacy_chance:
+            return ""
+        if not self.pve_combat_mgr:
+            return ""
+        won, battle_msg = await self.pve_combat_mgr.challenge_legacy_guardian(player)
+        if not won:
+            return f"\n\n🗿 你偶遇一处传承之地，但未能战胜守护者。\n{battle_msg}"
+        instance = await self.impart_mgr.create_legacy(
+            player.user_id, self.legacy_type, activate=False
+        )
+        if not instance:
+            return ""
+        name = self.impart_mgr.get_type_name(self.legacy_type)
+        return (
+            f"\n\n🗿 你偶遇一处传承之地，战胜了守护者！\n{battle_msg}\n"
+            f"🌟 获得【{name}】#{instance.id}，发送「激活传承」可开始修炼解锁。"
+        )
 
     async def check_adventure_status(self, user_id: str) -> tuple[bool, str]:
         """查看历练状态"""

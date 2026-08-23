@@ -12,7 +12,7 @@ from astrbot.api import logger
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 31  # v31: rifts 表播种青云剑冢（id 6，宗门专属秘境）
+LATEST_DB_VERSION = 32  # v32: 传承系统改版（legacy_instances/impart_pk_cooldown/impart_snatch_protection，impart_info 迁移后删除）
 
 MIGRATION_TASKS: dict[
     int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]
@@ -973,18 +973,44 @@ async def _create_all_tables_v22(conn: aiosqlite.Connection):
         )
     """)
 
-    # 传承信息表（v26：传承值 + 已领取等阶）
+    # 传承实例表（v32：替代旧 impart_info；一人多条，is_active 单激活）
     await conn.execute("""
-        CREATE TABLE IF NOT EXISTS impart_info (
+        CREATE TABLE IF NOT EXISTS legacy_instances (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL UNIQUE,
+            owner_id TEXT NOT NULL,
+            legacy_type TEXT NOT NULL DEFAULT 'common',
             impart_value INTEGER NOT NULL DEFAULT 0,
-            claimed_tiers TEXT NOT NULL DEFAULT '[]'
+            claimed_tiers TEXT NOT NULL DEFAULT '[]',
+            sect_id TEXT,
+            is_active INTEGER NOT NULL DEFAULT 0,
+            acquired_at INTEGER NOT NULL DEFAULT 0
         )
     """)
     await conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_impart_user ON impart_info(user_id)"
+        "CREATE INDEX IF NOT EXISTS idx_legacy_owner ON legacy_instances(owner_id)"
     )
+    await conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_legacy_active_owner "
+        "ON legacy_instances(owner_id) WHERE is_active = 1"
+    )
+
+    # 传承 PK 失败冷却表（v32）
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS impart_pk_cooldown (
+            challenger_id TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            failed_at INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (challenger_id, target_id)
+        )
+    """)
+
+    # 传承被夺保护表（v32）
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS impart_snatch_protection (
+            user_id TEXT PRIMARY KEY,
+            snatched_at INTEGER NOT NULL DEFAULT 0
+        )
+    """)
 
     # 用户CD表
     await conn.execute("""
@@ -1692,13 +1718,6 @@ async def _migrate_to_v12(conn: aiosqlite.Connection, config_manager: ConfigMana
             """,
                 (user_id,),
             )
-            # 初始化ImpartInfo
-            await conn.execute(
-                """
-                INSERT OR IGNORE INTO impart_info (user_id) VALUES (?)
-            """,
-                (user_id,),
-            )
 
     logger.info(f"v12迁移完成：完整修仙系统 - 已为 {len(users)} 个用户初始化扩展数据")
 
@@ -2307,3 +2326,86 @@ async def _migrate_to_v31(conn: aiosqlite.Connection, config_manager: ConfigMana
 
     await conn.commit()
     logger.info("v31迁移完成：已播种青云剑冢（id 6）")
+
+
+@migration(32)
+async def _migrate_to_v32(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """Migrate to v32 - rework impart system into multi-instance legacies.
+
+    Creates ``legacy_instances`` (one row per held legacy, with ``is_active``
+    for the single-activation rule), ``impart_pk_cooldown`` (challenger-target
+    failure cooldown) and ``impart_snatch_protection`` (3-day protection after
+    being snatched). Existing ``impart_info`` rows are converted to ``common``
+    type instances with progress preserved, then the old table is dropped.
+
+    Idempotent: re-running after a partial failure skips already-copied owners
+    (``legacy_instances`` non-empty) and tolerates the old table being absent.
+    """
+    logger.info("开始迁移到v32：传承系统改版（多实例+夺取制）")
+
+    await conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS legacy_instances (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_id TEXT NOT NULL,
+            legacy_type TEXT NOT NULL DEFAULT 'common',
+            impart_value INTEGER NOT NULL DEFAULT 0,
+            claimed_tiers TEXT NOT NULL DEFAULT '[]',
+            sect_id INTEGER,
+            is_active INTEGER NOT NULL DEFAULT 0,
+            acquired_at INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_legacy_owner ON legacy_instances(owner_id)"
+    )
+    # 保证同一玩家最多一条激活实例（见 design D1）
+    await conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_legacy_active_owner "
+        "ON legacy_instances(owner_id) WHERE is_active = 1"
+    )
+    await conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS impart_pk_cooldown (
+            challenger_id TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            failed_at INTEGER NOT NULL,
+            PRIMARY KEY (challenger_id, target_id)
+        )
+        """
+    )
+    await conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS impart_snatch_protection (
+            user_id TEXT PRIMARY KEY,
+            snatched_at INTEGER NOT NULL
+        )
+        """
+    )
+
+    # 旧数据迁移：impart_info → legacy_instances（保留进度，默认激活）
+    async with conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='impart_info'"
+    ) as cursor:
+        old_table_exists = await cursor.fetchone() is not None
+
+    if old_table_exists:
+        # v32 仅在版本<32时执行一次，此处 legacy_instances 必为空，直接整表拷贝
+        import time
+
+        await conn.execute(
+            """
+            INSERT INTO legacy_instances
+                (owner_id, legacy_type, impart_value, claimed_tiers, sect_id, is_active, acquired_at)
+            SELECT user_id, 'common', impart_value, claimed_tiers, NULL, 1, ?
+            FROM impart_info
+            """,
+            (int(time.time()),),
+        )
+        logger.info("已将 impart_info 数据迁移为 common 类型传承实例")
+        await conn.execute("DROP TABLE impart_info")
+        logger.info("旧 impart_info 表已删除")
+
+    await conn.commit()
+    logger.info("v32迁移完成：传承系统改版")

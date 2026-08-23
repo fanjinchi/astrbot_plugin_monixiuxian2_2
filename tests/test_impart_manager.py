@@ -1,21 +1,13 @@
-"""Tests for managers/impart_manager.py (impart value tiers and rewards)."""
+"""Tests for managers/impart_manager.py (legacy instances, single-activation, PK snatch)."""
 
 import pytest
 
 from tests.helpers import load_module, load_package_module
 
 # Load modules under a synthetic package so relative imports resolve.
+load_package_module("models.py", "astrbot_plugin_monixiuxian2_2.models")
 load_package_module(
-    "models.py",
-    "astrbot_plugin_monixiuxian2_2.models",
-)
-load_package_module(
-    "models_extended.py",
-    "astrbot_plugin_monixiuxian2_2.models_extended",
-)
-load_package_module(
-    "data/database_extended.py",
-    "astrbot_plugin_monixiuxian2_2.data.database_extended",
+    "models_extended.py", "astrbot_plugin_monixiuxian2_2.models_extended"
 )
 _data_mod = load_package_module(
     "data/data_manager.py",
@@ -26,27 +18,51 @@ DatabaseExtended = load_package_module(
     "data/database_extended.py",
     "astrbot_plugin_monixiuxian2_2.data.database_extended",
 ).DatabaseExtended
-Player = load_package_module(
-    "models.py",
-    "astrbot_plugin_monixiuxian2_2.models",
-).Player
-load_package_module(
-    "config_manager.py",
-    "astrbot_plugin_monixiuxian2_2.config_manager",
-)
+Player = load_package_module("models.py", "astrbot_plugin_monixiuxian2_2.models").Player
+load_package_module("config_manager.py", "astrbot_plugin_monixiuxian2_2.config_manager")
 _impart_mod = load_package_module(
     "managers/impart_manager.py",
     "astrbot_plugin_monixiuxian2_2.managers.impart_manager",
 )
 ImpartManager = _impart_mod.ImpartManager
+IMPART_PK_COOLDOWN_SECONDS = _impart_mod.IMPART_PK_COOLDOWN_SECONDS
+IMPART_SNATCH_PROTECTION_SECONDS = _impart_mod.IMPART_SNATCH_PROTECTION_SECONDS
 
 _migration_mod = load_module("migration_test", "data/migration.py")
 MigrationManager = _migration_mod.MigrationManager
 LATEST_DB_VERSION = _migration_mod.LATEST_DB_VERSION
 
+_TIERS = [
+    {
+        "tier": 1,
+        "impart_value_required": 20,
+        "rewards": [{"type": "heart_method", "id": "传承心法·吐纳"}],
+    },
+    {
+        "tier": 2,
+        "impart_value_required": 40,
+        "rewards": [{"type": "heart_method", "id": "传承心法·归元"}],
+    },
+    {
+        "tier": 3,
+        "impart_value_required": 60,
+        "rewards": [{"type": "technique", "id": "impart_skill_001"}],
+    },
+    {
+        "tier": 4,
+        "impart_value_required": 80,
+        "rewards": [{"type": "technique", "id": "impart_skill_002"}],
+    },
+    {
+        "tier": 5,
+        "impart_value_required": 100,
+        "rewards": [{"type": "level_up", "amount": 1}],
+    },
+]
+
 
 class DummyConfigManager:
-    """Minimal config manager stub for impart tests."""
+    """Minimal config manager stub for impart tests (types 分表)."""
 
     def __init__(self):
         self.game_config = {
@@ -105,33 +121,14 @@ class DummyConfigManager:
             },
         }
         self.impart_config = {
-            "tiers": [
-                {
-                    "tier": 1,
-                    "impart_value_required": 20,
-                    "rewards": [{"type": "heart_method", "id": "传承心法·吐纳"}],
-                },
-                {
-                    "tier": 2,
-                    "impart_value_required": 40,
-                    "rewards": [{"type": "heart_method", "id": "传承心法·归元"}],
-                },
-                {
-                    "tier": 3,
-                    "impart_value_required": 60,
-                    "rewards": [{"type": "technique", "id": "impart_skill_001"}],
-                },
-                {
-                    "tier": 4,
-                    "impart_value_required": 80,
-                    "rewards": [{"type": "technique", "id": "impart_skill_002"}],
-                },
-                {
-                    "tier": 5,
-                    "impart_value_required": 100,
-                    "rewards": [{"type": "level_up", "amount": 1}],
-                },
-            ]
+            "cultivation_points_every_minutes": 15,
+            "guardian": {"enemy_group": "legacy_guardian"},
+            "types": {
+                "common": {"name": "通用传承", "tiers": [dict(t) for t in _TIERS]},
+                "sect": {"name": "宗门传承", "tiers": [dict(t) for t in _TIERS]},
+                "adventure": {"name": "历练传承", "tiers": [dict(t) for t in _TIERS]},
+                "rift": {"name": "秘境传承", "tiers": [dict(t) for t in _TIERS]},
+            },
         }
 
     def get_max_level(self, cultivation_type="灵修"):
@@ -139,298 +136,354 @@ class DummyConfigManager:
         return len(self.level_data) - 1
 
 
-class TestHelpers:
-    """Shared fixtures for impart manager tests."""
+async def _setup_db():
+    """Create a migrated in-memory database and attach DatabaseExtended."""
+    db = DataBase(":memory:")
+    await db.connect()
+    await MigrationManager(db.conn, DummyConfigManager()).migrate()
+    db.ext = DatabaseExtended(db.conn)
+    return db
 
-    @staticmethod
-    async def setup_db():
-        """Create a migrated in-memory database and attach DatabaseExtended."""
-        db = DataBase(":memory:")
-        await db.connect()
-        await MigrationManager(db.conn, DummyConfigManager()).migrate()
-        db.ext = DatabaseExtended(db.conn)
-        return db
 
-    @staticmethod
-    async def create_player(db, user_id="u1"):
-        """Create a basic player for reward tests."""
-        player = Player(user_id=user_id, user_name="Tester", spiritual_root="天灵根")
-        await db.create_player(player)
-        return player
+async def _create_player(db, user_id="u1"):
+    """Create a basic player for reward tests."""
+    player = Player(user_id=user_id, user_name="Tester", spiritual_root="天灵根")
+    await db.create_player(player)
+    return player
+
+
+# ===== 实例创建 / 多条持有 / 激活制 =====
 
 
 @pytest.mark.asyncio
-async def test_tier_calculation_and_panel():
-    """Tier calculation matches the configured thresholds and panel is Chinese."""
-    db = await TestHelpers.setup_db()
+async def test_create_and_activate_single_active():
+    """Multiple instances can be held; only one is active at a time."""
+    db = await _setup_db()
     try:
-        await TestHelpers.create_player(db)
+        await _create_player(db)
         mgr = ImpartManager(db, DummyConfigManager())
 
-        # Start: 0 value, tier 0.
-        success, panel, info = await mgr.get_impart_info("u1")
-        assert not success  # no impart info yet
+        inst1 = await mgr.create_legacy("u1", "common")
+        inst2 = await mgr.create_legacy("u1", "adventure")
+        assert inst1 and inst2 and inst1.id != inst2.id
 
-        await db.ext.create_impart_info("u1")
-        success, panel, info = await mgr.get_impart_info("u1")
-        assert success
-        assert "第0阶" in panel
-        assert "传承值：0" in panel
-        assert "下一阶：第1阶" in panel
+        instances = await mgr.list_owner_legacies("u1")
+        assert len(instances) == 2
+        # 最新创建（activate=True）成为激活实例
+        active = await mgr.get_active_legacy("u1")
+        assert active is not None and active.id == inst2.id
 
-        # Just below tier 1 threshold.
-        ok, msg = await mgr.add_impart_value("u1", 19)
+        # 手动激活第一条，另一条自动去激
+        ok, msg = await mgr.activate_legacy("u1", inst1.id)
         assert ok
-        success, panel, info = await mgr.get_impart_info("u1")
-        assert "第0阶" in panel
-        assert "传承值：19" in panel
-
-        # Hit tier 1 and auto-grant the heart-method reward.
-        ok, msg = await mgr.add_impart_value("u1", 1)
-        assert ok
-        success, panel, info = await mgr.get_impart_info("u1")
-        assert "第1阶" in panel
-        assert "传承值：20" in panel
-        assert "已领取等阶：1" in panel
-
-        # Jump to tier 3.
-        ok, msg = await mgr.add_impart_value("u1", 40)
-        assert ok
-        success, panel, info = await mgr.get_impart_info("u1")
-        assert "第3阶" in panel
-        assert "传承值：60" in panel
-        assert "已领取等阶：1, 2, 3" in panel
+        active = await mgr.get_active_legacy("u1")
+        assert active.id == inst1.id
+        assert (await db.ext.get_legacy_instance_by_id(inst2.id)).is_active == 0
     finally:
         await db.close()
 
 
 @pytest.mark.asyncio
-async def test_heart_method_reward_to_storage():
-    """Tier 1 heart-method reward is added to the player's storage ring."""
-    db = await TestHelpers.setup_db()
+async def test_activate_rejects_foreign_or_missing_instance():
+    """activate_legacy fails for instances not owned by the player."""
+    db = await _setup_db()
     try:
-        await TestHelpers.create_player(db)
+        await _create_player(db, "u1")
+        await _create_player(db, "u2")
         mgr = ImpartManager(db, DummyConfigManager())
+        other = await mgr.create_legacy("u2", "common")
 
-        await db.ext.create_impart_info("u1")
-        ok, msg = await mgr.add_impart_value("u1", 20)
-        assert ok
-
-        # Reload player from DB to check storage ring.
-        updated = await db.get_player_by_id("u1")
-        items = updated.get_storage_ring_items()
-        assert "传承心法·吐纳" in items
-        assert items["传承心法·吐纳"] == 1
-
-        # No skills should have been learned.
-        skills = await db.ext.get_learned_skills("u1")
-        assert skills == []
+        ok, msg = await mgr.activate_legacy("u1", other.id)
+        assert not ok and "未找到" in msg
+        ok, msg = await mgr.activate_legacy("u1", 99999)
+        assert not ok
     finally:
         await db.close()
 
 
+# ===== 修炼累积粒度 =====
+
+
 @pytest.mark.asyncio
-async def test_technique_reward_writes_player_skills():
-    """Tier 3 technique reward is learned directly with source='impart'."""
-    db = await TestHelpers.setup_db()
+async def test_cultivation_accumulation_active_only_and_granularity():
+    """Only the active instance accumulates; sub-15min deltas are dropped by caller."""
+    db = await _setup_db()
     try:
-        await TestHelpers.create_player(db)
+        player = await _create_player(db)
         mgr = ImpartManager(db, DummyConfigManager())
+        inst_a = await mgr.create_legacy("u1", "common")  # active
+        inst_b = await mgr.create_legacy("u1", "adventure")  # becomes active
+        await mgr.activate_legacy("u1", inst_a.id)  # re-activate common
 
-        await db.ext.create_impart_info("u1")
-        ok, msg = await mgr.add_impart_value("u1", 60)
-        assert ok
+        # 出关结算：45 分钟 → 3 点；只加给激活的 common
+        msg = await mgr.add_active_impart_value(player, 45 // 15)
+        assert msg is not None and "+3" in msg
+        assert (await db.ext.get_legacy_instance_by_id(inst_a.id)).impart_value == 3
+        assert (await db.ext.get_legacy_instance_by_id(inst_b.id)).impart_value == 0
 
-        # Heart-method rewards from tiers 1 and 2 should also be in storage.
+        # 不足 15 分钟 → delta=0 → 无累积
+        msg = await mgr.add_active_impart_value(player, 14 // 15)
+        assert msg is None
+        assert (await db.ext.get_legacy_instance_by_id(inst_a.id)).impart_value == 3
+
+        # 无激活实例 → None
+        await db.ext.clear_active_legacy_instance("u1", inst_a.id)
+        assert await mgr.add_active_impart_value(player, 5) is None
+    finally:
+        await db.close()
+
+
+# ===== tier 自动发放 / 奖励 id 存在性 =====
+
+
+@pytest.mark.asyncio
+async def test_tier_rewards_auto_grant_and_ids_resolve():
+    """Crossing thresholds auto-grants rewards whose ids exist in config."""
+    db = await _setup_db()
+    try:
+        player = await _create_player(db)
+        mgr = ImpartManager(db, DummyConfigManager())
+        await mgr.create_legacy("u1", "common")  # active
+
+        # 一次加到 60，跨过 1/2/3 阶
+        msg = await mgr.add_active_impart_value(player, 60)
+        assert msg is not None and "解锁奖励" in msg
+
         updated = await db.get_player_by_id("u1")
         items = updated.get_storage_ring_items()
         assert items.get("传承心法·吐纳") == 1
         assert items.get("传承心法·归元") == 1
-
-        # Tier 3 technique should be learned.
         skills = await db.ext.get_learned_skills("u1")
-        assert len(skills) == 1
-        assert skills[0]["skill_id"] == "impart_skill_001"
+        assert [s["skill_id"] for s in skills] == ["impart_skill_001"]
         assert skills[0]["source"] == "impart"
+
+        # 奖励 id 存在性校验：dummy 配置里的 id 都能在 heart_methods/skills 中找到
+        assert mgr._find_heart_method("传承心法·吐纳") is not None
+        assert mgr._find_heart_method("传承心法·归元") is not None
+        assert mgr._find_skill_by_id("impart_skill_001") is not None
+        assert mgr._find_skill_by_id("impart_skill_002") is not None
+        assert mgr._find_skill_by_id("nonexistent_skill") is None
     finally:
         await db.close()
 
 
 @pytest.mark.asyncio
-async def test_level_up_reward_caps():
-    """Tier 5 level-up reward raises level_index and respects the cap."""
-    db = await TestHelpers.setup_db()
+async def test_reward_not_repeated_for_claimed_tier():
+    """A claimed tier is not granted again on further accumulation."""
+    db = await _setup_db()
     try:
-        player = await TestHelpers.create_player(db)
-        # Set level one below the configured maximum.
-        player.level_index = 8
-        await db.update_player(player)
-
+        player = await _create_player(db)
         mgr = ImpartManager(db, DummyConfigManager())
-        await db.ext.create_impart_info("u1")
-        ok, msg = await mgr.add_impart_value("u1", 100)
-        assert ok
-
-        updated = await db.get_player_by_id("u1")
-        assert updated.level_index == 9
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_level_up_reward_already_capped():
-    """Tier 5 level-up reward is a no-op when the player is already at max level."""
-    db = await TestHelpers.setup_db()
-    try:
-        player = await TestHelpers.create_player(db)
-        player.level_index = 9
-        await db.update_player(player)
-
-        mgr = ImpartManager(db, DummyConfigManager())
-        await db.ext.create_impart_info("u1")
-        ok, msg = await mgr.add_impart_value("u1", 100)
-        assert ok
-        assert "已达境界上限" in msg
-
-        updated = await db.get_player_by_id("u1")
-        assert updated.level_index == 9
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_repeat_reward_prevention():
-    """Claimed tier rewards are not granted again when impart value increases."""
-    db = await TestHelpers.setup_db()
-    try:
-        await TestHelpers.create_player(db)
-        mgr = ImpartManager(db, DummyConfigManager())
-
-        await db.ext.create_impart_info("u1")
-        await mgr.add_impart_value("u1", 20)
-        await mgr.add_impart_value("u1", 20)
-        await mgr.add_impart_value("u1", 20)
-
-        updated = await db.get_player_by_id("u1")
-        items = updated.get_storage_ring_items()
-        # Tier 1 heart-method was claimed only once.
-        assert items.get("传承心法·吐纳") == 1
-        # Tier 2 heart-method was claimed only once.
-        assert items.get("传承心法·归元") == 1
-
-        skills = await db.ext.get_learned_skills("u1")
-        # Tier 3 technique was claimed only once.
-        assert len(skills) == 1
-        assert skills[0]["skill_id"] == "impart_skill_001"
-
-        info = await db.ext.get_impart_info("u1")
-        assert sorted(info.get_claimed_tiers()) == [1, 2, 3]
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_technique_star_up_on_repeat_claim():
-    """Claiming a technique tier again only stars up the existing learned skill."""
-    db = await TestHelpers.setup_db()
-    try:
-        await TestHelpers.create_player(db)
-        mgr = ImpartManager(db, DummyConfigManager())
-
-        await db.ext.create_impart_info("u1")
-        # Reach tier 3 once.
-        await mgr.add_impart_value("u1", 60)
-        # Manually reset claimed tiers so tier 3 is granted again.
-        info = await db.ext.get_impart_info("u1")
-        info.set_claimed_tiers([1, 2])
-        await db.ext.update_impart_info(info)
-
-        # Re-grant tier 3 by adding a tiny value (no new tier threshold).
-        ok, msg = await mgr.add_impart_value("u1", 1)
-        assert ok
-
-        skills = await db.ext.get_learned_skills("u1")
-        assert len(skills) == 1
-        assert skills[0]["skill_id"] == "impart_skill_001"
-        assert skills[0]["star_level"] == 2
-        assert "升星至2星" in msg
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_technique_max_star_compensation():
-    """Max-star technique reward grants exp compensation, not a fake star-up."""
-    db = await TestHelpers.setup_db()
-    try:
-        await TestHelpers.create_player(db)
-        mgr = ImpartManager(db, DummyConfigManager())
-
-        await db.ext.create_impart_info("u1")
-        # Reach tier 3 and star the technique up to max (3).
-        await mgr.add_impart_value("u1", 60)
-        await db.ext.learn_or_star_up("u1", "impart_skill_001", "impart")
-        await db.ext.learn_or_star_up("u1", "impart_skill_001", "impart")
-        before = (await db.get_player_by_id("u1")).experience
-
-        # Re-grant tier 3 while already at max star.
-        info = await db.ext.get_impart_info("u1")
-        info.set_claimed_tiers([1, 2])
-        await db.ext.update_impart_info(info)
-        ok, msg = await mgr.add_impart_value("u1", 1)
-        assert ok
-
-        skills = await db.ext.get_learned_skills("u1")
-        assert skills[0]["skill_id"] == "impart_skill_001"
-        assert skills[0]["star_level"] == 3  # unchanged at cap
-        after = (await db.get_player_by_id("u1")).experience
-        assert after - before == 500  # base 1000 x ratio 0.5
-        assert "圆满" in msg and "修为" in msg
-    finally:
-        await db.close()
-
-
-@pytest.mark.asyncio
-async def test_get_info_auto_grants_pending_rewards():
-    """Opening the impart panel grants pending rewards and reflects them."""
-    db = await TestHelpers.setup_db()
-    try:
-        await TestHelpers.create_player(db)
-        await db.ext.create_impart_info("u1")
-
-        # Manually bump impart value without using the manager (so rewards are pending).
-        info = await db.ext.get_impart_info("u1")
-        info.impart_value = 30
-        await db.ext.update_impart_info(info)
-
-        mgr = ImpartManager(db, DummyConfigManager())
-        success, panel, _ = await mgr.get_impart_info("u1")
-        assert success
-        assert "🎁 自动发放奖励" in panel
-        assert "传承心法·吐纳" in panel
-        assert "第1阶" in panel
+        await mgr.create_legacy("u1", "common")
+        await mgr.add_active_impart_value(player, 20)
+        await mgr.add_active_impart_value(player, 20)
+        await mgr.add_active_impart_value(player, 20)
 
         updated = await db.get_player_by_id("u1")
         assert updated.get_storage_ring_items().get("传承心法·吐纳") == 1
+        assert updated.get_storage_ring_items().get("传承心法·归元") == 1
+        skills = await db.ext.get_learned_skills("u1")
+        assert len(skills) == 1 and skills[0]["skill_id"] == "impart_skill_001"
+    finally:
+        await db.close()
+
+
+# ===== PK 夺取 transfer 清零 =====
+
+
+@pytest.mark.asyncio
+async def test_transfer_legacy_resets_and_reassigns():
+    """Snatch transfer moves ownership, resets value/claimed, clears activation."""
+    db = await _setup_db()
+    try:
+        await _create_player(db, "defender")
+        await _create_player(db, "attacker")
+        mgr = ImpartManager(db, DummyConfigManager())
+
+        inst = await mgr.create_legacy("defender", "adventure")  # active
+        inst.impart_value = 60
+        inst.set_claimed_tiers([1, 2, 3])
+        await db.ext.update_legacy_instance(inst)
+
+        moved = await mgr.transfer_legacy(inst.id, "attacker")
+        assert moved is not None
+        assert moved.owner_id == "attacker"
+        assert moved.impart_value == 0
+        assert moved.get_claimed_tiers() == []
+        assert moved.is_active == 0
+        # 原主人不再持有，新主人激活态不受影响（需手动激活）
+        assert await mgr.get_active_legacy("defender") is None
+        assert await mgr.get_active_legacy("attacker") is None
+        assert len(await mgr.list_owner_legacies("defender")) == 0
+        assert len(await mgr.list_owner_legacies("attacker")) == 1
     finally:
         await db.close()
 
 
 @pytest.mark.asyncio
-async def test_impart_info_not_found():
-    """get_impart_info returns an error when the user has no impart record."""
-    db = await TestHelpers.setup_db()
+async def test_select_snatch_target_skips_sect_and_filters_type():
+    """Snatch target excludes sect legacies; optional type filter applies."""
+    db = await _setup_db()
+    try:
+        await _create_player(db, "defender")
+        mgr = ImpartManager(db, DummyConfigManager())
+        sect = await mgr.create_legacy("defender", "sect", sect_id=1, activate=False)
+        adv = await mgr.create_legacy("defender", "adventure", activate=False)
+        common = await mgr.create_legacy("defender", "common", activate=False)
+
+        # 默认取最新的非 sect 实例（common 最新）
+        target = await mgr.select_snatch_target("defender")
+        assert target is not None and target.id == common.id
+        # 类型过滤
+        target = await mgr.select_snatch_target("defender", "adventure")
+        assert target is not None and target.id == adv.id
+        # 只剩 sect 时无可夺目标
+        await db.ext.delete_legacy_instance(common.id)
+        await db.ext.delete_legacy_instance(adv.id)
+        assert await mgr.select_snatch_target("defender") is None
+        assert sect.legacy_type == "sect"
+    finally:
+        await db.close()
+
+
+# ===== 冷却边界 / 被夺保护 =====
+
+
+@pytest.mark.asyncio
+async def test_challenge_cooldown_boundary_and_per_target():
+    """5-day cooldown blocks re-challenge of same target; other targets unaffected."""
+    db = await _setup_db()
     try:
         mgr = ImpartManager(db, DummyConfigManager())
-        success, msg, info = await mgr.get_impart_info("noone")
-        assert not success
-        assert info is None
-        assert "未开启传承系统" in msg
+        now = 1_000_000_000
+
+        await db.ext.upsert_impart_pk_cooldown("atk", "def", now)
+        import time as _t
+
+        real = _t.time
+        try:
+            # 冻结时间到冷却期内（第 5 天边界内）
+            _t.time = lambda: now + 100
+            ok, remaining = await mgr.can_challenge("atk", "def")
+            assert not ok and remaining > 0
+            # 5×86400 后放行
+            _t.time = lambda: now + IMPART_PK_COOLDOWN_SECONDS
+            ok, remaining = await mgr.can_challenge("atk", "def")
+            assert ok and remaining == 0
+            # 不同对手不受限
+            _t.time = lambda: now + 100
+            ok, _ = await mgr.can_challenge("atk", "other")
+            assert ok
+        finally:
+            _t.time = real
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_snatch_protection_window():
+    """3-day protection counts down to zero after the window."""
+    db = await _setup_db()
+    try:
+        mgr = ImpartManager(db, DummyConfigManager())
+        now = 2_000_000_000
+        await db.ext.upsert_impart_snatch_protection("def", now)
+
+        import time as _t
+
+        real = _t.time
+        try:
+            _t.time = lambda: now + 60
+            remaining = await mgr.get_snatch_protection_remaining("def")
+            assert remaining == IMPART_SNATCH_PROTECTION_SECONDS - 60
+            _t.time = lambda: now + IMPART_SNATCH_PROTECTION_SECONDS
+            assert await mgr.get_snatch_protection_remaining("def") == 0
+        finally:
+            _t.time = real
+    finally:
+        await db.close()
+
+
+# ===== 排行（跨实例求和） =====
+
+
+@pytest.mark.asyncio
+async def test_ranking_sums_across_instances():
+    """Ranking aggregates impart_value over all of a player's instances."""
+    db = await _setup_db()
+    try:
+        await _create_player(db, "u1")
+        await _create_player(db, "u2")
+        mgr = ImpartManager(db, DummyConfigManager())
+
+        a = await mgr.create_legacy("u1", "common", activate=False)
+        b = await mgr.create_legacy("u1", "rift", activate=False)
+        a.impart_value = 30
+        b.impart_value = 25
+        await db.ext.update_legacy_instance(a)
+        await db.ext.update_legacy_instance(b)
+        c = await mgr.create_legacy("u2", "common", activate=False)
+        c.impart_value = 40
+        await db.ext.update_legacy_instance(c)
+
+        ranking = await mgr.get_ranking(10)
+        totals = {r["user_id"]: r["impart_value"] for r in ranking}
+        assert totals["u1"] == 55  # 30 + 25 across two instances
+        assert totals["u2"] == 40
+    finally:
+        await db.close()
+
+
+# ===== 战力断言：传承值不参与战斗属性 =====
+
+
+@pytest.mark.asyncio
+async def test_impart_value_does_not_affect_fighter_stats():
+    """build_fighter_from_player output is identical regardless of impart value."""
+    import sys
+
+    _combat_name = "astrbot_plugin_monixiuxian2_2.managers.combat_manager"
+    _combat_mod = sys.modules.get(_combat_name) or load_package_module(
+        "managers/combat_manager.py",
+        _combat_name,
+    )
+    CombatEngine = _combat_mod.CombatEngine
+
+    db = await _setup_db()
+    try:
+        player = await _create_player(db)
+        mgr = ImpartManager(db, DummyConfigManager())
+        engine = CombatEngine(config_manager=DummyConfigManager())
+
+        fighter_no = await engine.build_fighter_from_player(player)
+        attrs_no = (
+            fighter_no.hp,
+            fighter_no.damage,
+            fighter_no.agility,
+            fighter_no.speed,
+            fighter_no.armor_value,
+        )
+
+        inst = await mgr.create_legacy("u1", "common")
+        inst.impart_value = 100  # 满级传承值
+        await db.ext.update_legacy_instance(inst)
+        player = await db.get_player_by_id("u1")
+
+        fighter_yes = await engine.build_fighter_from_player(player)
+        attrs_yes = (
+            fighter_yes.hp,
+            fighter_yes.damage,
+            fighter_yes.agility,
+            fighter_yes.speed,
+            fighter_yes.armor_value,
+        )
+
+        assert attrs_no == attrs_yes
     finally:
         await db.close()
 
 
 @pytest.mark.asyncio
 async def test_latest_db_version_bumped():
-    """Ensure the migration version was bumped for the sect-growth schema."""
-    assert LATEST_DB_VERSION == 31
+    """Ensure the migration version was bumped for the legacy-instance schema."""
+    assert LATEST_DB_VERSION == 32

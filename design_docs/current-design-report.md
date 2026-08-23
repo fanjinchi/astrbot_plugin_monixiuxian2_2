@@ -77,7 +77,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | `enemies.json` | PvE 敌人模板（分组的等级区间与属性倍率） |
 | `boss_config.json` / `rift_config.json` / `sect_config.json` | Boss / 秘境 / 宗门配置（sect_config：positions 含 `promotion` 晋升门槛与 `benefits` 职阶福利、`scale_ratio` 捐献折算、`buildings` 洞天/丹房等级与消耗；rift_config 条目可带 `sect_id`+`access=sect_member` 做宗门专属秘境） |
 | `sect_factions.json` / `sect_tasks.json` | 默认（系统）宗门定义（join_level_range/长老/建筑物/treasures/heart_methods/skill_pool，v28 起）与宗门建设任务池 + 师承任务链（`config_manager.py:437-441` 加载并校验） |
-| `impart_config.json` | 传承等阶（tier）与奖励表 |
+| `impart_config.json` | 传承等阶（tier）与奖励表（按类型 common/sect/adventure/rift 分组） |
 | `adventure_config.json` | 历练路线与事件 |
 | `bounty_templates.json` | 悬赏模板 |
 | `storage_rings.json` | 储物戒指容量与价格 |
@@ -126,7 +126,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **BuffInfo**（预留）：main_buff/sec_buff/faqi_buff/fabao_weapon/armor_buff/atk_buff/blessed_spot/sub_buff
 - **Boss**：boss_level、hp/max_hp、atk、defense、stone_reward、status
 - **Rift**：rift_level、required_level、rewards(JSON)
-- **ImpartInfo**（传承，v26 重做）：`impart_value`（传承 PK 累积值）、`claimed_tiers`（已领取等阶 JSON）
+- **LegacyInstance**（传承实例，v32 重做）：一人可持多条，`legacy_type`（common/sect/adventure/rift）、`impart_value`（修炼累积值）、`claimed_tiers`（已领取等阶 JSON）、`sect_id`（宗门传承绑定，NULL=非宗门）、`is_active`（是否激活累积，同玩家仅一条）
 - **UserCd**：type（UserStatus）、create_time、scheduled_time、extra_data(JSON)
 
 ---
@@ -297,10 +297,14 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
   - K = `dual_cultivation.k_hours`（默认 2）；f(t) 为大境界序号系数（`realm_factor` 默认 linear，可配 power1.5/power2）
   - 双方各自按自身境界结算，与对方累计修为无关
 
-### 4.17 传承 / 传道 PK（managers/impart_manager.py、impart_pk_manager.py；v26 重做）
+### 4.17 传承系统（managers/impart_manager.py、impart_pk_manager.py；v32 重做）
 
-- **传承值**：通过传道 PK 累积 `impart_value`；达到 `impart_config.json` 等阶阈值自动发放等阶奖励（传承心法/功法/等级提升等）
-- **传道 PK**：走 CombatEngine 统一结算（`combat_type="impart_pk"`）
+- **传承实例**：一人可持多条（`legacy_instances` 表）；类型 common/sect/adventure/rift，宗门传承绑定宗门、离宗/被踢自动回收（sect_manager.py:472/:780 + `delete_legacy_instances_by_owner_sect`），且**不可被 PK 夺取**
+- **传承值累积**：仅修炼出关时结算（`handle_end_cultivation` 尾部），每 15 分钟 1 点，**仅累积激活中的传承**（「激活传承」指令切换，同玩家同时仅一条，部分唯一索引 `idx_legacy_active_owner` 保证）；传承值不参与 PK 计算，也不进战力公式
+- **传承 PK（夺取制）**：走 CombatEngine 统一结算（`combat_type="impart_pk"`）；胜利夺走对方最新一条非宗门实例（整个实例转移，传承值/已领奖励清零，新持有者重新修炼）；失败扣 1% 修为 + 5 天同人冷却（`impart_pk_cooldown`）；被夺方 3 日保护期（`impart_snatch_protection`）；平局不转移不计冷却
+- **获取途径**：①宗门宝库（`sect_factions.json` `legacies` 列表，领取需先胜守护 NPC，每人限领一条本宗传承）②历练机缘（adventure_config.json `legacy_chance`）③秘境机缘（rift_config.json `legacy_chance`）；②③触发 `spawn_enemy_from_group("legacy_guardian")` 守护挑战，胜利后获得实例
+- **等阶奖励**：达到类型对应 tiers 阈值（默认 20/40/60/80/100）自动发放（传承心法→储物戒/传承功法→player_skills source="impart"/等级提升封顶），按实例独立记录，复发防重。奖励 id 来自 content-design 管道（传承心法·吐纳/归元、传承·破妄一击/归元护体）
+- **GM 支持**：给予传承/清除传承/清除传承状态（测试预置与清理，仅 GM_ADMINS）
 
 ### 4.18 炼丹（managers/alchemy_manager.py）
 
@@ -322,7 +326,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 ---
 
-## 五、数据库（SQLite，当前版本 v30）
+## 五、数据库（SQLite，当前版本 v32）
 
 ### 5.1 表清单
 
@@ -336,7 +340,9 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | `buff_info` | id (AI)，user_id UNIQUE | 用户功法/法器 buff（预留字段） |
 | `boss` | boss_id (AI) | 世界 Boss（hp/atk/defense/stone_reward/status） |
 | `rifts` | rift_id (AI) | 秘境定义（预置 6 个：青云秘境→上古遗迹 + id 6 青云剑冢，后者为 rift_config.json 标记的青云门专属秘境，v31 播种） |
-| `impart_info` | id (AI)，user_id UNIQUE | 传承值与已领取等阶（v26 重做） |
+| `legacy_instances` | id (AI) | 传承实例：owner_id/legacy_type/impart_value/claimed_tiers/sect_id/is_active（v32 重做，替代 impart_info；部分唯一索引 idx_legacy_active_owner 保证同玩家仅一条激活） |
+| `impart_pk_cooldown` | challenger_id+target_id | 传承挑战失败冷却（5 天） |
+| `impart_snatch_protection` | user_id | 被夺保护期（3 日） |
 | `user_cd` | user_id | 忙碌状态（type/create_time/scheduled_time/extra_data JSON） |
 | `pending_gifts` | id (AI) | 赠予请求（receiver/sender/item/count/expires_at，默认 24h） |
 | `bank_accounts` | user_id | 存款（balance、last_interest_time） |
@@ -379,7 +385,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | v28 | 默认宗门与宗门功法归属：sects +is_system/faction_id/status/destruction_tier，player_skills +origin_sect_id/sect_bound（存量行保持默认，行为不变） |
 | v29 | players +sect_treasure_claims（宗门宝库领取记录，防跨退宗重复领取） |
 | v30 | players +sect_master_progress（师承任务链进度 JSON） |
-| v31 | rifts 播种青云剑冢（id 6，青云门专属秘境；config/rift_config.json 该条目 id 同步 4→6，消除与 id 4 玄冰地宫的冲突）（当前最新） |
+| v31 | rifts 播种青云剑冢（id 6，青云门专属秘境；config/rift_config.json 该条目 id 同步 4→6，消除与 id 4 玄冰地宫的冲突） |
+| v32 | 传承系统改版：legacy_instances/impart_pk_cooldown/impart_snatch_protection 三表，impart_info 数据拷贝后 DROP（当前最新） |
 
 ---
 

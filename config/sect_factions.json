@@ -105,7 +105,15 @@
             "treasures": 0.8
           }
         }
-      }
+      },
+      "legacies": [
+        {
+          "name": "青云门传承",
+          "legacy_type": "sect",
+          "min_position": 2,
+          "description": "青云门的镇派传承，仅限本宗弟子领取，离宗收回"
+        }
+      ]
     },
     {
       "id": "huanxi",
@@ -204,7 +212,15 @@
             "treasures": 0.8
           }
         }
-      }
+      },
+      "legacies": [
+        {
+          "name": "合欢宗传承",
+          "legacy_type": "sect",
+          "min_position": 2,
+          "description": "合欢宗的镇派传承，仅限本宗弟子领取，离宗收回"
+        }
+      ]
     }
   ]
 }

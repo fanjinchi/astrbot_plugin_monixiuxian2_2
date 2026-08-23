@@ -37,3 +37,5 @@ pool,id,name,trigger_name,trigger_condition,trigger_rate,effect_type,effect_valu
 传承功法池,draft_shiling,噬灵魔功,噬灵,attack,0.14,heal,0.30,,,,,,,,1,1.0,1.0,0.3,null,噬敌精血以战养战,想不想修真:吸血+10%；researcher 吸血 10-30%（trigger-effect-extensions 后入池）,吸血传承版：期望 0.14×0.30×7=29.4% ≤30% ✓（贴线，learn 0.3 极稀有平衡）；vampire 模式按实际伤害回血,draft
 传承功法池,draft_pojun,破军诀,破军一击,attack,0.15,pierce,0.5,,,,,,,,,1.0,1.0,0.5,null,破甲穿防直取要害,一念逍遥:破防按百分比削防；想不想修真:混沌真伤 10% 触发（researcher taxonomy）,破甲：pierce_rate=0.5 无视 50% 护甲减伤，期望 0.15×0.5×1.5=11.25% ≤30% ✓；高境界防拖（§4.6）；learn 0.5,draft
 通用功法池,verify_fatigue_001,燃血诀,燃血,attack,0.15,fatigue,0.10,damage,2,,,,,,,1.0,1.0,1.0,null,燃烧气血换取短暂战力后力竭,乱斗堂:爆裂一击 250%+疲劳（trigger-effect-extensions 后补冒烟）,验证 fatigue 引擎：自我 debuff 攻击×0.9 持续2回合；spec D11 自伤交换不计入预算（0%）；不入正式玩法,draft
+传承功法池,impart_skill_001,传承·破妄一击,破妄之眼,attack,0.18,damage_bonus,0.35,,,,,,,,,1.0,1.0,1.0,null,传承之地所悟攻伐法门,传承系统,等阶3奖励；期望增益 0.18×0.35=6.3% ✓,draft
+传承功法池,impart_skill_002,传承·归元护体,归元守护,defend,0.22,damage_reduction,0.45,,,,,,,,,1.0,1.0,1.0,null,传承之地所悟防御法门,传承系统,等阶4奖励；期望减伤 0.22×0.45=9.9% ✓,draft

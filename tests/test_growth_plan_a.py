@@ -212,4 +212,4 @@ class TestMigrationV27:
     def test_latest_version_bumped(self):
         with open(PLUGIN_ROOT / "data/migration.py", encoding="utf-8") as f:
             source = f.read()
-        assert "LATEST_DB_VERSION = 31" in source
+        assert "LATEST_DB_VERSION = 32" in source

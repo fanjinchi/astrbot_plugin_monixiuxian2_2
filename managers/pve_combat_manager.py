@@ -348,3 +348,54 @@ class PVECombatManager:
         # 8. 格式化并返回结果
         msg = self._format_combat_result(legacy_result, enemy, rewards)
         return msg, rewards
+
+    async def challenge_legacy_guardian(self, player: Player) -> tuple[bool, str]:
+        """发起传承之地守护 NPC 挑战（获取传承的前置门槛）。
+
+        独立函数而非复用 trigger_pve_combat：无概率触发、无修为/灵石/
+        掉落结算，战斗失败不致死（HP 下限 1），仅损失本次触发机会。
+
+        Args:
+            player: 发起挑战的玩家。
+
+        Returns:
+            (是否获胜, 战斗结果消息)。
+        """
+        from astrbot.api import logger
+
+        # 1. 生成守护 NPC（强度与玩家境界匹配）
+        try:
+            enemy = self.enemy_mgr.spawn_enemy_from_group(
+                "legacy_guardian", player.level_index
+            )
+        except Exception as e:
+            logger.error(f"生成传承守护者失败: {e}")
+            return False, "❌ 传承之地异常，请稍后再试。"
+
+        # 2. 构建双方 FighterState 并结算
+        player_fighter = await self.combat_engine.build_fighter_from_player(player)
+        enemy_fighter = self._build_enemy_fighter(enemy)
+        result = self.combat_engine.resolve_combat(
+            player_fighter, enemy_fighter, combat_type="pve"
+        )
+
+        # 3. HP 写回，失败不致死（下限 1，不扣修为/灵石/掉落）
+        final_hp = result.fighter1_final_hp
+        is_draw = result.winner == "draw"
+        won = result.winner == player.user_id
+        if not won and not is_draw:
+            final_hp = max(1, final_hp)
+        player.hp = final_hp
+
+        # 4. 组织结果消息（无奖励结算）
+        lines = list(result.combat_log or [])
+        lines.append("")
+        lines.append(f"🗿 传承之地守护者：{enemy.name}")
+        if is_draw:
+            lines.append("⚖️ 与守护者战成平手，传承之地暂时关闭，请择日再来。")
+        elif won:
+            lines.append("🏆 你战胜了守护者，传承之地为你开启！")
+        else:
+            lines.append("💀 你不敌守护者，被送出传承之地（气血未竭，可再次尝试）。")
+        lines.append(f"💚 剩余气血：{final_hp}")
+        return won, "\n".join(lines)

@@ -7,7 +7,7 @@ import json
 
 import aiosqlite
 
-from ..models_extended import Boss, BuffInfo, ImpartInfo, Rift, Sect, UserCd
+from ..models_extended import Boss, BuffInfo, LegacyInstance, Rift, Sect, UserCd
 
 
 class DatabaseExtended:
@@ -363,40 +363,282 @@ class DatabaseExtended:
             rows = await cursor.fetchall()
             return [Rift(**dict(row)) for row in rows]
 
-    # ===== 传承系统 CRUD =====
+    # ===== 传承系统 CRUD（legacy_instances，v32 改版） =====
 
-    async def create_impart_info(self, user_id: str):
-        """Initialize a user's impart info with zero value and no claimed tiers."""
+    async def create_legacy_instance(
+        self,
+        owner_id: str,
+        legacy_type: str,
+        sect_id: int | None = None,
+        is_active: bool = False,
+        commit: bool = True,
+    ) -> int:
+        """Create a legacy instance and return its row id.
+
+        Args:
+            owner_id: Owning player user ID.
+            legacy_type: One of common/sect/adventure/rift.
+            sect_id: Owning sect for sect-type legacies, else None.
+            is_active: Whether the instance starts as the active one.
+            commit: Whether to commit immediately (False inside outer txn).
+
+        Returns:
+            The new instance row id.
+        """
+        import time
+
         await self.conn.execute(
             """
-            INSERT INTO impart_info (user_id, impart_value, claimed_tiers)
-            VALUES (?, 0, '[]')
+            INSERT INTO legacy_instances
+                (owner_id, legacy_type, impart_value, claimed_tiers, sect_id, is_active, acquired_at)
+            VALUES (?, ?, 0, '[]', ?, ?, ?)
             """,
-            (user_id,),
+            (owner_id, legacy_type, sect_id, int(is_active), int(time.time())),
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
+        async with self.conn.execute("SELECT last_insert_rowid()") as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else 0
 
-    async def get_impart_info(self, user_id: str) -> ImpartInfo | None:
-        """Get a user's impart info."""
+    async def get_legacy_instance_by_id(
+        self, instance_id: int
+    ) -> LegacyInstance | None:
+        """Get a legacy instance by primary key."""
         async with self.conn.execute(
-            "SELECT * FROM impart_info WHERE user_id = ?", (user_id,)
+            "SELECT * FROM legacy_instances WHERE id = ?", (instance_id,)
         ) as cursor:
             row = await cursor.fetchone()
-            if row:
-                return ImpartInfo(**dict(row))
-            return None
+            return self._to_legacy(dict(row)) if row else None
 
-    async def update_impart_info(self, impart: ImpartInfo):
-        """Update a user's impart value and claimed tiers."""
+    async def list_legacy_instances_by_owner(
+        self, owner_id: str
+    ) -> list[LegacyInstance]:
+        """List all legacy instances of a player, newest first."""
+        async with self.conn.execute(
+            "SELECT * FROM legacy_instances WHERE owner_id = ? ORDER BY acquired_at DESC, id DESC",
+            (owner_id,),
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [self._to_legacy(dict(row)) for row in rows]
+
+    async def get_active_legacy_instance(self, owner_id: str) -> LegacyInstance | None:
+        """Get the player's currently active (accumulating) legacy instance."""
+        async with self.conn.execute(
+            "SELECT * FROM legacy_instances WHERE owner_id = ? AND is_active = 1",
+            (owner_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return self._to_legacy(dict(row)) if row else None
+
+    @staticmethod
+    def _to_legacy(row: dict) -> LegacyInstance:
+        """Normalize a legacy_instances row dict into a LegacyInstance.
+
+        SQLite is loosely typed: sect_id may come back as str/None while the
+        model declares ``int | None``. Normalize at the DAO boundary.
+        """
+        if row.get("sect_id") is not None:
+            row["sect_id"] = int(row["sect_id"])
+        row["is_active"] = int(row.get("is_active", 0))
+        return LegacyInstance(**row)
+
+    async def set_active_legacy_instance(self, owner_id: str, instance_id: int) -> bool:
+        """Mark instance_id active for owner and deactivate the rest (atomic).
+
+        Returns False when the instance does not belong to the owner.
+        """
+        await self.conn.execute("BEGIN IMMEDIATE")
+        try:
+            async with self.conn.execute(
+                "SELECT id FROM legacy_instances WHERE id = ? AND owner_id = ?",
+                (instance_id, owner_id),
+            ) as cursor:
+                if await cursor.fetchone() is None:
+                    await self.conn.rollback()
+                    return False
+            await self.conn.execute(
+                "UPDATE legacy_instances SET is_active = 0 WHERE owner_id = ?",
+                (owner_id,),
+            )
+            await self.conn.execute(
+                "UPDATE legacy_instances SET is_active = 1 WHERE id = ?",
+                (instance_id,),
+            )
+            await self.conn.commit()
+            return True
+        except Exception:
+            await self.conn.rollback()
+            raise
+
+    async def clear_active_legacy_instance(
+        self, owner_id: str, instance_id: int, commit: bool = True
+    ):
+        """Deactivate the given instance if it is the owner's active one.
+
+        Used when an active instance is snatched/reclaimed/deleted.
+        """
+        await self.conn.execute(
+            "UPDATE legacy_instances SET is_active = 0 WHERE id = ? AND owner_id = ?",
+            (instance_id, owner_id),
+        )
+        if commit:
+            await self.conn.commit()
+
+    async def update_legacy_instance(
+        self, instance: LegacyInstance, commit: bool = True
+    ):
+        """Update value/claimed/owner/active fields of a legacy instance.
+
+        Args:
+            instance: The instance to persist (matched by id).
+            commit: Whether to commit immediately (False inside outer txn).
+        """
         await self.conn.execute(
             """
-            UPDATE impart_info SET
-                impart_value = ?, claimed_tiers = ?
+            UPDATE legacy_instances SET
+                owner_id = ?, legacy_type = ?, impart_value = ?, claimed_tiers = ?,
+                sect_id = ?, is_active = ?
             WHERE id = ?
             """,
-            (impart.impart_value, impart.claimed_tiers, impart.id),
+            (
+                instance.owner_id,
+                instance.legacy_type,
+                instance.impart_value,
+                instance.claimed_tiers,
+                instance.sect_id,
+                instance.is_active,
+                instance.id,
+            ),
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
+
+    async def delete_legacy_instance(self, instance_id: int, commit: bool = True):
+        """Delete a legacy instance by primary key."""
+        await self.conn.execute(
+            "DELETE FROM legacy_instances WHERE id = ?", (instance_id,)
+        )
+        if commit:
+            await self.conn.commit()
+
+    async def delete_legacy_instances_by_owner_sect(
+        self, owner_id: str, sect_id: int, commit: bool = True
+    ) -> int:
+        """Delete the player's sect-bound legacy instances (leave-sect reclaim).
+
+        Returns:
+            Number of deleted rows.
+        """
+        cursor = await self.conn.execute(
+            "DELETE FROM legacy_instances WHERE owner_id = ? AND legacy_type = 'sect' AND sect_id = ?",
+            (owner_id, sect_id),
+        )
+        if commit:
+            await self.conn.commit()
+        return cursor.rowcount
+
+    async def get_legacy_value_ranking(self, limit: int = 10) -> list[dict]:
+        """Rank players by total impart value across all their instances."""
+        rankings = []
+        async with self.conn.execute(
+            """
+            SELECT owner_id, SUM(impart_value) AS total
+            FROM legacy_instances
+            GROUP BY owner_id
+            HAVING total > 0
+            ORDER BY total DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ) as cursor:
+            async for row in cursor:
+                rankings.append({"user_id": row[0], "impart_value": row[1]})
+        return rankings
+
+    # ===== 传承 PK 冷却 / 被夺保护 =====
+
+    async def get_impart_pk_cooldown(
+        self, challenger_id: str, target_id: str
+    ) -> int | None:
+        """Get the last failure timestamp for a challenger→target pair, if any."""
+        async with self.conn.execute(
+            "SELECT failed_at FROM impart_pk_cooldown WHERE challenger_id = ? AND target_id = ?",
+            (challenger_id, target_id),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+    async def upsert_impart_pk_cooldown(
+        self, challenger_id: str, target_id: str, failed_at: int, commit: bool = True
+    ):
+        """Record a challenge failure timestamp for a challenger→target pair."""
+        await self.conn.execute(
+            """
+            INSERT INTO impart_pk_cooldown (challenger_id, target_id, failed_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(challenger_id, target_id) DO UPDATE SET failed_at = excluded.failed_at
+            """,
+            (challenger_id, target_id, failed_at),
+        )
+        if commit:
+            await self.conn.commit()
+
+    async def get_impart_snatch_protection(self, user_id: str) -> int | None:
+        """Get the player's last snatched timestamp, if any."""
+        async with self.conn.execute(
+            "SELECT snatched_at FROM impart_snatch_protection WHERE user_id = ?",
+            (user_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+    async def upsert_impart_snatch_protection(
+        self, user_id: str, snatched_at: int, commit: bool = True
+    ):
+        """Record/refresh the player's snatch protection timestamp."""
+        await self.conn.execute(
+            """
+            INSERT INTO impart_snatch_protection (user_id, snatched_at)
+            VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET snatched_at = excluded.snatched_at
+            """,
+            (user_id, snatched_at),
+        )
+        if commit:
+            await self.conn.commit()
+
+    async def delete_impart_pk_cooldowns(
+        self, challenger_id: str, commit: bool = True
+    ) -> int:
+        """Delete all challenge cooldowns where the player is the challenger.
+
+        Returns:
+            Number of deleted rows (cooldown entries for different targets).
+        """
+        async with self.conn.execute(
+            "DELETE FROM impart_pk_cooldown WHERE challenger_id = ?", (challenger_id,)
+        ) as cursor:
+            deleted = cursor.rowcount
+        if commit:
+            await self.conn.commit()
+        return deleted
+
+    async def delete_impart_snatch_protection(
+        self, user_id: str, commit: bool = True
+    ) -> int:
+        """Delete a player's snatch protection entry.
+
+        Returns:
+            1 if an entry was deleted, 0 otherwise.
+        """
+        async with self.conn.execute(
+            "DELETE FROM impart_snatch_protection WHERE user_id = ?", (user_id,)
+        ) as cursor:
+            deleted = cursor.rowcount
+        if commit:
+            await self.conn.commit()
+        return deleted
 
     # ===== 用户CD系统 CRUD =====
 

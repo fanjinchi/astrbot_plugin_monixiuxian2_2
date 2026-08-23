@@ -1,4 +1,4 @@
-"""Tests for database migrations (v25 player_skills and v26 impart rework)."""
+"""Tests for database migrations (v25 player_skills, v26 impart rework, v32 legacy instances)."""
 
 import aiosqlite
 import pytest
@@ -62,14 +62,44 @@ async def test_fresh_install_reaches_latest_version():
             row = await cursor.fetchone()
         assert row is not None, "player_skills table not found"
 
-        async with db_conn2.execute("PRAGMA table_info(impart_info)") as cursor:
-            impart_cols = {row[1] for row in await cursor.fetchall()}
-        assert impart_cols == {
+        # v32: fresh installs build the three legacy-instance tables; old impart_info is gone
+        for table in (
+            "legacy_instances",
+            "impart_pk_cooldown",
+            "impart_snatch_protection",
+        ):
+            async with db_conn2.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ) as cursor:
+                assert await cursor.fetchone() is not None, f"{table} table not found"
+
+        async with db_conn2.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='impart_info'"
+        ) as cursor:
+            assert await cursor.fetchone() is None, (
+                "impart_info should be dropped at v32"
+            )
+
+        async with db_conn2.execute("PRAGMA table_info(legacy_instances)") as cursor:
+            legacy_cols = {row[1] for row in await cursor.fetchall()}
+        assert legacy_cols == {
             "id",
-            "user_id",
+            "owner_id",
+            "legacy_type",
             "impart_value",
             "claimed_tiers",
-        }, f"Unexpected impart_info columns: {impart_cols}"
+            "sect_id",
+            "is_active",
+            "acquired_at",
+        }, f"Unexpected legacy_instances columns: {legacy_cols}"
+
+        # 每人最多一条激活的部分唯一索引
+        async with db_conn2.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_legacy_active_owner'"
+        ) as cursor:
+            assert await cursor.fetchone() is not None, (
+                "idx_legacy_active_owner index not found"
+            )
 
         # v28: fresh installs already carry the system-sect / skill attribution columns
         async with db_conn2.execute("PRAGMA table_info(sects)") as cursor:
@@ -178,15 +208,19 @@ async def test_v21_to_latest_migration_rebuilds_players():
             row = await cursor.fetchone()
         assert row is not None, "player_skills table not found"
 
-        # v26 should have rebuilt impart_info with the new columns
-        async with db_conn.execute("PRAGMA table_info(impart_info)") as cursor:
-            impart_cols = {row[1] for row in await cursor.fetchall()}
-        assert impart_cols == {
-            "id",
-            "user_id",
-            "impart_value",
-            "claimed_tiers",
-        }, f"Unexpected impart_info columns: {impart_cols}"
+        # v26 built impart_info, which v32 later drops and replaces with legacy_instances
+        async with db_conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='impart_info'"
+        ) as cursor:
+            assert await cursor.fetchone() is None, (
+                "impart_info should be dropped at v32"
+            )
+        async with db_conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='legacy_instances'"
+        ) as cursor:
+            assert await cursor.fetchone() is not None, (
+                "legacy_instances table not found"
+            )
 
 
 @pytest.mark.asyncio
@@ -269,27 +303,26 @@ async def test_v25_to_v26_rebuilds_impart_info():
             version = (await cursor.fetchone())[0]
         assert version == LATEST_DB_VERSION
 
-        async with db_conn.execute("PRAGMA table_info(impart_info)") as cursor:
-            impart_cols = {row[1] for row in await cursor.fetchall()}
-        assert {
-            "impart_hp_per",
-            "impart_mp_per",
-            "impart_atk_per",
-            "impart_know_per",
-            "impart_burst_per",
-        }.isdisjoint(impart_cols), "Legacy impart columns still present"
-        assert impart_cols == {
-            "id",
-            "user_id",
-            "impart_value",
-            "claimed_tiers",
-        }, f"Unexpected impart_info columns: {impart_cols}"
-
+        # v26 重建的 impart_info 在 v32 被 DROP，旧数据经 v26 清零后无值可迁移
         async with db_conn.execute(
-            "SELECT COUNT(*) FROM impart_info WHERE user_id = ?", ("u1",)
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='impart_info'"
         ) as cursor:
-            count = (await cursor.fetchone())[0]
-        assert count == 0, "Legacy impart data should be discarded during v26 migration"
+            assert await cursor.fetchone() is None, (
+                "impart_info should be dropped at v32"
+            )
+
+        # v32 建三张传承新表，但 impart_info 旧行（v26 已清零）不会拷入
+        for table in (
+            "legacy_instances",
+            "impart_pk_cooldown",
+            "impart_snatch_protection",
+        ):
+            async with db_conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ) as cursor:
+                assert await cursor.fetchone() is not None, f"{table} table not found"
+        async with db_conn.execute("SELECT COUNT(*) FROM legacy_instances") as cursor:
+            assert (await cursor.fetchone())[0] == 0
 
 
 @pytest.mark.asyncio
@@ -524,3 +557,114 @@ async def test_create_all_tables_v2_backfills_sect_columns():
             "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_sect_faction'"
         ) as cursor:
             assert await cursor.fetchone() is not None
+
+
+@pytest.mark.asyncio
+async def test_v31_to_v32_migrates_impart_info_to_legacy_instances():
+    """v32 copies legacy impart_info rows into legacy_instances (type=common,
+    active, value/claimed preserved), then drops impart_info."""
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
+        await db_conn.execute("INSERT INTO db_info (version) VALUES (31)")
+        await db_conn.execute("""
+            CREATE TABLE impart_info (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL UNIQUE,
+                impart_value INTEGER NOT NULL DEFAULT 0,
+                claimed_tiers TEXT NOT NULL DEFAULT '[]'
+            )
+        """)
+        await db_conn.execute(
+            "INSERT INTO impart_info (user_id, impart_value, claimed_tiers) VALUES ('u1', 45, '[1, 2]')"
+        )
+        await db_conn.execute(
+            "INSERT INTO impart_info (user_id, impart_value, claimed_tiers) VALUES ('u2', 0, '[]')"
+        )
+        await db_conn.commit()
+
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        async with db_conn.execute("SELECT version FROM db_info") as cursor:
+            assert (await cursor.fetchone())[0] == 32
+
+        # 两张新表存在，旧表已 DROP
+        for table in (
+            "legacy_instances",
+            "impart_pk_cooldown",
+            "impart_snatch_protection",
+        ):
+            async with db_conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ) as cursor:
+                assert await cursor.fetchone() is not None, f"{table} table not found"
+        async with db_conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='impart_info'"
+        ) as cursor:
+            assert await cursor.fetchone() is None, "impart_info should be dropped"
+
+        # 旧行迁为 common 类型、激活、sect_id 为空，值与 claimed 保全
+        async with db_conn.execute(
+            "SELECT owner_id, legacy_type, impart_value, claimed_tiers, sect_id, is_active"
+            " FROM legacy_instances ORDER BY owner_id"
+        ) as cursor:
+            rows = await cursor.fetchall()
+        assert len(rows) == 2
+        assert rows[0] == ("u1", "common", 45, "[1, 2]", None, 1)
+        assert rows[1] == ("u2", "common", 0, "[]", None, 1)
+
+
+@pytest.mark.asyncio
+async def test_v32_migration_is_idempotent():
+    """A second migrate run must not duplicate legacy_instances rows nor fail
+    on the already-dropped impart_info table."""
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
+        await db_conn.execute("INSERT INTO db_info (version) VALUES (31)")
+        await db_conn.execute("""
+            CREATE TABLE impart_info (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL UNIQUE,
+                impart_value INTEGER NOT NULL DEFAULT 0,
+                claimed_tiers TEXT NOT NULL DEFAULT '[]'
+            )
+        """)
+        await db_conn.execute(
+            "INSERT INTO impart_info (user_id, impart_value) VALUES ('u1', 10)"
+        )
+        await db_conn.commit()
+
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        async with db_conn.execute("SELECT COUNT(*) FROM legacy_instances") as cursor:
+            assert (await cursor.fetchone())[0] == 1
+
+
+@pytest.mark.asyncio
+async def test_v32_active_owner_partial_unique_index():
+    """The partial unique index enforces at most one active legacy per owner."""
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        await db_conn.execute(
+            "INSERT INTO legacy_instances (owner_id, legacy_type, is_active, acquired_at)"
+            " VALUES ('u1', 'common', 1, 1)"
+        )
+        await db_conn.commit()
+        with pytest.raises(Exception):
+            await db_conn.execute(
+                "INSERT INTO legacy_instances (owner_id, legacy_type, is_active, acquired_at)"
+                " VALUES ('u1', 'adventure', 1, 2)"
+            )
+            await db_conn.commit()
+
+        # 多条非激活实例不受限
+        await db_conn.execute(
+            "INSERT INTO legacy_instances (owner_id, legacy_type, is_active, acquired_at)"
+            " VALUES ('u1', 'adventure', 0, 2)"
+        )
+        await db_conn.commit()
+        async with db_conn.execute(
+            "SELECT COUNT(*) FROM legacy_instances WHERE owner_id = 'u1'"
+        ) as cursor:
+            assert (await cursor.fetchone())[0] == 2

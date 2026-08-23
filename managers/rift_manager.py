@@ -109,6 +109,8 @@ class RiftManager:
         self.config_manager = config_manager
         self.storage_ring_manager = storage_ring_manager
         self.pve_combat_mgr = pve_combat_mgr
+        # 传承管理器：可选注入（main.py 装配后），用于秘境触发传承机缘
+        self.impart_mgr = None
         self.config = config_manager.rift_config if config_manager else {}
         self.explore_duration = self.config.get(
             "default_duration", self.DEFAULT_DURATION
@@ -379,6 +381,30 @@ class RiftManager:
             if item_lines:
                 item_msg = "\n\n📦 获得物品：\n" + "\n".join(item_lines)
 
+        # 6.5 传承机缘：按配置概率触发守护挑战，胜利则获得秘境传承实例
+        legacy_msg = ""
+        legacy_chance = float(self.config.get("legacy_chance", 0.0))
+        if self.impart_mgr and self.pve_combat_mgr and legacy_chance > 0:
+            if random.random() < legacy_chance:
+                won, battle_msg = await self.pve_combat_mgr.challenge_legacy_guardian(
+                    player
+                )
+                if won:
+                    legacy_type = "rift"
+                    instance = await self.impart_mgr.create_legacy(
+                        player.user_id, legacy_type, activate=False
+                    )
+                    if instance:
+                        name = self.impart_mgr.get_type_name(legacy_type)
+                        legacy_msg = (
+                            f"\n\n🗿 你偶遇上古传承之地，战胜了守护者！\n{battle_msg}\n"
+                            f"🌟 获得【{name}】#{instance.id}，发送「激活传承」可开始修炼解锁。"
+                        )
+                else:
+                    legacy_msg = (
+                        f"\n\n🗿 你偶遇上古传承之地，但未能战胜守护者。\n{battle_msg}"
+                    )
+
         # 7. 应用奖励
         player.experience += exp_reward
         player.gold += gold_reward
@@ -394,7 +420,7 @@ class RiftManager:
 {event["desc"]}{combat_msg}
 
 获得修为：+{exp_reward:,}
-获得灵石：+{gold_reward:,}{item_msg}
+获得灵石：+{gold_reward:,}{item_msg}{legacy_msg}
         """.strip()
 
         reward_data = {

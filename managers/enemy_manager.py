@@ -131,6 +131,7 @@ class EnemyManager:
         """
         self.config_manager: ConfigManager | None = config_manager
         self.enemy_groups: list[dict] = []
+        self.legacy_guardian_group: dict = {}
         self.difficulty_coefficients: dict = {}
         self.naming: dict = {}
         self.level_config: list = []
@@ -142,6 +143,9 @@ class EnemyManager:
         self.enemy_groups = config.get(
             "enemy_groups", self.DEFAULT_CONFIG["enemy_groups"]
         )
+        # 守护 NPC 组独立于普通 PvE 分组加载，不带 level_range，
+        # 只能经 spawn_enemy_from_group 定向触达，避免被普通战斗匹配
+        self.legacy_guardian_group = config.get("legacy_guardian_group", {})
         self.difficulty_coefficients = config.get(
             "difficulty_coefficients", self.DEFAULT_CONFIG["difficulty_coefficients"]
         )
@@ -382,6 +386,94 @@ class EnemyManager:
         random_token = f"{random.getrandbits(16):04x}"
         return Enemy(
             user_id=f"enemy_{template.get('key', 'unknown')}_{suffix}_{random_token}",
+            name=name,
+            hp=hp,
+            max_hp=hp,
+            damage=damage,
+            agility=agility,
+            speed=speed,
+            armor_value=armor_value,
+            exp=exp_reward,
+            crit_rate=crit_rate,
+            # 兼容旧字段
+            mp=exp_reward,
+            max_mp=exp_reward,
+            atk=damage,
+            defense=armor_value,
+        )
+
+    def spawn_enemy_from_group(self, group_key: str, player_level: int) -> Enemy:
+        """按组名定向生成敌人（用于传承守护 NPC 等特殊遭遇）。
+
+        绕开普通 PvE 的 ``_get_group_by_level`` 匹配，避免守护组被普通
+        战斗随机命中。守护组模板以 ``max_level_index`` 按玩家境界分档，
+        固定 normal 类别（无精英/Boss 前缀），强度与玩家境界匹配。
+
+        Args:
+            group_key: 目标组名（当前仅支持 ``legacy_guardian``）。
+            player_level: 玩家等级（level_index，1-based），用于选档与定强。
+
+        Returns:
+            生成的敌人对象（无修为/掉落结算语义，仅用于战斗）。
+
+        Raises:
+            ValueError: 组不存在或无可用模板时抛出。
+        """
+        if group_key != "legacy_guardian":
+            raise ValueError(f"未知的定向敌人组: {group_key}")
+        group = self.legacy_guardian_group
+        templates = group.get("templates", [])
+        if not templates:
+            raise ValueError("传承守护组未配置模板")
+
+        # 按玩家境界分档：选 max_level_index 能容纳玩家的第一个模板
+        template = next(
+            (t for t in templates if player_level <= t.get("max_level_index", 999)),
+            templates[-1],
+        )
+
+        hp_mult = template.get("hp_mult", 1.0)
+        atk_mult = template.get("atk_mult", 1.0)
+        armor_value = template.get("defense", 0)
+        crit_rate = template.get("crit_rate", 0)
+
+        # 守护组无 level_range，敌人等级直接锚定玩家等级（±浮动由
+        # _choose_enemy_level 的境界/玩家范围逻辑提供，组范围给全集）
+        max_index = len(self.level_config) - 1
+        enemy_level = self._choose_enemy_level(player_level, [0, max_index])
+
+        base_damage = self._get_level_base(enemy_level, "base_damage")
+        base_agility = self._get_level_base(enemy_level, "base_agility")
+        base_speed = self._get_level_base(enemy_level, "base_speed")
+        base_hp = self._get_level_base(enemy_level, "base_hp")
+
+        # 与 spawn_enemy 相同的向后兼容派生
+        if base_damage == 0 and base_hp == 0:
+            base_exp = self._get_level_base(enemy_level, "exp_needed")
+            base_damage = max(1, base_exp // 10)
+            base_hp = max(1, base_exp // 2)
+            base_agility = max(1, base_damage // 2)
+            base_speed = max(1, base_damage // 2)
+
+        damage = int(self._randomize_base_value(base_damage) * atk_mult)
+        hp = int(self._randomize_base_value(base_hp) * hp_mult)
+        agility = self._randomize_base_value(base_agility)
+        speed = self._randomize_base_value(base_speed)
+
+        difficulty_multiplier = self._global_difficulty_multiplier()
+        damage = max(1, int(damage * difficulty_multiplier))
+        hp = max(1, int(hp * difficulty_multiplier))
+        armor_value = max(0, int(armor_value * difficulty_multiplier))
+
+        exp_reward = self._get_level_base(enemy_level, "exp_needed")
+
+        name = template.get("name", "守护者")
+
+        EnemyManager._spawn_counter += 1
+        suffix = EnemyManager._spawn_counter
+        random_token = f"{random.getrandbits(16):04x}"
+        return Enemy(
+            user_id=f"guardian_{template.get('key', 'unknown')}_{suffix}_{random_token}",
             name=name,
             hp=hp,
             max_hp=hp,

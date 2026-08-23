@@ -5,45 +5,88 @@
       "id": 1,
       "name": "青云秘境",
       "level": 0,
-      "exp_range": [500, 1500],
-      "gold_range": [200, 800]
+      "exp_range": [
+        500,
+        1500
+      ],
+      "gold_range": [
+        200,
+        800
+      ],
+      "legacy_type": "rift"
     },
     {
       "id": 2,
       "name": "落日峡谷",
       "level": 3,
-      "exp_range": [1500, 4000],
-      "gold_range": [500, 2000]
+      "exp_range": [
+        1500,
+        4000
+      ],
+      "gold_range": [
+        500,
+        2000
+      ],
+      "legacy_type": "rift"
     },
     {
       "id": 3,
       "name": "万妖洞",
       "level": 6,
-      "exp_range": [3000, 8000],
-      "gold_range": [1000, 5000]
+      "exp_range": [
+        3000,
+        8000
+      ],
+      "gold_range": [
+        1000,
+        5000
+      ],
+      "legacy_type": "rift"
     },
     {
       "id": 4,
       "name": "玄冰地宫",
       "level": 10,
-      "exp_range": [5000, 15000],
-      "gold_range": [2000, 10000]
+      "exp_range": [
+        5000,
+        15000
+      ],
+      "gold_range": [
+        2000,
+        10000
+      ],
+      "legacy_type": "rift"
     },
     {
       "id": 5,
       "name": "上古遗迹",
       "level": 15,
-      "exp_range": [10000, 30000],
-      "gold_range": [5000, 20000]
+      "exp_range": [
+        10000,
+        30000
+      ],
+      "gold_range": [
+        5000,
+        20000
+      ],
+      "legacy_type": "rift"
     },
     {
       "id": 6,
       "name": "青云剑冢",
       "level": 3,
-      "exp_range": [300, 900],
-      "gold_range": [100, 400],
+      "exp_range": [
+        300,
+        900
+      ],
+      "gold_range": [
+        100,
+        400
+      ],
       "sect_id": "qingyun",
-      "access": "sect_member"
+      "access": "sect_member",
+      "legacy_type": "rift"
     }
-  ]
+  ],
+  "legacy_chance": 0.1
 }

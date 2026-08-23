@@ -7,6 +7,7 @@ from astrbot.api import logger
 from .data.default_configs import (
     ALCHEMY_CONFIG,
     BOSS_CONFIG,
+    IMPART_CONFIG,
     RIFT_CONFIG,
     SECT_CONFIG,
     SECT_FACTIONS,
@@ -415,9 +416,9 @@ class ConfigManager:
             config_dir / "alchemy_recipes.json"
         )
 
-        # Load impart tier reward config
+        # Load impart tier reward config (types 分表，缺失时用默认配置)
         self.impart_config = self._load_config_with_default(
-            config_dir / "impart_config.json", {}
+            config_dir / "impart_config.json", IMPART_CONFIG
         )
 
         # 加载游戏配置（包含各系统的硬编码参数）
@@ -448,7 +449,7 @@ class ConfigManager:
             f"{len(self.body_level_data)} 个体修境界配置，"
             f"{len(self.skills_data)} 个技能配置，"
             f"{len(self.heart_methods_data)} 个心法配置，"
-            f"{len(self.impart_config.get('tiers', []))} 个传承等阶，"
+            f"{len(self.impart_config.get('types', {}))} 类传承等阶，"
             f"以及新系统配置 (宗门/Boss/秘境/炼丹)"
         )
 

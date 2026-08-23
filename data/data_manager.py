@@ -173,7 +173,12 @@ class DataBase:
             ),
             ("DELETE FROM user_cd WHERE user_id = ?", (user_id,)),
             ("DELETE FROM buff_info WHERE user_id = ?", (user_id,)),
-            ("DELETE FROM impart_info WHERE user_id = ?", (user_id,)),
+            ("DELETE FROM legacy_instances WHERE owner_id = ?", (user_id,)),
+            (
+                "DELETE FROM impart_pk_cooldown WHERE challenger_id = ? OR target_id = ?",
+                (user_id, user_id),
+            ),
+            ("DELETE FROM impart_snatch_protection WHERE user_id = ?", (user_id,)),
             ("DELETE FROM combat_cooldowns WHERE user_id = ?", (user_id,)),
             (
                 "DELETE FROM pending_gifts WHERE sender_id = ? OR receiver_id = ?",

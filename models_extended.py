@@ -140,13 +140,22 @@ class Rift:
 
 
 @dataclass
-class ImpartInfo:
-    """Impart (inheritance) info data model."""
+class LegacyInstance:
+    """Legacy instance data model (one row per held impart legacy).
+
+    Replaces the old single-row ``ImpartInfo``. A player may hold multiple
+    instances; only the one with ``is_active`` set accumulates value on
+    cultivation settlement (design D1/D2 of rework-impart-system).
+    """
 
     id: int  # Primary key
-    user_id: str  # User ID
-    impart_value: int = 0  # Accumulated impart value from PK wins
+    owner_id: str  # Owning player user ID
+    legacy_type: str = "common"  # common / sect / adventure / rift
+    impart_value: int = 0  # Accumulated value from cultivation (15min/point)
     claimed_tiers: str = "[]"  # JSON list of claimed tier numbers
+    sect_id: int | None = None  # Owning sect for sect-type legacies
+    is_active: int = 0  # 1 = currently accumulating instance (at most one per owner)
+    acquired_at: int = 0  # Acquisition timestamp (PK target picks latest)
 
     def get_claimed_tiers(self) -> list[int]:
         """Return the list of claimed tier numbers."""

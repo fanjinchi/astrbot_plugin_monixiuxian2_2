@@ -39,6 +39,8 @@ class PlayerHandler:
         self.config_manager = config_manager
         self.skill_manager = skill_manager
         self.sect_mgr = sect_mgr
+        # 传承管理器：init 顺序在 player_handler 之后，由 main.py 装配后注入
+        self.impart_mgr = None
         self.cultivation_manager = CultivationManager(
             config, config_manager, skill_manager
         )
@@ -395,6 +397,14 @@ class PlayerHandler:
         await self.db.update_player(player)
         await self.db.ext.set_user_free(player.user_id)
 
+        # 传承值累积：仅激活中的传承实例（每15分钟+1点），随出关一次结算
+        legacy_line = ""
+        if self.impart_mgr is not None:
+            points = effective_minutes // 15
+            legacy_msg = await self.impart_mgr.add_active_impart_value(player, points)
+            if legacy_msg:
+                legacy_line = "\n\n" + legacy_msg
+
         # 计算闭关时长显示
         hours = duration_minutes // 60
         minutes = duration_minutes % 60
@@ -424,6 +434,8 @@ class PlayerHandler:
         )
         if learn_msgs:
             reply_msg += "\n\n" + "\n".join(learn_msgs)
+        if legacy_line:
+            reply_msg += legacy_line
         yield event.plain_result(reply_msg)
 
     @player_required

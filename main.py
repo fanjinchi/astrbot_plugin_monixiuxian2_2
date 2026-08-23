@@ -148,6 +148,7 @@ CMD_ALCHEMY_CRAFT = "炼丹"
 
 # 传承系统指令
 CMD_IMPART_INFO = "传承信息"
+CMD_IMPART_ACTIVATE = "激活传承"
 
 # Phase 1: 道号系统
 CMD_CHANGE_NICKNAME = "改道号"
@@ -265,12 +266,17 @@ class XiuXianPlugin(Star):
         self.combat_mgr = CombatManager(self.config_manager, self.skill_manager)
         self.enemy_mgr = EnemyManager(config_manager=self.config_manager)
         self.impart_mgr = ImpartManager(self.db, self.config_manager)
+        # 出关结算需要传承管理器（init 顺序在 player_handler 之后，此处注入）
+        self.player_handler.impart_mgr = self.impart_mgr
         self.pve_combat_mgr = PVECombatManager(
             self.combat_mgr,
             self.enemy_mgr,
             self.config_manager,
             self.impart_mgr,
         )
+        # 宗门传承领取/回收需要传承与PvE管理器（init 顺序在其后，此处注入）
+        self.sect_mgr.impart_mgr = self.impart_mgr
+        self.sect_mgr.pve_combat_mgr = self.pve_combat_mgr
         self.boss_mgr = BossManager(
             self.db,
             self.combat_mgr,
@@ -280,10 +286,14 @@ class XiuXianPlugin(Star):
         self.rift_mgr = RiftManager(
             self.db, self.config_manager, self.storage_ring_mgr, self.pve_combat_mgr
         )
+        # 秘境传承机缘需要传承管理器（init 顺序在其后，此处注入）
+        self.rift_mgr.impart_mgr = self.impart_mgr
         self.rank_mgr = RankingManager(self.db, self.combat_mgr, self.config_manager)
         self.adventure_mgr = AdventureManager(
             self.db, self.storage_ring_mgr, self.pve_combat_mgr
         )
+        # 历练传承机缘需要传承管理器（init 顺序在其后，此处注入）
+        self.adventure_mgr.impart_mgr = self.impart_mgr
         self.alchemy_mgr = AlchemyManager(
             self.db, self.config_manager, self.storage_ring_mgr
         )
@@ -301,6 +311,7 @@ class XiuXianPlugin(Star):
             plugin_data_path=plugin_data_path,
             broadcast_callback=self._broadcast_boss_spawn,
             sect_manager=self.sect_mgr,
+            impart_manager=self.impart_mgr,
         )
 
         # 初始化新功能处理器
@@ -1307,6 +1318,13 @@ class XiuXianPlugin(Star):
     async def handle_impart_info(self, event: AstrMessageEvent):
         """Command 「传承信息」- 查看传承信息; routes to impart_handlers.handle_impart_info."""
         async for r in self.impart_handlers.handle_impart_info(event):
+            yield r
+
+    @filter.command(CMD_IMPART_ACTIVATE, "激活传承（选择修炼累积目标）")
+    @require_whitelist
+    async def handle_impart_activate(self, event: AstrMessageEvent, target: str = ""):
+        """Command 「激活传承」- 选择一条持有传承作为修炼累积目标; routes to impart_handlers.handle_impart_activate."""
+        async for r in self.impart_handlers.handle_impart_activate(event, target):
             yield r
 
     # ===== Phase 1: 道号系统 =====
