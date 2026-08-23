@@ -193,21 +193,30 @@ class TestGameConfigKeys:
 
 
 class TestMigrationV27:
-    def test_migration_script_exists(self):
+    def test_registration_mechanism_kept(self):
+        """V3.11.0 起不再向前兼容（历史逐版本迁移已移除），但迁移任务注册机制保留。"""
         import ast
 
         with open(PLUGIN_ROOT / "data/migration.py", encoding="utf-8") as f:
             source = f.read()
         tree = ast.parse(source)
-        decorators = [
-            node.decorator_list[0].args[0].value  # type: ignore[arg-type]
+
+        # migration() 装饰器与 MIGRATION_TASKS 注册表仍在（供 v33+ 使用）
+        assert "def migration(version" in source
+        assert "MIGRATION_TASKS" in source
+
+        # 但不应再残留任何逐版本迁移函数（不再向前兼容）
+        async_fns = [
+            node.name
             for node in ast.walk(tree)
             if isinstance(node, ast.AsyncFunctionDef)
-            and node.decorator_list
-            and isinstance(node.decorator_list[0], ast.Call)
-            and isinstance(node.decorator_list[0].args[0], ast.Constant)
         ]
-        assert 27 in decorators, "Migration v27 must be registered"
+        assert not any(
+            n.startswith("_migrate_to_") for n in async_fns
+        ), "历史逐版本迁移函数应已全部移除"
+        assert not any(
+            n.startswith("_create_all_tables_v") for n in async_fns
+        ), "历史多套建表函数应已全部移除"
 
     def test_latest_version_bumped(self):
         with open(PLUGIN_ROOT / "data/migration.py", encoding="utf-8") as f:

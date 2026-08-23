@@ -32,6 +32,6 @@
 
 - **代码**：`managers/impart_manager.py`（重构：实例生命周期/累积/转移/冷却）、`managers/impart_pk_manager.py`（夺取制）、`managers/adventure_manager.py`、`managers/rift_manager.py`、`managers/sect_manager.py`（宝库 kind=legacy + 离宗回收）、`managers/pve_combat_manager.py`（守护 NPC 挑战）、`handlers/impart_handlers.py`、`handlers/impart_pk_handlers.py`、`handlers/player_handler.py`（出关累积）、`data/migration.py`（v32）、`data/database_extended.py`、`data/data_manager.py`、`models_extended.py`、`core/gm_manager.py`（传承预置/清除子命令）、`main.py`、`handlers/misc_handler.py`。
 - **配置**：`config/impart_config.json`（重构）、`config/adventure_config.json`、`config/rift_config.json`（加 `legacy_chance`）、`config/sect_factions.json`（宝库 kind=legacy）、`config/enemies.json`（legacy_guardian）、`config/heart_methods.json`/`config/skills.json`（经 sync 管道补齐奖励 id）。
-- **数据**：新表 `legacy_instances`、`impart_pk_cooldown`；旧表 `impart_info` 迁移后删除（迁移 v32）。
+- **数据**：新表 `legacy_instances`、`impart_pk_cooldown`、`impart_snatch_protection`；**迁移重构**：v3.11.0 起不再向前兼容——移除全部历史逐版本迁移（不再有 `impart_info` 拷贝保真），统一 `_create_all_tables()` 直接生成 v32 最新 schema，旧库重建（数据重置）；保留 `MIGRATION_TASKS` 注册机制供后续版本增量升级。
 - **测试**：`tests/test_impart_manager.py` 重写、`tests/test_migration.py` 增补 v32、`tests/test_sect_manager.py`（若存在）扩展；`functional_tests` 新增传承域用例。
 - **文档**：`design_docs/current-design-report.md`（4.17 节重写、ImpartInfo→LegacyInstance、迁移里程碑）、`design_docs/project-architecture.md`、`design_docs/api-overview.md`、`design_docs/sect-system-design.md`、`README.md`、`handlers/misc_handler.py` 帮助文本。

@@ -81,7 +81,41 @@ class EnemyManager:
                     "crit_rate_bonus": 0,
                 },
                 "drop_tier": "low",
-            }
+            },
+            {
+                "key": "legacy_guardian",
+                "name": "传承之地守护",
+                "description": "传承获取前置挑战的守护 NPC 组；不带 level_range，只能经 spawn_enemy_from_group 定向触达。",
+                "templates": [
+                    {
+                        "key": "guardian_low",
+                        "name": "守门石像",
+                        "max_level_index": 30,
+                        "hp_mult": 1.0,
+                        "atk_mult": 0.9,
+                        "defense": 5,
+                        "crit_rate": 0.05,
+                    },
+                    {
+                        "key": "guardian_mid",
+                        "name": "镇府灵将",
+                        "max_level_index": 60,
+                        "hp_mult": 1.1,
+                        "atk_mult": 1.0,
+                        "defense": 10,
+                        "crit_rate": 0.08,
+                    },
+                    {
+                        "key": "guardian_high",
+                        "name": "传承守护神",
+                        "max_level_index": 999,
+                        "hp_mult": 1.2,
+                        "atk_mult": 1.1,
+                        "defense": 20,
+                        "crit_rate": 0.1,
+                    },
+                ],
+            },
         ],
         "difficulty_coefficients": {
             "normal": 0.85,
@@ -131,11 +165,24 @@ class EnemyManager:
         """
         self.config_manager: ConfigManager | None = config_manager
         self.enemy_groups: list[dict] = []
-        self.legacy_guardian_group: dict = {}
         self.difficulty_coefficients: dict = {}
         self.naming: dict = {}
         self.level_config: list = []
         self.reload_config(level_config)
+
+    def get_guardian_group_key(self) -> str:
+        """返回传承守护 NPC 组在 enemy_groups 中的 key（配置驱动）。
+
+        读取 IMPART_CONFIG.guardian.enemy_group，改变配置即可更换守护组，
+        无需改代码。
+        """
+        if self.config_manager is not None:
+            return (
+                (self.config_manager.impart_config or {})
+                .get("guardian", {})
+                .get("enemy_group", "legacy_guardian")
+            )
+        return "legacy_guardian"
 
     def reload_config(self, level_config: list = None):
         """重新加载配置文件"""
@@ -143,9 +190,9 @@ class EnemyManager:
         self.enemy_groups = config.get(
             "enemy_groups", self.DEFAULT_CONFIG["enemy_groups"]
         )
-        # 守护 NPC 组独立于普通 PvE 分组加载，不带 level_range，
-        # 只能经 spawn_enemy_from_group 定向触达，避免被普通战斗匹配
-        self.legacy_guardian_group = config.get("legacy_guardian_group", {})
+        # 传承守护组不再单独存顶层键：组本身就放在 enemy_groups 列表内
+        # （由 get_guardian_group_key 指定的 key 标识，不带 level_range，
+        # 只能经 spawn_enemy_from_group 定向触达，避免被普通战斗匹配）
         self.difficulty_coefficients = config.get(
             "difficulty_coefficients", self.DEFAULT_CONFIG["difficulty_coefficients"]
         )
@@ -405,12 +452,14 @@ class EnemyManager:
     def spawn_enemy_from_group(self, group_key: str, player_level: int) -> Enemy:
         """按组名定向生成敌人（用于传承守护 NPC 等特殊遭遇）。
 
-        绕开普通 PvE 的 ``_get_group_by_level`` 匹配，避免守护组被普通
-        战斗随机命中。守护组模板以 ``max_level_index`` 按玩家境界分档，
-        固定 normal 类别（无精英/Boss 前缀），强度与玩家境界匹配。
+        组在 ``enemy_groups`` 列表内按 ``key`` 定位，绕开普通 PvE 的
+        ``_get_group_by_level`` 匹配（守护组不带 ``level_range``，不会被
+        普通战斗随机命中）。守护组模板以 ``max_level_index`` 按玩家境界
+        分档，固定 normal 类别（无精英/Boss 前缀），强度与玩家境界匹配。
 
         Args:
-            group_key: 目标组名（当前仅支持 ``legacy_guardian``）。
+            group_key: 目标组 key（默认守护组见 ``get_guardian_group_key()``，
+                由 IMPART_CONFIG.guardian.enemy_group 配置）。
             player_level: 玩家等级（level_index，1-based），用于选档与定强。
 
         Returns:
@@ -419,12 +468,15 @@ class EnemyManager:
         Raises:
             ValueError: 组不存在或无可用模板时抛出。
         """
-        if group_key != "legacy_guardian":
+        group = next(
+            (g for g in self.enemy_groups if g.get("key") == group_key),
+            None,
+        )
+        if group is None:
             raise ValueError(f"未知的定向敌人组: {group_key}")
-        group = self.legacy_guardian_group
         templates = group.get("templates", [])
         if not templates:
-            raise ValueError("传承守护组未配置模板")
+            raise ValueError(f"敌人组未配置模板: {group_key}")
 
         # 按玩家境界分档：选 max_level_index 能容纳玩家的第一个模板
         template = next(

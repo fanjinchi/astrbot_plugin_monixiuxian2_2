@@ -335,6 +335,43 @@
         "crit_rate_bonus": 5
       },
       "drop_tier": "top"
+    },
+    {
+      "key": "legacy_guardian",
+      "name": "传承之地守护",
+      "description": "守护传承之地的神秘存在，强度与来访者境界匹配",
+      "templates": [
+        {
+          "key": "guardian_low",
+          "name": "守碑灵",
+          "description": "守护低阶传承之地的石灵",
+          "max_level_index": 10,
+          "hp_mult": 1.1,
+          "atk_mult": 1.0,
+          "defense": 8,
+          "crit_rate": 8
+        },
+        {
+          "key": "guardian_mid",
+          "name": "镇殿战偶",
+          "description": "守护中阶传承之地的青铜战偶",
+          "max_level_index": 30,
+          "hp_mult": 1.2,
+          "atk_mult": 1.1,
+          "defense": 15,
+          "crit_rate": 10
+        },
+        {
+          "key": "guardian_high",
+          "name": "传承剑侍",
+          "description": "守护高阶传承之地的无名剑侍",
+          "max_level_index": 999,
+          "hp_mult": 1.3,
+          "atk_mult": 1.2,
+          "defense": 22,
+          "crit_rate": 12
+        }
+      ]
     }
   ],
   "drop_tables": {
@@ -447,43 +484,6 @@
     "normal": 0.85,
     "elite": 1.0,
     "boss": 1.2
-  },
-  "legacy_guardian_group": {
-    "key": "legacy_guardian",
-    "name": "传承之地守护",
-    "description": "守护传承之地的神秘存在，强度与来访者境界匹配",
-    "templates": [
-      {
-        "key": "guardian_low",
-        "name": "守碑灵",
-        "description": "守护低阶传承之地的石灵",
-        "max_level_index": 10,
-        "hp_mult": 1.1,
-        "atk_mult": 1.0,
-        "defense": 8,
-        "crit_rate": 8
-      },
-      {
-        "key": "guardian_mid",
-        "name": "镇殿战偶",
-        "description": "守护中阶传承之地的青铜战偶",
-        "max_level_index": 30,
-        "hp_mult": 1.2,
-        "atk_mult": 1.1,
-        "defense": 15,
-        "crit_rate": 10
-      },
-      {
-        "key": "guardian_high",
-        "name": "传承剑侍",
-        "description": "守护高阶传承之地的无名剑侍",
-        "max_level_index": 999,
-        "hp_mult": 1.3,
-        "atk_mult": 1.2,
-        "defense": 22,
-        "crit_rate": 12
-      }
-    ]
   },
   "naming": {
     "normal": "{name}",

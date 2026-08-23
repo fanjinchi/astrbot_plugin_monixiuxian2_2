@@ -7,8 +7,9 @@ its failure never breaks the check-in flow.
 """
 
 import sys
+import time
 from datetime import datetime
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -424,5 +425,51 @@ async def test_sect_shop_buy_flow():
     # 未知商品
     success, msg = await mgr.buy_sect_shop_item("s2", "不存在的东西")
     assert not success and "没有" in msg
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_end_cultivation_hints_when_legacy_unactivated(monkeypatch):
+    """出关时持有传承但未激活：提示需先激活（spec：未激活传承不累积）。
+
+    激活实例存在时正常累积累提示；无实例时不提示。
+    """
+    db = await _make_db()
+    handler = PlayerHandler(db, {"VALUES": {}}, FakeConfigManager())
+
+    await _make_player(db, "u1")
+
+    async def _enter_cultivation(user_id: str):
+        player = await db.get_player_by_id(user_id)
+        player.state = "修炼中"
+        player.cultivation_start_time = int(time.time()) - 30 * 60
+        await db.update_player(player)
+
+    # 场景1：持有传承但未激活 → 出关提示需先激活
+    fake_impart = MagicMock()
+    fake_impart.add_active_impart_value = AsyncMock(return_value=None)
+    handler.impart_mgr = fake_impart
+    monkeypatch.setattr(
+        db.ext, "list_legacy_instances_by_owner", AsyncMock(return_value=[object()])
+    )
+    await _enter_cultivation("u1")
+    event = _make_event("u1", "出关")
+    await _collect(handler.handle_end_cultivation(event))
+    msg = _last_msg(event)
+    assert "未激活" in msg and "激活传承" in msg
+
+    # 场景2：激活累积有输出 → 正常提示，不再提示未激活
+    fake_impart.add_active_impart_value = AsyncMock(
+        return_value="🌟 【通用传承】传承值 +2（当前 2）"
+    )
+    monkeypatch.setattr(
+        db.ext, "list_legacy_instances_by_owner", AsyncMock(return_value=[])
+    )
+    await _enter_cultivation("u1")
+    event = _make_event("u1", "出关")
+    await _collect(handler.handle_end_cultivation(event))
+    msg = _last_msg(event)
+    assert "未激活" not in msg and "传承值 +2" in msg
 
     await db.close()

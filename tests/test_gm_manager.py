@@ -769,6 +769,10 @@ async def test_give_legacy_default_and_typed(gm_manager, mock_db):
     ok, msg = await gm_manager.cmd_give_legacy(event, "900000002 adventure")
     assert ok and "历练传承" in msg and store[-1].legacy_type == "adventure"
 
+    # 单 token 数字视为目标（给予传承 900000002）
+    ok, msg = await gm_manager.cmd_give_legacy(event, "900000002")
+    assert ok and "通用传承" in msg and store[-1].legacy_type == "common"
+
     ok, msg = await gm_manager.cmd_give_legacy(event, "900000002 秘境")
     assert ok and store[-1].legacy_type == "rift"
 
@@ -778,7 +782,7 @@ async def test_give_legacy_default_and_typed(gm_manager, mock_db):
 
 @pytest.mark.asyncio
 async def test_give_sect_legacy_binds_current_sect(gm_manager, mock_db):
-    """给予 sect 类型时自动绑定目标玩家当前宗门。"""
+    """给予 sect 类型时自动绑定目标玩家当前宗门；无宗门时拒绝+提示。"""
     store = _wire_legacy(gm_manager, mock_db)
     player = make_player(user_id="900000002")
     player.sect_id = 7
@@ -788,6 +792,12 @@ async def test_give_sect_legacy_binds_current_sect(gm_manager, mock_db):
     ok, msg = await gm_manager.cmd_give_legacy(event, "900000002 sect")
     assert ok
     assert store[-1].legacy_type == "sect" and store[-1].sect_id == 7
+
+    # 无宗门玩家：拒绝创建，不产生游离宗门传承（sect-system 不变式）
+    player.sect_id = 0
+    ok, msg = await gm_manager.cmd_give_legacy(event, "900000002 sect")
+    assert not ok and "无宗门" in msg
+    assert len(store) == 1, "不应创建任何实例"
 
 
 @pytest.mark.asyncio
@@ -799,8 +809,9 @@ async def test_clear_legacy_state(gm_manager, mock_db):
     mock_db.ext.delete_impart_snatch_protection = AsyncMock(return_value=1)
     event = make_event(sender_id="gm_001")
 
-    # 数字目标需两个 token（单 token 数字被解析为数值参数、目标=发送者）
-    ok, msg = await gm_manager.cmd_clear_legacy_state(event, "900000002 all")
+    # 单 token 数字目标（spec 原文「清除传承状态 900000002」）：
+    # _resolve_target 的 single_token_is_target 参数使之可直接作为目标 ID
+    ok, msg = await gm_manager.cmd_clear_legacy_state(event, "900000002")
     assert ok and "挑战冷却 2 条" in msg and "保护期 1 条" in msg
     mock_db.ext.delete_impart_pk_cooldowns.assert_awaited_once_with("900000002")
     mock_db.ext.delete_impart_snatch_protection.assert_awaited_once_with("900000002")

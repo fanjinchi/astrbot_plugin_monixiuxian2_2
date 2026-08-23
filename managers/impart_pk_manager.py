@@ -117,7 +117,16 @@ class ImpartPkManager:
 
         attacker_wins = result.winner == attacker.user_id
         if attacker_wins:
-            await self.impart_mgr.transfer_legacy(target.id, attacker.user_id)
+            transferred = await self.impart_mgr.transfer_legacy(
+                target.id, attacker.user_id, expected_owner=defender.user_id
+            )
+            if transferred is None:
+                # 并发场景：实例在战斗期间已被他人转移（归属重校验不过）
+                return (
+                    False,
+                    battle_text,
+                    {"rejected": "你慢了一步：对方的那条传承已被他人夺走。"},
+                )
             # 被夺方获得 3 日保护期（任何玩家不可挑战）
             await self.impart_mgr.record_snatch_protection(defender.user_id)
             rewards["snatched_type"] = target.legacy_type

@@ -67,6 +67,30 @@
     {
       "type": "send",
       "player": "gm",
+      "text": "#修仙GM 清除传承 900000002 全部",
+      "note": "彻底复位 p1 传承实例（用例 hermetic，不依赖上次运行状态）"
+    },
+    {
+      "type": "expect",
+      "match": "re:已删除.*传承|未持有任何传承",
+      "timeout": 30,
+      "note": "p1 传承实例已清空"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除传承 900000003 全部",
+      "note": "彻底复位 p2 传承实例"
+    },
+    {
+      "type": "expect",
+      "match": "re:已删除.*传承|未持有任何传承",
+      "timeout": 30,
+      "note": "p2 传承实例已清空"
+    },
+    {
+      "type": "send",
+      "player": "gm",
       "text": "#修仙GM 给予传承 900000003 common",
       "note": "GM 给 p2 预置通用传承"
     },

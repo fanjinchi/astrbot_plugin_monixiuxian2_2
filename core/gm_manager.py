@@ -127,13 +127,25 @@ class GMManager:
     # ========== 通用工具 ==========
 
     def _resolve_target(
-        self, event: "AstrMessageEvent", args: str
+        self, event: "AstrMessageEvent", args: str, single_token_is_target: bool = False
     ) -> tuple[str | None, str]:
         """解析目标玩家。
 
+        Args:
+            event: 消息事件，用于提取 @mention 与发送者。
+            args: 命令剩余参数原文。
+            single_token_is_target: 目标型子命令（参数不可能是纯数字数值）
+                置 True，允许单个 5-12 位数字 token 直接作为目标 ID，
+                例如「清除传承状态 900000002」；数值型子命令保持 False，
+                单个数字仍是命令自身参数（如「设置修为 5000」）。
+
+        Returns:
+            (目标 user_id 或 None, 剩余参数字符串)；省略目标时目标为发送者。
+
         优先级：
         1. 消息中的 @mention
-        2. 参数中的纯数字 user_id
+        2. 参数中的纯数字 user_id（≥2 token 时首数字 token 必为目标；
+           单 token 时仅 single_token_is_target 且 5-12 位才视为目标）
         3. 省略目标时使用命令发送者
         """
         # 1. 从消息链中解析 At
@@ -154,13 +166,20 @@ class GMManager:
                     return str(candidate).lstrip("@"), cleaned_args
 
         # 2. 从剩余参数中取第一个 token，如果是数字则视为 user_id
-        # 规则：仅当剩余参数不少于 2 个时，第一个数字 token 才被视为目标 ID；
-        # 否则将该数字视为命令本身的数值参数（省略了目标）。
         tokens = args.split() if args else []
         if len(tokens) >= 2 and tokens[0].lstrip("@").isdigit():
             target_id = tokens[0].lstrip("@")
             remaining = " ".join(tokens[1:])
             return target_id, remaining
+        # 目标型子命令下，单个 5-12 位数字 token 视为目标 ID
+        # （平台 user_id 通常 5 位以上；短数字保留给数值参数与传承编号）
+        if (
+            single_token_is_target
+            and len(tokens) == 1
+            and tokens[0].lstrip("@").isdigit()
+            and 5 <= len(tokens[0].lstrip("@")) <= 12
+        ):
+            return tokens[0].lstrip("@"), ""
 
         # 3. 未指定目标，默认使用发送者
         sender_id = str(event.get_sender_id()) if event.get_sender_id() else None
@@ -342,7 +361,9 @@ class GMManager:
         仅用于功能测试与数据修复：创建的实例为未激活态、传承值 0，
         sect 类型自动绑定目标玩家当前所在宗门。
         """
-        target_id, remaining = self._resolve_target(event, args)
+        target_id, remaining = self._resolve_target(
+            event, args, single_token_is_target=True
+        )
         player = await self._get_player(target_id)
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"
@@ -358,7 +379,18 @@ class GMManager:
             options = "、".join(f"{v}/{k}" for k, v in LEGACY_TYPE_NAMES.items())
             return False, f"❌ 未知传承类型【{type_arg}】，可选：{options}"
 
-        sect_id = player.sect_id if legacy_type == "sect" and player.sect_id else None
+        # sect 类型必须绑定目标玩家当前宗门：无宗门时拒绝（避免产生
+        # 无法被 PK/回收匹配的游离宗门传承，违反 sect-system spec
+        # 「宗门传承 SHALL 额外绑定所属宗门」不变式）
+        if legacy_type == "sect":
+            if not player.sect_id:
+                return False, (
+                    f"❌ 无法给予宗门传承：{player.user_name} 当前无宗门，"
+                    "宗门传承需绑定所属宗门！"
+                )
+            sect_id = player.sect_id
+        else:
+            sect_id = None
         instance = await self.impart_manager.create_legacy(
             target_id, legacy_type, sect_id=sect_id, activate=False
         )
@@ -374,7 +406,9 @@ class GMManager:
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
         """清除传承：清除传承 [@玩家/ID] [编号]，无编号时删除该玩家全部传承实例。"""
-        target_id, remaining = self._resolve_target(event, args)
+        target_id, remaining = self._resolve_target(
+            event, args, single_token_is_target=True
+        )
         player = await self._get_player(target_id)
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"
@@ -413,7 +447,9 @@ class GMManager:
         同时清掉该玩家作为挑战者的全部冷却记录（对不同目标的），
         以及作为被夺者的保护期。注意：不删除传承实例本身。
         """
-        target_id, remaining = self._resolve_target(event, args)
+        target_id, remaining = self._resolve_target(
+            event, args, single_token_is_target=True
+        )
         player = await self._get_player(target_id)
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"
@@ -433,7 +469,9 @@ class GMManager:
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
         """设置境界。"""
-        target_id, remaining = self._resolve_target(event, args)
+        target_id, remaining = self._resolve_target(
+            event, args, single_token_is_target=True
+        )
         player = await self._get_player(target_id)
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"
@@ -489,7 +527,9 @@ class GMManager:
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
         """GM command: set the target player's sect position (0-4 or name)."""
-        target_id, remaining = self._resolve_target(event, args)
+        target_id, remaining = self._resolve_target(
+            event, args, single_token_is_target=True
+        )
         player = await self._get_player(target_id)
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"
@@ -659,7 +699,9 @@ class GMManager:
         self, event: "AstrMessageEvent", args: str, item_kind: str
     ) -> tuple[bool, str]:
         """给予物品或装备（进储物戒）。"""
-        target_id, remaining = self._resolve_target(event, args)
+        target_id, remaining = self._resolve_target(
+            event, args, single_token_is_target=True
+        )
         player = await self._get_player(target_id)
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"
@@ -696,7 +738,9 @@ class GMManager:
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
         """卸下装备。"""
-        target_id, remaining = self._resolve_target(event, args)
+        target_id, remaining = self._resolve_target(
+            event, args, single_token_is_target=True
+        )
         player = await self._get_player(target_id)
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"

@@ -58,7 +58,6 @@ class PVECombatManager:
         combat_mgr: CombatManager,
         enemy_mgr: EnemyManager,
         config_manager=None,
-        impart_manager=None,
     ):
         """
         初始化PVE战斗管理器
@@ -67,13 +66,11 @@ class PVECombatManager:
             combat_mgr: 统一战斗引擎或其 Legacy 适配器。
             enemy_mgr: 敌人管理器，用于生成敌人
             config_manager: 配置管理器，可选，用于读取装备数据
-            impart_manager: 传承管理器，可选，用于获取传承加成
         """
         # 兼容直接传入 CombatEngine 或 Legacy CombatManager
         self.combat_engine = getattr(combat_mgr, "engine", combat_mgr)
         self.enemy_mgr = enemy_mgr
         self.config_manager = config_manager
-        self.impart_manager = impart_manager
 
     def _should_trigger_combat(self, scene: str, difficulty: str) -> bool:
         """
@@ -363,10 +360,11 @@ class PVECombatManager:
         """
         from astrbot.api import logger
 
-        # 1. 生成守护 NPC（强度与玩家境界匹配）
+        # 1. 生成守护 NPC（强度与玩家境界匹配；组 key 由
+        #    IMPART_CONFIG.guardian.enemy_group 配置驱动）
         try:
             enemy = self.enemy_mgr.spawn_enemy_from_group(
-                "legacy_guardian", player.level_index
+                self.enemy_mgr.get_guardian_group_key(), player.level_index
             )
         except Exception as e:
             logger.error(f"生成传承守护者失败: {e}")
@@ -379,11 +377,12 @@ class PVECombatManager:
             player_fighter, enemy_fighter, combat_type="pve"
         )
 
-        # 3. HP 写回，失败不致死（下限 1，不扣修为/灵石/掉落）
+        # 3. HP 写回，失败不致死（下限 1，不扣修为/灵石/掉落；平局同归于尽
+        #    时同样兜底，避免玩家 hp=0）
         final_hp = result.fighter1_final_hp
         is_draw = result.winner == "draw"
         won = result.winner == player.user_id
-        if not won and not is_draw:
+        if not won:
             final_hp = max(1, final_hp)
         player.hp = final_hp
 

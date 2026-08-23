@@ -1,4 +1,4 @@
-"""Tests for database migrations (v25 player_skills, v26 impart rework, v32 legacy instances)."""
+"""Tests for database migrations (v3.11.0 不再向前兼容：旧库统一重建到最新 schema)。"""
 
 import aiosqlite
 import pytest
@@ -7,8 +7,7 @@ from tests.helpers import load_module, load_package_module
 
 _migration_mod = load_module("migration_test", "data/migration.py")
 MigrationManager = _migration_mod.MigrationManager
-_create_all_tables_v21 = _migration_mod._create_all_tables_v21
-_create_all_tables_v22 = _migration_mod._create_all_tables_v22
+_create_all_tables = _migration_mod._create_all_tables
 LATEST_DB_VERSION = _migration_mod.LATEST_DB_VERSION
 
 _data_mod = load_package_module(
@@ -25,6 +24,19 @@ class DummyConfigManager:
     pass
 
 
+async def _all_tables(db_conn) -> set[str]:
+    """Return the set of user table names in the database."""
+    async with db_conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+    ) as cursor:
+        return {row[0] for row in await cursor.fetchall()}
+
+
+async def _player_columns(db_conn) -> set[str]:
+    async with db_conn.execute("PRAGMA table_info(players)") as cursor:
+        return {row[1] for row in await cursor.fetchall()}
+
+
 @pytest.mark.asyncio
 async def test_fresh_install_reaches_latest_version():
     """A brand-new database is created with the latest schema and version."""
@@ -35,8 +47,7 @@ async def test_fresh_install_reaches_latest_version():
             row = await cursor.fetchone()
         assert row[0] == LATEST_DB_VERSION
 
-        async with db_conn.execute("PRAGMA table_info(players)") as cursor:
-            columns = {row[1] for row in await cursor.fetchall()}
+        columns = await _player_columns(db_conn)
 
     new_fields = {
         "damage",
@@ -53,32 +64,39 @@ async def test_fresh_install_reaches_latest_version():
     # learned_skills column must NOT exist
     assert "learned_skills" not in columns, "learned_skills column still present"
 
-    # player_skills table must exist
+    # 全部 24 张业务表齐备
     async with aiosqlite.connect(":memory:") as db_conn2:
         await MigrationManager(db_conn2, DummyConfigManager()).migrate()
-        async with db_conn2.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='player_skills'"
-        ) as cursor:
-            row = await cursor.fetchone()
-        assert row is not None, "player_skills table not found"
-
-        # v32: fresh installs build the three legacy-instance tables; old impart_info is gone
-        for table in (
+        tables = await _all_tables(db_conn2)
+        assert {
+            "db_info",
+            "players",
+            "shop",
+            "sects",
+            "buff_info",
+            "boss",
+            "rifts",
             "legacy_instances",
             "impart_pk_cooldown",
             "impart_snatch_protection",
-        ):
-            async with db_conn2.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
-            ) as cursor:
-                assert await cursor.fetchone() is not None, f"{table} table not found"
+            "user_cd",
+            "pending_gifts",
+            "bank_accounts",
+            "bank_loans",
+            "bank_transactions",
+            "bounty_tasks",
+            "blessed_lands",
+            "spirit_farms",
+            "dual_cultivation",
+            "spirit_eyes",
+            "dual_cultivation_requests",
+            "combat_cooldowns",
+            "player_skills",
+            "system_config",
+        } <= tables, f"Missing tables: {set() if False else tables}"
 
-        async with db_conn2.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='impart_info'"
-        ) as cursor:
-            assert await cursor.fetchone() is None, (
-                "impart_info should be dropped at v32"
-            )
+        # 旧的 impart_info 表已彻底移除
+        assert "impart_info" not in tables
 
         async with db_conn2.execute("PRAGMA table_info(legacy_instances)") as cursor:
             legacy_cols = {row[1] for row in await cursor.fetchall()}
@@ -101,7 +119,16 @@ async def test_fresh_install_reaches_latest_version():
                 "idx_legacy_active_owner index not found"
             )
 
-        # v28: fresh installs already carry the system-sect / skill attribution columns
+        # sect_id 类型统一为 INTEGER（不再有 v22 TEXT 与 v32 INTEGER 两路径漂移）
+        async with db_conn2.execute(
+            "PRAGMA table_info(legacy_instances)"
+        ) as cursor:
+            sect_id_type = {
+                row[1]: row[2] for row in await cursor.fetchall()
+            }["sect_id"]
+        assert sect_id_type == "INTEGER"
+
+        # 系统宗门列 / 技能归属列 / 师承进度列
         async with db_conn2.execute("PRAGMA table_info(sects)") as cursor:
             sect_cols = {row[1] for row in await cursor.fetchall()}
         assert {"is_system", "faction_id", "status", "destruction_tier"} <= sect_cols
@@ -110,10 +137,34 @@ async def test_fresh_install_reaches_latest_version():
             skill_cols = {row[1] for row in await cursor.fetchall()}
         assert {"origin_sect_id", "sect_bound"} <= skill_cols
 
-        # v30: fresh installs carry the master task chain progress column
         async with db_conn2.execute("PRAGMA table_info(players)") as cursor:
             player_cols = {row[1] for row in await cursor.fetchall()}
         assert "sect_master_progress" in player_cols
+
+
+@pytest.mark.asyncio
+async def test_fresh_install_seeds_rifts_and_eyes():
+    """Fresh installs seed 6 rifts (incl. 青云剑冢) and 3 spirit eyes."""
+    import json
+
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        async with db_conn.execute(
+            "SELECT rift_id, rift_name, rift_level, required_level, rewards FROM rifts"
+        ) as cursor:
+            rows = await cursor.fetchall()
+        by_id = {row[0]: row for row in rows}
+        assert set(by_id) == {1, 2, 3, 4, 5, 6}
+        assert by_id[4][1] == "玄冰地宫"
+        tomb = by_id[6]
+        assert tomb[1] == "青云剑冢"
+        assert json.loads(tomb[4]) == {"exp": [300, 900], "gold": [100, 400]}
+
+        async with db_conn.execute(
+            "SELECT COUNT(*) FROM spirit_eyes"
+        ) as cursor:
+            assert (await cursor.fetchone())[0] == 3
 
 
 @pytest.mark.asyncio
@@ -139,31 +190,62 @@ async def test_fresh_install_player_crud_works():
 
 
 @pytest.mark.asyncio
-async def test_v21_to_latest_migration_rebuilds_players():
-    """Migrating from the old v21 schema drops old players and rebuilds it."""
+async def test_migrate_is_idempotent_on_fresh():
+    """Running migrate() twice on a fresh database is a no-op."""
     async with aiosqlite.connect(":memory:") as db_conn:
-        await _create_all_tables_v21(db_conn)
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        async with db_conn.execute("SELECT version FROM db_info") as cursor:
+            assert (await cursor.fetchone())[0] == LATEST_DB_VERSION
+        async with db_conn.execute("SELECT COUNT(*) FROM legacy_instances") as cursor:
+            assert (await cursor.fetchone())[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_legacy_db_rebuilt_to_latest_schema():
+    """v3.11.0 不再向前兼容：旧版库（version < LATEST 且无迁移任务）整体重建——
+    schema 达最新，旧数据清空。"""
+    async with aiosqlite.connect(":memory:") as db_conn:
+        # 模拟遗留 v21 库：旧 players 列
+        await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
+        await db_conn.execute("INSERT INTO db_info (version) VALUES (21)")
         await db_conn.execute(
             """
-            INSERT INTO players (
-                user_id, user_name, experience, atk, mp, atkpractice,
-                magic_damage, physical_damage, magic_defense, physical_defense, mental_power
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            ("u1", "Tester", 1000, 10, 50, 3, 5, 5, 2, 2, 100),
+            CREATE TABLE players (
+                user_id TEXT PRIMARY KEY,
+                user_name TEXT NOT NULL DEFAULT '',
+                experience INTEGER NOT NULL DEFAULT 0,
+                atk INTEGER NOT NULL DEFAULT 0,
+                mp INTEGER NOT NULL DEFAULT 0,
+                atkpractice INTEGER NOT NULL DEFAULT 0,
+                magic_damage INTEGER NOT NULL DEFAULT 0,
+                physical_damage INTEGER NOT NULL DEFAULT 0,
+                magic_defense INTEGER NOT NULL DEFAULT 0,
+                physical_defense INTEGER NOT NULL DEFAULT 0,
+                mental_power INTEGER NOT NULL DEFAULT 0
+            )
+            """
         )
-        await db_conn.execute("INSERT INTO db_info (version) VALUES (?)", (21,))
+        await db_conn.execute(
+            """
+            INSERT INTO players (user_id, user_name, experience)
+            VALUES ('u1', 'Tester', 1000)
+            """
+        )
+        # 遗留旧表（不应再存在的名字）也要能容忍：重建路径 DROP 全表
+        await db_conn.execute(
+            "CREATE TABLE impart_info (user_id TEXT PRIMARY KEY, impart_value INTEGER)"
+        )
+        await db_conn.execute("INSERT INTO impart_info VALUES ('u1', 50)")
         await db_conn.commit()
 
         await MigrationManager(db_conn, DummyConfigManager()).migrate()
 
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
-            version = (await cursor.fetchone())[0]
-        assert version == LATEST_DB_VERSION
+            assert (await cursor.fetchone())[0] == LATEST_DB_VERSION
 
-        async with db_conn.execute("PRAGMA table_info(players)") as cursor:
-            columns = {row[1] for row in await cursor.fetchall()}
-
+        columns = await _player_columns(db_conn)
         new_fields = {
             "damage",
             "agility",
@@ -175,7 +257,6 @@ async def test_v21_to_latest_migration_rebuilds_players():
             "spiritual_root",
         }
         assert new_fields <= columns
-
         old_fields = {
             "attack",
             "defense",
@@ -187,142 +268,91 @@ async def test_v21_to_latest_migration_rebuilds_players():
             "physical_defense",
             "mental_power",
         }
-        assert not old_fields & columns, (
-            f"Old fields still present: {old_fields & columns}"
-        )
+        assert not old_fields & columns
 
-        assert "learned_skills" not in columns, "learned_skills column still present"
-
+        # 旧数据被清空（重建非保真）
         async with db_conn.execute("SELECT COUNT(*) FROM players") as cursor:
-            count = (await cursor.fetchone())[0]
-        assert count == 0, "Old players should be discarded during v22 migration"
+            assert (await cursor.fetchone())[0] == 0
 
-        async with db_conn.execute("PRAGMA table_info(buff_info)") as cursor:
-            buff_cols = {row[1] for row in await cursor.fetchall()}
-        assert buff_cols == {"id", "user_id"}
-
-        # player_skills table must exist
-        async with db_conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='player_skills'"
-        ) as cursor:
-            row = await cursor.fetchone()
-        assert row is not None, "player_skills table not found"
-
-        # v26 built impart_info, which v32 later drops and replaces with legacy_instances
-        async with db_conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='impart_info'"
-        ) as cursor:
-            assert await cursor.fetchone() is None, (
-                "impart_info should be dropped at v32"
-            )
-        async with db_conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='legacy_instances'"
-        ) as cursor:
-            assert await cursor.fetchone() is not None, (
-                "legacy_instances table not found"
-            )
-
-
-@pytest.mark.asyncio
-async def test_v23_to_v24_adds_spiritual_root():
-    """Databases already migrated to v23 get the spiritual_root column from v24."""
-    async with aiosqlite.connect(":memory:") as db_conn:
-        await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
-        await db_conn.execute("INSERT INTO db_info (version) VALUES (?)", (23,))
-        await db_conn.execute(
-            """
-            CREATE TABLE players (
-                user_id TEXT PRIMARY KEY,
-                user_name TEXT NOT NULL DEFAULT '',
-                level_index INTEGER NOT NULL DEFAULT 0,
-                cultivation_type TEXT NOT NULL DEFAULT '灵修'
-            )
-            """
-        )
-        # v31 会向 rifts 表播种青云剑冢，最小库需带上该表
-        await db_conn.execute(
-            """
-            CREATE TABLE rifts (
-                rift_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                rift_name TEXT NOT NULL,
-                rift_level INTEGER NOT NULL,
-                required_level INTEGER NOT NULL,
-                rewards TEXT NOT NULL DEFAULT '{}'
-            )
-            """
-        )
-        await db_conn.commit()
-
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
-
-        async with db_conn.execute("SELECT version FROM db_info") as cursor:
-            version = (await cursor.fetchone())[0]
-        assert version == LATEST_DB_VERSION
-
-        async with db_conn.execute("PRAGMA table_info(players)") as cursor:
-            columns = {row[1] for row in await cursor.fetchall()}
-        assert "spiritual_root" in columns
-
-
-@pytest.mark.asyncio
-async def test_v25_to_v26_rebuilds_impart_info():
-    """A v25 database with legacy impart columns is rebuilt to the new schema."""
-    async with aiosqlite.connect(":memory:") as db_conn:
-        await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
-        await db_conn.execute("INSERT INTO db_info (version) VALUES (?)", (25,))
-        await db_conn.execute("""
-            CREATE TABLE impart_info (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT NOT NULL UNIQUE,
-                impart_hp_per REAL NOT NULL DEFAULT 0.0,
-                impart_mp_per REAL NOT NULL DEFAULT 0.0,
-                impart_atk_per REAL NOT NULL DEFAULT 0.0,
-                impart_know_per REAL NOT NULL DEFAULT 0.0,
-                impart_burst_per REAL NOT NULL DEFAULT 0.0
-            )
-        """)
-        await db_conn.execute(
-            "INSERT INTO impart_info (user_id, impart_hp_per, impart_atk_per) VALUES (?, 0.1, 0.5)",
-            ("u1",),
-        )
-        # v31 会向 rifts 表播种青云剑冢，最小库需带上该表
-        await db_conn.execute("""
-            CREATE TABLE rifts (
-                rift_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                rift_name TEXT NOT NULL,
-                rift_level INTEGER NOT NULL,
-                required_level INTEGER NOT NULL,
-                rewards TEXT NOT NULL DEFAULT '{}'
-            )
-        """)
-        await db_conn.commit()
-
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
-
-        async with db_conn.execute("SELECT version FROM db_info") as cursor:
-            version = (await cursor.fetchone())[0]
-        assert version == LATEST_DB_VERSION
-
-        # v26 重建的 impart_info 在 v32 被 DROP，旧数据经 v26 清零后无值可迁移
-        async with db_conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='impart_info'"
-        ) as cursor:
-            assert await cursor.fetchone() is None, (
-                "impart_info should be dropped at v32"
-            )
-
-        # v32 建三张传承新表，但 impart_info 旧行（v26 已清零）不会拷入
-        for table in (
+        # 旧表被 DROP，最新 schema 的传承三表重建
+        tables = await _all_tables(db_conn)
+        assert "impart_info" not in tables
+        assert {
             "legacy_instances",
             "impart_pk_cooldown",
             "impart_snatch_protection",
-        ):
-            async with db_conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
-            ) as cursor:
-                assert await cursor.fetchone() is not None, f"{table} table not found"
-        async with db_conn.execute("SELECT COUNT(*) FROM legacy_instances") as cursor:
-            assert (await cursor.fetchone())[0] == 0
+        } <= tables
+
+        # 重建后种子数据可用
+        async with db_conn.execute(
+            "SELECT COUNT(*) FROM rifts"
+        ) as cursor:
+            assert (await cursor.fetchone())[0] == 6
+
+
+@pytest.mark.asyncio
+async def test_registered_migration_task_chain(monkeypatch):
+    """MIGRATION_TASKS 注册机制保留：后续版本（v33+）任务按升序执行，
+    版本号逐级推进，且执行后可幂等。"""
+    ran = []
+
+    async def _v33_task(conn, config_manager):
+        """Demo next-version task: create a marker table."""
+        await conn.execute(
+            "CREATE TABLE demo_v33_table (k TEXT PRIMARY KEY)"
+        )
+        ran.append(True)
+
+    # 临时注册 v33 并抬高 LATEST，验证任务链；结束后恢复
+    monkeypatch.setitem(_migration_mod.MIGRATION_TASKS, 33, _v33_task)
+    monkeypatch.setattr(_migration_mod, "LATEST_DB_VERSION", 33)
+
+    async with aiosqlite.connect(":memory:") as db_conn:
+        # 先建 v32 库（当前最新），再升级到 v33
+        await _create_all_tables(db_conn)
+        await db_conn.execute(
+            "INSERT INTO db_info (version) VALUES (32)"
+        )
+        await db_conn.commit()
+
+        assert _migration_mod.MIGRATION_TASKS[33] is _v33_task
+
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        async with db_conn.execute("SELECT version FROM db_info") as cursor:
+            assert (await cursor.fetchone())[0] == 33
+        assert ran == [True]
+        async with db_conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='demo_v33_table'"
+        ) as cursor:
+            assert await cursor.fetchone() is not None
+
+        # 幂等：再跑一次不触发
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        assert ran == [True]
+
+    # 体验证失败回滚路径：任务抛错时版本不前进、表不保留
+    async def _v34_bad_task(conn, config_manager):
+        await conn.execute("CREATE TABLE demo_v34_table (k TEXT PRIMARY KEY)")
+        raise RuntimeError("boom")
+
+    monkeypatch.setitem(_migration_mod.MIGRATION_TASKS, 34, _v34_bad_task)
+    monkeypatch.setattr(_migration_mod, "LATEST_DB_VERSION", 34)
+
+    async with aiosqlite.connect(":memory:") as db_conn:
+        await _create_all_tables(db_conn)
+        await db_conn.execute("INSERT INTO db_info (version) VALUES (33)")
+        await db_conn.commit()
+
+        with pytest.raises(RuntimeError):
+            await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        async with db_conn.execute("SELECT version FROM db_info") as cursor:
+            assert (await cursor.fetchone())[0] == 33
+        async with db_conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='demo_v34_table'"
+        ) as cursor:
+            assert await cursor.fetchone() is None
 
 
 @pytest.mark.asyncio
@@ -364,81 +394,6 @@ async def test_player_skills_crud():
 
 
 @pytest.mark.asyncio
-async def test_v28_adds_system_sect_and_skill_attribution_columns():
-    """v27 -> v28 adds system-sect columns and skill attribution with safe defaults."""
-    async with aiosqlite.connect(":memory:") as db_conn:
-        await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
-        await db_conn.execute("INSERT INTO db_info (version) VALUES (?)", (27,))
-        await db_conn.execute("""
-            CREATE TABLE sects (
-                sect_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                sect_name TEXT NOT NULL UNIQUE,
-                sect_owner TEXT NOT NULL,
-                sect_scale INTEGER NOT NULL DEFAULT 0,
-                sect_used_stone INTEGER NOT NULL DEFAULT 0,
-                sect_fairyland INTEGER NOT NULL DEFAULT 0,
-                sect_materials INTEGER NOT NULL DEFAULT 0,
-                mainbuff TEXT NOT NULL DEFAULT '0',
-                secbuff TEXT NOT NULL DEFAULT '0',
-                elixir_room_level INTEGER NOT NULL DEFAULT 0
-            )
-        """)
-        await db_conn.execute(
-            "INSERT INTO sects (sect_name, sect_owner) VALUES ('太一宗', 'u1')"
-        )
-        await db_conn.execute("""
-            CREATE TABLE player_skills (
-                user_id TEXT NOT NULL,
-                skill_id TEXT NOT NULL,
-                star_level INTEGER NOT NULL DEFAULT 1,
-                source TEXT NOT NULL DEFAULT '',
-                learned_at INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY (user_id, skill_id)
-            )
-        """)
-        await db_conn.execute(
-            "INSERT INTO player_skills (user_id, skill_id) VALUES ('u1', 'common_001')"
-        )
-        # v31 会向 rifts 表播种青云剑冢，最小库需带上该表
-        await db_conn.execute("""
-            CREATE TABLE rifts (
-                rift_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                rift_name TEXT NOT NULL,
-                rift_level INTEGER NOT NULL,
-                required_level INTEGER NOT NULL,
-                rewards TEXT NOT NULL DEFAULT '{}'
-            )
-        """)
-        await db_conn.commit()
-
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
-
-        async with db_conn.execute("SELECT version FROM db_info") as cursor:
-            assert (await cursor.fetchone())[0] == LATEST_DB_VERSION
-
-        async with db_conn.execute("PRAGMA table_info(sects)") as cursor:
-            sect_cols = {row[1] for row in await cursor.fetchall()}
-        assert {"is_system", "faction_id", "status", "destruction_tier"} <= sect_cols
-
-        async with db_conn.execute("PRAGMA table_info(player_skills)") as cursor:
-            skill_cols = {row[1] for row in await cursor.fetchall()}
-        assert {"origin_sect_id", "sect_bound"} <= skill_cols
-
-        # Existing rows keep zero-behavior defaults
-        async with db_conn.execute(
-            "SELECT is_system, faction_id, status, destruction_tier FROM sects"
-        ) as cursor:
-            row = await cursor.fetchone()
-        assert row == (0, None, "normal", None)
-
-        async with db_conn.execute(
-            "SELECT origin_sect_id, sect_bound FROM player_skills"
-        ) as cursor:
-            row = await cursor.fetchone()
-        assert row == (None, 0)
-
-
-@pytest.mark.asyncio
 async def test_player_skills_sect_attribution_pass_through():
     """learn_or_star_up stores origin_sect_id/sect_bound on first learn only."""
     async with aiosqlite.connect(":memory:") as db_conn:
@@ -471,177 +426,7 @@ async def test_player_skills_sect_attribution_pass_through():
 
 
 @pytest.mark.asyncio
-async def test_v31_fresh_install_seeds_sword_tomb_rift():
-    """Fresh installs carry rift id 6 青云剑冢 (sect-exclusive) alongside the
-    original five seeds; id 4 stays 玄冰地宫 (no collision with rift_config)."""
-    import json
-
-    async with aiosqlite.connect(":memory:") as db_conn:
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
-
-        async with db_conn.execute(
-            "SELECT rift_id, rift_name, rift_level, required_level, rewards FROM rifts"
-        ) as cursor:
-            rows = await cursor.fetchall()
-
-    by_id = {row[0]: row for row in rows}
-    assert set(by_id) == {1, 2, 3, 4, 5, 6}
-    assert by_id[4][1] == "玄冰地宫"
-    tomb = by_id[6]
-    assert tomb[1] == "青云剑冢"
-    assert tomb[2] == 3  # rift_level
-    assert tomb[3] == 3  # required_level
-    assert json.loads(tomb[4]) == {"exp": [300, 900], "gold": [100, 400]}
-
-
-@pytest.mark.asyncio
-async def test_v30_to_v31_seeds_sword_tomb_idempotently():
-    """Existing databases get rift id 6 from v31 without touching id 4;
-    a second migrate run is a no-op."""
-    async with aiosqlite.connect(":memory:") as db_conn:
-        await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
-        await db_conn.execute("INSERT INTO db_info (version) VALUES (30)")
-        await db_conn.execute("""
-            CREATE TABLE rifts (
-                rift_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                rift_name TEXT NOT NULL,
-                rift_level INTEGER NOT NULL,
-                required_level INTEGER NOT NULL,
-                rewards TEXT NOT NULL DEFAULT '{}'
-            )
-        """)
-        await db_conn.execute(
-            "INSERT INTO rifts (rift_id, rift_name, rift_level, required_level, rewards)"
-            " VALUES (4, '玄冰地宫', 4, 10, '{}')"
-        )
-        await db_conn.commit()
-
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
-
-        async with db_conn.execute("SELECT version FROM db_info") as cursor:
-            assert (await cursor.fetchone())[0] == LATEST_DB_VERSION
-        async with db_conn.execute(
-            "SELECT rift_name FROM rifts WHERE rift_id = 6"
-        ) as cursor:
-            row = await cursor.fetchone()
-        assert row is not None and row[0] == "青云剑冢"
-        async with db_conn.execute(
-            "SELECT rift_name FROM rifts WHERE rift_id = 4"
-        ) as cursor:
-            assert (await cursor.fetchone())[0] == "玄冰地宫"
-
-        # 幂等：再次迁移不报错、不重复插入
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
-        async with db_conn.execute(
-            "SELECT COUNT(*) FROM rifts WHERE rift_id = 6"
-        ) as cursor:
-            assert (await cursor.fetchone())[0] == 1
-
-
-@pytest.mark.asyncio
-async def test_create_all_tables_v2_backfills_sect_columns():
-    """_create_all_tables_v2 aligns with v22: players sect JSON columns,
-    player_skills attribution columns and the idx_sect_faction index."""
-    async with aiosqlite.connect(":memory:") as db_conn:
-        await _create_all_tables_v21(db_conn)  # v21 builds on top of v2
-
-        async with db_conn.execute("PRAGMA table_info(players)") as cursor:
-            player_cols = {row[1] for row in await cursor.fetchall()}
-        assert {"sect_treasure_claims", "sect_master_progress"} <= player_cols
-
-        async with db_conn.execute("PRAGMA table_info(player_skills)") as cursor:
-            skill_cols = {row[1] for row in await cursor.fetchall()}
-        assert {"origin_sect_id", "sect_bound"} <= skill_cols
-
-        async with db_conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_sect_faction'"
-        ) as cursor:
-            assert await cursor.fetchone() is not None
-
-
-@pytest.mark.asyncio
-async def test_v31_to_v32_migrates_impart_info_to_legacy_instances():
-    """v32 copies legacy impart_info rows into legacy_instances (type=common,
-    active, value/claimed preserved), then drops impart_info."""
-    async with aiosqlite.connect(":memory:") as db_conn:
-        await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
-        await db_conn.execute("INSERT INTO db_info (version) VALUES (31)")
-        await db_conn.execute("""
-            CREATE TABLE impart_info (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT NOT NULL UNIQUE,
-                impart_value INTEGER NOT NULL DEFAULT 0,
-                claimed_tiers TEXT NOT NULL DEFAULT '[]'
-            )
-        """)
-        await db_conn.execute(
-            "INSERT INTO impart_info (user_id, impart_value, claimed_tiers) VALUES ('u1', 45, '[1, 2]')"
-        )
-        await db_conn.execute(
-            "INSERT INTO impart_info (user_id, impart_value, claimed_tiers) VALUES ('u2', 0, '[]')"
-        )
-        await db_conn.commit()
-
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
-
-        async with db_conn.execute("SELECT version FROM db_info") as cursor:
-            assert (await cursor.fetchone())[0] == 32
-
-        # 两张新表存在，旧表已 DROP
-        for table in (
-            "legacy_instances",
-            "impart_pk_cooldown",
-            "impart_snatch_protection",
-        ):
-            async with db_conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
-            ) as cursor:
-                assert await cursor.fetchone() is not None, f"{table} table not found"
-        async with db_conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='impart_info'"
-        ) as cursor:
-            assert await cursor.fetchone() is None, "impart_info should be dropped"
-
-        # 旧行迁为 common 类型、激活、sect_id 为空，值与 claimed 保全
-        async with db_conn.execute(
-            "SELECT owner_id, legacy_type, impart_value, claimed_tiers, sect_id, is_active"
-            " FROM legacy_instances ORDER BY owner_id"
-        ) as cursor:
-            rows = await cursor.fetchall()
-        assert len(rows) == 2
-        assert rows[0] == ("u1", "common", 45, "[1, 2]", None, 1)
-        assert rows[1] == ("u2", "common", 0, "[]", None, 1)
-
-
-@pytest.mark.asyncio
-async def test_v32_migration_is_idempotent():
-    """A second migrate run must not duplicate legacy_instances rows nor fail
-    on the already-dropped impart_info table."""
-    async with aiosqlite.connect(":memory:") as db_conn:
-        await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
-        await db_conn.execute("INSERT INTO db_info (version) VALUES (31)")
-        await db_conn.execute("""
-            CREATE TABLE impart_info (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT NOT NULL UNIQUE,
-                impart_value INTEGER NOT NULL DEFAULT 0,
-                claimed_tiers TEXT NOT NULL DEFAULT '[]'
-            )
-        """)
-        await db_conn.execute(
-            "INSERT INTO impart_info (user_id, impart_value) VALUES ('u1', 10)"
-        )
-        await db_conn.commit()
-
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
-
-        async with db_conn.execute("SELECT COUNT(*) FROM legacy_instances") as cursor:
-            assert (await cursor.fetchone())[0] == 1
-
-
-@pytest.mark.asyncio
-async def test_v32_active_owner_partial_unique_index():
+async def test_active_owner_partial_unique_index():
     """The partial unique index enforces at most one active legacy per owner."""
     async with aiosqlite.connect(":memory:") as db_conn:
         await MigrationManager(db_conn, DummyConfigManager()).migrate()

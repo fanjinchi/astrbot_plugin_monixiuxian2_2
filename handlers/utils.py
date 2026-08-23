@@ -16,6 +16,7 @@ CMD_PLAYER_INFO = "我的信息"
 CMD_START_CULTIVATION = "闭关"
 CMD_END_CULTIVATION = "出关"
 CMD_CHECK_IN = "签到"
+CMD_IMPART_INFO = "传承信息"
 
 # 忙碌状态下允许执行的命令白名单
 BUSY_STATE_ALLOWED_COMMANDS = [
@@ -43,8 +44,12 @@ BUSY_STATE_ALLOWED_COMMANDS = [
     "境界榜",
     "战力榜",
     "灵石榜",
+    # 宗门榜
     "宗门榜",
     "存款榜",
+    # 传承查看（只读）：信息/排行繁忙时可查看
+    CMD_IMPART_INFO,
+    "传承排行",
     # 帮助信息
     "修仙帮助",
     # 闭关相关

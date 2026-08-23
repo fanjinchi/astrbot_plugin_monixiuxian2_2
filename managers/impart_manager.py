@@ -209,18 +209,36 @@ class ImpartManager:
         return None
 
     async def transfer_legacy(
-        self, instance_id: int, new_owner: str
+        self,
+        instance_id: int,
+        new_owner: str,
+        expected_owner: str | None = None,
     ) -> LegacyInstance | None:
         """Transfer instance ownership to the snatch winner (single txn).
 
         Value and claimed tiers reset (winner must re-cultivate), the
         previous owner's activation is cleared, and the winner's activation
         is left untouched (they activate manually via 激活传承).
+
+        Args:
+            instance_id: The legacy instance to transfer.
+            new_owner: The snatch winner's user id.
+            expected_owner: Optional re-check: when given, the instance must
+                still belong to this user inside the transaction; otherwise
+                the transfer is aborted (concurrent snatch lost the race).
+
+        Returns:
+            The updated instance, or None when not found / ownership
+            changed (expected_owner mismatch).
         """
         await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
             instance = await self.db.ext.get_legacy_instance_by_id(instance_id)
             if not instance:
+                await self.db.conn.rollback()
+                return None
+            if expected_owner is not None and instance.owner_id != expected_owner:
+                # 并发双开：实例已被他人夺走，不得从新主人手里再夺
                 await self.db.conn.rollback()
                 return None
             await self.db.ext.clear_active_legacy_instance(

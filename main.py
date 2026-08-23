@@ -272,7 +272,6 @@ class XiuXianPlugin(Star):
             self.combat_mgr,
             self.enemy_mgr,
             self.config_manager,
-            self.impart_mgr,
         )
         # 宗门传承领取/回收需要传承与PvE管理器（init 顺序在其后，此处注入）
         self.sect_mgr.impart_mgr = self.impart_mgr

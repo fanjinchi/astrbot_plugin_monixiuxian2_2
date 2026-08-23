@@ -20,7 +20,7 @@
 
 ### Requirement: 修炼累积传承值
 
-出关结算 SHALL 按有效修炼时长向玩家持有的每条传承实例累积传承值：每满 15 分钟为每条实例 +1 点，不足 15 分钟的部分不累计。传承值达到所属类型等阶阈值时 SHALL 自动发放该等阶奖励并标记已领取，同一等阶 SHALL 只发放一次。奖励内容 SHALL 按类型配置（心法入储物戒、功法习得、境界提升等，随 `impart_config.json` 类型配置）。
+出关结算 SHALL 按有效修炼时长向玩家当前激活的传承实例累积传承值：每满一个累积周期（`cultivation_points_every_minutes`，默认 15 分钟）+1 点，不足一个周期的部分不累计（未激活任何实例时不累积）。传承值达到所属类型等阶阈值时 SHALL 自动发放该等阶奖励并标记已领取，同一等阶 SHALL 只发放一次。奖励内容 SHALL 按类型配置（心法入储物戒、功法习得、境界提升等，随 `impart_config.json` 类型配置）。
 
 #### Scenario: 修炼累积传承值
 
@@ -50,7 +50,7 @@
 - 历练结算概率触发（`adventure_config.json` 的 `legacy_chance`），获得 `adventure` 类型；
 - 秘境结算概率触发（`rift_config.json` 的 `legacy_chance`），获得 `rift` 类型。
 
-触发概率 SHALL 由对应模块配置控制，配置为 0 时该途径不触发。守护 NPC SHALL 由 `enemies.json` 中专属守护者组按玩家境界选取模板生成（不经普通 PvE 分组匹配）。`common` 类型仅为旧数据迁移遗留类型，无新增获取途径。
+触发概率 SHALL 由对应模块配置控制，配置为 0 时该途径不触发。守护 NPC SHALL 由 `enemies.json` 中 `enemy_groups` 列表内的专属守护者组（组 key 由 `IMPART_CONFIG.guardian.enemy_group` 指定，配置驱动）按玩家境界选取模板生成（守护组不带 `level_range`，不经普通 PvE 分组匹配）。`common` 类型仅为旧数据迁移遗留/兑底类型，无新增获取途径。
 
 #### Scenario: 历练触发并获得传承
 
@@ -168,11 +168,11 @@
 - **WHEN** 甲的保护期已超过 3 日
 - **THEN** 对甲发起传承挑战 SHALL 不再被保护期拦截（仍受其他校验约束）
 
-### Requirement: 旧数据迁移
+### Requirement: 旧数据迁移（v3.11.0 起不向前兼容）
 
-升级本系统时 SHALL 将既有传承存储数据迁移为 `common` 类型传承实例，保留原传承值与已领取等阶，随后旧存储 SHALL 不再使用。
+升级本系统时 SHALL 将数据库迁移到最新 schema。由于 v3.11.0 起不再向前兼容：旧版数据库（版本低于当前且无已注册的增量迁移任务）SHALL 被整体重建为最新 schema（包含 `legacy_instances`/`impart_pk_cooldown`/`impart_snatch_protection` 三表），旧数据 SHALL 被清空；后续版本的增量升级通过 `MIGRATION_TASKS` 注册机制保留。
 
-#### Scenario: 迁移保留进度
+#### Scenario: 旧库重建为最新 schema
 
-- **WHEN** 系统升级前玩家拥有传承值 30、已领取等阶 [1]
-- **THEN** 升级后该玩家持有 `common` 类型传承实例，传承值 30、已领取等阶 [1]，可继续按新规则累积
+- **WHEN** 数据库版本为 v21（旧 players 列结构）且启动插件执行 `migrate()`
+- **THEN** 数据库被重建为 v32 最新 schema：旧表清空重建（players 为新四主属性列）、`legacy_instances` 三传承表存在、`db_info.version=32`，旧玩家数据被清空

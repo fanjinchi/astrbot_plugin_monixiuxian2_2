@@ -1,15 +1,15 @@
 ## 1. 数据层：迁移 v32 + 模型 + DAO
 
-- [x] 1.1 `data/migration.py` 新增 v32 迁移：创建 `legacy_instances`（id PK AUTOINCREMENT, owner_id TEXT, legacy_type TEXT, impart_value INTEGER DEFAULT 0, claimed_tiers TEXT DEFAULT '[]', sect_id INTEGER NULL, acquired_at INTEGER）与 `impart_pk_cooldown`（challenger_id, target_id, failed_at，联合 PK）；拷贝 `impart_info` 全部行 → `legacy_instances`（legacy_type='common'，保留 value/claimed）；同事务 DROP `impart_info`；LATEST_DB_VERSION 31 → 32
+- [x] 1.1 `data/migration.py` 迁移重构（v3.11.0 起不再向前兼容）：删除全部历史逐版本迁移（`_migrate_to_v2..v31`）与多套建表函数（`_create_all_tables_v1/v2/v21/v22`）；新增 `_create_all_tables()`——v32 最新 schema 唯一建表入口（`legacy_instances`/`impart_pk_cooldown`/`impart_snatch_protection` 三表、`idx_legacy_active_owner` 部分唯一索引、`sect_id INTEGER` 类型统一、24 表+种子数据）与 `_drop_all_tables()`（重建用）；`migrate()` 三分支：①fresh 建最新写 version=32 ②已注册 `MIGRATION_TASKS`（未来 v33+）按版本升序任务链逐版本升级（每版本一个事务，失败回滚）③旧库（version < LATEST 且无注册任务）→ 警告+全表 DROP 重建 → `INSERT db_info.version=32`（旧数据清空）；`LATEST_DB_VERSION = 32`
 - [x] 1.2 `models_extended.py` 新增 `LegacyInstance` 数据类（含 from_row/claimed_tiers JSON 解析），替代 `ImpartInfo`
 - [x] 1.3 `data/database_extended.py` 新增实例 DAO：create_legacy_instance / get_legacy_instance_by_id / list_legacy_instances_by_owner / update_legacy_instance / delete_legacy_instance / delete_legacy_instances_by_owner_sect；冷却 DAO：get_impart_pk_cooldown / upsert_impart_pk_cooldown；敏感更新走 BEGIN IMMEDIATE 事务
 - [x] 1.4 `data/data_manager.py`（L176 删玩家处）连带删除该玩家的传承实例与冷却记录；并**移除**旧的 `DELETE FROM impart_info` 语句（DROP 表后执行会报错）
 
 ## 2. 配置：类型分表 + 守护 NPC + 奖励落地
 
-- [x] 2.1 `config/impart_config.json` 重构为 `{ cultivation_points_every_minutes: 15, types: { common/sect/adventure/rift: { name, tiers: [{tier, impart_value_required, rewards}] } }, guardian: { enemy_group: "legacy_guardian" } }`，保留原 20/40/60/80/100 五阶为 common 默认
+- [x] 2.1 `config/impart_config.json` 重构为 `{ cultivation_points_every_minutes: 15, types: { common/sect/adventure/rift: { name, tiers: [{tier, impart_value_required, rewards}] } }, guardian: { enemy_group: "legacy_guardian" } }`，保留原 20/40/60/80/100 五阶为 common 默认；两个键均为运行时读取的配置驱动键（`cultivation_points_every_minutes` 由出关结算读取、`guardian.enemy_group` 由 `EnemyManager.get_guardian_group_key()` 读取，非死配置）
 - [x] 2.2 `data/default_configs.py` 补齐 impart 完整默认配置（缺失时 `_load_config_with_default` 不空转）
-- [x] 2.3 `config/enemies.json` 增加 `legacy_guardian` enemy_group：**不带 `level_range`**（避免被普通 PvE 的 `_get_group_by_level` 匹配劫持），templates 按境界段配置，仅经新增的 `spawn_enemy_from_group` API 触达
+- [x] 2.3 `config/enemies.json` 增加 `legacy_guardian` enemy_group：**不带 `level_range`**（避免被普通 PvE 的 `_get_group_by_level` 匹配劫持），templates 按境界段配置，仅经新增的 `spawn_enemy_from_group` API 触达；组并入 `enemy_groups` 列表（key=`legacy_guardian`，非独立顶层键），组 key 由 `IMPART_CONFIG.guardian.enemy_group` 配置驱动（`EnemyManager.get_guardian_group_key()` 读取，`PVECombatManager.challenge_legacy_guardian` 经该 key 定向生成）
 - [x] 2.4 在 `design_docs/content-design/heart_methods.csv`、`skills.csv` 补齐传承奖励条目（传承心法·吐纳/归元、传承功法×2），运行 `uv run python scripts/sync_content_to_config.py` 同步进 `config/heart_methods.json`/`config/skills.json`（修复奖励 id 空转）
 - [x] 2.5 `config/adventure_config.json` 与 `config/rift_config.json` 增加 `legacy_chance`；`config/sect_factions.json` 各宗门配置新增 `legacies` 列表承载宗门传承条目（宝库条目字段实为 `type`，`kind` 是 `sect_manager._get_treasury_entries` 映射产物——宗门传承作为独立 `legacies` 列表配置，领取时映射为 kind=legacy）
 - [x] 2.6 确认配置加载适配新结构（`config_manager.py` impart 读取路径不变，types 结构在 manager 层解析）
@@ -23,7 +23,7 @@
 
 ## 4. 修炼累积传承值
 
-- [x] 4.1 `handlers/player_handler.py` `handle_end_cultivation` 出关时对玩家全部实例 `add_impart_value(effective_minutes // 15)`，同事务提交
+- [x] 4.1 `handlers/player_handler.py` `handle_end_cultivation` 出关时对玩家激活的传承实例 `add_active_impart_value(effective_minutes // 15)`，同事务提交
 - [x] 4.2 出关消息追加传承值增长行（各实例类型 + 增长点数；无实例则不显示）
 
 ## 5. PK 夺取制
@@ -52,7 +52,7 @@
 - [x] 8.2 `tests/test_impart_manager.py` 重写：实例创建/多条持有/修炼累积粒度（15 分钟、不足不累计）/tier 自动发放（含奖励 id 存在性校验）/transfer 清零/冷却边界（第 5 天拒绝、5×86400 后放行、不同对手不受限）/宗门传承不可夺/排行总和/**战力断言**（`build_fighter_from_player` 输出不含传承值项，同战力不同传承值无偏移）
 - [x] 8.3 `tests/test_sect_manager.py`（若存在）扩展：宗门传承领取（守护挑战成功/失败不占名额）与离宗回收；补充 `legacy_chance=0` 时历练/秘境不触发的断言
 - [x] 8.4 新增 `functional_tests/cases/pvp/legacy-basic.json`（传承展示/夺取/保护/冷却/GM 预置清除全路径），`test_suite_ctl.py sync-cases && run --case legacy-basic` 连续两次通过（可重入）
-- [x] 8.6 `core/gm_manager.py` 新增「给予传承 [目标] [类型]」「清除传承 [目标] [编号]」「清除传承状态 [目标]」子命令（路由表注册 + handler + GMCommand 表 + 帮助文本），`main.py` 装配注入 `impart_manager`；legacy-basic 用例改为 GM 预置传承的完整夺取/冷却/保护路径（用例开头用「清除传承状态」保证可重入）并重跑通过
+- [x] 8.6 `core/gm_manager.py` 新增「给予传承 [目标] [类型]」「清除传承 [目标] [编号]」「清除传承状态 [目标]」子命令（路由表注册 + handler + GMCommand 表 + 帮助文本），`main.py` 装配注入 `impart_manager`；legacy-basic 用例改为 GM 预置传承的完整夺取/冷却/保护路径（用例开头「清除传承状态」+「清除传承 全部」保证可重入与 hermetic——不依赖上次运行状态）并重跑通过；GM 给予 sect 类型无宗门时拒绝并提示
 - [x] 8.5 回归：`uv run ruff format . && uv run ruff check . && uv run python -m pytest tests/ -v`（515 passed）
 
 ## 9. 版本与文档同步
