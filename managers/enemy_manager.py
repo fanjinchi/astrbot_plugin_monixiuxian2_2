@@ -245,7 +245,12 @@ class EnemyManager:
             level_range = group.get("level_range", [0, 0])
             if level_range[0] <= player_level <= level_range[1]:
                 return group
-        # 等级超过31时，默认使用顶级分组
+        # 等级超过最高分组时，回退到带 level_range 的最高级分组。
+        # 跳过无 level_range 的专项组（如 legacy_guardian 守护组），
+        # 它们只能经 spawn_enemy_from_group 定向触达，绝不能参与普通 PvE 匹配。
+        for group in reversed(self.enemy_groups):
+            if group.get("level_range"):
+                return group
         return self.enemy_groups[-1] if self.enemy_groups else {}
 
     def _global_difficulty_multiplier(self) -> float:

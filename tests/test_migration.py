@@ -2,6 +2,7 @@
 
 import aiosqlite
 import pytest
+import sqlite3
 
 from tests.helpers import load_module, load_package_module
 
@@ -93,7 +94,7 @@ async def test_fresh_install_reaches_latest_version():
             "combat_cooldowns",
             "player_skills",
             "system_config",
-        } <= tables, f"Missing tables: {set() if False else tables}"
+        } <= tables, f"Missing tables: {expected_tables - tables}"
 
         # 旧的 impart_info 表已彻底移除
         assert "impart_info" not in tables
@@ -159,6 +160,8 @@ async def test_fresh_install_seeds_rifts_and_eyes():
         assert by_id[4][1] == "玄冰地宫"
         tomb = by_id[6]
         assert tomb[1] == "青云剑冢"
+        assert tomb[2] == 3  # rift_level
+        assert tomb[3] == 3  # required_level
         assert json.loads(tomb[4]) == {"exp": [300, 900], "gold": [100, 400]}
 
         async with db_conn.execute(
@@ -194,10 +197,20 @@ async def test_migrate_is_idempotent_on_fresh():
     """Running migrate() twice on a fresh database is a no-op."""
     async with aiosqlite.connect(":memory:") as db_conn:
         await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        # 写入用户数据后二次 migrate：数据必须保留（区分真 no-op 与破坏性重建）
+        await db_conn.execute(
+            "INSERT INTO players (user_id, user_name, spiritual_root) VALUES ('u1', 'T', '天灵根')"
+        )
+        await db_conn.commit()
         await MigrationManager(db_conn, DummyConfigManager()).migrate()
 
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
             assert (await cursor.fetchone())[0] == LATEST_DB_VERSION
+        async with db_conn.execute(
+            "SELECT COUNT(*) FROM players WHERE user_id = 'u1'"
+        ) as cursor:
+            assert (await cursor.fetchone())[0] == 1
         async with db_conn.execute("SELECT COUNT(*) FROM legacy_instances") as cursor:
             assert (await cursor.fetchone())[0] == 0
 
@@ -436,7 +449,7 @@ async def test_active_owner_partial_unique_index():
             " VALUES ('u1', 'common', 1, 1)"
         )
         await db_conn.commit()
-        with pytest.raises(Exception):
+        with pytest.raises(sqlite3.IntegrityError):
             await db_conn.execute(
                 "INSERT INTO legacy_instances (owner_id, legacy_type, is_active, acquired_at)"
                 " VALUES ('u1', 'adventure', 1, 2)"

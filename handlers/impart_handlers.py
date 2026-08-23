@@ -34,7 +34,8 @@ class ImpartHandlers:
             return
 
         target = (target or "").strip().lstrip("#")
-        if target.isdigit():
+        # isdecimal 而非 isdigit：isdigit 对 '²' 等上标数字返回 True 但 int() 会抛 ValueError
+        if target.isdecimal():
             instance_id = int(target)
             ok, msg = await self.impart_mgr.activate_legacy(player.user_id, instance_id)
             yield event.plain_result(msg)

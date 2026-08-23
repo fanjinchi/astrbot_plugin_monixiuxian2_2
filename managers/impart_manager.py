@@ -123,18 +123,9 @@ class ImpartManager:
         if not instance_id:
             return None
         if activate:
-            if commit:
-                await self.db.ext.set_active_legacy_instance(owner_id, instance_id)
-            else:
-                # 外层事务内：手动去激+激活，不另起事务
-                await self.db.conn.execute(
-                    "UPDATE legacy_instances SET is_active = 0 WHERE owner_id = ?",
-                    (owner_id,),
-                )
-                await self.db.conn.execute(
-                    "UPDATE legacy_instances SET is_active = 1 WHERE id = ?",
-                    (instance_id,),
-                )
+            await self.db.ext.set_active_legacy_instance(
+                owner_id, instance_id, commit=commit
+            )
         return await self.db.ext.get_legacy_instance_by_id(instance_id)
 
     async def list_owner_legacies(self, user_id: str) -> list[LegacyInstance]:
@@ -289,7 +280,7 @@ class ImpartManager:
             return 0
         return IMPART_SNATCH_PROTECTION_SECONDS - elapsed
 
-    async def record_snatch_protection(self, user_id: str, commit: bool = False):
+    async def record_snatch_protection(self, user_id: str, commit: bool = True):
         """Record that the player's legacy was just snatched (3-day protection)."""
         await self.db.ext.upsert_impart_snatch_protection(
             user_id, int(time.time()), commit=commit

@@ -391,33 +391,41 @@ class PlayerHandler:
                     f"🎁 闭关悟道，领悟功法【{learned.get('name', '未知')}】！"
                 )
 
+        # 传承值累积：仅激活中的传承实例（每配置间隔分钟+1点，默认15分钟），随出关一次结算。
+        # 放在状态收尾之前：即使结算异常（try/except 已降级为日志），也不消耗本次闭关会话
+        legacy_line = ""
+        try:
+            # config_manager 运行时必为完整 ConfigManager（含 impart_config）；
+            # getattr 防御测试 stub 等缺键环境
+            impart_cfg = getattr(self.config_manager, "impart_config", None) or {}
+            every_minutes = max(
+                1, int(impart_cfg.get("cultivation_points_every_minutes", 15))
+            )
+            if self.impart_mgr is not None and effective_minutes >= every_minutes:
+                points = effective_minutes // every_minutes
+                legacy_msg = await self.impart_mgr.add_active_impart_value(
+                    player, points
+                )
+                if legacy_msg:
+                    legacy_line = "\n\n" + legacy_msg
+                else:
+                    # 应累积却无输出：持有传承但未激活，提示需先激活（spec：未激活不累积）
+                    owned = await self.db.ext.list_legacy_instances_by_owner(
+                        player.user_id
+                    )
+                    if owned:
+                        legacy_line = (
+                            "\n\n💡 你持有传承但未激活，本次闭关未累积传承值。\n"
+                            "使用「激活传承 <编号>」激活后再闭关。"
+                        )
+        except Exception as exc:
+            logger.error(f"出关传承值结算失败: {exc}")
+
         # 更新玩家状态
         player.state = "空闲"
         player.cultivation_start_time = 0
         await self.db.update_player(player)
         await self.db.ext.set_user_free(player.user_id)
-
-        # 传承值累积：仅激活中的传承实例（每配置间隔分钟+1点，默认15分钟），随出关一次结算
-        legacy_line = ""
-        # config_manager 运行时必为完整 ConfigManager（含 impart_config）；
-        # getattr 防御测试 stub 等缺键环境
-        impart_cfg = getattr(self.config_manager, "impart_config", None) or {}
-        every_minutes = max(
-            1, int(impart_cfg.get("cultivation_points_every_minutes", 15))
-        )
-        if self.impart_mgr is not None and effective_minutes >= every_minutes:
-            points = effective_minutes // every_minutes
-            legacy_msg = await self.impart_mgr.add_active_impart_value(player, points)
-            if legacy_msg:
-                legacy_line = "\n\n" + legacy_msg
-            else:
-                # 应累积却无输出：持有传承但未激活，提示需先激活（spec：未激活不累积）
-                owned = await self.db.ext.list_legacy_instances_by_owner(player.user_id)
-                if owned:
-                    legacy_line = (
-                        "\n\n💡 你持有传承但未激活，本次闭关未累积传承值。\n"
-                        "使用「激活传承 <编号>」激活后再闭关。"
-                    )
 
         # 计算闭关时长显示
         hours = duration_minutes // 60

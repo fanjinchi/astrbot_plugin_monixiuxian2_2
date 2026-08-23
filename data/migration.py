@@ -496,15 +496,16 @@ async def _create_all_tables(conn: aiosqlite.Connection):
 
 
 async def _drop_all_tables(conn: aiosqlite.Connection):
-    """Drop every user table (legacy databases being rebuilt)."""
-    await conn.execute("PRAGMA foreign_keys = OFF")
+    """Drop every user table (legacy databases being rebuilt).
+
+    PRAGMA foreign_keys 切换由调用方在事务外完成（SQLite 禁止事务内修改）。
+    """
     async with conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
     ) as cursor:
         tables = [row[0] for row in await cursor.fetchall()]
     for table in tables:
         await conn.execute(f'DROP TABLE IF EXISTS "{table}"')
-    await conn.execute("PRAGMA foreign_keys = ON")
 
 
 class MigrationManager:
@@ -583,6 +584,9 @@ class MigrationManager:
                 f"数据库版本 v{current_version} 低于 v{LATEST_DB_VERSION}，"
                 "且该项目不再向前兼容；将重建数据库到最新 schema（旧数据将被清空）。"
             )
+            # PRAGMA foreign_keys 必须在事务外切换（SQLite 禁止事务内修改），
+            # 否则 drop 顺序任意时外键约束可能阻断删除
+            await self.conn.execute("PRAGMA foreign_keys = OFF")
             await self.conn.execute("BEGIN")
             try:
                 await _drop_all_tables(self.conn)
@@ -595,6 +599,15 @@ class MigrationManager:
             except Exception:
                 await self.conn.rollback()
                 raise
+            finally:
+                await self.conn.execute("PRAGMA foreign_keys = ON")
             logger.info(f"数据库已重建到最新版本: v{LATEST_DB_VERSION}")
+        elif current_version > LATEST_DB_VERSION:
+            # 版本倒退（插件回滚/新库旧插件）：schema 可能比本插件新，继续运行
+            # 会产生 no such table/column 等偶发错误，必须显式失败
+            raise RuntimeError(
+                f"数据库版本 v{current_version} 高于本插件支持的 v{LATEST_DB_VERSION}，"
+                "不允许降级运行，请使用与数据库匹配的插件版本。"
+            )
         else:
             logger.info("数据库已是最新版本，无需升级。")

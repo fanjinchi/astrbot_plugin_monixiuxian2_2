@@ -1688,6 +1688,9 @@ class SectManager:
         if not self.impart_mgr or not self.pve_combat_mgr:
             return False, "❌ 传承系统未就绪，请稍后再试。"
 
+        if str(player.sect_id) != str(sect.sect_id):
+            return False, "❌ 你当前不在该宗门，无法领取宗门传承。"
+
         won, battle_msg = await self.pve_combat_mgr.challenge_legacy_guardian(player)
         if not won:
             return False, (
@@ -1696,17 +1699,23 @@ class SectManager:
                 f"此次未领取成功，不占用领取名额，可择日再试。"
             )
 
-        # 守护挑战胜利后，事务内创建实例 + 占名额（防并发重复领取）
+        # 守护挑战胜利后，事务内创建实例 + 占名额（防并发重复领取）。
+        # 重取玩家最新状态：守护战斗耗时较长，in-memory player 可能已陈旧，
+        # 并发双领取必须读取 DB 内最新 claims，否则会穿透「每人限领一次」检查
         await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
-            claims = player.get_sect_treasure_claims()
+            fresh_player = await self.db.get_player_by_id(player.user_id)
+            if fresh_player is None:
+                await self.db.conn.rollback()
+                return False, "❌ 玩家数据不存在，请稍后再试。"
+            claims = fresh_player.get_sect_treasure_claims()
             if entry["id"] in claims:
                 await self.db.conn.rollback()
                 return False, f"❌ 你已领取过【{entry['name']}】！"
             instance = await self.impart_mgr.create_legacy(
-                player.user_id,
+                fresh_player.user_id,
                 "sect",
-                sect_id=player.sect_id,
+                sect_id=fresh_player.sect_id,
                 activate=False,
                 commit=False,
             )
@@ -1714,8 +1723,8 @@ class SectManager:
                 await self.db.conn.rollback()
                 return False, "❌ 传承实例创建失败，请稍后再试。"
             claims.append(entry["id"])
-            player.set_sect_treasure_claims(claims)
-            await self.db.update_player(player, commit=False)
+            fresh_player.set_sect_treasure_claims(claims)
+            await self.db.update_player(fresh_player, commit=False)
             await self.db.conn.commit()
         except Exception:
             await self.db.conn.rollback()

@@ -409,6 +409,17 @@ class GMManager:
         target_id, remaining = self._resolve_target(
             event, args, single_token_is_target=True
         )
+        # 单裸数字歧义：当该数字命中发送者自己持有的传承编号时，按「清除自己的传承 #N」
+        # 处理——实例 ID 增至 5 位后会与用户 ID 位数重叠，管理员裸输编号更可能是
+        # 清自己的传承，而不是把数字当成目标玩家 ID（后者可用 @ 或双 token 明确指定）
+        raw = args.strip()
+        if not remaining and " " not in raw and raw.lstrip("#").isdigit():
+            own = await self.db.ext.list_legacy_instances_by_owner(
+                str(event.get_sender_id())
+            )
+            if any(i.id == int(raw.lstrip("#")) for i in own):
+                target_id = str(event.get_sender_id())
+                remaining = raw.lstrip("#")
         player = await self._get_player(target_id)
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"

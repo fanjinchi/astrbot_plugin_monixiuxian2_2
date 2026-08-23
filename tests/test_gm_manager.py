@@ -740,9 +740,13 @@ class _FakeImpartManager:
 
 def _wire_legacy(gm_manager, mock_db, storage=None):
     """Attach a fake impart manager and an in-memory legacy store to the GM fixture."""
-    gm_manager.impart_manager = _FakeImpartManager()
+    fake = _FakeImpartManager()
     store = storage if storage is not None else []
-    gm_manager.impart_manager.created = store  # create_legacy 与 DAO 共用同一存储
+    fake.created = store  # create_legacy 与 DAO 共用同一存储
+    # 预置 store 时同步 ID 计数器，避免后续 create_legacy 复用已存在编号
+    if store:
+        fake._next_id = max(i.id for i in store) + 1
+    gm_manager.impart_manager = fake
 
     async def _list_by_owner(owner_id):
         return [i for i in store if i.owner_id == owner_id]
@@ -776,8 +780,11 @@ async def test_give_legacy_default_and_typed(gm_manager, mock_db):
     ok, msg = await gm_manager.cmd_give_legacy(event, "900000002 秘境")
     assert ok and store[-1].legacy_type == "rift"
 
+    store_len = len(store)
     ok, msg = await gm_manager.cmd_give_legacy(event, "900000002 foo")
     assert not ok and "可选" in msg
+    # 非法类型不得创建实例（校验必须先于创建）
+    assert len(store) == store_len, "非法类型不应创建传承实例"
 
 
 @pytest.mark.asyncio

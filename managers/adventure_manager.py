@@ -317,10 +317,14 @@ class AdventureManager:
         else:
             dropped_items, item_msg = [], ""
 
-        # 传承机缘：按概率触发守护挑战，胜利则获得历练传承实例
+        # 传承机缘：按概率触发守护挑战，胜利则获得历练传承实例。
+        # 可选概率功能：异常降级为日志，绝不中断历练正常结算（防卡 ADVENTURING 状态）
         legacy_msg = ""
         if self.impart_mgr and self.legacy_chance > 0:
-            legacy_msg = await self._maybe_trigger_legacy(player)
+            try:
+                legacy_msg = await self._maybe_trigger_legacy(player)
+            except Exception as exc:
+                logger.error(f"历练传承机缘触发失败: {exc}")
 
         player.experience += rewards.get("exp", 0)
         if rewards.get("bonus_exp", 0) > 0:

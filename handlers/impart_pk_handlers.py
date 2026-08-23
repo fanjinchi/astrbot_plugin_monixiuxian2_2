@@ -111,7 +111,16 @@ class ImpartPkHandlers:
         for i, r in enumerate(rankings, 1):
             lines.append(f"{i}. {r['user_name']} - 传承值{r['impart_value']}")
         lines.append("━━━━━━━━━━━━━━━")
-        lines.append("传承值通过闭关修炼累积（每15分钟+1点）")
+        # 累积周期配置驱动：避免硬编码文案与配置不一致
+        impart_cfg = getattr(
+            getattr(self.impart_pk_mgr, "impart_mgr", None), "config_manager", None
+        )
+        every_minutes = 15
+        if impart_cfg is not None:
+            every_minutes = impart_cfg.impart_config.get(
+                "cultivation_points_every_minutes", 15
+            )
+        lines.append(f"传承值通过闭关修炼累积（每{every_minutes}分钟+1点）")
 
         yield event.plain_result("\n".join(lines))
 

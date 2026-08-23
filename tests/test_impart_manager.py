@@ -1,5 +1,7 @@
 """Tests for managers/impart_manager.py (legacy instances, single-activation, PK snatch)."""
 
+import time
+
 import pytest
 
 from tests.helpers import load_module, load_package_module
@@ -268,6 +270,68 @@ async def test_tier_rewards_auto_grant_and_ids_resolve():
 
 
 @pytest.mark.asyncio
+async def test_tier45_rewards_and_level_up_cap():
+    """Crossing tier 4/5 grants impart_skill_002 and a level-up (capped at max)."""
+    db = await _setup_db()
+    try:
+        player = await _create_player(db)
+        mgr = ImpartManager(db, DummyConfigManager())
+        await mgr.create_legacy("u1", "common")  # active
+
+        # 一次加到 120：跨过 1-5 阶全部奖励（覆盖原被删除测试的 tier4/5 分支）
+        msg = await mgr.add_active_impart_value(player, 120)
+        assert msg is not None and "解锁奖励" in msg
+
+        skills = await db.ext.get_learned_skills("u1")
+        assert [s["skill_id"] for s in skills] == [
+            "impart_skill_001",
+            "impart_skill_002",
+        ]
+        updated = await db.get_player_by_id("u1")
+        assert updated.level_index == 2  # tier5 level_up +1（Player 默认 level_index=1）
+        assert updated.get_storage_ring_items().get("传承心法·吐纳") == 1
+        assert updated.get_storage_ring_items().get("传承心法·归元") == 1
+
+        # 境界封顶：推满后新实例再跨阶不越界
+        max_level = mgr._max_level_index()
+        player.level_index = max_level
+        await db.update_player(player)
+        await mgr.create_legacy("u1", "adventure", activate=True)
+        await mgr.add_active_impart_value(player, 200)
+        final = await db.get_player_by_id("u1")
+        assert final.level_index == max_level
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_technique_star_up_and_max_star_compensation():
+    """Re-granting a learned technique stars it up; max-star yields exp compensation."""
+    db = await _setup_db()
+    try:
+        player = await _create_player(db)
+        mgr = ImpartManager(db, DummyConfigManager())
+
+        reward = {"type": "technique", "id": "impart_skill_001"}
+        msgs = []
+        # 三次：领悟 → 升星至2星 → 满星（已达 max_star 当次即进补偿分支）
+        for _ in range(3):
+            msgs.append(await mgr._grant_reward(player, reward))
+
+        assert "领悟传承功法" in msgs[0]
+        assert "升星至2星" in msgs[1]
+        assert "已达3星圆满" in msgs[2] and "500 点修为" in msgs[2]
+        # 满星补偿累加进修为（_grant_reward 只改内存对象，落库由外层负责）；星数落库
+        await db.update_player(player)
+        updated = await db.get_player_by_id("u1")
+        assert updated.experience == 500
+        skills = await db.ext.get_learned_skills("u1")
+        assert len(skills) == 1 and skills[0]["star_level"] == 3
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
 async def test_reward_not_repeated_for_claimed_tier():
     """A claimed tier is not granted again on further accumulation."""
     db = await _setup_db()
@@ -350,7 +414,7 @@ async def test_select_snatch_target_skips_sect_and_filters_type():
 
 
 @pytest.mark.asyncio
-async def test_challenge_cooldown_boundary_and_per_target():
+async def test_challenge_cooldown_boundary_and_per_target(monkeypatch):
     """5-day cooldown blocks re-challenge of same target; other targets unaffected."""
     db = await _setup_db()
     try:
@@ -358,30 +422,27 @@ async def test_challenge_cooldown_boundary_and_per_target():
         now = 1_000_000_000
 
         await db.ext.upsert_impart_pk_cooldown("atk", "def", now)
-        import time as _t
+        # monkeypatch 冻结 time.time：补丁自动回收，不泄漏到其他测试/模块
+        frozen = {"t": now}
+        monkeypatch.setattr(time, "time", lambda: frozen["t"])
 
-        real = _t.time
-        try:
-            # 冻结时间到冷却期内（第 5 天边界内）
-            _t.time = lambda: now + 100
-            ok, remaining = await mgr.can_challenge("atk", "def")
-            assert not ok and remaining > 0
-            # 5×86400 后放行
-            _t.time = lambda: now + IMPART_PK_COOLDOWN_SECONDS
-            ok, remaining = await mgr.can_challenge("atk", "def")
-            assert ok and remaining == 0
-            # 不同对手不受限
-            _t.time = lambda: now + 100
-            ok, _ = await mgr.can_challenge("atk", "other")
-            assert ok
-        finally:
-            _t.time = real
+        frozen["t"] = now + 100
+        ok, remaining = await mgr.can_challenge("atk", "def")
+        assert not ok and remaining > 0
+        # 5×86400 后放行
+        frozen["t"] = now + IMPART_PK_COOLDOWN_SECONDS
+        ok, remaining = await mgr.can_challenge("atk", "def")
+        assert ok and remaining == 0
+        # 不同对手不受限
+        frozen["t"] = now + 100
+        ok, _ = await mgr.can_challenge("atk", "other")
+        assert ok
     finally:
         await db.close()
 
 
 @pytest.mark.asyncio
-async def test_snatch_protection_window():
+async def test_snatch_protection_window(monkeypatch):
     """3-day protection counts down to zero after the window."""
     db = await _setup_db()
     try:
@@ -389,17 +450,13 @@ async def test_snatch_protection_window():
         now = 2_000_000_000
         await db.ext.upsert_impart_snatch_protection("def", now)
 
-        import time as _t
-
-        real = _t.time
-        try:
-            _t.time = lambda: now + 60
-            remaining = await mgr.get_snatch_protection_remaining("def")
-            assert remaining == IMPART_SNATCH_PROTECTION_SECONDS - 60
-            _t.time = lambda: now + IMPART_SNATCH_PROTECTION_SECONDS
-            assert await mgr.get_snatch_protection_remaining("def") == 0
-        finally:
-            _t.time = real
+        frozen = {"t": now}
+        monkeypatch.setattr(time, "time", lambda: frozen["t"])
+        frozen["t"] = now + 60
+        remaining = await mgr.get_snatch_protection_remaining("def")
+        assert remaining == IMPART_SNATCH_PROTECTION_SECONDS - 60
+        frozen["t"] = now + IMPART_SNATCH_PROTECTION_SECONDS
+        assert await mgr.get_snatch_protection_remaining("def") == 0
     finally:
         await db.close()
 

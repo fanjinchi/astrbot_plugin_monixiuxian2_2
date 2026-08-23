@@ -632,7 +632,7 @@ async def test_sect_legacy_claim_success_occupies_quota():
     """Winning the guardian fight creates a sect instance and consumes the quota."""
     db = await _make_db()
     config = LegacySectConfig()
-    mgr, impart = _make_legacy_mgr(db, config, won=True)
+    mgr, _ = _make_legacy_mgr(db, config, won=True)
     await mgr.ensure_system_sects()
 
     await _make_player(db, "u1", level_index=2)
@@ -660,7 +660,7 @@ async def test_sect_legacy_claim_failure_keeps_quota():
     """Losing the guardian fight does not consume the claim quota (retryable)."""
     db = await _make_db()
     config = LegacySectConfig()
-    mgr, impart = _make_legacy_mgr(db, config, won=False)
+    mgr, _ = _make_legacy_mgr(db, config, won=False)
     await mgr.ensure_system_sects()
 
     await _make_player(db, "u1", level_index=2)
@@ -669,6 +669,8 @@ async def test_sect_legacy_claim_failure_keeps_quota():
     success, msg = await mgr.claim_treasure("u1", "青云门传承")
     assert not success
     assert "不占用领取名额" in msg
+    # 守护战仅触发一次（失败即结算，不重复挑战）
+    assert mgr.pve_combat_mgr.calls == 1
     # 未创建实例、未占名额
     assert await db.ext.list_legacy_instances_by_owner("u1") == []
     player = await db.get_player_by_id("u1")
@@ -678,6 +680,7 @@ async def test_sect_legacy_claim_failure_keeps_quota():
     mgr.pve_combat_mgr = _StubPveCombat(True)
     success, msg = await mgr.claim_treasure("u1", "青云门传承")
     assert success, msg
+    assert mgr.pve_combat_mgr.calls == 1
     assert len(await db.ext.list_legacy_instances_by_owner("u1")) == 1
     await db.close()
 
@@ -687,7 +690,7 @@ async def test_leave_sect_reclaims_sect_legacy():
     """Leaving the sect removes the player's sect-bound legacy instances."""
     db = await _make_db()
     config = LegacySectConfig()
-    mgr, impart = _make_legacy_mgr(db, config, won=True)
+    mgr, _ = _make_legacy_mgr(db, config, won=True)
     await mgr.ensure_system_sects()
 
     await _make_player(db, "u1", level_index=2)

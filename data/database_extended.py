@@ -443,19 +443,30 @@ class DatabaseExtended:
         row["is_active"] = int(row.get("is_active", 0))
         return LegacyInstance(**row)
 
-    async def set_active_legacy_instance(self, owner_id: str, instance_id: int) -> bool:
+    async def set_active_legacy_instance(
+        self, owner_id: str, instance_id: int, commit: bool = True
+    ) -> bool:
         """Mark instance_id active for owner and deactivate the rest (atomic).
 
-        Returns False when the instance does not belong to the owner.
+        Args:
+            owner_id: 玩家 ID。
+            instance_id: 要激活的传承实例 ID。
+            commit: True 时自行 BEGIN IMMEDIATE 并提交（缺省）；False 时假定
+                调用方已开启外层事务，不另起事务、不提交、失败也不回滚外层。
+
+        Returns:
+            False when the instance does not belong to the owner.
         """
-        await self.conn.execute("BEGIN IMMEDIATE")
+        if commit:
+            await self.conn.execute("BEGIN IMMEDIATE")
         try:
             async with self.conn.execute(
                 "SELECT id FROM legacy_instances WHERE id = ? AND owner_id = ?",
                 (instance_id, owner_id),
             ) as cursor:
                 if await cursor.fetchone() is None:
-                    await self.conn.rollback()
+                    if commit:
+                        await self.conn.rollback()
                     return False
             await self.conn.execute(
                 "UPDATE legacy_instances SET is_active = 0 WHERE owner_id = ?",
@@ -465,10 +476,12 @@ class DatabaseExtended:
                 "UPDATE legacy_instances SET is_active = 1 WHERE id = ?",
                 (instance_id,),
             )
-            await self.conn.commit()
+            if commit:
+                await self.conn.commit()
             return True
         except Exception:
-            await self.conn.rollback()
+            if commit:
+                await self.conn.rollback()
             raise
 
     async def clear_active_legacy_instance(
@@ -534,9 +547,11 @@ class DatabaseExtended:
             "DELETE FROM legacy_instances WHERE owner_id = ? AND legacy_type = 'sect' AND sect_id = ?",
             (owner_id, sect_id),
         )
+        rowcount = cursor.rowcount
+        await cursor.close()
         if commit:
             await self.conn.commit()
-        return cursor.rowcount
+        return rowcount
 
     async def get_legacy_value_ranking(self, limit: int = 10) -> list[dict]:
         """Rank players by total impart value across all their instances."""

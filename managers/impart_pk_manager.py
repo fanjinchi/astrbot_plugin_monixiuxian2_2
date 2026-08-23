@@ -20,7 +20,8 @@ __all__ = ["ImpartPkManager"]
 def _fmt_duration(seconds: int) -> str:
     """Format seconds as a compact Chinese duration (X天X小时 / X小时 / X分钟)."""
     days, rem = divmod(seconds, 86400)
-    hours, minutes = divmod(rem, 3600)[:2][0], divmod(rem, 3600)[1] // 60
+    hours, minutes = divmod(rem, 3600)
+    minutes //= 60
     if days:
         return f"{days}天{hours}小时" if hours else f"{days}天"
     if hours:
