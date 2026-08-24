@@ -184,3 +184,52 @@ The system SHALL write a single log line to `gm_operations.log` for every GM com
 
 - **WHEN** a GM executes a `修仙GM` sub-command that fails validation
 - **THEN** the system appends a JSON log entry with `success: false` and the error reason
+
+### Requirement: GM 传承测试支持
+
+GM 系统 SHALL 提供传承实例的预置与清除子命令，用于功能测试与数据修复：「给予传承 [目标] [类型]」为指定玩家创建指定类型的传承实例；「清除传承 [目标] [编号]」删除指定玩家全部或指定编号的传承实例。两个子命令 SHALL NOT 修改传承值、修为或战斗属性。
+
+#### Scenario: 给予传承指定类型
+
+- **WHEN** GM 发送「给予传承 900000002 adventure」
+- **THEN** 目标玩家获得一条 adventure 类型传承实例（impart_value=0，is_active=0），回复包含实例编号与类型名
+
+#### Scenario: 给予传承默认类型
+
+- **WHEN** GM 发送「给予传承」（省略目标与类型，作用于发送者自身；类型支持 common/sect/adventure/rift 或中文短名如「秘境」）
+- **THEN** 目标玩家获得一条 common 类型传承实例
+
+#### Scenario: 类型参数非法
+
+- **WHEN** GM 发送「给予传承 900000002 foo」
+- **THEN** 系统拒绝并列出可选类型，不产生数据变更
+
+#### Scenario: 给予宗门传承需目标有宗门
+
+- **WHEN** GM 发送「给予传承 900000002 sect」且目标玩家当前无宗门
+- **THEN** 系统拒绝并提示「无宗门，宗门传承需绑定所属宗门」，不产生数据变更
+
+#### Scenario: 给予宗门传承绑定当前宗门
+
+- **WHEN** GM 发送「给予传承 900000002 sect」且目标玩家当前在宗门（sect_id=7）
+- **THEN** 创建 sect 类型实例且 `sect_id=7`，回复包含实例编号与类型名
+
+#### Scenario: 清除全部传承
+
+- **WHEN** GM 发送「清除传承 900000002 全部」或「清除传承」（省略编号，作用于发送者自身或 @目标）
+- **THEN** 目标玩家的全部传承实例被删除，回复删除数量
+
+#### Scenario: 清除指定编号传承
+
+- **WHEN** GM 发送「清除传承 900000002 3」
+- **THEN** 仅编号 3 且属于该玩家的实例被删除，其余保留；编号不存在或不属于该玩家时拒绝且不产生变更
+
+#### Scenario: 清除传承状态
+
+- **WHEN** GM 发送「清除传承状态 900000002」
+- **THEN** 该玩家作为挑战者的全部挑战冷却记录被删除，其被夺保护期被删除；传承实例本身不受影响；回复包含移除的冷却条数与保护期条数
+
+#### Scenario: 非 GM 拒绝
+
+- **WHEN** 非 GM_ADMINS 用户发送上述子命令
+- **THEN** 系统拒绝且不产生任何数据变更
