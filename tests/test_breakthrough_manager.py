@@ -276,3 +276,76 @@ class TestLevelUpRatePermanentBonus:
 
         assert rate == pytest.approx(1.0)
         assert "连败保底" in info
+
+
+class TestGrowthByRoute:
+    """Route- and realm-band-aware breakthrough growth (spec: attribute-numerics)."""
+
+    def test_tixiu_band_tables(self, breakthrough_manager):
+        """体修 hp_step declines across bands (17/16/15/15), agility weight rises."""
+        for level, expected_hp in [(5, 17), (15, 16), (25, 15), (35, 15)]:
+            hp_step, weights = breakthrough_manager._get_growth_params("体修", level)
+            assert hp_step == expected_hp
+        _, w_early = breakthrough_manager._get_growth_params("体修", 5)
+        _, w_late = breakthrough_manager._get_growth_params("体修", 35)
+        assert w_early["agility"] < w_late["agility"]
+        assert w_early["damage"] > w_late["damage"]
+
+    def test_lingxiu_band_tables(self, breakthrough_manager):
+        """灵修 hp_step rises across bands (15/16/17/17), damage weight overtakes late."""
+        hp_early, weights_early = breakthrough_manager._get_growth_params("灵修", 5)
+        hp_late, weights_late = breakthrough_manager._get_growth_params("灵修", 35)
+        assert (hp_early, hp_late) == (15, 17)
+        assert weights_early["damage"] < weights_late["damage"]
+        assert weights_early["speed"] > weights_late["speed"]
+
+    def test_cross_realm_breakthrough_uses_originating_band(
+        self, breakthrough_manager
+    ):
+        """练气九阶(level 9) 升入筑基的突破按练气段结算，筑基初期(level 10) 起按筑基段。"""
+        assert breakthrough_manager._get_growth_params("体修", 9)[0] == 17
+        assert breakthrough_manager._get_growth_params("体修", 10)[0] == 16
+
+    def test_fallback_without_route_table(
+        self, breakthrough_manager, config_manager
+    ):
+        """Legacy configs without growth_by_route keep the global behavior."""
+        skill_cfg = dict(config_manager.game_config["skill_system"])
+        skill_cfg.pop("growth_by_route", None)
+        config_manager.game_config["skill_system"] = skill_cfg
+
+        hp_step, weights = breakthrough_manager._get_growth_params("体修", 35)
+        assert hp_step == 15
+        assert weights == {"damage": 0.6, "agility": 0.25, "speed": 0.15}
+
+    @pytest.mark.asyncio
+    async def test_breakthrough_applies_route_hp_step(
+        self, breakthrough_manager, db_mock
+    ):
+        """体修练气段突破成功：气血 +18（路线表），战斗点合计 5。"""
+        db_mock.ext.get_active_loan = AsyncMock(return_value=None)
+        # 突破机缘轮盘是随机掉落，mock 掉落应用路径避免轮盘结果影响断言
+        breakthrough_manager.storage_ring_manager.get_available_slots = MagicMock(
+            return_value=1
+        )
+        breakthrough_manager.pill_manager.add_pill_to_inventory = AsyncMock()
+        player = Player(
+            user_id="u1",
+            level_index=5,
+            cultivation_type="体修",
+            experience=10**9,
+            hp=100,
+            damage=10,
+            agility=5,
+            speed=5,
+            armor_value=0,
+        )
+
+        success, msg, died = await breakthrough_manager.execute_breakthrough(player)
+
+        assert success and not died
+        assert player.level_index == 6
+        assert player.hp == 100 + 17
+        # 战斗点总量恒为 random_growth_step=5，只验证分配守恒不锁定随机落点
+        assert (player.damage - 10) + (player.agility - 5) + (player.speed - 5) == 5
+        assert "气血 +17" in msg

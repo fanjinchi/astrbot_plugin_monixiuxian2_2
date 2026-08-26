@@ -42,6 +42,45 @@ WEAPON_MOUNT_TAX_CAP = 0.08  # weapon-skills.md §2 rule 3: mounted skill expect
 TRIGGER_TIMINGS = ("on_attack", "on_defense", "on_crit", "round_start")
 STUN_RATE_CAP = 0.10  # weapon-skills.md §1: stun rates must stay low
 
+# 三族系数规范（route-identity.md §3，2026-08-27 修订：奖小于罚体现路线专属）
+GENERIC_RANGE = (0.95, 1.05)  # 通用件双边
+FAVORED_RANGE = (1.2, 1.4)  # 路线向件优势方
+PENALIZED_RANGE = (0.5, 0.7)  # 路线向件劣势方
+
+
+def _in_range(v: float, r: tuple[float, float]) -> bool:
+    """Inclusive range check with a small float epsilon."""
+    return r[0] - 1e-9 <= v <= r[1] + 1e-9
+
+
+def check_route_multipliers(rows: list[dict]) -> list[str]:
+    """Check route_mult_ling/route_mult_ti pairs against the three-family rule.
+
+    Generic items keep both sides in GENERIC_RANGE; route-leaning items must
+    pair one FAVORED_RANGE side with one PENALIZED_RANGE side (the penalty is
+    deliberately harsher than the bonus to make items feel route-exclusive).
+    """
+    results = []
+    for r in rows:
+        ling = float(r["route_mult_ling"])
+        ti = float(r["route_mult_ti"])
+        generic = _in_range(ling, GENERIC_RANGE) and _in_range(ti, GENERIC_RANGE)
+        leaning = (
+            _in_range(ling, FAVORED_RANGE)
+            and _in_range(ti, PENALIZED_RANGE)
+            or _in_range(ti, FAVORED_RANGE)
+            and _in_range(ling, PENALIZED_RANGE)
+        )
+        if generic or leaning:
+            continue
+        verdict = "WARN" if r["status"] == "legacy" else "FAIL"
+        results.append(
+            f"{verdict} {r['id']:<14} 路线系数越出三族规范："
+            f"灵修={ling} 体修={ti}（通用 {GENERIC_RANGE} / 路线向 "
+            f"{FAVORED_RANGE}×{PENALIZED_RANGE}） {r['name']}"
+        )
+    return results
+
 
 def check_weapon_mounts(rows: list[dict]) -> list[str]:
     """Check mounted trigger skills on weapons (engine-key contract + tax cap).
@@ -117,6 +156,51 @@ def check_weapon_mounts(rows: list[dict]) -> list[str]:
 
 
 MIRROR_TTK_RANGE = (5, 10)  # G1: armed mirror-match TTK target
+
+# 机制预算表（route-identity.md §4）：机制复杂度按境界段解锁
+# 练气段仅允许直接增伤/减伤；筑基段解锁数值变种但禁状态效果；
+# 金丹（L20+）起解锁状态效果，元婴（L30+）起解锁必杀/复合机制。
+# skills.csv 无等级列，功法侧段位纪律经心法 required_level_index 门禁人工落实，
+# 此处只对 weapons.csv 的挂载触发技做机器校验。
+DIRECT_ONLY_EFFECTS = {"damage_bonus", "damage_reduction"}
+STATUS_EFFECTS = {"stun", "dot", "buff", "debuff"}
+
+
+def check_weapon_mechanics_band(rows: list[dict]) -> list[str]:
+    """Check mounted trigger skills against the per-realm mechanics budget.
+
+    Args:
+        rows: Parsed weapons.csv rows.
+
+    Returns:
+        Human-readable result lines, each prefixed PASS/WARN/FAIL.
+    """
+    results = []
+    for r in rows:
+        if not r.get("trigger_skills_json") or r["trigger_skills_json"] == "[]":
+            continue
+        try:
+            skills = json.loads(r["trigger_skills_json"])
+        except json.JSONDecodeError:
+            continue  # 语法错误由 check_weapon_mounts 报告
+        level = int(r["required_level_index"])
+        for i, s in enumerate(skills):
+            if not isinstance(s, dict) or "effect_type" not in s:
+                continue  # 结构错误由 check_weapon_mounts 报告
+            where = f"{r['id']} trigger_skills[{i}]"
+            effect = s["effect_type"]
+            violation = None
+            if level < 10 and effect not in DIRECT_ONLY_EFFECTS:
+                violation = f"练气段仅允许直接增伤/减伤类，得 {effect}"
+            elif level < 20 and effect in STATUS_EFFECTS:
+                violation = f"筑基及以下禁状态效果，得 {effect}"
+            if violation is None:
+                continue
+            verdict = "WARN" if r["status"] == "legacy" else "FAIL"
+            results.append(
+                f"{verdict} {where:<16} 机制预算违规：{violation} {r['name']}"
+            )
+    return results
 
 
 def check_weapons(rows: list[dict]) -> list[str]:
@@ -254,8 +338,12 @@ def main() -> int:
     for filename, checker in (
         ("weapons.csv", check_weapons),
         ("weapons.csv", check_weapon_mounts),
+        ("weapons.csv", check_weapon_mechanics_band),
+        ("weapons.csv", check_route_multipliers),
         ("skills.csv", check_skills),
+        ("skills.csv", check_route_multipliers),
         ("heart_methods.csv", check_heart_methods),
+        ("heart_methods.csv", check_route_multipliers),
     ):
         path = DESIGN_DIR / filename
         with path.open(encoding="utf-8") as f:

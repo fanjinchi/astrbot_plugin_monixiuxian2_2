@@ -139,8 +139,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
   `total_exp = int(BASE_EXP_PER_MINUTE(默认100) × minutes × 灵根倍率 × (1 + 心法exp_multiplier) × 丹药cultivation_speed倍率)`
 - **时长上限**（handlers/player_handler.py:331-336）：`1440 + ((level_index - 1) // 10) × 360` 分钟（基础 24h，每提升一个大境界 +6h，大境界按 10 级一档）；不足 1 分钟无收益
 - 机制：开始仅记录时间戳，出关时按实际分钟结算（即"离线收益"）
-- **新玩家初始属性**（:291-310，创角随机区间，不读境界配置）：
-  - 灵修：伤害 8-18 / 身法 5-15 / 迅捷 5-15 / 气血 90-130
+- **新玩家初始属性**（:282-311，创角随机区间，不读境界配置；区间按路线差异化，见 `content-design/route-identity.md` §2）：
+  - 灵修：伤害 8-18 / 身法 5-15 / 迅捷 **10-18**（2026-08-27 上调，迅捷身份从创角成立） / 气血 90-130
   - 体修：伤害 15-30 / 身法 3-10 / 迅捷 5-12 / 气血 120-180 / 护甲 3-10；寿命 50-100
 - **闭关领悟**（skill_system 规范）：结算时每满 2 小时一次领悟判定，每次 15%（需装备心法），仅触及配套池与修习目标，不含通用池
 - **签到**：`gold = randint(50, 500)`，每日 1 次
@@ -153,9 +153,10 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
   - 基础成功率按目标等级所在大境界查表（level_config.success_rates）：练气 100% / 筑基 80% / 金丹 65% / 元婴 55% / 化神 50% / 炼虚 45% / 合体及以后 40% 地板
   - `level_up_rate`：永久加成（整数百分点），并入基础成功率、受丹药 cap 钳制；当前无产出途径（恒为 0）
   - **连败保底**：每败 +5%（`breakthrough_pity_step`），19 连败必成（`breakthrough_pity_guarantee`）
-- **成功收益**：level_index +1，触发**方案A成长**（breakthrough_manager.py:200-225）：
-  - 气血独立通道：`hp += hp_growth_step`（默认 15）
-  - 战斗属性 `random_growth_step`（默认 5）点逐点加权随机：伤害 60% / 身法 25% / 迅捷 15%（`growth_weights`）
+- **成功收益**：level_index +1，触发**方案A成长（路线化）**（breakthrough_manager.py `_get_growth_params`，2026-08-27 `dual-route-identity`）：
+  - 成长参数按「路线 × 大境界段」取表（`skill_system.growth_by_route`，数组下标=大境界序号，升境界的突破按原段结算）；缺表时回退全局配置
+  - 气血独立通道：`hp += hp_step[路线][段]`；战斗属性 `random_growth_step`（默认 5）点按该段权重逐点随机
+  - 定稿数值与校准结论见 `content-design/route-identity.md` §2（体修初期略强→元婴收敛至 ~50% 胜率）
   - 突破失败无任何属性奖励
 - **失败死亡判定**：`death_rate = clamp(uniform(0.005, 0.03) × 丹药死亡倍率, 0, 1)`（v3.7.0 起由 [0.01,0.1] 下调）
   - 死亡 → 有回生丹则复活（全属性减半），否则删号

@@ -290,7 +290,9 @@ class CultivationManager:
                 gold=initial_gold,
                 damage=random.randint(8, 18),
                 agility=random.randint(5, 15),
-                speed=random.randint(5, 15),
+                # 灵修迅捷身份从创角开始（dual-route-identity C1 决策）：
+                # 区间 10-18 高于体修的 5-12，对冲体修创角的面板优势
+                speed=random.randint(10, 18),
                 hp=random.randint(90, 130),
                 armor_value=0,
             )

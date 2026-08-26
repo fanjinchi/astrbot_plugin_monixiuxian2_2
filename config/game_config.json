@@ -34,6 +34,27 @@
       "agility": 0.25,
       "speed": 0.15
     },
+    "growth_by_route": {
+      "体修": {
+        "hp_step": [17, 16, 15, 15],
+        "growth_weights": [
+          {"damage": 0.55, "agility": 0.25, "speed": 0.20},
+          {"damage": 0.52, "agility": 0.26, "speed": 0.22},
+          {"damage": 0.49, "agility": 0.27, "speed": 0.24},
+          {"damage": 0.46, "agility": 0.28, "speed": 0.26}
+        ]
+      },
+      "灵修": {
+        "hp_step": [15, 16, 17, 17],
+        "growth_weights": [
+          {"damage": 0.52, "agility": 0.22, "speed": 0.26},
+          {"damage": 0.55, "agility": 0.20, "speed": 0.25},
+          {"damage": 0.58, "agility": 0.18, "speed": 0.24},
+          {"damage": 0.62, "agility": 0.16, "speed": 0.22}
+        ]
+      },
+      "comment": "按路线×大境界段的突破成长表（openspec: dual-route-identity，经 sim_route_matchup.py 校准定稿，配合灵修创角迅捷 10-18 的 C1 决策：练气段体修胜率约 61% 逐段收敛至元婴约 50%）。数组下标=大境界序号（0=练气…3=元婴），每段权重和恒为 1；升境界的那次突破按原境界段取表。灵修气血/伤害成长更高以收敛创角差距，体修保身法身份。缺失时回退上方全局 hp_growth_step/growth_weights"
+    },
     "breakthrough_pity_step": 0.05,
     "breakthrough_pity_guarantee": 19,
     "max_technique_slots": 4,

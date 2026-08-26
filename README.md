@@ -314,6 +314,17 @@ astrbot_plugin_monixiuxian2_2/
 
 ---
 
+### v3.12.0 - 双路线身份：灵修/体修差异化成长
+
+**⚠️ 平衡性变更**
+
+- **突破成长路线化**：成长权重与气血步长改为按「路线 × 大境界段」取表（`game_config.json` → `skill_system.growth_by_route`），体修初期气血/身法占优、灵修伤害后期反超；缺表时自动回退旧的全局配置
+- **灵修创角迅捷上调**：初始迅捷区间 5-15 → 10-18（迅捷身份从创角成立，对冲体修创角面板优势；体修创角不变）
+- 数值经镜像对抗模拟校准（`design_docs/attribute-growth/sim_route_matchup.py`）：练气段体修胜率 ~58%，逐段收敛至元婴 ~50%
+- 新增内容设计规范 `design_docs/content-design/route-identity.md`（三族系数、机制预算表）；`validate_budget.py` 新增武器挂载技能的分段机制校验
+
+---
+
 ### v3.11.0 - 传承系统改版：PK 夺取制与修炼累积
 
 **💥 破坏性变更**

@@ -478,10 +478,10 @@ def _make_skill_mgr(config_manager, user="u1"):
 
 
 def test_route_multiplier_scales_trigger_rate_per_route(config_manager):
-    """体修 gets 1.2x on 铁山靠 (counter), 灵修 gets 0.8x."""
+    """体修 gets 1.2x on 铁山靠 (counter), 灵修 gets 0.7x."""
     for user, route, expected in (
         ("u_ti", "体修", 0.2 * 1.2),
-        ("u_ling", "灵修", 0.2 * 0.8),
+        ("u_ling", "灵修", 0.2 * 0.7),
     ):
         mgr, db = _make_skill_mgr(config_manager, user)
         db.ext.player_skills[(user, "draft_tieshan")] = {"star_level": 1}

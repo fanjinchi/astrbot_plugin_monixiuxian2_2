@@ -40,6 +40,47 @@ class BreakthroughManager:
         )
         self.pill_manager = pill_manager or PillManager(db, config_manager)
 
+    def _get_growth_params(
+        self, cultivation_type: str, level_index: int
+    ) -> tuple[int, dict]:
+        """Resolve breakthrough growth parameters for a route and realm band.
+
+        Growth tables live at ``game_config.skill_system.growth_by_route`` keyed
+        by cultivation route; each entry holds ``hp_step`` and
+        ``growth_weights`` arrays indexed by major-realm ordinal (tens digit of
+        the level: 0=练气, 1=筑基, ...). The breakthrough that crosses into the
+        next major realm still settles on the originating band, so callers pass
+        the pre-breakthrough level. Missing route entries fall back to the
+        global ``hp_growth_step``/``growth_weights`` so legacy configs keep
+        working (spec: attribute-numerics 属性来源).
+
+        Args:
+            cultivation_type: Player route ("灵修" or "体修").
+            level_index: Pre-breakthrough level whose realm band applies.
+
+        Returns:
+            (hp_step, growth_weights) for this breakthrough.
+        """
+        skill_cfg = self.config_manager.game_config.get("skill_system", {})
+        hp_step = skill_cfg.get("hp_growth_step", 15)
+        weights = skill_cfg.get(
+            "growth_weights", {"damage": 0.6, "agility": 0.25, "speed": 0.15}
+        )
+
+        route_cfg = skill_cfg.get("growth_by_route", {}).get(cultivation_type)
+        if not route_cfg:
+            return hp_step, weights
+
+        band = level_index // 10
+        hp_table = route_cfg.get("hp_step", [])
+        if hp_table:
+            # 表短于境界数时用最后一档兜底，新赛季未续表也不至于崩
+            hp_step = hp_table[min(band, len(hp_table) - 1)]
+        weight_table = route_cfg.get("growth_weights", [])
+        if weight_table:
+            weights = weight_table[min(band, len(weight_table) - 1)]
+        return hp_step, weights
+
     def check_breakthrough_requirements(self, player: Player) -> tuple[bool, str]:
         """检查玩家是否满足突破条件
 
@@ -199,10 +240,11 @@ class BreakthroughManager:
             player.level_index = next_level_index
 
             skill_cfg = self.config_manager.game_config.get("skill_system", {})
-            hp_step = skill_cfg.get("hp_growth_step", 15)
             combat_points = skill_cfg.get("random_growth_step", 5)
-            weights = skill_cfg.get(
-                "growth_weights", {"damage": 0.6, "agility": 0.25, "speed": 0.15}
+            # 成长表按路线 × 原大境界段取值（升入下一境界的突破仍按原段结算），
+            # 缺表时回退全局配置，见 _get_growth_params
+            hp_step, weights = self._get_growth_params(
+                player.cultivation_type, next_level_index - 1
             )
 
             # HP 独立通道

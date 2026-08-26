@@ -4,6 +4,9 @@
 > 数值框架（`design_docs/attribute-growth/growth-balance-proposals.md`）适配产出
 > 武器、功法、心法的定稿数值，最终生成 `config/weapons.json` / `skills.json` /
 > `heart_methods.json`。
+>
+> **路线定位（2026-08-27 起生效）**：灵修/体修的身份差异、成长表定稿、内容三族
+> 系数规范与机制预算表统一见 **`route-identity.md`**，填充内容前必读。
 
 ---
 
@@ -39,7 +42,7 @@
 | `base_damage` / `weapon_coefficient_k` | 同名 | 新框架：每击 = base_damage + 伤害属性 × K（`combat_manager.py:566`） |
 | `bonus_damage` | `damage` | 武器提供的 +伤害属性词条 |
 | `armor_value` / `price` / `shop_weight` | 同名 | |
-| `route_mult_ling` / `route_mult_ti` | `route_multiplier.灵修/体修` | 路线倍率 ±20% 以内（§4.2） |
+| `route_mult_ling` / `route_mult_ti` | `route_multiplier.灵修/体修` | 路线倍率：逐件身份标识，三族取值规则见 `route-identity.md` §3（通用件 1.0；路线向件优势方 1.2~1.4 / 劣势方 0.5~0.7） |
 | `trigger_skills_json` | `trigger_skills` | JSON 数组，武器触发技（可空 `[]`） |
 | `description` | 同名 | |
 | `ref_source` | **设计列** | 原型出处，如 `MB:Leek`、`QPet:接力棒`、`现有配置` |
@@ -63,7 +66,7 @@
 `route,route_mult_ling,route_mult_ti,shop_weight,ref_source,design_note,status`
 
 - `passive_bonus_json`：如 `{"hp_percent": 0.1}`；`skill_pool_json`：决定功法池（心法是 build 的"职业"）
-- `route_mult_ling` / `route_mult_ti`：设计列，入库后对应 `route_multiplier.灵修` / `route_multiplier.体修`；v1 池可全部 1.0，未来路线专属心法再差异化
+- `route_mult_ling` / `route_mult_ti`：设计列，入库后对应 `route_multiplier.灵修` / `route_multiplier.体修`；取值规则（三族：通用/体修向/灵修向，通用件保持 1.0）见 `route-identity.md` §3
 
 ## 3. 数值预算速查（机器校验规则）
 
@@ -81,6 +84,8 @@
 
 基准成长曲线（验算用）：`HP(L) = 100 + 15×(L−1)`，`伤害(L) = 10 + 3×(L−1)`
 （与 proposals §2 的 L10/L99 锚点一致：L10 HP 235 / 伤害 37，L99 HP 1570 / 伤害 304）。
+注：这是**路线中立的验算基准**；2026-08-27 起实际成长为路线分表（`route-identity.md` §2），
+内容预算按中立基准评估即可，路线间差异由系数三族而非预算表达。
 
 ## 4. 工作流
 
