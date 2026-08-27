@@ -37,3 +37,12 @@
 - [x] 5.1 bible §6 改造：保留收编状态词定义/裁决规则/§6.1 五宗规划位表；§6.2~§6.9 全枚举名录删除，改为指向 canon 表的说明 + 示范样例两行；变更记录注明迁移
 - [x] 5.2 `design_docs/README.md` 登记：season-1-outline.md、三张 canon 新表、lint_narrative.py
 - [x] 5.3 `openspec validate narrative-content-pipeline --strict` 通过；lint 对全量现状跑出基线报告（WARN 数入变更记录：0 FAIL / 70 WARN）
+
+## 6. 审查修正（2026-08-27，评审发现问题后追加）
+
+- [x] 6.1 幕表事实对齐：等级段修为 Lv1-9/10-19/20-29/30-39（Lv40=化神初期为满级边界）；秘境开启叙事列改为 `rift_config.json` required_level 实况（金丹/元婴段无新秘境标注为缺口，扩充与满级玩法登记 bd `trl`）
+- [x] 6.2 数量勘误与术语统一：武器 11→10 件；历练"13 组"→"5 组 13 事件"；bible §1.7"每事件组"→"每事件"
+- [x] 6.3 canon 覆盖缺口补登记：新建 `scripts/export_config_to_canon.py`，补登 wpn_qy_001/heart_qy_001/qy_001-003/hx_001-002（status=legacy）；新建 `bounty-canon.csv`（8 模板）
+- [x] 6.4 reconcile 语义修正（D9）：legacy 行 config 条目由"删除"改为"保护"（delta spec MODIFIED 设计表合并同步）
+- [x] 6.5 lint 改进：轻量 canon 表补"叙事待写" WARN（回填进度可见）；bounty 接入 canon 定严重度；新增 `tests/test_lint_narrative.py`；lint 新基线 0 FAIL / 119 WARN
+- [x] 6.6 后续工作登记 bd：秘境扩充+满级玩法 `trl`；config 导入导出工作流封装 skill `mhv`

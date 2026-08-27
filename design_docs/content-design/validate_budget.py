@@ -89,6 +89,8 @@ def check_weapon_mounts(rows: list[dict]) -> list[str]:
     effect_type / trigger_rate / effect_value) and stay within the mounted
     tax budget (weapon-skills.md rule 3): expected gain = rate x value <= 8%,
     and the tax-adjusted per-hit must not exceed the budget band high +5%.
+    Legacy rows are informational only: their violations are downgraded to
+    WARN (consistent with the other checks in this module).
 
     Args:
         rows: Parsed weapons.csv rows.
@@ -100,58 +102,71 @@ def check_weapon_mounts(rows: list[dict]) -> list[str]:
     for r in rows:
         if not r.get("trigger_skills_json") or r["trigger_skills_json"] == "[]":
             continue
+        row_lines: list[str] = []
         try:
             skills = json.loads(r["trigger_skills_json"])
         except json.JSONDecodeError as e:
-            results.append(f"FAIL {r['id']:<12} trigger_skills_json 不是合法 JSON: {e}")
-            continue
-        level = max(1, int(r["required_level_index"]))
-        size = r["size_class"]
-        per_hit = float(r["base_damage"]) + (
-            benchmark_damage(level) + float(r["bonus_damage"])
-        ) * float(r["weapon_coefficient_k"])
-        hp = benchmark_hp(level)
-        lo, hi = SIZE_BUDGET.get(size, (0, 0))
-        for i, s in enumerate(skills):
-            where = f"{r['id']} trigger_skills[{i}]"
-            if not isinstance(s, dict):
-                results.append(f"FAIL {where:<16} 必须是对象")
-                continue
-            missing = {
-                "trigger_timing",
-                "effect_type",
-                "trigger_rate",
-                "effect_value",
-            } - s.keys()
-            if missing:
-                results.append(f"FAIL {where:<16} 缺引擎键 {sorted(missing)}")
-                continue
-            timing = s["trigger_timing"]
-            rate = float(s["trigger_rate"])
-            value = float(s["effect_value"])
-            if timing not in TRIGGER_TIMINGS:
-                results.append(f"FAIL {where:<16} 未知 timing {timing}")
-            if not 0 < rate <= 1:
-                results.append(f"FAIL {where:<16} trigger_rate 需在 (0,1]，得 {rate}")
-            gain = rate * value
-            if s["effect_type"] == "stun":
-                if rate > STUN_RATE_CAP:
-                    results.append(
-                        f"FAIL {where:<16} stun 概率 {rate} 超上限 {STUN_RATE_CAP}"
-                    )
-            elif gain > WEAPON_MOUNT_TAX_CAP:
-                results.append(
-                    f"FAIL {where:<16} 期望增幅 {gain:.1%} 超税上限 {WEAPON_MOUNT_TAX_CAP:.0%}"
-                )
-            taxed = per_hit * (1 + gain)
-            if taxed > hp * hi * 1.05:
-                results.append(
-                    f"FAIL {where:<16} 含税每击 {taxed:.1f} 越带上限 {hp * hi * 1.05:.1f}"
-                )
-            results.append(
-                f"PASS {where:<16} {s['name']} {timing} {s['effect_type']} "
-                f"rate={rate} value={value} 期望增幅={gain:.1%}"
+            row_lines.append(
+                f"FAIL {r['id']:<12} trigger_skills_json 不是合法 JSON: {e}"
             )
+            skills = None
+        if skills is not None:
+            level = max(1, int(r["required_level_index"]))
+            size = r["size_class"]
+            per_hit = float(r["base_damage"]) + (
+                benchmark_damage(level) + float(r["bonus_damage"])
+            ) * float(r["weapon_coefficient_k"])
+            hp = benchmark_hp(level)
+            lo, hi = SIZE_BUDGET.get(size, (0, 0))
+            for i, s in enumerate(skills):
+                where = f"{r['id']} trigger_skills[{i}]"
+                if not isinstance(s, dict):
+                    row_lines.append(f"FAIL {where:<16} 必须是对象")
+                    continue
+                missing = {
+                    "trigger_timing",
+                    "effect_type",
+                    "trigger_rate",
+                    "effect_value",
+                } - s.keys()
+                if missing:
+                    row_lines.append(f"FAIL {where:<16} 缺引擎键 {sorted(missing)}")
+                    continue
+                timing = s["trigger_timing"]
+                rate = float(s["trigger_rate"])
+                value = float(s["effect_value"])
+                if timing not in TRIGGER_TIMINGS:
+                    row_lines.append(f"FAIL {where:<16} 未知 timing {timing}")
+                if not 0 < rate <= 1:
+                    row_lines.append(
+                        f"FAIL {where:<16} trigger_rate 需在 (0,1]，得 {rate}"
+                    )
+                gain = rate * value
+                if s["effect_type"] == "stun":
+                    if rate > STUN_RATE_CAP:
+                        row_lines.append(
+                            f"FAIL {where:<16} stun 概率 {rate} 超上限 {STUN_RATE_CAP}"
+                        )
+                elif gain > WEAPON_MOUNT_TAX_CAP:
+                    row_lines.append(
+                        f"FAIL {where:<16} 期望增幅 {gain:.1%} 超税上限 {WEAPON_MOUNT_TAX_CAP:.0%}"
+                    )
+                taxed = per_hit * (1 + gain)
+                if taxed > hp * hi * 1.05:
+                    row_lines.append(
+                        f"FAIL {where:<16} 含税每击 {taxed:.1f} 越带上限 {hp * hi * 1.05:.1f}"
+                    )
+                row_lines.append(
+                    f"PASS {where:<16} {s['name']} {timing} {s['effect_type']} "
+                    f"rate={rate} value={value} 期望增幅={gain:.1%}"
+                )
+        if r["status"] == "legacy":
+            # legacy 行仅参照（config 逆向导出/旧框架存档），违例降 WARN 不阻塞
+            row_lines = [
+                "WARN " + line[5:] if line.startswith("FAIL ") else line
+                for line in row_lines
+            ]
+        results.extend(row_lines)
     return results
 
 

@@ -9,6 +9,8 @@ Checks (spec `content-sync-pipeline` 叙事文案 lint 闸门):
 - 名字一致性：canon 表 name 列与 config 同 id/key 条目 name 必须一致
 - canon 列：``canon_origin/tone_tier/story_hook/narrative_status`` 四列存在、
   取值域合法（tone_tier 四档 / narrative_status 三态）、canon_origin 可在 bible 查证
+- 叙事待写：``narrative_status`` 为占位/待写/空的行恒 WARN（含无 description 的
+  轻量 canon 表），让回填进度在基线 WARN 数中可见
 
 严重度规则（design.md 风险节）：
 - ``status=legacy`` 行恒 WARN（参照行，与 validate_budget.py 一致）
@@ -222,6 +224,11 @@ def _load_name_maps() -> dict[str, dict[str, str]]:
     maps["rifts"] = {
         str(r.get("id", "")): r.get("name", "") for r in rift.get("rifts", [])
     }
+    # bounty_templates.json templates（id 为 int，统一 str 比较）
+    bounty = _load_json(CONFIG_DIR / "bounty_templates.json")
+    maps["bounty"] = {
+        str(t.get("id", "")): t.get("name", "") for t in bounty.get("templates", [])
+    }
     return maps
 
 
@@ -283,6 +290,21 @@ def _check_canon_columns(rows: list[dict], table: str, results: list[str]) -> No
             )
 
 
+def _check_narrative_backlog(rows: list[dict], table: str, results: list[str]) -> None:
+    """Emit a backlog WARN for rows whose narrative is not yet written.
+
+    无 description 列的轻量 canon 表不走 ``_check_description``（那里有同款
+    WARN），在此单独登记，让回填进度体现在基线 WARN 数中。
+    """
+    for r in rows:
+        cid = str(r.get("id") or r.get("key") or "").strip()
+        narrative = (r.get("narrative_status") or "").strip()
+        if narrative in ("占位", "待写") or not narrative:
+            results.append(
+                f"WARN {table}.csv[{cid}] narrative_status={narrative or '（空）'}，叙事待写"
+            )
+
+
 def _check_description(
     rows: list[dict],
     table: str,
@@ -309,7 +331,7 @@ def _check_config_descriptions(strict: bool, max_len: int) -> list[str]:
     """Scan config-only description fields（events/enemies/bounty/routes）。
 
     这些域 description 文本只活在 config（design D2），按对应 canon 表的
-    narrative_status 定严重度；无 canon 表的路由/悬赏按"占位"处理。
+    narrative_status 定严重度；无 canon 表的路由按"占位"处理。
     """
     results: list[str] = []
 
@@ -368,14 +390,25 @@ def _check_config_descriptions(strict: bool, max_len: int) -> list[str]:
                     f"{sev} enemies.json {group.get('key')}.{tpl.get('key')} {problem}"
                 )
 
-    # bounty_templates（无 canon 表，按"占位"处理）
+    # bounty_templates narrative_status lookup（id → narrative_status）
+    bounty_status: dict[str, str] = {}
+    try:
+        for r in _load_csv("bounty-canon.csv"):
+            bounty_status[str(r.get("id", "")).strip()] = (
+                r.get("narrative_status") or ""
+            ).strip()
+    except FileNotFoundError:
+        pass
+
     bounty = _load_json(CONFIG_DIR / "bounty_templates.json")
     for tpl in bounty.get("templates", []):
+        narrative = bounty_status.get(str(tpl.get("id", "")), "占位")
+        sev = "FAIL" if narrative == "定稿" else ("FAIL" if strict else "WARN")
         for problem in _text_violations(
             (tpl.get("description") or "").strip(), max_len
         ):
             results.append(
-                f"WARN bounty_templates.json templates[{tpl.get('id')}] {problem}"
+                f"{sev} bounty_templates.json templates[{tpl.get('id')}] {problem}"
             )
 
     return results
@@ -407,11 +440,12 @@ def main() -> int:
         ("skills.csv", "skills", "id"),
         ("heart_methods.csv", "heart_methods", "id"),
     )
-    # 无 description 列的 canon 表：canon 列 + 名字一致
+    # 无 description 列的 canon 表：canon 列 + 名字一致 + 叙事待写 backlog
     canon_tables = (
         ("events-canon.csv", "events", "key"),
         ("enemies-canon.csv", "enemies", "key"),
         ("rifts-canon.csv", "rifts", "id"),
+        ("bounty-canon.csv", "bounty", "id"),
     )
 
     for filename, table, id_field in desc_tables:
@@ -431,6 +465,7 @@ def main() -> int:
         lines: list[str] = []
         _check_canon_columns(rows, table, lines)
         _check_name_consistency(rows, table, name_maps[table], id_field, lines)
+        _check_narrative_backlog(rows, table, lines)
         all_lines.extend(lines)
         for line in lines:
             print(" ", line)

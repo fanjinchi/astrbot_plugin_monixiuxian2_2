@@ -34,7 +34,7 @@
 - **WHEN** 某行 `tone_tier` 填了"幽默风"（非 bible 定义档位）
 - **THEN** lint 报告非法取值并 FAIL，同步中止
 
-#### Scenario: 出处不可查证警告
+#### Scenario: 出处不可查证拒绝
 
 - **WHEN** 某行 `canon_origin` 填了"云州·落星湖"而 bible 地理章无"落星湖"
 - **THEN** lint 以 FAIL 报告"出处未在 bible 登记"，提示要么先在 bible 补设定、要么改用已登记出处
@@ -43,3 +43,31 @@
 
 - **WHEN** 某行数值 status=draft 且 narrative_status=占位
 - **THEN** lint 对该行描述按"占位文案"规则放宽检查（允许平实功能描述），但仍 MUST 检查禁用词与名字一致性，并以 WARN 提示该行叙事待写
+
+## MODIFIED Requirements
+
+### Requirement: 设计表合并同步
+
+（reconcile 全量重导语义不变，仅修订 legacy 行的处置——2026-08-27 审查发现：宗门技能池/青云心典等现存内容未登记设计表时会被 reconcile 静默删除）系统 SHALL 提供设计 CSV → config JSON 的同步脚本，以设计表为唯一来源进行全量重导：脚本 SHALL 导入 status 为 draft/final 的设计行（按 `name` 键合并：同名更新字段、新名新增），并 SHALL 删除 config 中完全不在 CSV 中的既有条目。status=legacy 的行是"未收编现存内容"的登记位（如 `export_config_to_canon.py` 补登记的宗门池/镇派心法）：不参与导入、闸门违例仅 WARN，且其 config 同名条目 MUST NOT 被 reconcile 删除（要删除内容 = 从 CSV 整行移除该行）。legacy 行中的设计有效条目由设计表修正为 draft 并过预算闸门后纳入导入。
+
+#### Scenario: 表外条目删除
+
+- **WHEN** config 中存在完全不在 CSV（任何 status 行）中的旧条目
+- **THEN** 同步后该条目被删除，config 仅保留 CSV 已登记条目（draft/final 导入 + legacy 保护）
+
+#### Scenario: 同名条目更新
+
+- **WHEN** CSV 中 status=draft 的行与 config 既有条目同名
+- **THEN** 该条目的字段被 CSV 值更新，config 其余条目保持不变
+
+#### Scenario: 新条目新增
+
+- **WHEN** CSV 行的 name 不存在于 config
+- **THEN** 脚本在 config 中追加该条目
+
+#### Scenario: legacy 行跳过
+
+（语义修订：旧版为"不导入即删除"，2026-08-27 起改为"不导入但保护"，场景名沿用原标识）
+
+- **WHEN** CSV 行的 status=legacy 且 config 存在同名条目（如补登记的宗门技能池）
+- **THEN** 该行不参与同步导入，其 config 条目在 reconcile 阶段被保留；该行的闸门违例只计 WARN 不阻塞同步

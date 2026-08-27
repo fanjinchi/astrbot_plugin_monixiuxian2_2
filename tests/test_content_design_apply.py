@@ -341,6 +341,24 @@ def test_reconcile_filters_config_to_imported_names():
     assert groups["体修专属"] == []
 
 
+def test_reconcile_protects_legacy_registry_rows():
+    """legacy rows are never imported, but their config counterparts survive.
+
+    narrative-content-pipeline 语义变更：legacy 行是"未收编现存内容"的登记
+    位（如 export_config_to_canon.py 补登记的宗门池），reconcile 只删除
+    完全不在 CSV 中的条目。
+    """
+    entries = [{"name": "A"}, {"name": "B"}, {"name": "C"}]
+    deleted = _reconcile_list(entries, {"A"}, {"C"})
+    assert deleted == ["B"]
+    assert [e["name"] for e in entries] == ["A", "C"]
+
+    groups = {"sect_qingyun": [{"name": "A"}, {"name": "B"}]}
+    deleted = _reconcile_groups(groups, set(), {"A", "B"})
+    assert deleted == []
+    assert len(groups["sect_qingyun"]) == 2
+
+
 def test_merge_skill_clears_stale_trigger_and_ultimate():
     """A row without trigger/ultimate keys must clear stale ones in config.
 

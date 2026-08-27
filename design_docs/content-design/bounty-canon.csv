@@ -1,0 +1,9 @@
+id,name,canon_origin,tone_tier,story_hook,narrative_status,note
+301,巡山情报,散修日常,平淡,,占位,category=巡山；difficulty=easy
+302,灵药补给,散修日常,平淡,,占位,category=采集；difficulty=normal
+303,妖兽清剿,散修日常,平淡,,占位,category=猎杀；difficulty=hard
+304,秘境侦察,散修日常,平淡,,占位,category=探索；difficulty=normal
+305,护送商旅,散修日常,平淡,,占位,category=护送；difficulty=hard
+306,禁地余波,散修日常,平淡,,占位,category=镇压；difficulty=elite
+307,后山巡视,散修日常,平淡,,占位,category=巡山；difficulty=easy
+308,执事堂派差,散修日常,平淡,,占位,category=采集；difficulty=normal

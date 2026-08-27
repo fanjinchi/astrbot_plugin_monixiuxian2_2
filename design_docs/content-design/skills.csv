@@ -39,3 +39,8 @@ pool,id,name,trigger_name,trigger_condition,trigger_rate,effect_type,effect_valu
 通用功法池,verify_fatigue_001,燃血诀,燃血,attack,0.15,fatigue,0.10,damage,2,,,,,,,1.0,1.0,1.0,null,燃烧气血换取短暂战力后力竭,乱斗堂:爆裂一击 250%+疲劳（trigger-effect-extensions 后补冒烟）,验证 fatigue 引擎：自我 debuff 攻击×0.9 持续2回合；spec D11 自伤交换不计入预算（0%）；不入正式玩法,draft,散修日常,平淡,燃烧气血换取短暂战力后力竭,占位
 传承功法池,impart_skill_001,传承·破妄一击,破妄之眼,attack,0.18,damage_bonus,0.35,,,,,,,,,1.0,1.0,1.0,null,传承之地所悟攻伐法门,传承系统,等阶3奖励；期望增益 0.18×0.35=6.3% ✓,draft,传承之地,正经,传承之地所悟攻伐法门,占位
 传承功法池,impart_skill_002,传承·归元护体,归元守护,defend,0.22,damage_reduction,0.45,,,,,,,,,1.0,1.0,1.0,null,传承之地所悟防御法门,传承系统,等阶4奖励；期望减伤 0.22×0.45=9.9% ✓,draft,传承之地,正经,传承之地所悟防御法门,占位
+sect_qingyun,qy_001,青云剑诀,青云一剑,attack,0.18,damage_bonus,0.3,,,,,,,,,1.1,0.9,1.0,null,青云门镇派剑诀，剑出如青云出岫，绵里藏针,现有配置,config 逆向导出补登记（scripts/export_config_to_canon.py）,legacy,青云门,正经,,占位
+sect_qingyun,qy_002,清风护体功,清风屏障,defend,0.2,damage_reduction,0.35,,,,,,,,,1.0,1.0,0.8,null,青云门内门护身功法，清气护体，可卸来敌攻势,现有配置,config 逆向导出补登记（scripts/export_config_to_canon.py）,legacy,青云门,正经,,占位
+sect_qingyun,qy_003,紫霄雷引,紫霄落雷,crit,0.25,damage_bonus,0.5,,,,,,,,,1.2,0.8,0.5,"{""name"": ""万剑归宗"", ""trigger_condition"": ""once_per_battle"", ""effect_type"": ""massive_damage"", ""effect_value"": 1.5, ""min_action_index"": 5}",青云门亲传绝学，引紫霄神雷淬体，偶发雷霆之威,现有配置,config 逆向导出补登记（scripts/export_config_to_canon.py）,legacy,青云门,正经,,占位
+sect_huanxi,hx_001,蚀心魔音,蚀心之音,attack,0.15,debuff,0.2,,,,,,,,,1.0,1.0,1.0,null,合欢宗杀术，魔音蚀心，乱敌心神,现有配置,config 逆向导出补登记（scripts/export_config_to_canon.py）,legacy,合欢宗,玩梗灰,,占位
+sect_huanxi,hx_002,血影掠杀,血影连击,attack,0.18,combo,0.55,,,,,,,,,0.9,1.1,0.7,null,合欢宗护法亲传，身化血影，连环掠杀,现有配置,config 逆向导出补登记（scripts/export_config_to_canon.py）,legacy,合欢宗,玩梗灰,,占位

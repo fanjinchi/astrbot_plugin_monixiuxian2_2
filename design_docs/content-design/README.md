@@ -22,8 +22,10 @@
 | `events-canon.csv` | 历练事件叙事表（事件组 key/name + 叙事四列，无数值列） |
 | `enemies-canon.csv` | 敌人叙事表（模板 key/name + 叙事四列 + 精英前缀/Boss 名备注） |
 | `rifts-canon.csv` | 秘境叙事表（id/name + 叙事四列 + 文案待工程变更备注） |
+| `bounty-canon.csv` | 悬赏叙事表（模板 id/name + 叙事四列 + category/difficulty 备注） |
 | `validate_budget.py` | 数值预算验算脚本（§3 速查表的机器校验） |
 | `lint_narrative.py` | 叙事文案 lint 脚本（禁词/数值承诺/长度/品级冠词/名字一致性 + canon 列校验，sync 第二道闸门） |
+| `../../scripts/export_config_to_canon.py` | config → canon CSV 逆向导出补登记脚本（缺失条目以 status=legacy 照抄 config 数值补登，保护其不被 reconcile 删除） |
 | `*.md` | 各系统的设计说明、原型对照、适配决策记录 |
 
 > **叙事 canon 四列（2026-09-03 起）**：`weapons/skills/heart_methods` 三表末尾追加
@@ -57,7 +59,7 @@
 | `description` | 同名 | |
 | `ref_source` | **设计列** | 原型出处，如 `MB:Leek`、`QPet:接力棒`、`现有配置` |
 | `design_note` | **设计列** | 适配修改理由 |
-| `status` | **设计列** | `draft` 设计中 / `final` 已定稿 / `legacy` 现有配置参照（仅参考，不计入校验） |
+| `status` | **设计列** | `draft` 设计中 / `final` 已定稿 / `legacy` 未收编现存内容登记位（不导入、闸门违例仅 WARN、config 同名条目受 reconcile 保护；删除内容 = 整行移除，收编 = 改 draft 并过预算闸门） |
 
 ### skills.csv
 

@@ -11,8 +11,11 @@ spec content-sync-pipeline — 初版仅 ``narrative_status=定稿`` 行 FAIL �
 
 Reconcile semantics: imported draft/final rows update same-name entries and
 append new names; config entries absent from the CSVs are deleted. Rows with
-status ``legacy`` are reference-only and always skipped (their config
-counterparts are therefore deleted by reconcile).
+status ``legacy`` are reference-only and never imported; their config
+counterparts are PROTECTED from reconcile deletion (a legacy row is the
+registry entry for live content not yet brought under design management, e.g.
+sect pools backfilled by ``export_config_to_canon.py``). To remove content
+from config, delete its CSV row entirely.
 
 skills.csv sync: trigger skills keep the persisted ``trigger_condition`` key
 (the skill_manager normalization layer maps it to the engine contract key
@@ -462,29 +465,37 @@ def _merge_skill(groups: dict, payload: dict) -> tuple[str, list[str]]:
     return ("ADD", [])
 
 
-def _reconcile_list(entries: list[dict], imported_names: set[str]) -> list[str]:
+def _reconcile_list(
+    entries: list[dict],
+    imported_names: set[str],
+    protected_names: set[str] | None = None,
+) -> list[str]:
     """Drop config entries absent from the imported design rows (reconcile).
 
     Args:
         entries: The config list to filter in place.
         imported_names: Names imported from the CSVs this run.
+        protected_names: Names present in the CSV with a non-imported status
+            (``legacy``); their config entries are kept (see module docstring).
 
     Returns:
         The names of deleted entries.
     """
-    deleted = [e["name"] for e in entries if e.get("name") not in imported_names]
-    entries[:] = [e for e in entries if e.get("name") in imported_names]
+    keep = imported_names | (protected_names or set())
+    deleted = [e["name"] for e in entries if e.get("name") not in keep]
+    entries[:] = [e for e in entries if e.get("name") in keep]
     return deleted
 
 
-def _reconcile_groups(groups: dict, imported_names: set[str]) -> list[str]:
+def _reconcile_groups(
+    groups: dict, imported_names: set[str], protected_names: set[str] | None = None
+) -> list[str]:
     """Reconcile the grouped (dict-of-list) config format like _reconcile_list."""
+    keep = imported_names | (protected_names or set())
     deleted = []
     for entries in groups.values():
-        deleted.extend(
-            e["name"] for e in entries if e.get("name") not in imported_names
-        )
-        entries[:] = [e for e in entries if e.get("name") in imported_names]
+        deleted.extend(e["name"] for e in entries if e.get("name") not in keep)
+        entries[:] = [e for e in entries if e.get("name") in keep]
     return deleted
 
 
@@ -573,15 +584,29 @@ def main() -> int:
         print(f"  {action} {s['name']}")
         print("\n".join(diffs) if diffs else "    (no field changes)")
 
-    # Reconcile: drop config entries absent from the imported design rows.
+    # Reconcile: drop config entries absent from the CSVs entirely. legacy rows
+    # are not imported but PROTECT their config counterparts from deletion
+    # (module docstring; removal of content = delete the CSV row).
+    protected = {
+        label: {(r.get("name") or "").strip() for r in skipped}
+        for label, skipped in (
+            ("weapons.json", weapon_skipped),
+            ("heart_methods.json", heart_skipped),
+            ("skills.json", skill_skipped),
+        )
+    }
     for label, entries, imported in (
         ("weapons.json", weapons_cfg, weapons),
         ("heart_methods.json", heart_list, hearts),
     ):
-        deleted = _reconcile_list(entries, {x["name"] for x in imported})
+        deleted = _reconcile_list(
+            entries, {x["name"] for x in imported}, protected[label]
+        )
         for name in deleted:
             print(f"  DELETE {name} ({label}, absent from CSV)")
-    deleted = _reconcile_groups(skills_cfg, {s["name"] for s in skills})
+    deleted = _reconcile_groups(
+        skills_cfg, {s["name"] for s in skills}, protected["skills.json"]
+    )
     for name in deleted:
         print(f"  DELETE {name} (skills.json, absent from CSV)")
 

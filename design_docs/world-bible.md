@@ -2,7 +2,7 @@
 
 > **本文档是插件所有内容文案的唯一事实来源**：config 描述字段、历练事件池、敌人命名池、宗门 description、悬赏/秘境文本、后续新增物品与剧情，一律以此为准。
 > 规则：与其他设计资料（`current-design-report.md` 等）冲突时，**数值以 current-design-report 为准、叙事以本文档为准**；叙事冲突点反查本文档并回写出处。
-> 范围：第一季开放至 **元婴**（Lv40：练气/筑基/金丹/元婴）。化神及以上境界无独立"上界"，后续等级开放 = 灵气复苏推进的时间轴，见第 4 章。
+> 范围：第一季内容覆盖 **练气 → 元婴（Lv1-39）**，等级上限 **Lv40**。按 `config_manager.get_level_name` 命名规则，Lv10/20/30 分别为筑基/金丹/元婴初期，**Lv40 = 化神初期**——化神内容不写（§4.3），Lv40 仅作第一季满级边界与满级玩法挂载点（规划中，bd `trl`）。化神及以上境界无独立"上界"，后续等级开放 = 灵气复苏推进的时间轴，见第 4 章。
 
 ---
 
@@ -102,9 +102,11 @@
 
 历练事件文案按"变体池"组织，避免玩家反复刷同一句（§1.2 的动作→画面→结果三拍在不同变体间轮换）：
 
-- **每事件组 ≥5 条通用变体**：同一事件（如"遭遇拦路妖兽"）至少 5 条不重复的通用文案；
+- **每事件 ≥5 条通用变体**：同一事件（如"遭遇拦路妖兽"）至少 5 条不重复的通用文案；
 - **每州 ≥1 条专属变体**：每条事件另配六州专属文案各 ≥1 条（云/沧/朔/蛮/青/中州，落州名与地貌烙印，见 §2.2），让历练地点有地域感；
 - 悬赏文案同理：每类悬赏主题 ≥5 条通用 + 每州 ≥1 条专属。
+
+（"事件"指 `adventure_config.json` 里 event_groups 下的单条事件——现 5 组共 13 事件；"组"只是 risk 分桶，变体量标准按事件计。）
 
 ---
 
@@ -363,12 +365,13 @@
 
 | 内容域 | canon 表 | 说明 |
 |---|---|---|
-| 武器 | `design_docs/content-design/weapons.csv`（`canon_origin/tone_tier/story_hook/narrative_status` 列） | 含 §6.1 五宗宗门之宝的规划位 |
-| 功法 | `design_docs/content-design/skills.csv`（同上四列） | 含宗门池/传承池 |
-| 心法 | `design_docs/content-design/heart_methods.csv`（同上四列） | 含五宗镇派心法规划位 |
+| 武器 | `design_docs/content-design/weapons.csv`（`canon_origin/tone_tier/story_hook/narrative_status` 列） | 含 §6.1 五宗宗门之宝的青云镇山剑（wpn_qy_001，导出补登记 legacy 行）；其余四宗宗门之宝为规划位 |
+| 功法 | `design_docs/content-design/skills.csv`（同上四列） | 含宗门池 sect_qingyun/sect_huanxi（导出补登记 legacy 行）与传承池 |
+| 心法 | `design_docs/content-design/heart_methods.csv`（同上四列） | 含青云心典（heart_qy_001，导出补登记 legacy 行）；其余四宗镇派心法为规划位待补 |
 | 历练事件 | `design_docs/content-design/events-canon.csv` | 事件组 key ↔ name 对照 + 叙事列 |
 | 敌人 | `design_docs/content-design/enemies-canon.csv` | 敌人模板 + 精英前缀/Boss 名叙事备注 |
 | 秘境 | `design_docs/content-design/rifts-canon.csv` | 秘境 id ↔ name 对照 + 叙事列（config 暂无 `description`，文案待工程变更 bd `og9`） |
+| 悬赏 | `design_docs/content-design/bounty-canon.csv` | 悬赏模板 id ↔ name 对照 + 叙事列 |
 | 丹药 | （待建 `pills-canon.csv`，后续内容变更补） | 名录暂存 `config/pills.json`，以 config 名为准 |
 | 材料 | （待建 `materials-canon.csv`，后续内容变更补） | 名录暂存 `config/items.json`，以 config 名为准 |
 
@@ -418,3 +421,8 @@
   3. **势力弹药库**：§3.2 新增 §3.2.6 NPC 人格化三件套（10 名具名 NPC）；§3.2 新增文风档位四值（正经/正经+冷幽默/玩梗灰/平淡）；§3.6 新增势力冲突矩阵。
   4. **§6 全枚举退役**：§6.2~§6.9 逐条名录迁至 canon 表（weapons/skills/heart_methods + 新建 events/enemies/rifts），bible 只保留裁决规则与示范样例两行。
   5. **叙事 lint 基线**：`lint_narrative.py` 对全量现状跑通 —— **0 FAIL / 70 WARN**（70 行 `narrative_status=占位` 叙事待写；占位行 WARN 不阻塞同步，仅 `定稿` 行 FAIL 阻塞）。
+- 2026-08-27 审查修正（同 change `narrative-content-pipeline` 评审后追加；**纯设定/文档/工具变更，不改动任何 config 数值与现有文案内容本身**）：
+  1. **幕表事实对齐**（season-1-outline.md §1）：等级段修为练气 Lv1-9 / 筑基 Lv10-19 / 金丹 Lv20-29 / 元婴 Lv30-39（`get_level_name` 规则下 Lv10/20/30 为下一境初期，Lv40=化神初期为第一季满级边界）；"秘境开启叙事"列改为 `rift_config.json` required_level 实况（6 秘境筑基中期全部解锁，金丹/元婴段无新秘境标注为缺口，扩充与满级玩法登记 bd `trl`）；本文范围行同步修正。
+  2. **术语与数量勘误**：§1.7 变体量标准"每事件组"→"每事件"（event_groups 的"组"是 risk 分桶，现 5 组 13 事件）；outline §2 武器 11→10 件、功法 40→45 个（含宗门池）、心法 20→21 本（含青云心典）。
+  3. **canon 覆盖补登记**：`scripts/export_config_to_canon.py` 逆向导出补登 wpn_qy_001/heart_qy_001/qy_001-003/hx_001-002（status=legacy）；新建 `bounty-canon.csv`；§6.2 表同步更新。配套 reconcile 语义修正：legacy 行 config 条目受保护不再被删除（design D9）。
+  4. **lint 新基线**：轻量 canon 表（events/enemies/rifts/bounty）纳入"叙事待写"统计 —— **0 FAIL / 119 WARN**。
