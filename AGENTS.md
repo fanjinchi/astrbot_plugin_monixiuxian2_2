@@ -172,6 +172,16 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 - **纯 bug 修复**（行为与数值设计意图不变）不要求；拿不准是否影响玩法时，按"影响玩法"处理。
 - 正式变更提案仍走 OpenSpec 流程（`openspec/changes/`），design_docs 负责保持"设计事实"与实现同步。
 
+### 15. 内容设计先行：剧情/数值内容必须先进 design_docs（必做）
+
+**一切可配置的游戏内容（剧情文案、武器/功法/心法/丹药/材料数值、事件、悬赏、秘境、敌人等）一律先在 `design_docs/` 完成设计，禁止直接改 `config/*.json`**。流程：
+
+1. **策划阶段（design_docs）**：剧情/文案类内容按叙事管线落笔——基调与规范查 `design_docs/world-bible.md`，季度计划查 `design_docs/season-1-outline.md`，条目登记进 `design_docs/content-design/` 的 canon 表（含数值的写全列，无数值的写轻量叙事表）；数值/玩法类内容写进 `content-design/` 对应 CSV（draft 行）。设计期自检：`lint_narrative.py` + `validate_budget.py`。
+2. **用户确认**：设计在 design_docs 就绪后**必须等用户手动确认**，不由 AI 自行入库。
+3. **导入阶段（用户发起导入任务）**：经 `scripts/sync_content_to_config.py`（预算 + 叙事 lint 双闸门）从 design_docs 导入 config；反向补登记用 `scripts/export_config_to_canon.py`。导入后按 §14 同步文档、跑测试与质量门。
+
+唯一的例外是**工程性 config 变更**（新增字段、结构调整，如 rift 加 description），这类走 OpenSpec 工程变更，不算内容填充。
+
 ## 测试
 
 - 测试文件在 `tests/` 目录，使用 **pytest**
