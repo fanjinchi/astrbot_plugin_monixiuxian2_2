@@ -4,8 +4,10 @@
 Reads ``design_docs/content-design/weapons.csv``, ``heart_methods.csv`` and
 ``skills.csv``, reconciles rows with status ``draft``/``final`` into
 ``config/weapons.json``, ``config/heart_methods.json`` and
-``config/skills.json`` (keyed by item ``name``), and runs the budget gate
-(``design_docs/content-design/validate_budget.py``) before writing.
+``config/skills.json`` (keyed by item ``name``), and runs two gates before
+writing: the budget gate (``design_docs/content-design/validate_budget.py``)
+and the narrative lint gate (``design_docs/content-design/lint_narrative.py``,
+spec content-sync-pipeline — 初版仅 ``narrative_status=定稿`` 行 FAIL 阻塞).
 
 Reconcile semantics: imported draft/final rows update same-name entries and
 append new names; config entries absent from the CSVs are deleted. Rows with
@@ -592,6 +594,20 @@ def main() -> int:
     )
     if gate.returncode != 0:
         print("Budget gate FAILED, nothing was written.")
+        return 1
+
+    # Narrative lint gate: second gate after budget check (spec
+    # content-sync-pipeline 叙事文案 lint 闸门). Initial version only FAILs
+    # narrative_status=定稿 rows (lint_narrative.py default mode), the rest
+    # WARN — giving canon 回填 a window before full enforcement (design.md 风险节).
+    print("\nRunning narrative lint gate (lint_narrative.py)...")
+    sys.stdout.flush()  # keep report order stable when stdout is piped
+    lint_gate = subprocess.run(
+        [sys.executable, str(DESIGN_DIR / "lint_narrative.py")],
+        check=False,
+    )
+    if lint_gate.returncode != 0:
+        print("Narrative lint gate FAILED, nothing was written.")
         return 1
 
     if args.dry_run:

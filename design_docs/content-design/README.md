@@ -19,8 +19,18 @@
 | `weapons.csv` | 武器设计表（每行一件武器） |
 | `skills.csv` | 功法设计表（每行一个功法，含触发技） |
 | `heart_methods.csv` | 心法设计表（每行一个心法） |
+| `events-canon.csv` | 历练事件叙事表（事件组 key/name + 叙事四列，无数值列） |
+| `enemies-canon.csv` | 敌人叙事表（模板 key/name + 叙事四列 + 精英前缀/Boss 名备注） |
+| `rifts-canon.csv` | 秘境叙事表（id/name + 叙事四列 + 文案待工程变更备注） |
 | `validate_budget.py` | 数值预算验算脚本（§3 速查表的机器校验） |
+| `lint_narrative.py` | 叙事文案 lint 脚本（禁词/数值承诺/长度/品级冠词/名字一致性 + canon 列校验，sync 第二道闸门） |
 | `*.md` | 各系统的设计说明、原型对照、适配决策记录 |
+
+> **叙事 canon 四列（2026-09-03 起）**：`weapons/skills/heart_methods` 三表末尾追加
+> `canon_origin`（叙事出处，须可查证于 bible 州域/宗门/秘境或通用出处类）、`tone_tier`
+> （文风档：正经 / 正经+冷幽默 / 玩梗灰 / 平淡）、`story_hook`（一句话叙事钩子）、
+> `narrative_status`（占位 / 待写 / 定稿）。三张 `*-canon.csv` 只含叙事列、不含数值列。
+> 文风与禁词规范见 `world-bible.md` §1.3/§5.3；变体量标准见 bible §1.7。
 
 为什么用 CSV 而不是 Markdown 表格 / JSON / Excel：
 

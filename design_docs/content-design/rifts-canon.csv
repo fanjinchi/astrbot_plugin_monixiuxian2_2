@@ -1,0 +1,7 @@
+id,name,canon_origin,tone_tier,story_hook,narrative_status,note
+1,青云秘境,云州·青云山,正经,灵气复苏后最早重新活跃的入门秘境，青云门护持的试炼之地,占位,config 暂无 description 字段，入口/结算文案待工程变更落地（bd og9）
+2,落日峡谷,沧州,正经,两山夹峙的血色峡谷，谷底埋着上古战场的残甲，灵气回潮后锈铁重新生出灵光,占位,config 暂无 description 字段，文案待工程变更（bd og9）
+3,万妖洞,蛮州,正经,南疆妖脉封印松动，洞深处妖物渐次苏醒,占位,config 暂无 description 字段，文案待工程变更（bd og9）
+4,玄冰地宫,朔州,正经,北境永冻灵脉囤积的存量灵气，复苏后最早"活过来"的秘境,占位,config 暂无 description 字段，文案待工程变更（bd og9）
+5,上古遗迹,中州,正经,上古战场残址，地仙大能殒身之地，禁制松动后宝藏重新露出獠牙,占位,config 暂无 description 字段，文案待工程变更（bd og9）
+6,青云剑冢,云州·青云山,正经,青云门历代剑修的埋剑之地，收归上古遗留的剑冢,占位,青云门专属（sect_id=qingyun）；config 暂无 description 字段，文案待工程变更（bd og9）
