@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 try:
     from ..data.data_manager import DataBase
+    from ..data.default_configs import RIFT_CONFIG
     from ..managers.enemy_manager import EnemyManager  # noqa: F401
     from ..managers.pve_combat_manager import (
         RIFT_LEVEL_DIFFICULTY_MAP,
@@ -19,6 +20,7 @@ try:
     )
     from ..models import Player
     from ..models_extended import UserStatus
+    from ..utils.narrative_text import render_narrative
 except ImportError:
     # 独立运行（测试）时降级加载依赖
     def _load_module(name, rel_path):
@@ -31,6 +33,31 @@ except ImportError:
         spec.loader.exec_module(mod)
         return mod
 
+    def _load_default_configs():
+        """Load data/default_configs.py under a synthetic package.
+
+        default_configs relatively imports its narrative_defaults package, so
+        the plain file-path loader above cannot satisfy it; a synthetic parent
+        package gives the relative import a resolution context.
+        """
+        import types
+
+        plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        pkg_name = "rift_manager_standalone_data"
+        if pkg_name not in sys.modules:
+            pkg = types.ModuleType(pkg_name)
+            pkg.__path__ = [os.path.join(plugin_root, "data")]
+            sys.modules[pkg_name] = pkg
+        full_name = f"{pkg_name}.default_configs"
+        if full_name in sys.modules:
+            return sys.modules[full_name]
+        path = os.path.join(plugin_root, "data", "default_configs.py")
+        spec = importlib.util.spec_from_file_location(full_name, path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[full_name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
     DataBase = object
     _pve = _load_module("pve_combat_manager", "managers/pve_combat_manager.py")
     PVECombatManager = _pve.PVECombatManager
@@ -39,6 +66,9 @@ except ImportError:
     Player = _md.Player
     _mde = _load_module("models_extended", "models_extended.py")
     UserStatus = _mde.UserStatus
+    _nt = _load_module("narrative_text", "utils/narrative_text.py")
+    render_narrative = _nt.render_narrative
+    RIFT_CONFIG = _load_default_configs().RIFT_CONFIG
 
 if TYPE_CHECKING:
     from ..core import StorageRingManager
@@ -200,6 +230,10 @@ class RiftManager:
             level_name = self._get_level_name(rift.required_level)
 
             msg += f"【{rift.rift_name}】(ID:{rift.rift_id})\n"
+            # 入口叙事位（config-only，design D3）：旧配置无 description 字段按空处理
+            description = (entry or {}).get("description") or ""
+            if description:
+                msg += f"  {description}\n"
             if entry and entry.get("sect_id") and entry.get("access") == "sect_member":
                 msg += "  🏯 宗门专属秘境\n"
             if rift.required_level == 0:
@@ -319,15 +353,12 @@ class RiftManager:
             exp_reward = random.randint(1000, 5000)
             gold_reward = random.randint(500, 2000)
 
-        # 随机事件
-        events = [
-            {"desc": "你发现了一处灵泉，修为大增！", "item_chance": 70},
-            {"desc": "你在秘境中击败了一只妖兽！", "item_chance": 80},
-            {"desc": "你找到了一个隐藏的宝箱！", "item_chance": 100},
-            {"desc": "你领悟了一些修炼心得。", "item_chance": 40},
-            {"desc": "你在秘境中遇到了前辈留下的传承！", "item_chance": 90},
-        ]
-        event = random.choice(events)
+        # 随机事件：变体池外移至 rift 配置顶层 explore_events（design D3，字段
+        # 结构沿用原硬编码 desc/item_chance）；旧配置缺该键时回落 RIFT_CONFIG 默认池
+        events = self.config.get("explore_events") or RIFT_CONFIG.get(
+            "explore_events", []
+        )
+        event = random.choice(events) if events else {"desc": "", "item_chance": 0}
 
         combat_msg = ""
         combat_rewards = {}
@@ -396,13 +427,24 @@ class RiftManager:
                     )
                     if instance:
                         name = self.impart_mgr.get_type_name(legacy_type)
-                        legacy_msg = (
-                            f"\n\n🗿 你偶遇上古传承之地，战胜了守护者！\n{battle_msg}\n"
-                            f"🌟 获得【{name}】#{instance.id}，发送「激活传承」可开始修炼解锁。"
+                        # 传承之地文案单源：narrative legacy_encounter 模板簇
+                        # （与历练/宗门同簇，design D5 逐字搬运）
+                        legacy_msg = render_narrative(
+                            self.config_manager,
+                            "legacy_encounter",
+                            "encounter_win",
+                            {
+                                "battle_msg": battle_msg,
+                                "name": name,
+                                "instance_id": instance.id,
+                            },
                         )
                 else:
-                    legacy_msg = (
-                        f"\n\n🗿 你偶遇上古传承之地，但未能战胜守护者。\n{battle_msg}"
+                    legacy_msg = render_narrative(
+                        self.config_manager,
+                        "legacy_encounter",
+                        "encounter_lose",
+                        {"battle_msg": battle_msg},
                     )
 
         # 7. 应用奖励
@@ -413,11 +455,16 @@ class RiftManager:
         # 8. 清除CD
         await self.db.ext.set_user_free(user_id)
 
+        # 结算叙事位（config-only，design D3）：空串时输出与旧版逐字一致
+        rift_entry = self._get_rift_config_entry(rift_id)
+        settlement_desc = (rift_entry or {}).get("settlement_desc") or ""
+        settlement_line = f"{settlement_desc}\n\n" if settlement_desc else ""
+
         msg = f"""
 🌀 探索完成 - {rift_name}
 ━━━━━━━━━━━━━━━
 
-{event["desc"]}{combat_msg}
+{settlement_line}{event["desc"]}{combat_msg}
 
 获得修为：+{exp_reward:,}
 获得灵石：+{gold_reward:,}{item_msg}{legacy_msg}

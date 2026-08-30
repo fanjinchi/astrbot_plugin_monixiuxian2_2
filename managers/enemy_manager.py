@@ -14,6 +14,36 @@ from typing import TYPE_CHECKING, Any
 
 from astrbot.api import logger
 
+try:
+    from ..data.default_configs import ENEMY_CONFIG
+except ImportError:
+    # 独立运行（测试）时降级加载依赖：default_configs 内部相对导入
+    # narrative_defaults 包，需合成父包提供解析上下文
+    import importlib.util
+    import os
+    import sys
+    import types
+
+    def _load_default_configs():
+        """Load data/default_configs.py under a synthetic package."""
+        plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        pkg_name = "enemy_manager_standalone_data"
+        if pkg_name not in sys.modules:
+            pkg = types.ModuleType(pkg_name)
+            pkg.__path__ = [os.path.join(plugin_root, "data")]
+            sys.modules[pkg_name] = pkg
+        full_name = f"{pkg_name}.default_configs"
+        if full_name in sys.modules:
+            return sys.modules[full_name]
+        path = os.path.join(plugin_root, "data", "default_configs.py")
+        spec = importlib.util.spec_from_file_location(full_name, path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[full_name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
+    ENEMY_CONFIG = _load_default_configs().ENEMY_CONFIG
+
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
 
@@ -50,84 +80,9 @@ class EnemyManager:
     # 类级计数器，用于为每个生成的敌人分配唯一 user_id
     _spawn_counter = 0
 
-    DEFAULT_CONFIG = {
-        "enemy_groups": [
-            {
-                "key": "default",
-                "name": "默认妖域",
-                "level_range": [0, 100],
-                "templates": [
-                    {
-                        "key": "default_monster",
-                        "name": "未知妖兽",
-                        "elite_prefixes": ["强大的"],
-                        "boss_names": ["妖王"],
-                        "hp_mult": 1.0,
-                        "atk_mult": 1.0,
-                        "defense": 0,
-                        "crit_rate": 0,
-                    }
-                ],
-                "elite": {
-                    "hp_mult": 1.0,
-                    "atk_mult": 1.0,
-                    "defense_bonus": 0,
-                    "crit_rate_bonus": 0,
-                },
-                "boss": {
-                    "hp_mult": 1.2,
-                    "atk_mult": 1.2,
-                    "defense_bonus": 0,
-                    "crit_rate_bonus": 0,
-                },
-                "drop_tier": "low",
-            },
-            {
-                "key": "legacy_guardian",
-                "name": "传承之地守护",
-                "description": "传承获取前置挑战的守护 NPC 组；不带 level_range，只能经 spawn_enemy_from_group 定向触达。",
-                "templates": [
-                    {
-                        "key": "guardian_low",
-                        "name": "守门石像",
-                        "max_level_index": 30,
-                        "hp_mult": 1.0,
-                        "atk_mult": 0.9,
-                        "defense": 5,
-                        "crit_rate": 0.05,
-                    },
-                    {
-                        "key": "guardian_mid",
-                        "name": "镇府灵将",
-                        "max_level_index": 60,
-                        "hp_mult": 1.1,
-                        "atk_mult": 1.0,
-                        "defense": 10,
-                        "crit_rate": 0.08,
-                    },
-                    {
-                        "key": "guardian_high",
-                        "name": "传承守护神",
-                        "max_level_index": 999,
-                        "hp_mult": 1.2,
-                        "atk_mult": 1.1,
-                        "defense": 20,
-                        "crit_rate": 0.1,
-                    },
-                ],
-            },
-        ],
-        "difficulty_coefficients": {
-            "normal": 0.85,
-            "elite": 1.0,
-            "boss": 1.2,
-        },
-        "naming": {
-            "normal": "{name}",
-            "elite": "{prefix}{name}",
-            "boss": "{boss_name}",
-        },
-    }
+    # fallback 默认值单源在 data/default_configs.py（externalize-narrative-texts
+    # D4 收敛，消除内嵌副本与 config 文件的漂移）
+    DEFAULT_CONFIG = ENEMY_CONFIG
 
     DEFAULT_LEVEL_CONFIG = [
         {"exp_needed": 0},

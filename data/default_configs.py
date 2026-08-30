@@ -1,5 +1,24 @@
 # data/default_configs.py
 
+# 叙事文案默认值按域拆分在 data/narrative_defaults/ 包中（避免单文件冲突），
+# 在此汇编导出，保持「默认值统一从 default_configs 引用」的单源约定。
+from .narrative_defaults import DEFAULT_NARRATIVE_CONFIG, NARRATIVE_SCENE_VARS
+
+__all__ = [
+    "ADVENTURE_CONFIG",
+    "BOUNTY_CONFIG",
+    "DEFAULT_NARRATIVE_CONFIG",
+    "ENEMY_CONFIG",
+    "NARRATIVE_SCENE_VARS",
+    "SECT_CONFIG",
+    "SECT_FACTIONS",
+    "SECT_TASKS",
+    "BOSS_CONFIG",
+    "RIFT_CONFIG",
+    "ALCHEMY_CONFIG",
+    "IMPART_CONFIG",
+]
+
 SECT_CONFIG = {
     "create_cost": 10000,
     "create_level_required": 3,  # 筑基
@@ -134,15 +153,28 @@ BOSS_CONFIG = {
 RIFT_CONFIG = {
     "default_duration": 1800,  # 30分钟
     "legacy_chance": 0.10,  # 探索完成触发秘境传承机缘的概率（0 关闭）
+    # 探索事件变体池（外移自 rift_manager 原硬编码，文案逐字保留）；
+    # 旧版 rift_config.json 缺该键时运行时回落到本默认池
+    "explore_events": [
+        {"desc": "你发现了一处灵泉，修为大增！", "item_chance": 70},
+        {"desc": "你在秘境中击败了一只妖兽！", "item_chance": 80},
+        {"desc": "你找到了一个隐藏的宝箱！", "item_chance": 100},
+        {"desc": "你领悟了一些修炼心得。", "item_chance": 40},
+        {"desc": "你在秘境中遇到了前辈留下的传承！", "item_chance": 90},
+    ],
     "rifts": [
         # id 1-5 的内容以 rifts 表 DB 种子为准（migration v15），此处仅保留
-        # 与 DB 一致的基础信息 + 宗门准入字段（sect_id/access），避免双写漂移
+        # 与 DB 一致的基础信息 + 宗门准入字段（sect_id/access），避免双写漂移。
+        # description/settlement_desc 为叙事占位（config-only，不落 DB），
+        # 内容由 design_docs 管线后续填充；空串时 UI/结算行为与旧版一致
         {
             "id": 1,
             "name": "青云秘境",
             "level": 0,
             "exp_range": [500, 1500],
             "gold_range": [200, 800],
+            "description": "",
+            "settlement_desc": "",
         },
         {
             "id": 2,
@@ -150,6 +182,8 @@ RIFT_CONFIG = {
             "level": 3,
             "exp_range": [1500, 4000],
             "gold_range": [500, 2000],
+            "description": "",
+            "settlement_desc": "",
         },
         {
             "id": 3,
@@ -157,6 +191,8 @@ RIFT_CONFIG = {
             "level": 6,
             "exp_range": [3000, 8000],
             "gold_range": [1000, 5000],
+            "description": "",
+            "settlement_desc": "",
         },
         {
             "id": 4,
@@ -164,6 +200,8 @@ RIFT_CONFIG = {
             "level": 10,
             "exp_range": [5000, 15000],
             "gold_range": [2000, 10000],
+            "description": "",
+            "settlement_desc": "",
         },
         {
             "id": 5,
@@ -171,6 +209,8 @@ RIFT_CONFIG = {
             "level": 15,
             "exp_range": [10000, 30000],
             "gold_range": [5000, 20000],
+            "description": "",
+            "settlement_desc": "",
         },
         {
             "id": 6,
@@ -180,6 +220,8 @@ RIFT_CONFIG = {
             "gold_range": [100, 400],
             "sect_id": "qingyun",  # 宗门专属秘境
             "access": "sect_member",  # 仅本宗成员可探索（7.2 接线准入校验）
+            "description": "",
+            "settlement_desc": "",
         },
     ],
 }
@@ -470,4 +512,188 @@ SECT_TASKS = {
             ],
         },
     ],
+}
+
+
+# --- 三 manager 的 fallback 默认值（externalize-narrative-texts D4 收敛） ---
+# adventure/bounty/enemy 三 manager 原各自内嵌一份 DEFAULT_CONFIG 副本，
+# 与 config/*.json 漂移后成为漏检源；现统一迁移到此单源，manager 改为引用。
+
+ADVENTURE_CONFIG = {
+    "routes": [
+        {
+            "key": "scout",
+            "name": "巡山问道",
+            "aliases": ["短途", "巡山"],
+            "description": "巡视宗门周边，风险较低，适合积累经验。",
+            "risk": "低",
+            "duration": 1800,
+            "min_level": 0,
+            "fatigue_cooldown": 300,
+            "base_exp_per_min": 45,
+            "base_gold_per_min": 10,
+            "level_bonus_exp": 12,
+            "level_bonus_gold": 3,
+            "completion_bonus": {"exp": 300, "gold": 120},
+            "event_weights": {"safe": 60, "standard": 30, "risky": 10},
+            "drop_tier": "low",
+            "bounty_tag": "adventure_scout",
+            "bounty_progress": 1,
+        }
+    ],
+    "event_groups": {
+        "safe": [
+            {
+                "key": "steady_path",
+                "name": "平稳推进",
+                "desc": "历练过程顺风顺水，按部就班地完成目标。",
+                "exp_mult": 1.1,
+                "gold_mult": 1.1,
+                "item_chance": 60,
+                "bonus_progress": 0,
+            }
+        ],
+        "standard": [
+            {
+                "key": "minor_skirmish",
+                "name": "遭遇小型冲突",
+                "desc": "击退拦路妖兽，实战经验有所增长。",
+                "exp_mult": 1.2,
+                "gold_mult": 1.2,
+                "item_chance": 50,
+                "bonus_progress": 1,
+            }
+        ],
+        "risky": [
+            {
+                "key": "ambush",
+                "name": "埋伏受创",
+                "desc": "遭遇伏击，受了点伤但仍坚持完成任务。",
+                "exp_mult": 0.7,
+                "gold_mult": 0.7,
+                "item_chance": 15,
+                "bonus_progress": 0,
+                "injury": True,
+            }
+        ],
+    },
+    "drop_tables": {
+        "low": [
+            {"name": "灵草", "weight": 50, "min": 1, "max": 3},
+            {"name": "精铁", "weight": 30, "min": 1, "max": 2},
+            {"name": "灵石碎片", "weight": 20, "min": 2, "max": 5},
+        ]
+    },
+}
+
+BOUNTY_CONFIG = {
+    "difficulties": {
+        "easy": {
+            "name": "F级",
+            "stone_scale": 1.0,
+            "exp_scale": 1.0,
+            "min_level": 0,
+        }
+    },
+    "templates": [
+        {
+            "id": 1,
+            "name": "击退妖兽",
+            "difficulty": "easy",
+            "category": "巡山",
+            "progress_tags": ["adventure_scout"],
+            "min_target": 3,
+            "max_target": 5,
+            "time_limit": 3600,
+            "reward": {"stone": 300, "exp": 2500},
+            "item_table": "hunt",
+            "description": "驱逐骚扰山门的妖兽。",
+        }
+    ],
+    "item_tables": {
+        "hunt": [
+            {"name": "灵兽毛皮", "weight": 40, "min": 1, "max": 3},
+            {"name": "妖兽精血", "weight": 30, "min": 1, "max": 2},
+            {"name": "玄铁", "weight": 30, "min": 1, "max": 2},
+        ]
+    },
+}
+
+ENEMY_CONFIG = {
+    "enemy_groups": [
+        {
+            "key": "default",
+            "name": "默认妖域",
+            "level_range": [0, 100],
+            "templates": [
+                {
+                    "key": "default_monster",
+                    "name": "未知妖兽",
+                    "elite_prefixes": ["强大的"],
+                    "boss_names": ["妖王"],
+                    "hp_mult": 1.0,
+                    "atk_mult": 1.0,
+                    "defense": 0,
+                    "crit_rate": 0,
+                }
+            ],
+            "elite": {
+                "hp_mult": 1.0,
+                "atk_mult": 1.0,
+                "defense_bonus": 0,
+                "crit_rate_bonus": 0,
+            },
+            "boss": {
+                "hp_mult": 1.2,
+                "atk_mult": 1.2,
+                "defense_bonus": 0,
+                "crit_rate_bonus": 0,
+            },
+            "drop_tier": "low",
+        },
+        {
+            "key": "legacy_guardian",
+            "name": "传承之地守护",
+            "description": "传承获取前置挑战的守护 NPC 组；不带 level_range，只能经 spawn_enemy_from_group 定向触达。",
+            "templates": [
+                {
+                    "key": "guardian_low",
+                    "name": "守门石像",
+                    "max_level_index": 30,
+                    "hp_mult": 1.0,
+                    "atk_mult": 0.9,
+                    "defense": 5,
+                    "crit_rate": 0.05,
+                },
+                {
+                    "key": "guardian_mid",
+                    "name": "镇府灵将",
+                    "max_level_index": 60,
+                    "hp_mult": 1.1,
+                    "atk_mult": 1.0,
+                    "defense": 10,
+                    "crit_rate": 0.08,
+                },
+                {
+                    "key": "guardian_high",
+                    "name": "传承守护神",
+                    "max_level_index": 999,
+                    "hp_mult": 1.2,
+                    "atk_mult": 1.1,
+                    "defense": 20,
+                    "crit_rate": 0.1,
+                },
+            ],
+        },
+    ],
+    "difficulty_coefficients": {
+        "normal": 0.85,
+        "elite": 1.0,
+        "boss": 1.2,
+    },
+    "naming": {
+        "normal": "{name}",
+        "elite": "{prefix}{name}",
+        "boss": "{boss_name}",
+    },
 }

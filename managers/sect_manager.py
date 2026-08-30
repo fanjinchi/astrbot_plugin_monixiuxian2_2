@@ -13,6 +13,7 @@ from astrbot.api import logger
 from ..data.data_manager import DataBase
 from ..models import Player
 from ..models_extended import Sect, UserStatus
+from ..utils.narrative_text import render_narrative
 
 SECT_NAME_MIN_LENGTH = 2
 SECT_NAME_MAX_LENGTH = 12
@@ -1693,10 +1694,12 @@ class SectManager:
 
         won, battle_msg = await self.pve_combat_mgr.challenge_legacy_guardian(player)
         if not won:
-            return False, (
-                f"🗿 领取【{entry['name']}】需先战胜传承之地守护者。\n"
-                f"{battle_msg}\n"
-                f"此次未领取成功，不占用领取名额，可择日再试。"
+            # 传承之地文案单源：narrative legacy_encounter 模板簇（与历练/秘境同簇）
+            return False, render_narrative(
+                self.config_manager,
+                "legacy_encounter",
+                "claim_lose",
+                {"name": entry["name"], "battle_msg": battle_msg},
             )
 
         # 守护挑战胜利后，事务内创建实例 + 占名额（防并发重复领取）。
@@ -1745,11 +1748,15 @@ class SectManager:
             await self.db.conn.rollback()
             raise
 
-        return True, (
-            f"🗿 你战胜了守护者！\n{battle_msg}\n"
-            f"🌟 获得宗门传承【{entry['name']}】#{instance.id}！\n"
-            f"⚠️ 宗门传承不可被夺取，但离宗时将自动归还宗门。\n"
-            f"💡 发送「激活传承 {instance.id}」开始修炼解锁等阶奖励。"
+        return True, render_narrative(
+            self.config_manager,
+            "legacy_encounter",
+            "claim_win",
+            {
+                "name": entry["name"],
+                "battle_msg": battle_msg,
+                "instance_id": instance.id,
+            },
         )
 
     # ===== 6.3 宗门商店（贡献点结算） =====

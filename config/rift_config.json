@@ -13,6 +13,8 @@
         200,
         800
       ],
+      "description": "",
+      "settlement_desc": "",
       "legacy_type": "rift"
     },
     {
@@ -27,6 +29,8 @@
         500,
         2000
       ],
+      "description": "",
+      "settlement_desc": "",
       "legacy_type": "rift"
     },
     {
@@ -41,6 +45,8 @@
         1000,
         5000
       ],
+      "description": "",
+      "settlement_desc": "",
       "legacy_type": "rift"
     },
     {
@@ -55,6 +61,8 @@
         2000,
         10000
       ],
+      "description": "",
+      "settlement_desc": "",
       "legacy_type": "rift"
     },
     {
@@ -69,6 +77,8 @@
         5000,
         20000
       ],
+      "description": "",
+      "settlement_desc": "",
       "legacy_type": "rift"
     },
     {
@@ -85,7 +95,31 @@
       ],
       "sect_id": "qingyun",
       "access": "sect_member",
+      "description": "",
+      "settlement_desc": "",
       "legacy_type": "rift"
+    }
+  ],
+  "explore_events": [
+    {
+      "desc": "你发现了一处灵泉，修为大增！",
+      "item_chance": 70
+    },
+    {
+      "desc": "你在秘境中击败了一只妖兽！",
+      "item_chance": 80
+    },
+    {
+      "desc": "你找到了一个隐藏的宝箱！",
+      "item_chance": 100
+    },
+    {
+      "desc": "你领悟了一些修炼心得。",
+      "item_chance": 40
+    },
+    {
+      "desc": "你在秘境中遇到了前辈留下的传承！",
+      "item_chance": 90
     }
   ],
   "legacy_chance": 0.1

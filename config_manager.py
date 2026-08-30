@@ -7,11 +7,23 @@ from astrbot.api import logger
 from .data.default_configs import (
     ALCHEMY_CONFIG,
     BOSS_CONFIG,
+    DEFAULT_NARRATIVE_CONFIG,
     IMPART_CONFIG,
+    NARRATIVE_SCENE_VARS,
     RIFT_CONFIG,
     SECT_CONFIG,
     SECT_FACTIONS,
     SECT_TASKS,
+)
+
+# 叙事文案辅助函数单源在 utils/narrative_text.py（可独立加载，供 managers 的
+# try/except 测试加载分支使用）；渲染入口 render_narrative 等由调用方直接从该
+# 模块引入，此处仅引入校验逻辑所需符号。
+from .utils.narrative_text import (
+    _NARRATIVE_ROUTES,
+    NARRATIVE_BUCKET_KEYS,
+    _iter_scene_entries,
+    extract_template_vars,
 )
 
 _CHINESE_DIGITS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
@@ -59,6 +71,10 @@ class ConfigManager:
         self.skills_data: dict[str, dict] = {}  # Skill definitions
         self.heart_methods_data: dict[str, dict] = {}  # Heart method definitions
         self.impart_config: dict[str, Any] = {}  # Impart tier rewards
+        self.narrative_config: dict[str, Any] = {}  # 叙事文案模板与变体池
+        self.spirit_root_descriptions: dict[
+            str, dict
+        ] = {}  # 灵根/体质评价，key为灵根名
 
         self._load_all()
 
@@ -421,6 +437,17 @@ class ConfigManager:
             config_dir / "impart_config.json", IMPART_CONFIG
         )
 
+        # 叙事文案配置（模板+变体池），加载后做插值变量契约校验
+        self.narrative_config = self._load_config_with_default(
+            config_dir / "narrative_config.json", DEFAULT_NARRATIVE_CONFIG
+        )
+        self._validate_narrative_config()
+
+        # 灵根/体质评价大表（条目型配置，key为灵根名）
+        self.spirit_root_descriptions = self._load_items_data(
+            config_dir / "spirit_root_descriptions.json"
+        )
+
         # 加载游戏配置（包含各系统的硬编码参数）
         self.game_config = self._load_config_with_default(
             config_dir / "game_config.json", {}
@@ -488,6 +515,92 @@ class ConfigManager:
     def invalidate_cache(self):
         """清除缓存，在配置重载时调用"""
         self._pill_names_cache = None
+
+    def _validate_narrative_config(self):
+        """Validate narrative template variable contracts against declared scenes.
+
+        For every scene declared in ``NARRATIVE_SCENE_VARS``, each configured
+        template (all three shapes, including bucketed pools and route-tagged
+        entries) may only reference variables the code render point declares.
+        A violating scene is replaced with the embedded default so the plugin
+        keeps running; the error log names the scene key, location, and
+        offending variables. Unknown bucket keys only warn — the content side
+        may pre-fill buckets for segments the code does not select yet. The
+        embedded defaults themselves are validated too, as a dev-time safety
+        net (a broken default has nothing left to fall back to).
+        """
+        for section, scenes in NARRATIVE_SCENE_VARS.items():
+            for scene, declared in scenes.items():
+                default_value = DEFAULT_NARRATIVE_CONFIG.get(section, {}).get(scene)
+                if default_value is not None:
+                    self._check_narrative_scene(
+                        section, scene, default_value, declared, source="内嵌默认"
+                    )
+
+            section_cfg = self.narrative_config.get(section)
+            if not isinstance(section_cfg, dict):
+                continue
+            for scene, declared in scenes.items():
+                if scene not in section_cfg:
+                    continue
+                if not self._check_narrative_scene(
+                    section, scene, section_cfg[scene], declared, source="配置"
+                ):
+                    section_cfg[scene] = DEFAULT_NARRATIVE_CONFIG.get(section, {}).get(
+                        scene
+                    )
+
+    def _check_narrative_scene(
+        self, section: str, scene: str, value: Any, declared: set[str], source: str
+    ) -> bool:
+        """Check one scene value against its declared variable contract.
+
+        Returns True when the scene is usable. Violations are logged with the
+        scene key, entry location, and offending variable names.
+        """
+        ok = True
+        if isinstance(value, dict) and not isinstance(value.get("text"), str):
+            for bucket in value:
+                if bucket not in NARRATIVE_BUCKET_KEYS:
+                    logger.warning(
+                        f"叙事配置[{source}] {section}.{scene} 存在未知分桶键 "
+                        f"{bucket!r}，该桶不会被取用（合法桶键: {NARRATIVE_BUCKET_KEYS}）。"
+                    )
+
+        for location, entry in _iter_scene_entries(value):
+            if isinstance(entry, dict):
+                tagged_route = entry.get("route")
+                if tagged_route and tagged_route not in _NARRATIVE_ROUTES:
+                    logger.warning(
+                        f"叙事配置[{source}] {section}.{scene}{location} 存在未知路线标注 "
+                        f"{tagged_route!r}（合法值: {_NARRATIVE_ROUTES}）。"
+                    )
+                template = entry.get("text")
+                if not isinstance(template, str):
+                    logger.error(
+                        f"叙事配置[{source}] {section}.{scene}{location} 条目缺少 text 字段。"
+                    )
+                    ok = False
+                    continue
+            else:
+                template = entry
+            try:
+                used = extract_template_vars(template)
+            except ValueError as exc:
+                logger.error(
+                    f"叙事文案契约违例[{source}] {section}.{scene}{location}: "
+                    f"模板花括号不配对（{exc}）。"
+                )
+                ok = False
+                continue
+            unknown = used - declared
+            if unknown:
+                logger.error(
+                    f"叙事文案契约违例[{source}] {section}.{scene}{location}: "
+                    f"未知变量 {sorted(unknown)}，该场景已声明变量 {sorted(declared)}。"
+                )
+                ok = False
+        return ok
 
     def _validate_sect_configs(self):
         """Validate sect_factions/sect_tasks structure and cross-references.

@@ -16,9 +16,11 @@ from astrbot.api import logger
 
 try:
     from ..data.data_manager import DataBase
+    from ..data.default_configs import ADVENTURE_CONFIG
     from ..managers.pve_combat_manager import PVECombatManager
     from ..models import Player
     from ..models_extended import UserStatus
+    from ..utils.narrative_text import render_narrative, select_narrative_pool
 except ImportError:
     # 独立运行（测试）时降级加载依赖
     def _load_module(name, rel_path):
@@ -31,6 +33,31 @@ except ImportError:
         spec.loader.exec_module(mod)
         return mod
 
+    def _load_default_configs():
+        """Load data/default_configs.py under a synthetic package.
+
+        default_configs relatively imports its narrative_defaults package, so
+        the plain file-path loader above cannot satisfy it; a synthetic parent
+        package gives the relative import a resolution context.
+        """
+        import types
+
+        plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        pkg_name = "adventure_manager_standalone_data"
+        if pkg_name not in sys.modules:
+            pkg = types.ModuleType(pkg_name)
+            pkg.__path__ = [os.path.join(plugin_root, "data")]
+            sys.modules[pkg_name] = pkg
+        full_name = f"{pkg_name}.default_configs"
+        if full_name in sys.modules:
+            return sys.modules[full_name]
+        path = os.path.join(plugin_root, "data", "default_configs.py")
+        spec = importlib.util.spec_from_file_location(full_name, path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[full_name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
     DataBase = object
     _pve = _load_module("pve_combat_manager", "managers/pve_combat_manager.py")
     PVECombatManager = _pve.PVECombatManager
@@ -38,6 +65,10 @@ except ImportError:
     Player = _md.Player
     _mde = _load_module("models_extended", "models_extended.py")
     UserStatus = _mde.UserStatus
+    _nt = _load_module("narrative_text", "utils/narrative_text.py")
+    render_narrative = _nt.render_narrative
+    select_narrative_pool = _nt.select_narrative_pool
+    ADVENTURE_CONFIG = _load_default_configs().ADVENTURE_CONFIG
 
 if TYPE_CHECKING:
     from ..core import StorageRingManager
@@ -52,72 +83,9 @@ class AdventureManager:
     CONFIG_FILE = (
         Path(__file__).resolve().parents[1] / "config" / "adventure_config.json"
     )
-    DEFAULT_CONFIG = {
-        "routes": [
-            {
-                "key": "scout",
-                "name": "巡山问道",
-                "aliases": ["短途", "巡山"],
-                "description": "巡视宗门周边，风险较低，适合积累经验。",
-                "risk": "低",
-                "duration": 1800,
-                "min_level": 0,
-                "fatigue_cooldown": 300,
-                "base_exp_per_min": 45,
-                "base_gold_per_min": 10,
-                "level_bonus_exp": 12,
-                "level_bonus_gold": 3,
-                "completion_bonus": {"exp": 300, "gold": 120},
-                "event_weights": {"safe": 60, "standard": 30, "risky": 10},
-                "drop_tier": "low",
-                "bounty_tag": "adventure_scout",
-                "bounty_progress": 1,
-            }
-        ],
-        "event_groups": {
-            "safe": [
-                {
-                    "key": "steady_path",
-                    "name": "平稳推进",
-                    "desc": "历练过程顺风顺水，按部就班地完成目标。",
-                    "exp_mult": 1.1,
-                    "gold_mult": 1.1,
-                    "item_chance": 60,
-                    "bonus_progress": 0,
-                }
-            ],
-            "standard": [
-                {
-                    "key": "minor_skirmish",
-                    "name": "遭遇小型冲突",
-                    "desc": "击退拦路妖兽，实战经验有所增长。",
-                    "exp_mult": 1.2,
-                    "gold_mult": 1.2,
-                    "item_chance": 50,
-                    "bonus_progress": 1,
-                }
-            ],
-            "risky": [
-                {
-                    "key": "ambush",
-                    "name": "埋伏受创",
-                    "desc": "遭遇伏击，受了点伤但仍坚持完成任务。",
-                    "exp_mult": 0.7,
-                    "gold_mult": 0.7,
-                    "item_chance": 15,
-                    "bonus_progress": 0,
-                    "injury": True,
-                }
-            ],
-        },
-        "drop_tables": {
-            "low": [
-                {"name": "灵草", "weight": 50, "min": 1, "max": 3},
-                {"name": "精铁", "weight": 30, "min": 1, "max": 2},
-                {"name": "灵石碎片", "weight": 20, "min": 2, "max": 5},
-            ]
-        },
-    }
+    # fallback 默认值单源在 data/default_configs.py（externalize-narrative-texts
+    # D4 收敛，消除内嵌副本与 config 文件的漂移）
+    DEFAULT_CONFIG = ADVENTURE_CONFIG
 
     def __init__(
         self,
@@ -125,12 +93,15 @@ class AdventureManager:
         storage_ring_manager: "StorageRingManager" = None,
         pve_combat_mgr: PVECombatManager = None,
         impart_mgr=None,
+        config_manager=None,
     ):
         self.db = db
         self.storage_ring_manager = storage_ring_manager
         self.pve_combat_mgr = pve_combat_mgr
         # 传承管理器：可选注入（main.py 装配后），用于历练触发传承机缘
         self.impart_mgr = impart_mgr
+        # 配置管理器：可选注入，供叙事文案渲染（缺失时 render_narrative 回落内嵌默认）
+        self.config_manager = config_manager
         self._route_cooldowns: dict[str, dict[str, int]] = {}
         self.routes: dict[str, dict] = {}
         self.route_alias_index: dict[str, str] = {}
@@ -345,10 +316,13 @@ class AdventureManager:
 
         fatigue_hint = f"\n⏳ 该路线休整：{fatigue // 60} 分钟" if fatigue else ""
         display_minutes = effective_duration // 60
+        # 事件文案：按玩家境界段从 desc_variants 分桶池取（当前段+通用桶合并随机，
+        # design D7），未配置或合并池为空时逐字回落 desc 兜底
+        event_desc = self._select_event_desc(event, player)
         # 宗门专属事件（带 sect_id）在结算消息中显性标记，普通事件文案不变
-        event_line = event["desc"]
+        event_line = event_desc
         if event.get("sect_id"):
-            event_line = f"🏯 宗门际遇 · {event.get('name', '')}\n{event['desc']}"
+            event_line = f"🏯 宗门际遇 · {event.get('name', '')}\n{event_desc}"
         msg = (
             f"🚶 历练归来 · {route['name']}\n"
             f"━━━━━━━━━━━━━━━\n"
@@ -369,7 +343,7 @@ class AdventureManager:
             "route_key": route["key"],
             "route_name": route["name"],
             "event_key": event.get("key"),
-            "event_desc": event["desc"],
+            "event_desc": event_desc,
             "exp_reward": rewards["exp"],
             "gold_reward": rewards["gold"],
             "items": dropped_items,
@@ -394,16 +368,24 @@ class AdventureManager:
             return ""
         won, battle_msg = await self.pve_combat_mgr.challenge_legacy_guardian(player)
         if not won:
-            return f"\n\n🗿 你偶遇一处传承之地，但未能战胜守护者。\n{battle_msg}"
+            # 传承之地文案单源：narrative legacy_encounter 模板簇（与秘境/宗门同簇）
+            return render_narrative(
+                self.config_manager,
+                "legacy_encounter",
+                "encounter_lose",
+                {"battle_msg": battle_msg},
+            )
         instance = await self.impart_mgr.create_legacy(
             player.user_id, self.legacy_type, activate=False
         )
         if not instance:
             return ""
         name = self.impart_mgr.get_type_name(self.legacy_type)
-        return (
-            f"\n\n🗿 你偶遇一处传承之地，战胜了守护者！\n{battle_msg}\n"
-            f"🌟 获得【{name}】#{instance.id}，发送「激活传承」可开始修炼解锁。"
+        return render_narrative(
+            self.config_manager,
+            "legacy_encounter",
+            "encounter_win",
+            {"battle_msg": battle_msg, "name": name, "instance_id": instance.id},
         )
 
     async def check_adventure_status(self, user_id: str) -> tuple[bool, str]:
@@ -475,6 +457,25 @@ class AdventureManager:
             if isinstance(event, dict)
             and (not event.get("sect_id") or event.get("sect_id") == faction_id)
         ]
+
+    def _select_event_desc(self, event: dict, player: Player) -> str:
+        """Pick the event's narrative copy for the player.
+
+        ``desc_variants`` (design D7) is normalized by the shared
+        ``select_narrative_pool`` helper: bucketed pools merge the player's
+        current realm-segment bucket with the 通用 bucket and filter
+        route-tagged entries by the player's cultivation route. An empty pool
+        (no variants configured, uncovered segment, or everything filtered)
+        falls back to the verbatim ``desc`` field.
+        """
+        pool = select_narrative_pool(
+            event.get("desc_variants"),
+            route=getattr(player, "cultivation_type", None),
+            level_index=getattr(player, "level_index", None),
+        )
+        if pool:
+            return random.choice(pool)
+        return event["desc"]
 
     def _build_event_weight_pool(
         self, route: dict, faction_id: str | None

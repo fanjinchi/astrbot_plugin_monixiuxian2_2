@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 
 try:
     from ..models import Item
+    from ..utils.narrative_text import render_narrative
 except ImportError:
     # Standalone execution / test loading bypasses the package root.
     import importlib.util
@@ -36,6 +37,16 @@ except ImportError:
     _models_mod = importlib.util.module_from_spec(_spec)
     _spec.loader.exec_module(_models_mod)
     Item = _models_mod.Item
+
+    # narrative_text.py is import-safe standalone (it has its own fallback for
+    # the narrative_defaults package), so a plain by-path load works here.
+    _narrative_spec = importlib.util.spec_from_file_location(
+        "combat_narrative_text",
+        os.path.join(_plugin_root, "utils", "narrative_text.py"),
+    )
+    _narrative_mod = importlib.util.module_from_spec(_narrative_spec)
+    _narrative_spec.loader.exec_module(_narrative_mod)
+    render_narrative = _narrative_mod.render_narrative
 
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
@@ -169,6 +180,25 @@ class CombatEngine:
         self._armor_k_level_coeff = self._combat_cfg.get("armor_k_level_coeff", 10)
         self._base_crit_rate = self._combat_cfg.get("base_crit_rate", 0.15)
 
+    def _narrative(self, scene: str, variables: dict | None = None) -> str:
+        """Render one combat log line from the narrative config.
+
+        Thin wrapper over ``render_narrative`` pinning the ``combat`` section
+        so every battle-report line shares one config source. Fake config
+        managers in tests (no ``narrative_config`` attribute) silently fall
+        back to the embedded defaults in ``data/narrative_defaults/combat.py``.
+
+        The global RNG state is saved/restored around the render: template
+        selection (``random.choice``) must not perturb the combat RNG stream,
+        otherwise seeded statistical tests and any future replay tooling would
+        observe different combat outcomes purely from copy rendering.
+        """
+        rng_state = random.getstate()
+        try:
+            return render_narrative(self.config_manager, "combat", scene, variables)
+        finally:
+            random.setstate(rng_state)
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -199,8 +229,12 @@ class CombatEngine:
         crit_multiplier = self._combat_cfg.get("crit_damage_multiplier", 1.5)
 
         log: list[str] = []
-        log.append("☆━━━━ 战斗开始 ━━━━☆")
-        log.append(f"{fighter1.name} VS {fighter2.name}")
+        log.append(self._narrative("battle_opening"))
+        log.append(
+            self._narrative(
+                "battle_vs", {"name1": fighter1.name, "name2": fighter2.name}
+            )
+        )
         log.append(
             f"{fighter1.name}：气血 {fighter1.hp}/{fighter1.max_hp}，"
             f"伤害 {fighter1.damage}，身法 {fighter1.agility}，迅捷 {fighter1.speed}"
@@ -250,19 +284,19 @@ class CombatEngine:
         # Determine winner
         if fighter1.hp <= 0 and fighter2.hp <= 0:
             winner = "draw"
-            log.append("☆━━━━ 同归于尽！平局！━━━━☆")
+            log.append(self._narrative("battle_mutual_destruction"))
         elif fighter1.hp <= 0:
             winner = fighter2.user_id
-            log.append(f"☆━━━━ {fighter2.name} 胜利！━━━━☆")
+            log.append(self._narrative("battle_victory", {"name": fighter2.name}))
         elif fighter2.hp <= 0:
             winner = fighter1.user_id
-            log.append(f"☆━━━━ {fighter1.name} 胜利！━━━━☆")
+            log.append(self._narrative("battle_victory", {"name": fighter1.name}))
         elif total_actions >= action_limit:
             winner = "draw"
-            log.append("☆━━━━ 战斗胶着，双方罢手，平局！━━━━☆")
+            log.append(self._narrative("battle_draw_stalemate"))
         else:
             winner = "draw"
-            log.append("☆━━━━ 平局！━━━━☆")
+            log.append(self._narrative("battle_draw"))
 
         # Merge log into chunks
         merged_log = self._merge_log(log, merge_count)
@@ -595,7 +629,16 @@ class CombatEngine:
         )
         applied = self._apply_status_effect(who, effect)
         if applied:
-            log.append(f"{actor.name} 的【{effect.source_name}】作用于 {who.name}")
+            log.append(
+                self._narrative(
+                    "buff_applied",
+                    {
+                        "actor_name": actor.name,
+                        "effect_name": effect.source_name,
+                        "target_name": who.name,
+                    },
+                )
+            )
         else:
             # Cap rejection must not be logged as a successful application
             # (review fix: truthful battle log).
@@ -771,7 +814,12 @@ class CombatEngine:
             if effect.remaining > 0:
                 alive.append(effect)
             else:
-                log.append(f"{fighter.name} 的【{effect.source_name}】效果消散")
+                log.append(
+                    self._narrative(
+                        "status_expired",
+                        {"name": fighter.name, "effect_name": effect.source_name},
+                    )
+                )
         fighter.status_effects = alive
 
     def _process_round_start_skills(
@@ -815,7 +863,12 @@ class CombatEngine:
             dmg_increment = handler(fighter, fighter, skill, state)
             if dmg_increment:
                 fighter.next_attack_mult += dmg_increment
-                log.append(f"{fighter.name} 触发【{skill_name}】，下回合攻势更盛！")
+                log.append(
+                    self._narrative(
+                        "trigger_round_start_boost",
+                        {"name": fighter.name, "skill_name": skill_name},
+                    )
+                )
 
     def _process_trigger_skills(
         self,
@@ -872,14 +925,30 @@ class CombatEngine:
             dmg_increment = handler(actor, target, skill, state)
             if dmg_increment:
                 result["damage_mult"] += dmg_increment
-                log.append(f"{actor.name} 触发【{skill_name}】，攻势更盛！")
+                log.append(
+                    self._narrative(
+                        "trigger_attack_boost",
+                        {"actor_name": actor.name, "skill_name": skill_name},
+                    )
+                )
             elif effect == "stun":
                 log.append(
-                    f"{actor.name} 触发【{skill_name}】，"
-                    f"{target.name} 被眩晕，下回合无法出手！"
+                    self._narrative(
+                        "trigger_stun",
+                        {
+                            "actor_name": actor.name,
+                            "skill_name": skill_name,
+                            "target_name": target.name,
+                        },
+                    )
                 )
             elif effect == "damage_reduction":
-                log.append(f"{actor.name} 触发【{skill_name}】，受到的伤害降低！")
+                log.append(
+                    self._narrative(
+                        "trigger_damage_reduction",
+                        {"actor_name": actor.name, "skill_name": skill_name},
+                    )
+                )
         return result
 
     def _resolve_attack(
@@ -901,7 +970,7 @@ class CombatEngine:
         # Stun check: skip this action right
         if attacker.skip_next_action:
             attacker.skip_next_action = False
-            log.append(f"{attacker.name} 处于眩晕状态，无法出手！")
+            log.append(self._narrative("stun_skip", {"name": attacker.name}))
             return
 
         # One-shot unavoidable flag (consumed on this attack, spec: combat-core)
@@ -911,20 +980,28 @@ class CombatEngine:
         # 1. Dodge (exempt when unavoidable)
         dodge_rate = self._calc_dodge_rate(attacker, defender, dodge_cap)
         if not unavoidable and random.random() < dodge_rate:
-            log.append(f"{defender.name} 身形一闪，躲过了 {attacker.name} 的攻击！")
+            log.append(
+                self._narrative(
+                    "dodge",
+                    {
+                        "defender_name": defender.name,
+                        "attacker_name": attacker.name,
+                    },
+                )
+            )
             return
 
         # 2. Block (simplified: 10% base + equipment bonuses; exempt when unavoidable)
         block_rate = self._calc_block_rate(defender)
         blocked = (not unavoidable) and random.random() < block_rate
         if blocked:
-            log.append(f"{defender.name} 举盾格挡，化解了部分攻势！")
+            log.append(self._narrative("block", {"defender_name": defender.name}))
 
         # 3. Crit (capped crit rate)
         effective_crit_rate = min(attacker.crit_rate, self._crit_rate_cap)
         is_crit = random.random() < effective_crit_rate
         if is_crit:
-            log.append(f"{attacker.name} 目光如电，寻得破绽！")
+            log.append(self._narrative("crit_notice", {"attacker_name": attacker.name}))
 
         skill_mult = 1.0
 
@@ -977,7 +1054,12 @@ class CombatEngine:
                     )
                     effect = "damage_bonus"
                     handler = self.EFFECT_HANDLERS[effect]
-                log.append(f"{attacker.name} 施展大招【{ult_name}】，天地变色！")
+                log.append(
+                    self._narrative(
+                        "ultimate_cast",
+                        {"attacker_name": attacker.name, "ult_name": ult_name},
+                    )
+                )
                 state = {
                     "combo_cap": self._combo_cap,
                     "damage_mult": ultimate_mult,
@@ -1020,9 +1102,19 @@ class CombatEngine:
         defender.hp -= final_damage
 
         if is_crit:
-            log.append(f"{attacker.name} 暴击！造成 {final_damage} 点伤害！")
+            log.append(
+                self._narrative(
+                    "damage_crit",
+                    {"attacker_name": attacker.name, "final_damage": final_damage},
+                )
+            )
         else:
-            log.append(f"{attacker.name} 发起攻击，造成 {final_damage} 点伤害")
+            log.append(
+                self._narrative(
+                    "damage_normal",
+                    {"attacker_name": attacker.name, "final_damage": final_damage},
+                )
+            )
 
         # Reflect: refund fraction of actual damage back to the attacker
         # (max once per round, never reflects reflect).
@@ -1030,20 +1122,37 @@ class CombatEngine:
             defender.reflect_round = round_no
             reflect_dmg = max(1, int(final_damage * defender.reflect_rate))
             attacker.hp -= reflect_dmg
-            log.append(f"{defender.name} 反弹 {reflect_dmg} 点伤害！")
+            log.append(
+                self._narrative(
+                    "reflect",
+                    {"defender_name": defender.name, "reflect_dmg": reflect_dmg},
+                )
+            )
             self._try_survive(attacker, log)
 
         # Vampire heal-back (one-shot, from heal/vampire effect)
         if attacker.next_attack_vampire > 0:
             heal = max(1, int(final_damage * attacker.next_attack_vampire))
             attacker.hp = min(attacker.max_hp, attacker.hp + heal)
-            log.append(f"{attacker.name} 吸取 {heal} 气血！")
+            log.append(
+                self._narrative(
+                    "lifesteal", {"attacker_name": attacker.name, "heal": heal}
+                )
+            )
             attacker.next_attack_vampire = 0.0
 
         # Survive (免死): lethal damage keeps the fighter at 1 HP once per charge
         self._try_survive(defender, log)
 
-        log.append(f"{defender.name} 剩余气血: {max(0, defender.hp)}")
+        log.append(
+            self._narrative(
+                "remaining_hp",
+                {
+                    "defender_name": defender.name,
+                    "remaining_hp": max(0, defender.hp),
+                },
+            )
+        )
 
         # 8. Trigger skills - on_defense (counter / stun / damage reduction)
         if defender.hp > 0:
@@ -1071,7 +1180,7 @@ class CombatEngine:
                 fighter.max_hp,
                 fighter.hp + int(fighter.max_hp * fighter.survive_recovery),
             )
-        log.append(f"{fighter.name} 触发【免死】，于绝境中存活！")
+        log.append(self._narrative("survive", {"name": fighter.name}))
 
     def _calc_dodge_rate(
         self, attacker: FighterState, defender: FighterState, cap: float

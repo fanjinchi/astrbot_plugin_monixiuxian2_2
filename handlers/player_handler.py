@@ -11,6 +11,7 @@ from ..core import CultivationManager, PillManager, SkillManager
 from ..data import DataBase
 from ..models import Player
 from ..models_extended import UserStatus
+from ..utils.narrative_text import render_narrative
 from .utils import player_required
 
 CMD_START_XIUXIAN = "我要修仙"
@@ -46,6 +47,18 @@ class PlayerHandler:
         )
         self.pill_manager = PillManager(self.db, self.config_manager)
 
+    def _render_narrative(self, scene: str, variables: dict | None = None) -> str:
+        """Render a cultivation-domain narrative template for this handler.
+
+        Falls back to the embedded default copy when ``config_manager`` is
+        absent — some tests build the handler via ``__new__`` with only the
+        collaborators under test attached, and ``render_narrative`` treats any
+        object without a ``narrative_config`` attribute as "use defaults".
+        """
+        return render_narrative(
+            getattr(self, "config_manager", None), "cultivation", scene, variables
+        )
+
     async def handle_start_xiuxian(
         self, event: AstrMessageEvent, cultivation_type: str = ""
     ):
@@ -63,10 +76,9 @@ class PlayerHandler:
 
         # 如果没有提供职业选择，显示选择提示
         if not cultivation_type or cultivation_type.strip() == "":
-            help_msg = (
-                "🌟 欢迎踏入修仙之路！\n"
-                "━━━━━━━━━━━━━━━\n"
-                "请选择你的修炼方式：\n\n"
+            # 欢迎头部为叙事文案（配置化）；属性数值与规则列表属数值说明类，
+            # 留在代码原位（externalize-narrative-texts design D6）
+            help_msg = self._render_narrative("creation_help_welcome") + (
                 "【灵修】以灵气为主，法术攻击\n"
                 "• 寿命：100\n"
                 "• 灵气：100-1000\n"
@@ -113,17 +125,18 @@ class PlayerHandler:
         root_description = self.cultivation_manager._get_root_description(root_name)
 
         reply_msg = (
-            f"🎉 恭喜道友 {event.get_sender_name()} 踏上仙途！\n"
-            f"━━━━━━━━━━━━━━━\n"
+            self._render_narrative(
+                "creation_welcome",
+                {"name": event.get_sender_name()},
+            )
+            + f"━━━━━━━━━━━━━━━\n"
             f"修炼方式：【{new_player.cultivation_type}】\n"
             f"灵根：【{new_player.spiritual_root}】\n"
             f"评价：{root_description}\n"
             f"启动资金：{new_player.gold} 灵石\n"
             f"━━━━━━━━━━━━━━━\n"
-            f"⚠️ 修仙有风险，突破需谨慎！\n"
-            f"突破失败或生命值归零会导致\n"
-            f"身死道消，所有数据清除！\n"
-            f"━━━━━━━━━━━━━━━\n"
+            + self._render_narrative("creation_warning")
+            + f"━━━━━━━━━━━━━━━\n"
             f"💡 发送「{CMD_PLAYER_INFO}」查看状态"
         )
         yield event.plain_result(reply_msg)
@@ -301,11 +314,7 @@ class PlayerHandler:
         await self.db.ext.set_user_busy(player.user_id, UserStatus.CULTIVATING, 0)
 
         yield event.plain_result(
-            "🧘 道友已进入闭关状态\n"
-            "━━━━━━━━━━━━━━━\n"
-            "闭关期间，你将与世隔绝，潜心修炼。\n"
-            f"💡 发送「{CMD_END_CULTIVATION}」结束闭关\n"
-            "⏱️ 每分钟将获得修为，受灵根资质影响。"
+            self._render_narrative("retreat_start", {"end_cmd": CMD_END_CULTIVATION})
         )
 
     @player_required
@@ -387,8 +396,12 @@ class PlayerHandler:
                 )
             )
             for learned in learned_list:
+                # 「未知」兜底在代码侧解析，模板只接收确定的功法名
                 learn_msgs.append(
-                    f"🎁 闭关悟道，领悟功法【{learned.get('name', '未知')}】！"
+                    self._render_narrative(
+                        "retreat_epiphany",
+                        {"skill_name": learned.get("name", "未知")},
+                    )
                 )
 
         # 传承值累积：仅激活中的传承实例（每配置间隔分钟+1点，默认15分钟），随出关一次结算。
@@ -435,9 +448,8 @@ class PlayerHandler:
                         player.user_id
                     )
                     if owned:
-                        legacy_line = (
-                            "\n\n💡 你持有传承但未激活，本次闭关未累积传承值。\n"
-                            "使用「激活传承 <编号>」激活后再闭关。"
+                        legacy_line = self._render_narrative(
+                            "impart_value_inactive_hint"
                         )
             except Exception as exc:
                 logger.exception("出关传承值结算失败: %s", exc)
@@ -459,15 +471,17 @@ class PlayerHandler:
                 f"\n⚠️ 闭关超过{effective_hours}小时，仅计算前{effective_hours}小时修为"
             )
 
-        reply_msg = (
-            "🌟 道友出关成功！\n"
-            "━━━━━━━━━━━━━━━\n"
-            f"⏱️ 闭关时长：{time_str}\n"
-            f"{fairyland_line}"
-            f"📈 获得修为：{gained_exp:,}{exceed_msg}\n"
-            f"💫 当前修为：{player.experience:,}\n"
-            "━━━━━━━━━━━━━━━\n"
-            "道友已回归红尘，可继续修行。"
+        # 结算骨架文案配置化；fairyland_line/exceed_msg 含数值说明，在代码侧
+        # 拼好后作为变量注入（design D6），模板只负责叙事骨架
+        reply_msg = self._render_narrative(
+            "retreat_settlement",
+            {
+                "time_str": time_str,
+                "fairyland_line": fairyland_line,
+                "gained_exp": gained_exp,
+                "exceed_msg": exceed_msg,
+                "current_exp": player.experience,
+            },
         )
         if learn_msgs:
             reply_msg += "\n\n" + "\n".join(learn_msgs)
@@ -619,10 +633,10 @@ class PlayerHandler:
         if reclaimed:
             reclaim_msg = f"\n宗门之宝【{'、'.join(reclaimed)}】已归还宗门。"
 
+        # 告别词为叙事文案（配置化）；冷却规则行「（7天内不可再次重修）」
+        # 属数值说明类，与宗门之宝回收行一起留在代码原位（design D6）
         yield event.plain_result(
-            "💀 你选择了弃道重修，旧生一切化为尘埃。\n"
-            "━━━━━━━━━━━━━━━\n"
-            "可立即使用「我要修仙」重新踏上仙途。\n"
-            "（7天内不可再次重修）"
-            f"{reclaim_msg}"
+            self._render_narrative("rebirth_farewell")
+            + "（7天内不可再次重修）"
+            + f"{reclaim_msg}"
         )

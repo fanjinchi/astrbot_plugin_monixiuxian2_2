@@ -10,6 +10,26 @@ from __future__ import annotations
 import random
 from collections.abc import Iterable
 
+try:
+    from ..utils.narrative_text import render_narrative
+except ImportError:
+    # Standalone loading under tests (tests/helpers.load_module bypasses the
+    # package __init__ chain, so the relative import above has no package
+    # context): load utils/narrative_text.py by file path, following the
+    # _load_module shim pattern in managers/rift_manager.py.
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    _nt_path = Path(__file__).resolve().parents[1] / "utils" / "narrative_text.py"
+    _nt_spec = importlib.util.spec_from_file_location(
+        "narrative_text_standalone", _nt_path
+    )
+    _nt = importlib.util.module_from_spec(_nt_spec)
+    sys.modules[_nt_spec.name] = _nt
+    _nt_spec.loader.exec_module(_nt)
+    render_narrative = _nt.render_narrative
+
 # Defaults for the "fortune" section in game_config.json.
 # Rates are mutually exclusive and must sum to <= 1.0; the remainder is "nothing".
 _FORTUNE_DEFAULTS = {
@@ -191,7 +211,12 @@ def roll_breakthrough_fortune(
         return {
             "type": "weapon",
             "items": [{"name": name, "count": 1, "data": chosen}],
-            "message": f"🎁 机缘天降，获得武器【{name}】（{rank}）！",
+            # Default copy from the embedded narrative defaults; the configured
+            # pool is consulted later in format_fortune_message (which receives
+            # the config manager), so a config override still wins at display.
+            "message": render_narrative(
+                None, "fortune", "weapon_drop", {"name": name, "rank": rank}
+            ),
         }
 
     if roll < cfg["weapon_rate"] + cfg["heart_method_rate"]:
@@ -204,7 +229,9 @@ def roll_breakthrough_fortune(
         return {
             "type": "heart_method",
             "items": [{"name": name, "count": 1, "data": chosen}],
-            "message": f"🎁 福至心灵，获得心法【{name}】（{rank}）！",
+            "message": render_narrative(
+                None, "fortune", "heart_method_drop", {"name": name, "rank": rank}
+            ),
         }
 
     # Pill drop
@@ -216,19 +243,61 @@ def roll_breakthrough_fortune(
     return {
         "type": "pill",
         "items": dropped,
-        "message": "🎁 仙缘际会，获得丹药" + "、".join(parts) + "！",
+        "message": render_narrative(
+            None, "fortune", "pill_drop", {"items": "、".join(parts)}
+        ),
     }
 
 
-def format_fortune_message(result: dict | None) -> str:
+# Fortune result type -> narrative scene key, for re-rendering against the
+# configured copy pool in format_fortune_message.
+_FORTUNE_SCENE_BY_TYPE = {
+    "weapon": "weapon_drop",
+    "heart_method": "heart_method_drop",
+    "pill": "pill_drop",
+}
+
+
+def _fortune_variables(result: dict) -> dict:
+    """Rebuild the interpolation variables for a fortune result.
+
+    Args:
+        result: The result dict from ``roll_breakthrough_fortune``.
+
+    Returns:
+        The variable dict matching the scene's declared contract: ``items``
+        (顿号-joined "【name】xcount" list) for pill drops, ``name``/``rank``
+        for weapon and heart-method drops.
+    """
+    items = result.get("items") or []
+    if result.get("type") == "pill":
+        parts = [f"【{item['name']}】x{item['count']}" for item in items]
+        return {"items": "、".join(parts)}
+    first = items[0] if items else {}
+    data = first.get("data") or {}
+    return {"name": first.get("name", ""), "rank": data.get("rank", "")}
+
+
+def format_fortune_message(result: dict | None, config_manager=None) -> str:
     """Format a fortune result for appending to the breakthrough success message.
 
     Args:
         result: The result dict from ``roll_breakthrough_fortune`` or ``None``.
+        config_manager: Optional config manager; when given, the message is
+            re-rendered through ``render_narrative`` so configured copy pools
+            take effect. When omitted (unit tests), the default copy already
+            rendered into ``result["message"]`` by the roll is returned as-is.
 
     Returns:
         A Chinese message, or an empty string when there is no drop.
     """
     if result is None:
         return ""
-    return result.get("message", "")
+    if config_manager is None:
+        return result.get("message", "")
+    scene = _FORTUNE_SCENE_BY_TYPE.get(result.get("type"))
+    if scene is None:
+        return result.get("message", "")
+    return render_narrative(
+        config_manager, "fortune", scene, _fortune_variables(result)
+    )

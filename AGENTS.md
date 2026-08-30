@@ -204,6 +204,7 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 - **Skill 可用（首选入口）**：`.agents/skills/testing-astrbot-plugins-via-webtest` 是指向测试平台仓库 `skill/` 的符号链接，由测试平台网页端「Skill 分发」弹层维护（勾选建链接/取消删链接；**不要手动编辑链接内的文件**，改动要在测试平台仓库进行）。支持项目级 skills 的 agent 会自动发现它——**手动探测、JSON 用例编写与回归、热重载、批注读取等详细操作一律以该 SKILL.md 为准**，本节只保留项目级约定。
 - **启用前提**：Dashboard → 平台管理 → 启用「网页测试平台 (webtest)」；网页入口 `http://127.0.0.1:8765` 或 Dashboard 插件详情 → 页面（嵌入版）。skill 里的前置检查（`/api/status` 应返回 `adapter_ready: true`）失败时先启用平台。
 - **反馈闭环**：用户在网页写批注 → AI 拉取批注（方式见 SKILL.md 工作流 D）→ 修改修仙插件代码 → 热重载（`POST /api/ops/plugin-reload`，与 Dashboard 重载同一底层但不走登录态）→ 重跑用例/`wait` 断言确认 → 汇报。
+- **真实环境功能测试由用户手动发起（2026-08-30 定）**：AI 不主动跑 webtest 平台用例（含 `test_suite_ctl.py run`、平台 CLI、热重载后回归），写完代码以 `pytest tests/` + ruff 为质量门即可收尾；需要真实环境回归时由用户自行运行或明确指示后才执行，AI 不为此等待/轮询平台。
 - **改动同步**：插件代码改动提交到独立仓库；`design_docs/test-platform.md` 若需同步更新，按独立仓库实际代码修正（无自动同步）。
 
 ## 功能测试套件（项目内用例与结果归档）

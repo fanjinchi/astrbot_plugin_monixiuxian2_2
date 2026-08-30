@@ -1,0 +1,59 @@
+{
+  "breakthrough": {
+    "success": "✨ 突破成功！✨{streak_bonus_msg}\n━━━━━━━━━━━━━━━\n{rate_info}\n━━━━━━━━━━━━━━━\n恭喜你从【{current_level_name}】突破至【{next_level_name}】！\n\n【属性增长】\n气血 +{hp_growth}\n伤害 +{damage_growth}\n身法 +{agility_growth}\n迅捷 +{speed_growth}\n\n【当前属性】\n伤害：{damage}\n身法：{agility}\n迅捷：{speed}\n气血：{hp}\n护甲：{armor_value}",
+    "lose_streak_reward": "\n💪 苦尽甘来，天道不负有心人！",
+    "comprehend_success": "🎁 福至心灵，领悟功法【{name}】！",
+    "comprehend_fail": "🎁 破而后立，领悟功法【{name}】！",
+    "comprehend_universal": "🎁 破境感悟，领悟通用功法【{name}】！",
+    "revive": "💀 突破失败，走火入魔！💀\n━━━━━━━━━━━━━━━\n{rate_info}\n━━━━━━━━━━━━━━━\n你在突破【{next_level_name}】时走火入魔...\n\n⚡ 回生丹效果触发！⚡\n━━━━━━━━━━━━━━━\n🌟 你涅槃重生了！\n⚠️ 但所有属性降低到之前的一半\n💊 回生丹效果已消耗\n━━━━━━━━━━━━━━━\n请继续修炼，重回巅峰！",
+    "death": "💀 突破失败，走火入魔！💀\n━━━━━━━━━━━━━━━\n{rate_info}\n━━━━━━━━━━━━━━━\n你在突破【{next_level_name}】时走火入魔，身死道消...\n所有修为和装备化为虚无\n若想重新修仙，请使用'我要修仙'命令重新开始",
+    "pity_hint": "\n连败 {streak} 次，天道酬勤：下次成功率 +{next_bonus:.0%}（再败 {remaining} 次必成）",
+    "survive": "❌ 突破失败 ❌\n━━━━━━━━━━━━━━━\n{rate_info}\n━━━━━━━━━━━━━━━\n突破【{next_level_name}】失败，但幸运地保住了性命\n修为受损，损失了 {exp_penalty} 点修为\n当前修为：{experience}{pity_msg}"
+  },
+  "combat": {
+    "battle_opening": "☆━━━━ 战斗开始 ━━━━☆",
+    "battle_vs": "{name1} VS {name2}",
+    "battle_mutual_destruction": "☆━━━━ 同归于尽！平局！━━━━☆",
+    "battle_victory": "☆━━━━ {name} 胜利！━━━━☆",
+    "battle_draw_stalemate": "☆━━━━ 战斗胶着，双方罢手，平局！━━━━☆",
+    "battle_draw": "☆━━━━ 平局！━━━━☆",
+    "stun_skip": "{name} 处于眩晕状态，无法出手！",
+    "dodge": "{defender_name} 身形一闪，躲过了 {attacker_name} 的攻击！",
+    "block": "{defender_name} 举盾格挡，化解了部分攻势！",
+    "crit_notice": "{attacker_name} 目光如电，寻得破绽！",
+    "ultimate_cast": "{attacker_name} 施展大招【{ult_name}】，天地变色！",
+    "damage_crit": "{attacker_name} 暴击！造成 {final_damage} 点伤害！",
+    "damage_normal": "{attacker_name} 发起攻击，造成 {final_damage} 点伤害",
+    "reflect": "{defender_name} 反弹 {reflect_dmg} 点伤害！",
+    "lifesteal": "{attacker_name} 吸取 {heal} 气血！",
+    "remaining_hp": "{defender_name} 剩余气血: {remaining_hp}",
+    "survive": "{name} 触发【免死】，于绝境中存活！",
+    "buff_applied": "{actor_name} 的【{effect_name}】作用于 {target_name}",
+    "status_expired": "{name} 的【{effect_name}】效果消散",
+    "trigger_round_start_boost": "{name} 触发【{skill_name}】，下回合攻势更盛！",
+    "trigger_attack_boost": "{actor_name} 触发【{skill_name}】，攻势更盛！",
+    "trigger_stun": "{actor_name} 触发【{skill_name}】，{target_name} 被眩晕，下回合无法出手！",
+    "trigger_damage_reduction": "{actor_name} 触发【{skill_name}】，受到的伤害降低！"
+  },
+  "cultivation": {
+    "retreat_start": "🧘 道友已进入闭关状态\n━━━━━━━━━━━━━━━\n闭关期间，你将与世隔绝，潜心修炼。\n💡 发送「{end_cmd}」结束闭关\n⏱️ 每分钟将获得修为，受灵根资质影响。",
+    "retreat_settlement": "🌟 道友出关成功！\n━━━━━━━━━━━━━━━\n⏱️ 闭关时长：{time_str}\n{fairyland_line}📈 获得修为：{gained_exp:,}{exceed_msg}\n💫 当前修为：{current_exp:,}\n━━━━━━━━━━━━━━━\n道友已回归红尘，可继续修行。",
+    "retreat_epiphany": "🎁 闭关悟道，领悟功法【{skill_name}】！",
+    "impart_value_inactive_hint": "\n\n💡 你持有传承但未激活，本次闭关未累积传承值。\n使用「激活传承 <编号>」激活后再闭关。",
+    "creation_help_welcome": "🌟 欢迎踏入修仙之路！\n━━━━━━━━━━━━━━━\n请选择你的修炼方式：\n\n",
+    "creation_welcome": "🎉 恭喜道友 {name} 踏上仙途！\n",
+    "creation_warning": "⚠️ 修仙有风险，突破需谨慎！\n突破失败或生命值归零会导致\n身死道消，所有数据清除！\n",
+    "rebirth_farewell": "💀 你选择了弃道重修，旧生一切化为尘埃。\n━━━━━━━━━━━━━━━\n可立即使用「我要修仙」重新踏上仙途。\n"
+  },
+  "fortune": {
+    "weapon_drop": "🎁 机缘天降，获得武器【{name}】（{rank}）！",
+    "heart_method_drop": "🎁 福至心灵，获得心法【{name}】（{rank}）！",
+    "pill_drop": "🎁 仙缘际会，获得丹药{items}！"
+  },
+  "legacy_encounter": {
+    "encounter_win": "\n\n🗿 你偶遇上古传承之地，战胜了守护者！\n{battle_msg}\n🌟 获得【{name}】#{instance_id}，发送「激活传承」可开始修炼解锁。",
+    "encounter_lose": "\n\n🗿 你偶遇上古传承之地，但未能战胜守护者。\n{battle_msg}",
+    "claim_win": "🗿 你战胜了守护者！\n{battle_msg}\n🌟 获得宗门传承【{name}】#{instance_id}！\n⚠️ 宗门传承不可被夺取，但离宗时将自动归还宗门。\n💡 发送「激活传承 {instance_id}」开始修炼解锁等阶奖励。",
+    "claim_lose": "🗿 领取【{name}】需先战胜传承之地守护者。\n{battle_msg}\n此次未领取成功，不占用领取名额，可择日再试。"
+  }
+}

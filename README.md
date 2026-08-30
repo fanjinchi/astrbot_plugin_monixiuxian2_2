@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.11.0
+> **版本:** v3.12.2
 > **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -244,8 +244,11 @@
 |---------|------|
 | `sect_config.json` | 宗门创建消耗、职位权限、任务奖励 |
 | `boss_config.json` | Boss 属性成长曲线、生成间隔 |
-| `rift_config.json` | 秘境名称、等级要求、探索时长、奖励池 |
+| `rift_config.json` | 秘境名称、等级要求、探索时长、奖励池、入口/结算描述（`description`/`settlement_desc`）、探索事件池（`explore_events`） |
 | `alchemy_config.json` | 丹药配方、材料消耗、成功率计算 |
+| `narrative_config.json` | 高频叙事文案：突破/机缘/战斗/修炼结算/传承之地模板与变体池（支持分桶与路线标注，变量经契约校验） |
+| `spirit_root_descriptions.json` | 灵根/体质评价文案（条目型，按灵根名索引） |
+| `adventure_config.json` | 历练路线、事件组（事件支持 `tags` 题材标签与 `desc_variants` 境界段分桶文案池）、掉落表 |
 
 **注意**：修改配置后需重启 AstrBot 生效。
 
@@ -311,6 +314,22 @@ astrbot_plugin_monixiuxian2_2/
 ---
 
 ## 📝 更新日志
+
+---
+
+### v3.12.2 - 叙事文案配置化载体（文案外移工程）
+
+**🎯 核心改动（纯工程变更，文案内容与数值零变更）**
+- **高频叙事文案全部进配置**：突破（成功/失败/身死道消/保命/连败保底/领悟功法）、突破机缘掉落、战斗说书人句式与战斗框架收束语、修炼闭关/出关结算/角色创建/弃道重修、传承之地偶遇与领取文案，统一外移至 `config/narrative_config.json`（默认 `data/narrative_defaults/`），改文案不再需要改代码
+- **变体池载体**：场景支持单模板/扁平池/境界段分桶池（通用/练气/筑基/金丹/元婴）三种形态，条目可带灵修/体修路线标注；模板插值变量加载时契约校验，写错变量名启动报错并回退默认，不崩溃
+- **灵根评价大表**外移至 `config/spirit_root_descriptions.json`
+- **秘境**：`rift_config.json` 新增 `description`（入口描述，秘境列表展示）/`settlement_desc`（结算叙事位）/`explore_events`（探索事件变体池，原硬编码）
+- **历练事件**：`adventure_config.json` 事件条目支持 `tags`（题材标签位）与 `desc_variants`（按玩家境界段出不同文案，空桶回落原 `desc`），数值字段不变
+- **fallback 收敛**：adventure/bounty/enemy 三管理器的内嵌默认配置迁移至 `data/default_configs.py` 单源；删除死代码 `utils/config_loader.py`
+
+**🔧 其他**
+- 数值说明类文本（突破成功率分解、结算数值行等）按规则保持简洁直白、留在代码原位不外移
+- 战斗文案渲染做 RNG 隔离（保存/恢复随机状态），文案轮换不影响战斗随机序列
 
 ---
 

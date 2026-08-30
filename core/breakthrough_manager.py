@@ -10,6 +10,7 @@ from astrbot.api import logger
 from ..config_manager import ConfigManager
 from ..data import DataBase
 from ..models import Player
+from ..utils.narrative_text import render_narrative
 from .breakthrough_fortune import format_fortune_message, roll_breakthrough_fortune
 
 if TYPE_CHECKING:
@@ -275,10 +276,12 @@ class BreakthroughManager:
             # 检查并处理突破贷款自动还款
             loan_msg = await self._handle_breakthrough_loan_repay(player)
 
-            # 高连败彩蛋文案
+            # 高连败彩蛋文案（叙事文案外移：默认文本见 narrative_defaults/breakthrough.py）
             streak_bonus_msg = ""
             if prev_fail_streak >= 3:
-                streak_bonus_msg = "\n💪 苦尽甘来，天道不负有心人！"
+                streak_bonus_msg = render_narrative(
+                    self.config_manager, "breakthrough", "lose_streak_reward"
+                )
 
             # 领悟判定（成功 20%）
             learn_msgs = []
@@ -290,14 +293,24 @@ class BreakthroughManager:
                 )
                 if learned:
                     learn_msgs.append(
-                        f"🎁 福至心灵，领悟功法【{learned.get('name', '未知')}】！"
+                        render_narrative(
+                            self.config_manager,
+                            "breakthrough",
+                            "comprehend_success",
+                            {"name": learned.get("name", "未知")},
+                        )
                     )
                 fallback = await self.skill_manager.roll_universal_pool_breakthrough(
                     player, success=True
                 )
                 if fallback:
                     learn_msgs.append(
-                        f"🎁 破境感悟，领悟通用功法【{fallback.get('name', '未知')}】！"
+                        render_narrative(
+                            self.config_manager,
+                            "breakthrough",
+                            "comprehend_universal",
+                            {"name": fallback.get("name", "未知")},
+                        )
                     )
 
             # 突破机缘轮盘（方案 A 成长与领悟判定之后）
@@ -307,23 +320,25 @@ class BreakthroughManager:
             if fortune_msg:
                 learn_msgs.append(fortune_msg)
 
-            success_msg = (
-                f"✨ 突破成功！✨{streak_bonus_msg}\n"
-                f"━━━━━━━━━━━━━━━\n"
-                f"{rate_info}\n"
-                f"━━━━━━━━━━━━━━━\n"
-                f"恭喜你从【{current_level_name}】突破至【{next_level_name}】！\n"
-                f"\n【属性增长】\n"
-                f"气血 +{hp_growth}\n"
-                f"伤害 +{combat_growth.get('damage', 0)}\n"
-                f"身法 +{combat_growth.get('agility', 0)}\n"
-                f"迅捷 +{combat_growth.get('speed', 0)}\n"
-                f"\n【当前属性】\n"
-                f"伤害：{player.damage}\n"
-                f"身法：{player.agility}\n"
-                f"迅捷：{player.speed}\n"
-                f"气血：{player.hp}\n"
-                f"护甲：{player.armor_value}"
+            success_msg = render_narrative(
+                self.config_manager,
+                "breakthrough",
+                "success",
+                {
+                    "streak_bonus_msg": streak_bonus_msg,
+                    "rate_info": rate_info,
+                    "current_level_name": current_level_name,
+                    "next_level_name": next_level_name,
+                    "hp_growth": hp_growth,
+                    "damage_growth": combat_growth.get("damage", 0),
+                    "agility_growth": combat_growth.get("agility", 0),
+                    "speed_growth": combat_growth.get("speed", 0),
+                    "damage": player.damage,
+                    "agility": player.agility,
+                    "speed": player.speed,
+                    "hp": player.hp,
+                    "armor_value": player.armor_value,
+                },
             )
             if learn_msgs:
                 success_msg += "\n\n" + "\n".join(learn_msgs)
@@ -369,20 +384,11 @@ class BreakthroughManager:
 
                 if resurrected:
                     # 回生丹触发，玩家复活
-                    resurrection_msg = (
-                        f"💀 突破失败，走火入魔！💀\n"
-                        f"━━━━━━━━━━━━━━━\n"
-                        f"{rate_info}\n"
-                        f"━━━━━━━━━━━━━━━\n"
-                        f"你在突破【{next_level_name}】时走火入魔...\n"
-                        f"\n"
-                        f"⚡ 回生丹效果触发！⚡\n"
-                        f"━━━━━━━━━━━━━━━\n"
-                        f"🌟 你涅槃重生了！\n"
-                        f"⚠️ 但所有属性降低到之前的一半\n"
-                        f"💊 回生丹效果已消耗\n"
-                        f"━━━━━━━━━━━━━━━\n"
-                        f"请继续修炼，重回巅峰！"
+                    resurrection_msg = render_narrative(
+                        self.config_manager,
+                        "breakthrough",
+                        "revive",
+                        {"rate_info": rate_info, "next_level_name": next_level_name},
                     )
 
                     logger.info(f"玩家 {player.user_id} 突破失败触发回生丹，成功复活")
@@ -393,14 +399,11 @@ class BreakthroughManager:
                 # 玩家死亡 - 级联删除所有关联数据
                 await self.db.delete_player_cascade(player.user_id)
 
-                death_msg = (
-                    f"💀 突破失败，走火入魔！💀\n"
-                    f"━━━━━━━━━━━━━━━\n"
-                    f"{rate_info}\n"
-                    f"━━━━━━━━━━━━━━━\n"
-                    f"你在突破【{next_level_name}】时走火入魔，身死道消...\n"
-                    f"所有修为和装备化为虚无\n"
-                    f"若想重新修仙，请使用'我要修仙'命令重新开始"
+                death_msg = render_narrative(
+                    self.config_manager,
+                    "breakthrough",
+                    "death",
+                    {"rate_info": rate_info, "next_level_name": next_level_name},
                 )
 
                 logger.info(
@@ -430,10 +433,15 @@ class BreakthroughManager:
                 streak = player.breakthrough_fail_streak
                 next_bonus = streak * pity_step
                 remaining = max(0, pity_guarantee - streak)
-                pity_msg = (
-                    f"\n连败 {streak} 次，天道酬勤："
-                    f"下次成功率 +{next_bonus:.0%}"
-                    f"（再败 {remaining} 次必成）"
+                pity_msg = render_narrative(
+                    self.config_manager,
+                    "breakthrough",
+                    "pity_hint",
+                    {
+                        "streak": streak,
+                        "next_bonus": next_bonus,
+                        "remaining": remaining,
+                    },
                 )
 
                 # 领悟判定（失败 10% 软保底）
@@ -446,7 +454,12 @@ class BreakthroughManager:
                     )
                     if learned:
                         learn_msgs.append(
-                            f"🎁 破而后立，领悟功法【{learned.get('name', '未知')}】！"
+                            render_narrative(
+                                self.config_manager,
+                                "breakthrough",
+                                "comprehend_fail",
+                                {"name": learned.get("name", "未知")},
+                            )
                         )
                     fallback = (
                         await self.skill_manager.roll_universal_pool_breakthrough(
@@ -455,18 +468,25 @@ class BreakthroughManager:
                     )
                     if fallback:
                         learn_msgs.append(
-                            f"🎁 破境感悟，领悟通用功法【{fallback.get('name', '未知')}】！"
+                            render_narrative(
+                                self.config_manager,
+                                "breakthrough",
+                                "comprehend_universal",
+                                {"name": fallback.get("name", "未知")},
+                            )
                         )
 
-                fail_msg = (
-                    f"❌ 突破失败 ❌\n"
-                    f"━━━━━━━━━━━━━━━\n"
-                    f"{rate_info}\n"
-                    f"━━━━━━━━━━━━━━━\n"
-                    f"突破【{next_level_name}】失败，但幸运地保住了性命\n"
-                    f"修为受损，损失了 {exp_penalty} 点修为\n"
-                    f"当前修为：{player.experience}"
-                    f"{pity_msg}"
+                fail_msg = render_narrative(
+                    self.config_manager,
+                    "breakthrough",
+                    "survive",
+                    {
+                        "rate_info": rate_info,
+                        "next_level_name": next_level_name,
+                        "exp_penalty": exp_penalty,
+                        "experience": player.experience,
+                        "pity_msg": pity_msg,
+                    },
                 )
                 if learn_msgs:
                     fail_msg += "\n\n" + "\n".join(learn_msgs)
@@ -523,7 +543,7 @@ class BreakthroughManager:
                     player, item["name"], item["count"]
                 )
 
-        return format_fortune_message(result)
+        return format_fortune_message(result, config_manager=self.config_manager)
 
     async def _handle_breakthrough_loan_repay(self, player: Player) -> str:
         """处理突破贷款自动还款

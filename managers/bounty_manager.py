@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Optional
 from astrbot.api import logger
 
 from ..data import DataBase
+from ..data.default_configs import BOUNTY_CONFIG
 from ..models import Player
 
 if TYPE_CHECKING:
@@ -28,38 +29,9 @@ class BountyManager:
     ADVENTURE_CONFIG_FILE = (
         Path(__file__).resolve().parents[1] / "config" / "adventure_config.json"
     )
-    DEFAULT_CONFIG = {
-        "difficulties": {
-            "easy": {
-                "name": "F级",
-                "stone_scale": 1.0,
-                "exp_scale": 1.0,
-                "min_level": 0,
-            }
-        },
-        "templates": [
-            {
-                "id": 1,
-                "name": "击退妖兽",
-                "difficulty": "easy",
-                "category": "巡山",
-                "progress_tags": ["adventure_scout"],
-                "min_target": 3,
-                "max_target": 5,
-                "time_limit": 3600,
-                "reward": {"stone": 300, "exp": 2500},
-                "item_table": "hunt",
-                "description": "驱逐骚扰山门的妖兽。",
-            }
-        ],
-        "item_tables": {
-            "hunt": [
-                {"name": "灵兽毛皮", "weight": 40, "min": 1, "max": 3},
-                {"name": "妖兽精血", "weight": 30, "min": 1, "max": 2},
-                {"name": "玄铁", "weight": 30, "min": 1, "max": 2},
-            ]
-        },
-    }
+    # fallback 默认值单源在 data/default_configs.py（externalize-narrative-texts
+    # D4 收敛，消除内嵌副本与 config 文件的漂移）
+    DEFAULT_CONFIG = BOUNTY_CONFIG
 
     def __init__(
         self, db: DataBase, storage_ring_manager: Optional["StorageRingManager"] = None

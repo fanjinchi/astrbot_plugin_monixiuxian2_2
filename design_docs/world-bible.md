@@ -92,14 +92,19 @@
 | 文案类别 | 物理位置 | 外移优先级 |
 |---|---|---|
 | 物品描述（武器/功法/心法） | `config/weapons.json` / `skills.json` / `heart_methods.json` 的 `description`（源：`content-design/*.csv`） | 已在 config，无需外移 |
-| 历练路线与事件文案 | `config/adventure_config.json` `routes[].description` + `event_groups[*][*].desc` | 已在 config |
+| 历练路线与事件文案 | `config/adventure_config.json` `routes[].description` + `event_groups[*][*].desc`（兜底）/ `desc_variants`（按境界段分桶变体池，桶键 通用/练气/筑基/金丹/元婴）+ `tags`（题材标签位） | 已在 config，分桶载体已就绪待内容填充 |
 | 悬赏文案 | `config/bounty_templates.json` `templates[].description` | 已在 config |
 | 敌人描述/精英前缀/Boss 名 | `config/enemies.json` `templates[].description` / `elite_prefixes` / `boss_names` | 已在 config |
-| 秘境入口/结算文案 | `config/rift_config.json`（**当前无 `description` 字段**） | 需工程变更补字段（bd `og9`） |
-| 突破成功/失败/身死道消文案 | `core/breakthrough_manager.py`（硬编码） | 高（bd `yux`） |
-| 战斗说书人出招文案 | `managers/combat_manager.py` `_resolve_attack`（硬编码） | 高（bd `yux`） |
-| 修炼结算/闭关出关文案 | `core/cultivation_manager.py` + `handlers/player_handler.py`（硬编码） | 高（bd `yux`） |
+| 秘境入口/结算文案 | `config/rift_config.json` `description` / `settlement_desc`（字段已补，内容待内容管线填充）；探索事件变体池在同文件 `explore_events` | 已在 config |
+| 突破成功/失败/身死道消/保命/连败保底文案 | `config/narrative_config.json` `breakthrough` 节（默认：`data/narrative_defaults/breakthrough.py`） | 已外移 |
+| 突破机缘掉落文案 | `config/narrative_config.json` `fortune` 节 | 已外移 |
+| 战斗说书人句式与战斗框架收束语 | `config/narrative_config.json` `combat` 节 | 已外移 |
+| 修炼闭关/出关结算/角色创建/弃道重修文案 | `config/narrative_config.json` `cultivation` 节 | 已外移 |
+| 传承之地偶遇/领取文案 | `config/narrative_config.json` `legacy_encounter` 节（单一模板簇，三处触发点共用） | 已外移 |
+| 灵根/体质评价大表 | `config/spirit_root_descriptions.json`（条目型） | 已外移 |
 | 突破成功率分解 / 结算数值行 / 属性面板等数值说明 | 代码原位 | 不外移（数值说明类，§1.3 注） |
+
+> 载体约定：narrative_config 场景值支持三种形态——单模板（str）、扁平变体池（list）、境界段分桶池（dict）；池条目可带 `route` 路线标注；模板插值变量在加载时做契约校验（声明集见 `data/narrative_defaults/` 各域 `SCENE_VARS`）。取用逻辑单源在 `utils/narrative_text.py`。
 
 ### 1.7 事件与悬赏文案变体量标准
 
@@ -430,3 +435,7 @@
   3. **canon 覆盖补登记**：`scripts/export_config_to_canon.py` 逆向导出补登 wpn_qy_001/heart_qy_001/qy_001-003/hx_001-002（status=legacy）；新建 `bounty-canon.csv`；§6.2 表同步更新。配套 reconcile 语义修正：legacy 行 config 条目受保护不再被删除（design D9）。
   4. **lint 新基线**：轻量 canon 表（events/enemies/rifts/bounty）纳入"叙事待写"统计 —— **0 FAIL / 119 WARN**。
 - 2026-08-28 数值说明类文本规则：成功率分解/结算数值/面板说明等机制数值说明不做叙事化、不外移配置，保持简洁直白（§1.3 注、§1.6 清单同步）；externalize-narrative-texts change 的 rate_info 外移范围相应撤回。
+- 2026-08-30 文案外移工程落地（change `externalize-narrative-texts`；**纯工程变更，文案内容零变更**）：
+  1. **§1.6 清单更新**：突破/机缘/战斗/修炼结算/传承之地文案外移至 `config/narrative_config.json`（内嵌默认 `data/narrative_defaults/` 按域分片）；灵根评价大表外移至 `config/spirit_root_descriptions.json`；`rift_config.json` 补 `description`/`settlement_desc` 字段与 `explore_events` 探索事件池；`adventure_config.json` 事件条目支持 `tags`/`desc_variants` 境界段分桶变体池。
+  2. **载体约定**：场景值三形态（单模板/扁平池/分桶池）+ `route` 路线标注 + 加载时插值变量契约校验，取用逻辑单源 `utils/narrative_text.py`。
+  3. **fallback 收敛**：adventure/bounty/enemy 三 manager 内嵌 DEFAULT 副本迁移进 `data/default_configs.py` 单源；删除死代码 `utils/config_loader.py`。

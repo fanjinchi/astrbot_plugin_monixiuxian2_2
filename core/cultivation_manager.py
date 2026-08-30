@@ -201,66 +201,17 @@ class CultivationManager:
         return selected_root
 
     def _get_root_description(self, root_name: str) -> str:
-        """获取灵根描述"""
-        descriptions = {
-            "伪": "【废柴】资质低劣，修炼如龟速",
-            # 四灵根
-            "金木水火": "【凡品】四灵根杂乱，资质平庸",
-            "金木水土": "【凡品】四灵根杂乱，资质平庸",
-            "金木火土": "【凡品】四灵根杂乱，资质平庸",
-            "金水火土": "【凡品】四灵根杂乱，资质平庸",
-            "木水火土": "【凡品】四灵根杂乱，资质平庸",
-            # 三灵根
-            "金木水": "【凡品】三灵根较杂，资质一般",
-            "金木火": "【凡品】三灵根较杂，资质一般",
-            "金木土": "【凡品】三灵根较杂，资质一般",
-            "金水火": "【凡品】三灵根较杂，资质一般",
-            "金水土": "【凡品】三灵根较杂，资质一般",
-            "金火土": "【凡品】三灵根较杂，资质一般",
-            "木水火": "【凡品】三灵根较杂，资质一般",
-            "木水土": "【凡品】三灵根较杂，资质一般",
-            "木火土": "【凡品】三灵根较杂，资质一般",
-            "水火土": "【凡品】三灵根较杂，资质一般",
-            # 双灵根
-            "金木": "【良品】双灵根，较为常见",
-            "金水": "【良品】双灵根，较为常见",
-            "金火": "【良品】双灵根，较为常见",
-            "金土": "【良品】双灵根，较为常见",
-            "木水": "【良品】双灵根，较为常见",
-            "木火": "【良品】双灵根，较为常见",
-            "木土": "【良品】双灵根，较为常见",
-            "水火": "【良品】双灵根，较为常见",
-            "水土": "【良品】双灵根，较为常见",
-            "火土": "【良品】双灵根，较为常见",
-            # 五行单灵根
-            "金": "【上品】金之精华，锋锐无双",
-            "木": "【上品】木之生机，生生不息",
-            "水": "【上品】水之灵韵，柔中带刚",
-            "火": "【上品】火之烈焰，霸道无匹",
-            "土": "【上品】土之厚重，稳如磐石",
-            # 变异灵根
-            "雷": "【稀有】天地雷霆，毁灭之力",
-            "冰": "【稀有】极寒冰封，万物凝固",
-            "风": "【稀有】疾风骤雨，来去无踪",
-            "暗": "【稀有】幽暗深邃，诡异莫测",
-            "光": "【稀有】神圣光明，普照万物",
-            # 天灵根
-            "天金": "【极品】天选之子，金之极致",
-            "天木": "【极品】天选之子，木之极致",
-            "天水": "【极品】天选之子，水之极致",
-            "天火": "【极品】天选之子，火之极致",
-            "天土": "【极品】天选之子，土之极致",
-            "天雷": "【极品】天选之子，雷之极致",
-            # 传说级
-            "阴阳": "【传说】阴阳调和，造化玄机",
-            "融合": "【传说】五行融合，万法归一",
-            # 神话级
-            "混沌": "【神话】混沌初开，包罗万象",
-            # 禁忌级
-            "先天道体": "【禁忌】天生道体，与天地同寿",
-            "神圣体质": "【禁忌】神之后裔，天赋异禀",
-        }
-        return descriptions.get(root_name, "【未知】神秘的灵根")
+        """Look up the flavor description for a spirit root from config.
+
+        The description table lives in ``config/spirit_root_descriptions.json``
+        (loaded as ``config_manager.spirit_root_descriptions``). Test fakes may
+        lack the table; missing entries fall back to a generic placeholder.
+        """
+        table = getattr(self.config_manager, "spirit_root_descriptions", None) or {}
+        entry = table.get(root_name)
+        if isinstance(entry, dict) and entry.get("description"):
+            return entry["description"]
+        return "【未知】神秘的灵根"
 
     def generate_new_player_stats(
         self, user_id: str, cultivation_type: str = "灵修"

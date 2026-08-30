@@ -289,7 +289,10 @@ class XiuXianPlugin(Star):
         self.rift_mgr.impart_mgr = self.impart_mgr
         self.rank_mgr = RankingManager(self.db, self.combat_mgr, self.config_manager)
         self.adventure_mgr = AdventureManager(
-            self.db, self.storage_ring_mgr, self.pve_combat_mgr
+            self.db,
+            self.storage_ring_mgr,
+            self.pve_combat_mgr,
+            config_manager=self.config_manager,
         )
         # 历练传承机缘需要传承管理器（init 顺序在其后，此处注入）
         self.adventure_mgr.impart_mgr = self.impart_mgr
