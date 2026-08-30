@@ -215,7 +215,7 @@ def test_random_growth_attribute_selection():
 
 
 def test_new_player_starts_at_level_one():
-    """Newly generated players must start at level 1 (练气一阶 / 锻体一阶)."""
+    """Newly generated players must start at level 1 (练气一阶, two routes share the same realm list since 2026-09-09)."""
     from tests.helpers import load_package_module
 
     _cult_mod = load_package_module(

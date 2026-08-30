@@ -1,7 +1,7 @@
 group,key,name,canon_origin,tone_tier,story_hook,narrative_status,note
 safe,herb_bloom,灵药丰收,散修日常,平淡,你偶遇灵药盛放之地，顺手采撷一批,占位,通用（四路线均可触发）；专属变体按六州落州名与地貌烙印（bible §1.7）
 safe,travel_insight,旅途悟道,散修日常,平淡,沿途的山河激发灵感，你对大道多了几分理解,占位,通用；专属变体覆盖六州
-safe,ally_help,前辈相助,散修日常,平淡,路遇前辈赠予心得与灵石，你受益良多,占位,通用；可挂 §3.2.6 NPC 或势力冲突矩阵人物
+safe,ally_help,前辈相助,散修日常,正经+冷幽默,路遇前辈赠予心得与灵石，你受益良多,占位,通用（四路线均可触发）；专属变体按六州落州名，NPC 用州域散修（§3.2.7），不落宗门 NPC
 standard,steady_path,平稳推进,散修日常,平淡,历练过程顺风顺水，按部就班地完成既定目标,占位,通用
 standard,beast_skirmish,遭遇拦路妖兽,妖域,平淡,你击退了扰民的妖兽，增长了实战经验,占位,通用；弹药取自 §2.3 妖域智慧梯度 + §3.6 冲突矩阵
 standard,secret_cache,秘宝遗迹,上古遗宝,正经,意外发现遗迹残骸，获得少量古物,占位,通用；上古遗宝路线（bible §5.1 天品语境）
@@ -11,4 +11,6 @@ risky,trade_windfall,天降横财,散修日常,平淡,解救的商队奉上重�
 disaster,ambush_fail,埋伏受创,散修日常,平淡,敌对势力趁你不备发动袭击，你被迫撤退并整理伤势,占位,通用；袭击方可取自 §3.6 势力冲突矩阵
 disaster,lost_in_fog,迷失古雾,上古遗宝,正经,你陷入幻雾耽误大量时间，所幸保住性命,占位,通用；古雾可挂 §2.2 某州地貌烙印
 sect_qingyun,elder_guidance,长老传功,青云门,正经,传功长老玄诚子游历路过，见你勤勉，随手点拨了几句运炁诀窍,占位,青云门专属（sect_id=qingyun）；NPC 三件套见 §3.2.6 玄诚子
-sect_qingyun,sect_errand,执事堂派差,青云门,正经,执事堂临时征调你护送一批宗门资材回山，一路有惊无险,占位,青云门专属（sect_id=qingyun）；NPC 见 §3.2.6 清微道长
+sect_qingyun,sect_errand,执事堂派差,青云门,正经+冷幽默,执事堂临时征调你护送一批宗门资材回山，一路有惊无险,占位,青云门专属（sect_id=qingyun）；NPC 见 §3.2.6 清微道长
+sect_qingyun,sect_duel,演武切磋,青云门,正经+冷幽默,演武场同门切磋，输赢皆有进益,占位,青云门专属（sect_id=qingyun）；宗门内活动类；剧本已写待灌 copy_variants
+sect_qingyun,sect_trial,下山历练,青云门,正经+冷幽默,领宗门差事下山历练，途中自有际遇,占位,青云门专属（sect_id=qingyun）；下山奇遇类；剧本已写待灌 copy_variants

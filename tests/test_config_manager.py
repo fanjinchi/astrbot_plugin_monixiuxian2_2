@@ -108,10 +108,10 @@ class TestLevelConfigCentralApi:
         assert config_manager.get_level_name(200) == "境界200"
 
     def test_get_level_name_body_route(self, config_manager):
-        """体修 names are resolved from the independent body realm list."""
-        assert config_manager.get_level_name(1, "体修") == "锻体一阶"
-        assert config_manager.get_level_name(10, "体修") == "铜皮初期"
-        assert config_manager.get_level_name(99, "体修") == "地仙体魄九阶"
+        """体修 names use the same unified realm list as 灵修 (2026-09-09 定)."""
+        assert config_manager.get_level_name(1, "体修") == "练气一阶"
+        assert config_manager.get_level_name(10, "体修") == "筑基初期"
+        assert config_manager.get_level_name(99, "体修") == "地仙九阶"
 
     def test_exp_curve_pivots_are_continuous(self, config_manager):
         """The three-segment curve must match exactly at the segment boundaries."""
@@ -155,4 +155,4 @@ class TestLevelConfigCentralApi:
         assert config_manager.get_level_index_by_name("筑基初期") == 10
         assert config_manager.get_level_index_by_name("地仙九阶") == 99
         assert config_manager.get_level_index_by_name("不存在") is None
-        assert config_manager.get_level_index_by_name("锻体一阶", "体修") == 1
+        assert config_manager.get_level_index_by_name("练气一阶", "体修") == 1
