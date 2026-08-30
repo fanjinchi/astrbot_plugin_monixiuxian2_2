@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "astrbot_plugin_monixiuxian2_2",
+  "project_id": "5e195e89-32c9-4a18-bff3-bfd1f7d9cde5"
+}
