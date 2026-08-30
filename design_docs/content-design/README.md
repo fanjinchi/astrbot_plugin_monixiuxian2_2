@@ -24,7 +24,9 @@
 | `rifts-canon.csv` | 秘境叙事表（id/name + 叙事四列 + 文案待工程变更备注） |
 | `bounty-canon.csv` | 悬赏叙事表（模板 id/name + 叙事四列 + category/difficulty 备注） |
 | `validate_budget.py` | 数值预算验算脚本（§3 速查表的机器校验） |
-| `lint_narrative.py` | 叙事文案 lint 脚本（禁词/数值承诺/长度/品级冠词/名字一致性 + canon 列校验，sync 第二道闸门） |
+| `copy_variants.csv` | 变体设计表（season-1-tier1-copywriting §1.1）：突破/修炼/战斗/机缘/事件五域场景变体，列=domain,scene,level_band,state,route,variant_no,text,tone_tier,narrative_status,note；事件域 text 来自 `剧情/` 剧本册两轮审阅后的定稿稿，四宗组属性登记后 config 立组随 bd n6o |
+| `scene_key_registry.md` | 场景 key 登记表（task 1.4）：全部场景 key ↔ 运行时载体（narrative_config 模板/adventure_config 事件）↔ {var} 变量白名单；lint 按运行时事实源校验 |
+| `lint_narrative.py` | 叙事文案 lint 脚本（禁词/数值承诺/长度/品级冠词/名字一致性 + canon 列校验 + copy_variants 变体校验，sync 第二道闸门） |
 | `../../scripts/export_config_to_canon.py` | config → canon CSV 逆向导出补登记脚本（缺失条目以 status=legacy 照抄 config 数值补登，保护其不被 reconcile 删除） |
 | `*.md` | 各系统的设计说明、原型对照、适配决策记录 |
 

@@ -83,6 +83,38 @@ GRADE_RANK_RE = re.compile(r"[凡灵玄地天][品阶级]")
 
 DEFAULT_MAX_LEN = 60  # design.md 开放问题：按域设限，初版统一 60 可调
 
+# copy_variants.csv 变体设计表（season-1-tier1-copywriting tasks 1.1/1.2）
+COPY_VARIANTS_COLS = (
+    "domain",
+    "scene",
+    "level_band",
+    "state",
+    "route",
+    "variant_no",
+    "text",
+    "tone_tier",
+    "narrative_status",
+    "note",
+    "group",
+)
+# domain：四域 + 机缘（tasks 2.4 fortune 节场景）+ 事件域；事件域 scene = 事件 key
+DOMAINS = ("breakthrough", "cultivation", "combat", "fortune", "adventure_event")
+# level_band：境界段分桶键 + 事件帧区间值（区间导入时展开到两桶，不倍增文本）
+LEVEL_BANDS = ("通用", "练气", "筑基", "金丹", "元婴", "练气-筑基", "金丹-元婴")
+# 长度上限按域参数化：突破/战斗/修炼/机缘短句，事件长句（proposal 分档约定）
+# 数值以 12 册定稿剧本实测分布校准（tasks 5.5 灌入后）：突破帧三拍结构
+# 上限 104、机缘 111、事件域 180（灌入前 60/120 按单句预估，与成稿冲突，
+# 保留“短句域<事件域”的分档语义，数值按各域实测 max 取整）
+DOMAIN_MAX_LEN = {
+    "breakthrough": 120,
+    "cultivation": 80,
+    "combat": 80,
+    "fortune": 120,
+    "adventure_event": 180,
+}
+
+_WHITELIST_VAR_RE = re.compile(r"\{([a-zA-Z_0-9]+)\}")
+
 # canon 四列取值域（spec content-sync-pipeline）
 TONE_TIERS = ("正经", "正经+冷幽默", "玩梗灰", "平淡")
 NARRATIVE_STATUSES = ("占位", "待写", "定稿")
@@ -105,6 +137,10 @@ CANON_RIFTS = ("青云秘境", "落日峡谷", "万妖洞", "玄冰地宫", "上
 CANON_REGIONS = ("青云山",)
 CANON_GENERIC = ("散修日常", "上古遗宝", "传承之地", "现有配置", "原创")
 CANON_NAMES = CANON_STATES + CANON_SECTS + CANON_RIFTS + CANON_REGIONS
+
+# copy_variants.csv 取值域（见 lint_narrative.py 顶部注释）
+STATES = CANON_STATES + ("通用",)  # 六州 + 通用（非地域文案）
+ROUTES = ("灵修", "体修", "通用")
 
 # canon_origin 组分分隔符（"云州·青云山" 拆为 [云州, 青云山] 逐个查证）
 _ORIGIN_SEP_RE = re.compile(r"[·•・/、,，\s]+")
@@ -414,6 +450,141 @@ def _check_config_descriptions(strict: bool, max_len: int) -> list[str]:
     return results
 
 
+def _load_var_whitelist() -> dict[str, set[str]]:
+    """Build {domain.scene: set(var)} from runtime narrative templates.
+
+    scene key 登记表（tasks 1.4）的运行时事实源：narrative_config.json 各
+    场景模板的 ``{var}`` 插值 + adventure_config 事件 desc（静态文本，白名单
+    多为空）。事件域 scene 用事件 key；四宗组复用同源 key（config 立组随
+    bd n6o，未登记前 lint 按未知 scene WARN 提示）。
+    """
+    whitelist: dict[str, set[str]] = {}
+    try:
+        narr = _load_json(CONFIG_DIR / "narrative_config.json")
+    except FileNotFoundError:
+        narr = {}
+    for domain, scenes in narr.items():
+        if not isinstance(scenes, dict):
+            continue
+        for scene, tpl in scenes.items():
+            if isinstance(tpl, str):
+                whitelist[f"{domain}.{scene}"] = set(_WHITELIST_VAR_RE.findall(tpl))
+    try:
+        adv = _load_json(CONFIG_DIR / "adventure_config.json")
+    except FileNotFoundError:
+        adv = {}
+    for events in adv.get("event_groups", {}).values():
+        for ev in events:
+            key = str(ev.get("key", "")).strip()
+            if key:
+                whitelist[f"adventure_event.{key}"] = set(
+                    _WHITELIST_VAR_RE.findall(ev.get("desc") or "")
+                )
+    return whitelist
+
+
+def _check_copy_variants(rows: list[dict], results: list[str], strict: bool) -> None:
+    """Check copy_variants.csv：取值域 / 域长度 / 禁词 / {var} 白名单 / 编号唯一。
+
+    无 status 列（design D1），严重度仅按 narrative_status 定档：定稿行违例
+    → FAIL；占位/待写 → WARN（--strict 时也 FAIL）；仅有表头（未填充）→
+    WARN 提示写作期渐进。
+    """
+    if not rows:
+        results.append("WARN copy_variants.csv 仅有表头（写作填充后自动通过）")
+        return
+    missing_cols = [c for c in COPY_VARIANTS_COLS if c not in rows[0]]
+    if missing_cols:
+        results.append(f"FAIL copy_variants.csv 缺列 {sorted(missing_cols)}")
+        return
+    whitelist = _load_var_whitelist()
+    seen_variants: dict[tuple[str, str, str], set[str]] = {}
+    for i, r in enumerate(rows, start=2):
+        domain = (r.get("domain") or "").strip()
+        scene = (r.get("scene") or "").strip()
+        text = (r.get("text") or "").strip()
+        status = (r.get("narrative_status") or "").strip()
+        where = f"copy_variants.csv:{i} [{domain}.{scene}]"
+        # 严重度定档：定稿行违例必 FAIL；占位/待写仅 --strict 时 FAIL
+        verdict = "FAIL" if status == "定稿" else ("FAIL" if strict else "WARN")
+
+        if domain not in DOMAINS:
+            results.append(
+                f"FAIL {where} domain 非法取值「{domain or '（空）'}」（允许 {DOMAINS}）"
+            )
+            continue
+        if not scene:
+            results.append(f"{verdict} {where} scene 为空")
+            continue
+        level_band = (r.get("level_band") or "").strip()
+        if level_band not in LEVEL_BANDS:
+            results.append(
+                f"{verdict} {where} level_band 非法取值「{level_band or '（空）'}」"
+                f"（允许 {LEVEL_BANDS}）"
+            )
+        state = (r.get("state") or "").strip()
+        if state not in STATES:
+            results.append(
+                f"{verdict} {where} state 非法取值「{state or '（空）'}」（允许 {STATES}）"
+            )
+        route = (r.get("route") or "").strip()
+        if route not in ROUTES:
+            results.append(
+                f"{verdict} {where} route 非法取值「{route or '（空）'}」（允许 {ROUTES}）"
+            )
+        tone = (r.get("tone_tier") or "").strip()
+        if tone not in TONE_TIERS:
+            results.append(
+                f"{verdict} {where} tone_tier 非法取值「{tone or '（空）'}」"
+                f"（允许 {TONE_TIERS}）"
+            )
+        if status not in NARRATIVE_STATUSES:
+            results.append(
+                f"{verdict} {where} narrative_status 非法取值「{status or '（空）'}」"
+                f"（允许 {NARRATIVE_STATUSES}）"
+            )
+
+        # 编号唯一性：同 domain.scene.group 内 variant_no 不得重复（对应剧本编号
+        # 01-11；group 列承载组属性，四宗与青云门同源 scene key 借此分离）
+        variant_no = (r.get("variant_no") or "").strip()
+        group = (r.get("group") or "").strip()
+        if variant_no:
+            seen = seen_variants.setdefault((domain, scene, group), set())
+            if variant_no in seen:
+                results.append(
+                    f"FAIL {where} variant_no「{variant_no}」重复"
+                    f"（同 scene 内需唯一，组 «{group or '散修'}»）"
+                )
+            seen.add(variant_no)
+
+        if not text:
+            results.append(f"{verdict} {where} text 为空")
+            continue
+        # 脱 {var} 槽再跑文本检查：变量名含数字（{name1} 等）不应触发数字违例
+        plain = _WHITELIST_VAR_RE.sub("", text)
+        for problem in _text_violations(
+            plain, DOMAIN_MAX_LEN.get(domain, DEFAULT_MAX_LEN)
+        ):
+            results.append(f"{verdict} {where} text {problem}")
+
+        # {var} 白名单：变量必须在该场景运行时模板的插值白名单内；
+        # 未知 scene → WARN（回核提示，不阻塞写作期）
+        wild_key = f"{domain}.{scene}"
+        allowed = whitelist.get(wild_key)
+        if allowed is None:
+            results.append(
+                f"WARN {where} scene 未在运行时模板登记（见 scene_key_registry.md；"
+                "四宗组待 bd n6o 立组时登记）"
+            )
+        else:
+            for var in _WHITELIST_VAR_RE.findall(text):
+                if var not in allowed:
+                    results.append(
+                        f"{verdict} {where} 变量 {{{var}}} 不在「{wild_key}」白名单"
+                        f"（允许 {sorted(allowed)}，见 scene_key_registry.md）"
+                    )
+
+
 def main() -> int:
     """Run all narrative lint checks and print a report. Returns exit code."""
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
@@ -474,6 +645,13 @@ def main() -> int:
     config_lines = _check_config_descriptions(args.strict, max_len)
     all_lines.extend(config_lines)
     for line in config_lines:
+        print(" ", line)
+
+    print("\n== copy_variants.csv（变体设计表） ==")
+    variants_lines: list[str] = []
+    _check_copy_variants(_load_csv("copy_variants.csv"), variants_lines, args.strict)
+    all_lines.extend(variants_lines)
+    for line in variants_lines:
         print(" ", line)
 
     fails = sum(line.startswith("FAIL") for line in all_lines)
