@@ -252,7 +252,7 @@ class CombatEngine:
             # Start a new round every two actions; round-start skills fire once per round.
             if total_actions % 2 == 0:
                 rounds += 1
-                log.append(f"-- 第 {rounds} 回合 --")
+                log.append(self._narrative("round_header", {"rounds": rounds}))
                 # Tick existing effects first so round-start skills applied this
                 # round get their full duration (review fix: tick ordering).
                 self._tick_status_effects(fighter1, log)
@@ -475,9 +475,20 @@ class CombatEngine:
         value = skill.get("effect_value", 0)
         counter_dmg = max(1, int(actor.damage * value))
         target.hp -= counter_dmg
+        # Render via the engine's _narrative wrapper (not render_narrative
+        # directly) so the RNG state save/restore around template selection
+        # stays in effect; the skill-name fallback is resolved here and passed
+        # in as a variable (design D2/D3).
         state["log"].append(
-            f"{actor.name} 触发【{skill.get('name', '反击')}】反击，"
-            f"对 {target.name} 造成 {counter_dmg} 点伤害！"
+            state["engine"]._narrative(
+                "effect_counter",
+                {
+                    "actor_name": actor.name,
+                    "skill_name": skill.get("name", "反击"),
+                    "target_name": target.name,
+                    "counter_dmg": counter_dmg,
+                },
+            )
         )
         state["engine"]._try_survive(target, state["log"])
         return 0.0
@@ -518,8 +529,17 @@ class CombatEngine:
         heal_percent = skill.get("heal_percent", value)
         heal = max(1, int(actor.max_hp * heal_percent))
         actor.hp = min(actor.max_hp, actor.hp + heal)
+        # Via engine._narrative to keep the RNG state save/restore (see
+        # _handler_counter); skill-name fallback resolved into a variable.
         state["log"].append(
-            f"{actor.name} 触发【{skill.get('name', '治疗')}】，恢复 {heal} 气血！"
+            state["engine"]._narrative(
+                "effect_heal",
+                {
+                    "actor_name": actor.name,
+                    "skill_name": skill.get("name", "治疗"),
+                    "heal": heal,
+                },
+            )
         )
         return 0.0
 
@@ -565,8 +585,17 @@ class CombatEngine:
         )
         applied = state["engine"]._apply_status_effect(target, effect)
         if applied:
+            # Via engine._narrative to keep the RNG state save/restore (see
+            # _handler_counter); skill-name fallback resolved into a variable.
             state["log"].append(
-                f"{actor.name} 使【{skill.get('name', 'dot')}】附着于 {target.name}"
+                state["engine"]._narrative(
+                    "effect_dot_attach",
+                    {
+                        "actor_name": actor.name,
+                        "skill_name": skill.get("name", "dot"),
+                        "target_name": target.name,
+                    },
+                )
             )
         return 0.0
 
@@ -643,8 +672,14 @@ class CombatEngine:
             # Cap rejection must not be logged as a successful application
             # (review fix: truthful battle log).
             log.append(
-                f"{actor.name} 的【{effect.source_name}】未生效："
-                f"同类效果已达叠加上限（{self._status_stack_cap}）"
+                self._narrative(
+                    "effect_stack_cap_rejected",
+                    {
+                        "actor_name": actor.name,
+                        "effect_name": effect.source_name,
+                        "stack_cap": self._status_stack_cap,
+                    },
+                )
             )
 
     @staticmethod
@@ -696,7 +731,14 @@ class CombatEngine:
         """Handle survive: grant lethal-protection charges for this battle."""
         actor.survive_charges += skill.get("survive_count", 1)
         actor.survive_recovery = skill.get("survive_recovery", actor.survive_recovery)
-        state["log"].append(f"{actor.name} 获得【{skill.get('name', '免死')}】庇护！")
+        # Via engine._narrative to keep the RNG state save/restore (see
+        # _handler_counter); skill-name fallback resolved into a variable.
+        state["log"].append(
+            state["engine"]._narrative(
+                "effect_survive_grant",
+                {"actor_name": actor.name, "skill_name": skill.get("name", "免死")},
+            )
+        )
         return 0.0
 
     EFFECT_HANDLERS: dict[str, Callable] = {
@@ -805,7 +847,14 @@ class CombatEngine:
                 )
                 fighter.hp -= dmg
                 log.append(
-                    f"{fighter.name} 受【{effect.source_name}】侵蚀，损失 {dmg} 气血！"
+                    self._narrative(
+                        "effect_dot_tick",
+                        {
+                            "name": fighter.name,
+                            "effect_name": effect.source_name,
+                            "dot_dmg": dmg,
+                        },
+                    )
                 )
                 # Lethal dots consume survive charges like any damage source
                 # (review fix: funnel through _try_survive).

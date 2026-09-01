@@ -990,9 +990,16 @@ class DatabaseExtended:
             return None
 
     async def update_bank_account(
-        self, user_id: str, balance: int, last_interest_time: int
+        self, user_id: str, balance: int, last_interest_time: int, commit: bool = True
     ):
-        """更新或创建银行账户"""
+        """更新或创建银行账户
+
+        Args:
+            user_id: 用户ID
+            balance: 账户余额
+            last_interest_time: 上次利息结算时间戳
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         await self.conn.execute(
             """
             INSERT INTO bank_accounts (user_id, balance, last_interest_time)
@@ -1003,7 +1010,8 @@ class DatabaseExtended:
             """,
             (user_id, balance, last_interest_time),
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
     # ===== Phase 2: 悬赏令系统 CRUD =====
 
@@ -1258,31 +1266,57 @@ class DatabaseExtended:
         borrowed_at: int,
         due_at: int,
         loan_type: str = "normal",
+        commit: bool = True,
     ) -> int:
-        """创建贷款记录"""
+        """创建贷款记录
+
+        Args:
+            user_id: 用户ID
+            principal: 本金
+            interest_rate: 日利率
+            borrowed_at: 借出时间戳
+            due_at: 到期时间戳
+            loan_type: 贷款类型 (normal/breakthrough)
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback。
+                last_insert_rowid() 是连接级状态，查询保持原位随事务内执行，
+                与是否提交无关（design D2）
+        """
         await self.conn.execute(
             """INSERT INTO bank_loans (user_id, principal, interest_rate, borrowed_at, due_at, status, loan_type)
                VALUES (?, ?, ?, ?, ?, 'active', ?)""",
             (user_id, principal, interest_rate, borrowed_at, due_at, loan_type),
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
         async with self.conn.execute("SELECT last_insert_rowid()") as cursor:
             row = await cursor.fetchone()
             return row[0] if row else 0
 
-    async def close_loan(self, loan_id: int):
-        """关闭贷款（标记为已还清）"""
+    async def close_loan(self, loan_id: int, commit: bool = True):
+        """关闭贷款（标记为已还清）
+
+        Args:
+            loan_id: 贷款记录ID
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         await self.conn.execute(
             "UPDATE bank_loans SET status = 'closed' WHERE id = ?", (loan_id,)
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
-    async def mark_loan_overdue(self, loan_id: int):
-        """标记贷款逾期"""
+    async def mark_loan_overdue(self, loan_id: int, commit: bool = True):
+        """标记贷款逾期
+
+        Args:
+            loan_id: 贷款记录ID
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         await self.conn.execute(
             "UPDATE bank_loans SET status = 'overdue' WHERE id = ?", (loan_id,)
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
     async def get_overdue_loans(self, current_time: int) -> list[dict]:
         """获取所有逾期贷款"""
@@ -1316,14 +1350,26 @@ class DatabaseExtended:
         balance_after: int,
         description: str,
         created_at: int,
+        commit: bool = True,
     ):
-        """添加银行交易流水"""
+        """添加银行交易流水
+
+        Args:
+            user_id: 用户ID
+            trans_type: 交易类型
+            amount: 变动金额（存为正、取为负）
+            balance_after: 交易后余额
+            description: 交易描述
+            created_at: 交易时间戳
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         await self.conn.execute(
             """INSERT INTO bank_transactions (user_id, trans_type, amount, balance_after, description, created_at)
                VALUES (?, ?, ?, ?, ?, ?)""",
             (user_id, trans_type, amount, balance_after, description, created_at),
         )
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
     async def get_bank_transactions(self, user_id: str, limit: int = 20) -> list[dict]:
         """获取用户银行交易流水"""

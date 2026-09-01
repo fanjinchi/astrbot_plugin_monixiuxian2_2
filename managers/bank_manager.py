@@ -124,7 +124,7 @@ class BankManager:
                 )
 
             player.gold -= amount
-            await self.db.update_player(player)
+            await self.db.update_player(player, commit=False)
 
             new_balance = current_balance + amount
             now = int(time.time())
@@ -132,10 +132,11 @@ class BankManager:
                 player.user_id,
                 new_balance,
                 now if current_balance == 0 else bank_data["last_interest_time"],
+                commit=False,
             )
 
             await self._add_transaction(
-                player.user_id, "deposit", amount, new_balance, "存入灵石"
+                player.user_id, "deposit", amount, new_balance, "存入灵石", commit=False
             )
 
             await self.db.conn.commit()
@@ -160,14 +161,22 @@ class BankManager:
 
             new_balance = bank_data["balance"] - amount
             await self.db.ext.update_bank_account(
-                player.user_id, new_balance, bank_data["last_interest_time"]
+                player.user_id,
+                new_balance,
+                bank_data["last_interest_time"],
+                commit=False,
             )
 
             player.gold += amount
-            await self.db.update_player(player)
+            await self.db.update_player(player, commit=False)
 
             await self._add_transaction(
-                player.user_id, "withdraw", -amount, new_balance, "取出灵石"
+                player.user_id,
+                "withdraw",
+                -amount,
+                new_balance,
+                "取出灵石",
+                commit=False,
             )
 
             await self.db.conn.commit()
@@ -270,11 +279,17 @@ class BankManager:
             due_at = now + duration_days * 86400
 
             await self.db.ext.create_loan(
-                player.user_id, amount, interest_rate, now, due_at, loan_type
+                player.user_id,
+                amount,
+                interest_rate,
+                now,
+                due_at,
+                loan_type,
+                commit=False,
             )
 
             player.gold += amount
-            await self.db.update_player(player)
+            await self.db.update_player(player, commit=False)
 
             bank_data = await self.db.ext.get_bank_account(player.user_id)
             balance = bank_data["balance"] if bank_data else 0
@@ -284,6 +299,7 @@ class BankManager:
                 amount,
                 balance,
                 f"{type_name}：借入{amount:,}灵石",
+                commit=False,
             )
 
             total_interest = int(amount * interest_rate * duration_days)
@@ -328,9 +344,9 @@ class BankManager:
                 )
 
             player.gold -= total_due
-            await self.db.update_player(player)
+            await self.db.update_player(player, commit=False)
 
-            await self.db.ext.close_loan(loan_info["id"])
+            await self.db.ext.close_loan(loan_info["id"], commit=False)
 
             bank_data = await self.db.ext.get_bank_account(player.user_id)
             balance = bank_data["balance"] if bank_data else 0
@@ -340,6 +356,7 @@ class BankManager:
                 -total_due,
                 balance,
                 f"还款：本金{loan_info['principal']:,}+利息{loan_info['current_interest']:,}",
+                commit=False,
             )
 
             loan_type_name = (
@@ -404,11 +421,16 @@ class BankManager:
         amount: int,
         balance_after: int,
         description: str,
+        commit: bool = True,
     ):
-        """添加交易流水"""
+        """添加交易流水
+
+        Args:
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+        """
         now = int(time.time())
         await self.db.ext.add_bank_transaction(
-            user_id, trans_type, amount, balance_after, description, now
+            user_id, trans_type, amount, balance_after, description, now, commit=commit
         )
 
     async def get_transactions(self, user_id: str, limit: int = 20) -> list[dict]:

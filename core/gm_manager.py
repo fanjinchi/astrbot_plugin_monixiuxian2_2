@@ -2,6 +2,7 @@
 
 import json
 import os
+import random
 import re
 import sys
 import time
@@ -57,6 +58,68 @@ if TYPE_CHECKING:
 
 # 日志文件大小阈值：500 MB
 LOG_MAX_SIZE_BYTES = 500 * 1024 * 1024
+
+# 「时间快进」字段覆盖清单（OpenSpec gm-test-time-and-rng-controls design D2
+# 显式枚举）。每条 = (回复域名, UPDATE 语句)，语句中的每个 ? 都以前移秒数填充。
+# 原则：只前移参与到期/冷却判定的时间戳；历史记录类时间戳（交易流水、日志、
+# 创建时间）一律不动。首版不覆盖的已知域见 design D2（丹药 buff、商店刷新、
+# 灵田、洞天/灵眼收取、双修请求过期等），均不阻碍冷却类测试主链路。
+# 约束：新增等待类冷却域时必须同步补充本清单与 GM 帮助文本（AGENTS.md §2）。
+_TIME_SKIP_RULES: tuple[tuple[str, str], ...] = (
+    (
+        "历练/秘境/宗门任务计划完成时间",
+        "UPDATE user_cd SET scheduled_time = scheduled_time - ? "
+        "WHERE type != 0 AND scheduled_time > 0",
+    ),
+    (
+        "闭关开始时间",
+        "UPDATE players SET cultivation_start_time = cultivation_start_time - ? "
+        "WHERE state = '修炼中' AND cultivation_start_time > 0",
+    ),
+    (
+        "决斗/切磋冷却",
+        "UPDATE combat_cooldowns SET last_duel_time = last_duel_time - ?, "
+        "last_spar_time = last_spar_time - ? "
+        "WHERE last_duel_time > 0 OR last_spar_time > 0",
+    ),
+    (
+        "双修冷却",
+        "UPDATE dual_cultivation SET last_dual_time = last_dual_time - ? "
+        "WHERE last_dual_time > 0",
+    ),
+    (
+        "进行中悬赏过期时间",
+        "UPDATE bounty_tasks SET expire_time = expire_time - ? WHERE status = 1",
+    ),
+    (
+        "贷款到期时间",
+        "UPDATE bank_loans SET due_at = due_at - ? WHERE status = 'active'",
+    ),
+    # system_config 的 value 为 TEXT：CAST 守卫只前移正整数时间戳，
+    # 非数值/已归零配置项不受影响（TEXT 列亲和性会把算回的结果存回文本）
+    (
+        "悬赏放弃冷却",
+        "UPDATE system_config "
+        "SET value = CAST(CAST(value AS INTEGER) - ? AS TEXT) "
+        "WHERE key LIKE 'bounty_abandon_cd_%' AND CAST(value AS INTEGER) > 0",
+    ),
+    (
+        "Boss/灵眼下次刷新时间",
+        "UPDATE system_config "
+        "SET value = CAST(CAST(value AS INTEGER) - ? AS TEXT) "
+        "WHERE key IN ('boss_next_spawn_time', 'spirit_eye_next_spawn_time') "
+        "AND CAST(value AS INTEGER) > 0",
+    ),
+    (
+        "传承挑战冷却",
+        "UPDATE impart_pk_cooldown SET failed_at = failed_at - ? WHERE failed_at > 0",
+    ),
+    (
+        "传承被夺保护期",
+        "UPDATE impart_snatch_protection SET snatched_at = snatched_at - ? "
+        "WHERE snatched_at > 0",
+    ),
+)
 
 
 def _is_at_component(component) -> bool:
@@ -122,6 +185,11 @@ class GMManager:
             "生成boss": self.cmd_spawn_boss,
             "生成Boss": self.cmd_spawn_boss,
             "生成BOSS": self.cmd_spawn_boss,
+            # 测试工具子命令（纯中文指令无大小写别名，参照「清除cd/清除CD」
+            # 先例——大小写别名仅为拉丁字母子命令存在）
+            "时间快进": self.cmd_time_skip,
+            "清除全部冷却": self.cmd_clear_all_cooldowns,
+            "随机种子": self.cmd_seed,
         }
 
     # ========== 通用工具 ==========
@@ -347,6 +415,13 @@ class GMManager:
             "\n"
             "👹 系统\n"
             "  生成Boss\n"
+            "\n"
+            "🧪 测试工具（⚠️ 仅限测试实例）\n"
+            "  时间快进 <秒> 确认 （全库到期类时间戳前移，不可逆；不唤醒睡眠中的定时任务，\n"
+            "    Boss/灵眼下轮醒来即触发，需要立即生成请用「生成Boss」；前移贷款到期会真实触发逾期追杀）\n"
+            "  清除全部冷却 [@玩家/ID] 确认 （忙碌/决斗切磋/双修/悬赏/传承/历练路线休整一键清零）\n"
+            "  随机种子 <整数> / 随机种子 重置 （进程级固定全局随机序列，同进程其他插件亦受影响；\n"
+            "    重置或重启进程恢复；与测试平台 deterministic+seed 同机制，后执行者生效）\n"
             "\n"
             "💡 目标玩家可省略，默认作用于发送者；\n"
             "💡 带 [] 的参数可省略，<> 为必填。"
@@ -1026,3 +1101,178 @@ class GMManager:
                 logger.warning(f"【GM管理器】广播Boss生成消息失败: {e}")
 
         return True, f"✅ 已生成世界Boss：{boss.boss_name}"
+
+    # ========== 测试工具子命令（仅限测试实例，见 design D1/D4/D5/D6） ==========
+
+    async def cmd_time_skip(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """时间快进：将枚举清单内的到期判定时间戳统一前移 N 秒（design D1/D2）。
+
+        直接改写数据库字段（与 cmd_force_adventure 改 scheduled_time 同一先例），
+        让业务逻辑在「时间已到」的真实状态下运行——不是绕过结算逻辑。
+        不承诺唤醒 asyncio.sleep 中的定时任务（Boss/灵眼循环下次醒来读到
+        已前移的刷新时间即触发）。前移不可逆，故沿用「确认」约定。
+        """
+        confirmed, remaining = self._pop_confirmation(args)
+        if not confirmed:
+            return (
+                False,
+                "⚠️ 时间快进 为破坏性操作（全库时间戳前移、不可逆），"
+                "请在命令末尾追加「确认」以执行。\n"
+                "例如：/修仙GM 时间快进 3600 确认",
+            )
+
+        seconds = self._parse_int(remaining.strip())
+        if seconds is None or seconds <= 0:
+            return (
+                False,
+                "❌ 秒数须为正整数，例如：/修仙GM 时间快进 3600 确认",
+            )
+
+        # 多表改写包在一个事务里，避免快进一半留下混合时间态
+        counts: list[tuple[str, int]] = []
+        await self.db.conn.execute("BEGIN IMMEDIATE")
+        try:
+            for label, sql in _TIME_SKIP_RULES:
+                params = (seconds,) * sql.count("?")
+                async with self.db.conn.execute(sql, params) as cursor:
+                    counts.append((label, max(cursor.rowcount, 0)))
+            await self.db.conn.commit()
+        except Exception:
+            await self.db.conn.rollback()
+            raise
+
+        detail = "\n".join(f"  {label}：{count} 条" for label, count in counts)
+        total = sum(count for _, count in counts)
+        return True, (
+            f"✅ 时间已快进 {seconds} 秒（共前移 {total} 条记录）：\n"
+            f"{detail}\n"
+            "⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（Boss/灵眼）不会被唤醒，"
+            "将在下次醒来时立即触发，需要立即生成请用「生成Boss」。"
+        )
+
+    async def cmd_clear_all_cooldowns(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """清除全部冷却：一键归零目标玩家全部冷却与忙碌状态（design D3）。
+
+        编排者：每域都走与既有子命令相同的清除路径（「清除CD」「清除悬赏」
+        「清除传承状态」的并集超集），保证「GM 清除后状态 == 正常到期后状态」，
+        避免第三套清除逻辑漂移。供测试用例首尾清洗状态。
+        每步清除都以"存在才写"为条件，无可清除状态时零副作用。
+        """
+        confirmed, remaining = self._pop_confirmation(args)
+        if not confirmed:
+            return (
+                False,
+                "⚠️ 清除全部冷却 为破坏性操作，请在命令末尾追加「确认」以执行。\n"
+                "例如：/修仙GM 清除全部冷却 @玩家 确认",
+            )
+
+        target_id, _ = self._resolve_target(
+            event, remaining, single_token_is_target=True
+        )
+        player = await self._get_player(target_id)
+        if not player:
+            return False, "❌ 目标玩家尚未踏入修仙之路！"
+
+        cleared: list[str] = []
+
+        # 1. 忙碌状态（同「清除CD」）：user_cd 与 player.state 双层同步复位
+        user_cd = await self.db.ext.get_user_cd(target_id)
+        if (user_cd and user_cd.type != UserStatus.IDLE) or player.state != "空闲":
+            await self.db.ext.set_user_free(target_id)
+            player.state = "空闲"
+            await self.db.update_player(player)
+            cleared.append("忙碌状态：1 条")
+
+        # 2. 决斗/切磋冷却清零（无 ext 方法，与 combat_handlers 一样直连 conn）
+        async with self.db.conn.execute(
+            "UPDATE combat_cooldowns SET last_duel_time = 0, last_spar_time = 0 "
+            "WHERE user_id = ? AND (last_duel_time > 0 OR last_spar_time > 0)",
+            (target_id,),
+        ) as cursor:
+            combat_cleared = cursor.rowcount
+        await self.db.conn.commit()
+        if combat_cleared:
+            cleared.append(f"决斗/切磋冷却：{combat_cleared} 条")
+
+        # 3. 双修冷却清零
+        async with self.db.conn.execute(
+            "UPDATE dual_cultivation SET last_dual_time = 0 "
+            "WHERE user_id = ? AND last_dual_time > 0",
+            (target_id,),
+        ) as cursor:
+            dual_cleared = cursor.rowcount
+        await self.db.conn.commit()
+        if dual_cleared:
+            cleared.append(f"双修冷却：{dual_cleared} 条")
+
+        # 4. 悬赏（同「清除悬赏」）：进行中悬赏移除 + 放弃冷却键置 "0"
+        # （db 层无 delete_system_config，过期时间戳写 "0" 即失效）
+        active = await self.db.ext.get_active_bounty(target_id)
+        if active:
+            await self.db.ext.cancel_bounty(target_id)
+            cleared.append(f"进行中悬赏：1 条（{active['bounty_name']}）")
+        cd_key = f"bounty_abandon_cd_{target_id}"
+        if await self.db.ext.get_system_config(cd_key):
+            await self.db.ext.set_system_config(cd_key, "0")
+            cleared.append("悬赏放弃冷却：1 条")
+
+        # 5. 传承（同「清除传承状态」）：挑战冷却 + 被夺保护期，不删除传承实例
+        pk_deleted = await self.db.ext.delete_impart_pk_cooldowns(target_id)
+        if pk_deleted:
+            cleared.append(f"传承挑战冷却：{pk_deleted} 条")
+        protection_deleted = await self.db.ext.delete_impart_snatch_protection(
+            target_id
+        )
+        if protection_deleted:
+            cleared.append(f"传承被夺保护期：{protection_deleted} 条")
+
+        # 6. 历练路线休整冷却（内存态不落库，同 cmd_force_adventure 的弹出方式）
+        if self.adventure_manager:
+            popped = self.adventure_manager._route_cooldowns.pop(target_id, None)
+            if popped:
+                cleared.append(f"历练路线休整冷却：{len(popped)} 条")
+
+        if not cleared:
+            return (
+                False,
+                f"❌ 【{player.user_name or target_id}】没有可清除的冷却状态！",
+            )
+        detail = "\n".join(f"  {line}" for line in cleared)
+        return True, (
+            f"✅ 已清除【{player.user_name or target_id}】的全部冷却状态：\n{detail}"
+        )
+
+    async def cmd_seed(self, event: "AstrMessageEvent", args: str) -> tuple[bool, str]:
+        """随机种子：为当前进程注入固定全局随机种子（design D4/D5）。
+
+        非破坏性（不改数据、可重置、进程重启自愈），不要求「确认」；
+        种子状态不持久化——杜绝测试种子泄漏到生产会话的残留风险，
+        也因此不提供"种子查询"（回复与审计日志即状态记录）。
+        """
+        token = args.strip()
+        if token == "重置":
+            random.seed()
+            return True, (
+                "✅ 已恢复系统熵随机源，后续随机行为不再按固定序列产出。\n"
+                "⚠️ 仅限测试场景使用。"
+            )
+
+        value = self._parse_int(token)
+        if value is None:
+            return False, (
+                "❌ 参数错误：/修仙GM 随机种子 <整数> 设定固定种子，"
+                "或 /修仙GM 随机种子 重置 恢复随机。"
+            )
+
+        random.seed(value)
+        return True, (
+            f"✅ 已设定全局随机种子：{value}\n"
+            "⚠️ 仅限测试场景：进程级生效——同进程所有使用全局 random 的组件"
+            "（含宿主其他插件）都进入固定序列；「随机种子 重置」或重启进程即恢复。\n"
+            "💡 与测试平台 deterministic+seed 同机制（双方都重置全局种子），"
+            "后执行者生效：平台用例开启 deterministic 时会在每次 send 前覆盖 GM 种子。"
+        )

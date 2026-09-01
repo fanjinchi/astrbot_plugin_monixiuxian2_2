@@ -1,18 +1,29 @@
 """Tests for GMManager."""
 
 import json
+import random
 import tempfile
+import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import pytest_asyncio
 
-from tests.helpers import load_module
+from tests.helpers import load_module, load_package_module
 
 # Load gm_manager without triggering the plugin's __init__.py chain
 _mod = load_module("gm_manager", "core/gm_manager.py")
 GMManager = _mod.GMManager
 LOG_MAX_SIZE_BYTES = _mod.LOG_MAX_SIZE_BYTES
+
+_migration_mod = load_module("migration_gm_test", "data/migration.py")
+MigrationManager = _migration_mod.MigrationManager
+
+_data_mod = load_package_module(
+    "data/data_manager.py", "astrbot_plugin_monixiuxian2_2.data.data_manager"
+)
+DataBase = _data_mod.DataBase
 
 
 class At(MagicMock):
@@ -872,3 +883,432 @@ async def test_clear_legacy_all_and_by_id(gm_manager, mock_db):
     # 空持有拒绝
     ok, msg = await gm_manager.cmd_clear_legacy(make_event(sender_id="900000002"), "")
     assert not ok and "未持有任何传承" in msg
+
+
+# ===== GM 测试工具子命令（时间快进 / 清除全部冷却 / 随机种子） =====
+# OpenSpec change: gm-test-time-and-rng-controls
+
+
+@pytest_asyncio.fixture
+async def real_db():
+    """Provide a migrated in-memory database and close it after the test."""
+    database = DataBase(":memory:")
+    await database.connect()
+    await MigrationManager(database.conn, MagicMock()).migrate()
+    yield database
+    await database.close()
+
+
+@pytest_asyncio.fixture
+async def gm_real_db(real_db, mock_config_manager, plugin_data_dir):
+    """GMManager backed by a real in-memory DB; peripheral managers stay mocked."""
+    adventure = MagicMock()
+    adventure._route_cooldowns = {}
+    return GMManager(
+        db=real_db,
+        config_manager=mock_config_manager,
+        storage_ring_manager=MagicMock(),
+        equipment_manager=MagicMock(),
+        adventure_manager=adventure,
+        rift_manager=None,
+        boss_manager=None,
+        bounty_manager=None,
+        plugin_data_path=plugin_data_dir,
+    )
+
+
+async def _seed_time_skip_domains(db, now):
+    """Insert one covered row per 时间快进 domain plus control rows that must
+    stay untouched (IDLE user_cd, non-cultivating player, inactive records,
+    non-numeric system_config value)."""
+    await db.ext.set_user_busy("u_adv", 2, now + 3600)  # 历练中
+    await db.ext.set_user_free("u_idle")  # IDLE 行 scheduled_time=0，不应前移
+    await db.conn.execute(
+        "INSERT INTO players (user_id, user_name, state, cultivation_start_time) "
+        "VALUES ('u_cult', '闭关道友', '修炼中', ?)",
+        (now - 60,),
+    )
+    await db.conn.execute(
+        "INSERT INTO players (user_id, user_name, state, cultivation_start_time) "
+        "VALUES ('u_free', '闲云野鹤', '空闲', ?)",
+        (now - 60,),
+    )
+    await db.conn.execute(
+        "INSERT INTO combat_cooldowns (user_id, last_duel_time, last_spar_time) "
+        "VALUES ('u_pvp', ?, ?)",
+        (now - 100, now - 50),
+    )
+    await db.conn.execute(
+        "INSERT INTO dual_cultivation (user_id, last_dual_time) VALUES ('u_dual', ?)",
+        (now - 200,),
+    )
+    await db.conn.execute(
+        "INSERT INTO bounty_tasks (user_id, bounty_id, bounty_name, target_type, "
+        "target_count, rewards, start_time, expire_time, status) "
+        "VALUES ('u_bounty', 301, '后山巡视', 'adventure', 3, '{}', ?, ?, 1)",
+        (now - 10, now + 7200),
+    )
+    await db.conn.execute(
+        "INSERT INTO bounty_tasks (user_id, bounty_id, bounty_name, target_type, "
+        "target_count, rewards, start_time, expire_time, status) "
+        "VALUES ('u_bounty_done', 302, '已结算悬赏', 'adventure', 1, '{}', ?, ?, 0)",
+        (now - 5000, now - 4000),
+    )
+    await db.conn.execute(
+        "INSERT INTO bank_loans (user_id, principal, borrowed_at, due_at, status) "
+        "VALUES ('u_loan', 1000, ?, ?, 'active')",
+        (now - 1000, now + 86400),
+    )
+    await db.conn.execute(
+        "INSERT INTO bank_loans (user_id, principal, borrowed_at, due_at, status) "
+        "VALUES ('u_repaid', 1000, ?, ?, 'repaid')",
+        (now - 9000, now - 8000),
+    )
+    await db.ext.set_system_config("bounty_abandon_cd_u_bounty", str(now + 1800))
+    await db.ext.set_system_config("boss_next_spawn_time", str(now + 600))
+    # 已过期字段：前移只会更深地留在过去，不会倒排到未来
+    await db.ext.set_system_config("spirit_eye_next_spawn_time", str(now - 100))
+    await db.ext.set_system_config("unrelated_key", "not_a_timestamp")
+    await db.conn.execute(
+        "INSERT INTO impart_pk_cooldown (challenger_id, target_id, failed_at) "
+        "VALUES ('u_challenger', 'u_target', ?)",
+        (now - 300,),
+    )
+    await db.conn.execute(
+        "INSERT INTO impart_snatch_protection (user_id, snatched_at) "
+        "VALUES ('u_snatched', ?)",
+        (now - 400,),
+    )
+    await db.conn.commit()
+
+
+class TestTimeSkip:
+    """GM「时间快进」：确认约定、参数校验、逐域前移量与回复条数。"""
+
+    @pytest.mark.asyncio
+    async def test_requires_confirmation_with_zero_side_effects(
+        self, gm_real_db, real_db
+    ):
+        now = int(time.time())
+        await _seed_time_skip_domains(real_db, now)
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_real_db.cmd_time_skip(event, "3600")
+
+        assert success is False
+        assert "确认" in msg
+        cd = await real_db.ext.get_user_cd("u_adv")
+        assert cd.scheduled_time == now + 3600
+        assert await real_db.ext.get_system_config("boss_next_spawn_time") == str(
+            now + 600
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("bad", ["abc", "0", "-5", "3.5", ""])
+    async def test_invalid_seconds_rejected(self, gm_real_db, real_db, bad):
+        now = int(time.time())
+        await _seed_time_skip_domains(real_db, now)
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_real_db.cmd_time_skip(event, f"{bad} 确认")
+
+        assert success is False
+        assert "正整数" in msg
+        cd = await real_db.ext.get_user_cd("u_adv")
+        assert cd.scheduled_time == now + 3600
+
+    @pytest.mark.asyncio
+    async def test_skip_shifts_all_domains(self, gm_real_db, real_db):
+        now = int(time.time())
+        await _seed_time_skip_domains(real_db, now)
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_real_db.cmd_time_skip(event, "3600 确认")
+        assert success is True
+
+        # user_cd：忙碌记录前移，IDLE 记录不动
+        cd = await real_db.ext.get_user_cd("u_adv")
+        assert cd.scheduled_time == now + 3600 - 3600
+        idle = await real_db.ext.get_user_cd("u_idle")
+        assert idle.scheduled_time == 0
+
+        # players：仅闭关（修炼中）玩家前移
+        async with real_db.conn.execute(
+            "SELECT state, cultivation_start_time FROM players "
+            "WHERE user_id IN ('u_cult', 'u_free')"
+        ) as cur:
+            rows = {r[0]: r[1] async for r in cur}
+        assert rows["修炼中"] == now - 60 - 3600
+        assert rows["空闲"] == now - 60
+
+        # combat_cooldowns：两个字段同时前移
+        async with real_db.conn.execute(
+            "SELECT last_duel_time, last_spar_time FROM combat_cooldowns "
+            "WHERE user_id = 'u_pvp'"
+        ) as cur:
+            duel, spar = await cur.fetchone()
+        assert duel == now - 100 - 3600
+        assert spar == now - 50 - 3600
+
+        # 双修冷却
+        async with real_db.conn.execute(
+            "SELECT last_dual_time FROM dual_cultivation WHERE user_id = 'u_dual'"
+        ) as cur:
+            (dual_time,) = await cur.fetchone()
+        assert dual_time == now - 200 - 3600
+
+        # bounty_tasks：仅进行中（status=1）前移
+        async with real_db.conn.execute(
+            "SELECT user_id, expire_time FROM bounty_tasks"
+        ) as cur:
+            bounties = {r[0]: r[1] async for r in cur}
+        assert bounties["u_bounty"] == now + 7200 - 3600
+        assert bounties["u_bounty_done"] == now - 4000
+
+        # bank_loans：仅 active 前移
+        async with real_db.conn.execute(
+            "SELECT user_id, due_at FROM bank_loans"
+        ) as cur:
+            loans = {r[0]: r[1] async for r in cur}
+        assert loans["u_loan"] == now + 86400 - 3600
+        assert loans["u_repaid"] == now - 8000
+
+        # system_config 三键；非时间戳键不动；已过期字段不倒排到未来
+        assert await real_db.ext.get_system_config("bounty_abandon_cd_u_bounty") == str(
+            now + 1800 - 3600
+        )
+        assert await real_db.ext.get_system_config("boss_next_spawn_time") == str(
+            now + 600 - 3600
+        )
+        eye = int(await real_db.ext.get_system_config("spirit_eye_next_spawn_time"))
+        assert eye == now - 100 - 3600 < now
+        assert await real_db.ext.get_system_config("unrelated_key") == "not_a_timestamp"
+
+        # 传承：挑战冷却与被夺保护期
+        failed_at = await real_db.ext.get_impart_pk_cooldown("u_challenger", "u_target")
+        assert failed_at == now - 300 - 3600
+        snatched_at = await real_db.ext.get_impart_snatch_protection("u_snatched")
+        assert snatched_at == now - 400 - 3600
+
+        # 回复逐域列出前移条数
+        for fragment in (
+            "历练/秘境/宗门任务计划完成时间：1 条",
+            "闭关开始时间：1 条",
+            "决斗/切磋冷却：1 条",
+            "双修冷却：1 条",
+            "进行中悬赏过期时间：1 条",
+            "贷款到期时间：1 条",
+            "悬赏放弃冷却：1 条",
+            "Boss/灵眼下次刷新时间：2 条",
+            "传承挑战冷却：1 条",
+            "传承被夺保护期：1 条",
+            "共前移 11 条",
+        ):
+            assert fragment in msg
+
+    def test_commands_registered(self, gm_manager):
+        assert gm_manager._commands["时间快进"] == gm_manager.cmd_time_skip
+        assert (
+            gm_manager._commands["清除全部冷却"] == gm_manager.cmd_clear_all_cooldowns
+        )
+        assert gm_manager._commands["随机种子"] == gm_manager.cmd_seed
+
+
+async def _seed_clear_all_domains(db, uid, now):
+    """Preset every clearable cooldown domain for the target player."""
+    await db.conn.execute(
+        "INSERT INTO players (user_id, user_name, state) VALUES (?, '道友', '历练中')",
+        (uid,),
+    )
+    await db.ext.set_user_busy(uid, 2, now + 3600)  # 历练中
+    await db.conn.execute(
+        "INSERT INTO combat_cooldowns (user_id, last_duel_time, last_spar_time) "
+        "VALUES (?, ?, ?)",
+        (uid, now - 10, now - 5),
+    )
+    await db.conn.execute(
+        "INSERT INTO dual_cultivation (user_id, last_dual_time) VALUES (?, ?)",
+        (uid, now - 30),
+    )
+    await db.ext.create_bounty(uid, 301, "后山巡视", "adventure", 3, "{}", now + 7200)
+    await db.ext.set_system_config(f"bounty_abandon_cd_{uid}", str(now + 1800))
+    await db.ext.upsert_impart_pk_cooldown(uid, "someone", now - 60)
+    await db.ext.upsert_impart_snatch_protection(uid, now - 120)
+    await db.conn.commit()
+
+
+class TestClearAllCooldowns:
+    """GM「清除全部冷却」：确认约定、逐域归零、空状态提示。"""
+
+    @pytest.mark.asyncio
+    async def test_requires_confirmation_with_zero_side_effects(
+        self, gm_real_db, real_db
+    ):
+        uid = "900000002"
+        now = int(time.time())
+        await _seed_clear_all_domains(real_db, uid, now)
+        gm_real_db.adventure_manager._route_cooldowns[uid] = {"route_a": now + 300}
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_real_db.cmd_clear_all_cooldowns(event, uid)
+
+        assert success is False
+        assert "确认" in msg
+        cd = await real_db.ext.get_user_cd(uid)
+        assert cd.type != 0
+        assert (await real_db.ext.get_active_bounty(uid)) is not None
+        assert uid in gm_real_db.adventure_manager._route_cooldowns
+
+    @pytest.mark.asyncio
+    async def test_clears_all_domains(self, gm_real_db, real_db):
+        uid = "900000002"
+        now = int(time.time())
+        await _seed_clear_all_domains(real_db, uid, now)
+        gm_real_db.adventure_manager._route_cooldowns[uid] = {"route_a": now + 300}
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_real_db.cmd_clear_all_cooldowns(event, f"{uid} 确认")
+        assert success is True
+
+        # user_cd 空闲 + player.state 同步复位
+        cd = await real_db.ext.get_user_cd(uid)
+        assert cd.type == 0
+        player = await real_db.get_player_by_id(uid)
+        assert player.state == "空闲"
+
+        # 决斗/切磋可立即发起
+        async with real_db.conn.execute(
+            "SELECT last_duel_time, last_spar_time FROM combat_cooldowns "
+            "WHERE user_id = ?",
+            (uid,),
+        ) as cur:
+            duel, spar = await cur.fetchone()
+        assert duel == 0 and spar == 0
+
+        # 双修冷却归零
+        async with real_db.conn.execute(
+            "SELECT last_dual_time FROM dual_cultivation WHERE user_id = ?", (uid,)
+        ) as cur:
+            (dual_time,) = await cur.fetchone()
+        assert dual_time == 0
+
+        # 悬赏可立即接取：无进行中悬赏 + 放弃冷却置 "0"
+        assert (await real_db.ext.get_active_bounty(uid)) is None
+        assert await real_db.ext.get_system_config(f"bounty_abandon_cd_{uid}") == "0"
+
+        # 传承挑战冷却/被夺保护期删除
+        assert (await real_db.ext.get_impart_pk_cooldown(uid, "someone")) is None
+        assert (await real_db.ext.get_impart_snatch_protection(uid)) is None
+
+        # 历练路线休整冷却（内存）弹出
+        assert uid not in gm_real_db.adventure_manager._route_cooldowns
+
+        for fragment in (
+            "忙碌状态：1 条",
+            "决斗/切磋冷却：1 条",
+            "双修冷却：1 条",
+            "进行中悬赏：1 条（后山巡视）",
+            "悬赏放弃冷却：1 条",
+            "传承挑战冷却：1 条",
+            "传承被夺保护期：1 条",
+            "历练路线休整冷却：1 条",
+        ):
+            assert fragment in msg
+
+    @pytest.mark.asyncio
+    async def test_nothing_to_clear(self, gm_real_db, real_db):
+        uid = "900000003"
+        await real_db.conn.execute(
+            "INSERT INTO players (user_id, user_name, state) "
+            "VALUES (?, '闲人', '空闲')",
+            (uid,),
+        )
+        await real_db.conn.commit()
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_real_db.cmd_clear_all_cooldowns(event, f"{uid} 确认")
+
+        assert success is False
+        assert "没有可清除" in msg
+        # 无副作用：不生成任何悬赏冷却键或 user_cd 行
+        assert (await real_db.ext.get_system_config(f"bounty_abandon_cd_{uid}")) is None
+        assert (await real_db.ext.get_user_cd(uid)) is None
+
+
+@pytest.fixture
+def restore_random():
+    """Reset global RNG entropy after each seed test so a fixed sequence never
+    leaks into other tests (种子不持久化约定在测试侧的镜像)。"""
+    yield
+    random.seed()
+
+
+class TestSeed:
+    """GM「随机种子」：固定可复现、重置恢复、非法参数保持随机状态。"""
+
+    @pytest.mark.asyncio
+    async def test_fixed_seed_reproducible(self, gm_manager, restore_random):
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_seed(event, "42")
+        assert success is True
+        assert "42" in msg
+        assert "仅限测试场景" in msg and "进程级" in msg
+
+        seq1 = [random.random() for _ in range(8)]
+        await gm_manager.cmd_seed(event, "42")
+        seq2 = [random.random() for _ in range(8)]
+        assert seq1 == seq2
+
+    @pytest.mark.asyncio
+    async def test_reset_restores_entropy(self, gm_manager, restore_random):
+        event = make_event(sender_id="gm_001")
+        await gm_manager.cmd_seed(event, "42")
+        fixed_seq = [random.random() for _ in range(8)]
+
+        success, msg = await gm_manager.cmd_seed(event, "重置")
+        assert success is True
+        assert "系统熵" in msg
+
+        seq = [random.random() for _ in range(8)]
+        # 重置后不再按固定序列产出（8 个 53-bit 浮点全相同的概率可忽略）
+        assert seq != fixed_seq
+
+    @pytest.mark.asyncio
+    async def test_invalid_param_keeps_random_state(self, gm_manager, restore_random):
+        event = make_event(sender_id="gm_001")
+        await gm_manager.cmd_seed(event, "123")
+        state_before = random.getstate()
+
+        success, msg = await gm_manager.cmd_seed(event, "abc")
+        assert success is False
+        assert "参数错误" in msg
+        assert random.getstate() == state_before
+
+        success, _ = await gm_manager.cmd_seed(event, "")
+        assert success is False
+        assert random.getstate() == state_before
+
+    @pytest.mark.asyncio
+    async def test_seed_logged_via_dispatch(
+        self, gm_manager, plugin_data_dir, restore_random
+    ):
+        event = make_event(sender_id="gm_001")
+        success, _ = await gm_manager.dispatch("gm_001", event, "随机种子", "42")
+        assert success is True
+
+        content = (
+            (plugin_data_dir / "gm_operations.log").read_text(encoding="utf-8").strip()
+        )
+        entry = json.loads(content)
+        assert entry["command"] == "随机种子"
+        assert entry["args"] == "42"
+        assert entry["gm_user_id"] == "gm_001"
+        assert entry["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_help_lists_test_commands(self, gm_manager):
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_help(event, "")
+        assert success is True
+        for fragment in ("时间快进", "清除全部冷却", "随机种子", "仅限测试实例"):
+            assert fragment in msg

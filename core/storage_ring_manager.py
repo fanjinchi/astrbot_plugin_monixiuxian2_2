@@ -109,7 +109,11 @@ class StorageRingManager:
         """将物品存入储物戒（带事务保护）
 
         Args:
-            external_transaction: 如果为True，表示外部已有事务，跳过内部事务管理
+            external_transaction: 如果为True，表示外部已有事务，跳过内部事务管理。
+                True 时要求外层事务入口已在 BEGIN IMMEDIATE 写锁内重取过 player
+                （如 shop_handler.handle_buy），本方法直接作用于传入的 player 对象、
+                不再内部重取——写锁内无并发写者，二次重取会产生第二个 player 对象，
+                物品写入新对象后会被外层用旧对象整行写回覆盖（购买丢货扣钱 bug 根因）。
         """
         can_store, reason = self.can_store_item(item_name)
         if not can_store:
@@ -118,12 +122,13 @@ class StorageRingManager:
         if not external_transaction:
             await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
-            fresh_player = await self.db.get_player_by_id(player.user_id)
-            if not fresh_player:
-                if not external_transaction:
+            if not external_transaction:
+                # 独立调用路径：BEGIN 后重取，保证在写锁内读到最新数据
+                fresh_player = await self.db.get_player_by_id(player.user_id)
+                if not fresh_player:
                     await self.db.conn.rollback()
-                return False, "玩家不存在或已被删除"
-            player = fresh_player
+                    return False, "玩家不存在或已被删除"
+                player = fresh_player
             items = player.get_storage_ring_items()
 
             if item_name not in items:
@@ -136,7 +141,7 @@ class StorageRingManager:
 
             items[item_name] = items.get(item_name, 0) + count
             player.set_storage_ring_items(items)
-            await self.db.update_player(player)
+            await self.db.update_player(player, commit=False)
             if not external_transaction:
                 await self.db.conn.commit()
 
@@ -184,7 +189,7 @@ class StorageRingManager:
                 items[item_name] = current_count - count
 
             player.set_storage_ring_items(items)
-            await self.db.update_player(player)
+            await self.db.update_player(player, commit=False)
             await self.db.conn.commit()
 
             capacity = self.get_ring_capacity(player.storage_ring)
@@ -223,7 +228,7 @@ class StorageRingManager:
                 discard_count = count
 
             player.set_storage_ring_items(items)
-            await self.db.update_player(player)
+            await self.db.update_player(player, commit=False)
             await self.db.conn.commit()
 
             capacity = self.get_ring_capacity(player.storage_ring)

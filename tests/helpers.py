@@ -5,6 +5,7 @@ pytest discovers tests from the AstrBot project root. This loader uses
 importlib.util so each module is loaded without its package __init__.
 """
 
+import importlib
 import importlib.util
 import os
 import sys
@@ -13,8 +14,12 @@ from pathlib import Path
 
 # Determine the plugin root directory (two levels up from this file)
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
-if str(PLUGIN_ROOT) not in sys.path:
-    sys.path.insert(0, str(PLUGIN_ROOT))
+# PLUGIN_ROOT lets tests load modules by file path; its parent (data/plugins/)
+# makes the plugin importable as a namespace package so _ensure_package can
+# prefer the real package over a synthetic stub.
+for _p in (PLUGIN_ROOT, PLUGIN_ROOT.parent):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 
 def load_module(mod_name: str, rel_path: str):
@@ -38,9 +43,28 @@ def load_module(mod_name: str, rel_path: str):
 
 
 def _ensure_package(full_name: str, package_path: Path) -> None:
-    """Create an empty package module in sys.modules if absent."""
+    """Ensure ``full_name`` is importable in ``sys.modules``.
+
+    Prefers importing the real package: its ``__init__.py`` re-exports names
+    that other plugin modules rely on (e.g. ``from ..data import DataBase``).
+    Falls back to an empty synthetic package when the real ``__init__.py``
+    cannot be imported in the test environment (e.g. ``managers/__init__.py``
+    chains into imports that only resolve inside AstrBot). A bare synthetic
+    package would shadow the real one and break such imports with
+    "cannot import name ... (unknown location)" during collection whenever
+    load order put the synthetic stub first.
+
+    Args:
+        full_name: Dotted package name (e.g. ``"astrbot_plugin_monixiuxian2_2.data"``).
+        package_path: Filesystem path used as ``__path__`` for the synthetic fallback.
+    """
     if full_name in sys.modules:
         return
+    try:
+        importlib.import_module(full_name)
+        return
+    except Exception:
+        pass  # Real __init__ not importable here; use the synthetic stub.
     pkg = types.ModuleType(full_name)
     pkg.__path__ = [os.fspath(package_path)]
     sys.modules[full_name] = pkg

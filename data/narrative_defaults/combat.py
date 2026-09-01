@@ -3,14 +3,17 @@
 
 Every default text is copied verbatim from the original hard-coded strings in
 ``managers/combat_manager.py`` (``_resolve_attack`` sentence patterns,
-``_try_survive`` cheat-death line, battle frame opening/result closers, and
-skill-trigger/buff lines). Initial pools have length 1 (single-template str
-shape) so existing test assertions on the exact wording keep passing.
+``_try_survive`` cheat-death line, battle frame opening/result closers,
+skill-trigger/buff lines, the round header, and the effect-handler log lines).
+Initial pools have length 1 (single-template str shape) so existing test
+assertions on the exact wording keep passing.
 
 Numeric/structural lines intentionally stay in code (design D6): the fighter
-stat panel lines, the ``-- 第 N 回合 --`` round header, and the dot-tick /
+stat panel lines. The ``-- 第 N 回合 --`` round header and the dot-tick /
 counter / heal / dot-attach / survive-grant / stack-cap-rejection log lines in
-the effect handlers are outside this change's scope.
+the effect handlers are covered too — they were externalized by the follow-up
+change ``narrative-text-migration-leftovers`` (``round_header`` and the
+``effect_*`` scenes below).
 """
 
 # Verbatim copy rules (design D5): emoji, full/half-width punctuation, and the
@@ -30,6 +33,8 @@ SCENES: dict[str, object] = {
     "battle_draw_stalemate": "☆━━━━ 战斗胶着，双方罢手，平局！━━━━☆",
     # Fallback draw closer (defensive branch, not reachable in practice).
     "battle_draw": "☆━━━━ 平局！━━━━☆",
+    # Round header emitted every two actions (resolve_combat).
+    "round_header": "-- 第 {rounds} 回合 --",
     # --- Attack chain (CombatEngine._resolve_attack) ---
     # Stunned attacker loses the action.
     "stun_skip": "{name} 处于眩晕状态，无法出手！",
@@ -70,6 +75,24 @@ SCENES: dict[str, object] = {
     ),
     # damage_reduction trigger skill fired.
     "trigger_damage_reduction": "{actor_name} 触发【{skill_name}】，受到的伤害降低！",
+    # --- Effect handler / status log lines ---
+    # counter trigger effect: immediate retaliation damage (_handler_counter).
+    "effect_counter": (
+        "{actor_name} 触发【{skill_name}】反击，"
+        "对 {target_name} 造成 {counter_dmg} 点伤害！"
+    ),
+    # heal trigger effect: restore HP (_handler_heal).
+    "effect_heal": "{actor_name} 触发【{skill_name}】，恢复 {heal} 气血！",
+    # dot trigger effect: attach a per-round damage status (_handler_dot).
+    "effect_dot_attach": "{actor_name} 使【{skill_name}】附着于 {target_name}",
+    # buff/debuff/fatigue rejected by the stack cap (_attach_stat_status).
+    "effect_stack_cap_rejected": (
+        "{actor_name} 的【{effect_name}】未生效：同类效果已达叠加上限（{stack_cap}）"
+    ),
+    # survive trigger effect: grant lethal-protection charges (_handler_survive).
+    "effect_survive_grant": "{actor_name} 获得【{skill_name}】庇护！",
+    # dot ticks at round start (_tick_status_effects).
+    "effect_dot_tick": "{name} 受【{effect_name}】侵蚀，损失 {dot_dmg} 气血！",
 }
 
 # Declared interpolation variables per scene. Load-time contract validation
@@ -83,6 +106,7 @@ SCENE_VARS: dict[str, set[str]] = {
     "battle_victory": {"name"},
     "battle_draw_stalemate": set(),
     "battle_draw": set(),
+    "round_header": {"rounds"},
     "stun_skip": {"name"},
     "dodge": {"defender_name", "attacker_name"},
     "block": {"defender_name"},
@@ -100,4 +124,10 @@ SCENE_VARS: dict[str, set[str]] = {
     "trigger_attack_boost": {"actor_name", "skill_name"},
     "trigger_stun": {"actor_name", "skill_name", "target_name"},
     "trigger_damage_reduction": {"actor_name", "skill_name"},
+    "effect_counter": {"actor_name", "skill_name", "target_name", "counter_dmg"},
+    "effect_heal": {"actor_name", "skill_name", "heal"},
+    "effect_dot_attach": {"actor_name", "skill_name", "target_name"},
+    "effect_stack_cap_rejected": {"actor_name", "effect_name", "stack_cap"},
+    "effect_survive_grant": {"actor_name", "skill_name"},
+    "effect_dot_tick": {"name", "effect_name", "dot_dmg"},
 }

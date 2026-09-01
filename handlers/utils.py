@@ -174,14 +174,20 @@ async def _check_loan_status(db, player: Player) -> dict:
                 player_name = player.user_name or f"道友{player.user_id[:6]}"
 
                 # 删除玩家（级联删除所有关联数据）
-                await db.delete_player_cascade(player.user_id)
+                await db.delete_player_cascade(player.user_id, commit=False)
 
                 # 标记贷款逾期
-                await db.ext.mark_loan_overdue(loan["id"])
+                await db.ext.mark_loan_overdue(loan["id"], commit=False)
 
                 # 记录流水
                 await db.ext.add_bank_transaction(
-                    player.user_id, "bank_kill", 0, 0, "逾期未还款，被银行追杀致死", now
+                    player.user_id,
+                    "bank_kill",
+                    0,
+                    0,
+                    "逾期未还款，被银行追杀致死",
+                    now,
+                    commit=False,
                 )
 
                 await db.conn.commit()

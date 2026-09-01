@@ -75,6 +75,7 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
   2. 更新 `BUSY_STATE_ALLOWED_COMMANDS`（如需要）
   3. 在操作开始时写入 `user_cd` 表，结束时清除
   4. 同步更新 `player.state`
+- 若新增**等待类冷却域**（任何参与到期/冷却判定的时间戳字段，如新的周期活动、冷却表、system_config 到期键），必须同步 GM「时间快进」的字段覆盖清单（`core/gm_manager.py` 的 `_TIME_SKIP_RULES`）与 GM 帮助文本——否则新冷却不被快进覆盖，冷却类功能测试会隐性失败
 
 ### 3. 数据库操作规范
 

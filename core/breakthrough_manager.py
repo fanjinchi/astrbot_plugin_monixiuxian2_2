@@ -511,8 +511,12 @@ class BreakthroughManager:
         Returns:
             用于追加到突破成功消息的中文文案；无掉落时返回空字符串。
         """
+        # 传入全局 random 模块而非新建 random.Random()：roll_breakthrough_fortune
+        # 的 rng 参数为 duck-typed（仅用 random()/randint()），全局模块同为
+        # Mersenne Twister、分布完全不变，但由此纳入 GM「随机种子」与测试平台
+        # deterministic 的全局 seed 覆盖（design D4 收编例外）。
         result = roll_breakthrough_fortune(
-            random.Random(),
+            random,
             self.config_manager.game_config,
             new_level_index,
             list(self.config_manager.weapons_data.values()),
@@ -535,7 +539,15 @@ class BreakthroughManager:
                 player.set_storage_ring_items(items)
                 await self.db.update_player(player)
             else:
-                return f"🎁 机缘天降，获得【{item_name}】，但储物戒已满无法存入。"
+                # Storage ring is full: the drop is lost. Rendered through the
+                # narrative config (fortune.storage_full_drop) like the three
+                # sibling drop lines in format_fortune_message.
+                return render_narrative(
+                    self.config_manager,
+                    "fortune",
+                    "storage_full_drop",
+                    {"name": item_name},
+                )
 
         elif result["type"] == "pill":
             for item in result["items"]:

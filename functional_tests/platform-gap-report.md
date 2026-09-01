@@ -1,7 +1,7 @@
 # 网页测试平台能力差距报告
 
 > 对着 `astrbot_plugin_testplatform`（webtest）实际 REST 能力与首批功能测试用例需求整理。
-> 更新日期：2026-08-20。范围：`add-functional-test-suite` 第一批 28 条用例 + `add-sect-functional-tests` 9 条宗门用例 + `update-sect-functional-tests`（宗门指令统一后）新/改用例 + `adapt-pvp-effects-to-platform-v020`（PvP 随机效果用例 deterministic/seed 化）。映射平台 v0.2.0（`deterministic`/`seed`、`expect_not`、`combine`、one-shot 编排 CLI）。
+> 更新日期：2026-08-31。范围：`add-functional-test-suite` 第一批 28 条用例 + `add-sect-functional-tests` 9 条宗门用例 + `update-sect-functional-tests`（宗门指令统一后）新/改用例 + `adapt-pvp-effects-to-platform-v020`（PvP 随机效果用例 deterministic/seed 化）+ `gm-test-time-and-rng-controls`（插件侧 GM 时间快进/清除全部冷却/随机种子）。映射平台 v0.2.0（`deterministic`/`seed`、`expect_not`、`combine`、one-shot 编排 CLI）。
 
 ## Supported（可直接依赖）
 
@@ -28,12 +28,12 @@
 |---|---|---|---|
 | 群聊指令触发 | AstrBot 全局 `wake_prefix` 为 `#`，群聊必须带唤醒前缀 | 不带 `#` 时事件不会进入插件 Filter | 用例中所有群聊 `send` 统一加 `#` 前缀（已落地） |
 | GM 身份 | 由插件 `ACCESS_CONTROL.GM_ADMINS` 控制，平台只负责投递 `user_id` | 必须先在 AstrBot 插件配置中加入固定 GM ID 并重载插件 | 测试实例已把 `900000001` 加入 `GM_ADMINS`；随环境配置文档记录 |
-| 随机/概率效果验证 | 随机效果单次运行不保证触发；`deterministic`+`seed` 为尽力而为（宿主可能仍有异步活动耗掉 RNG） | 极端情况下同 seed 仍不可复现 | **PvP 20 个 sampled 效果用例已全部声明 `deterministic: true` + `seed: 42`**（seed 在每个 send 注入前重置，固定行为）；必要时 `--repeat N --fixture` 聚合文本证据，`_count_evidence` 统计触发次数；宗门随机池/事件用例同此策略；`--repeat` 仅在确定性不可靠时兑底 |
+| 随机/概率效果验证 | 随机效果单次运行不保证触发；`deterministic`+`seed` 为尽力而为（宿主可能仍有异步活动耗掉 RNG） | 极端情况下同 seed 仍不可复现 | **PvP 20 个 sampled 效果用例已全部声明 `deterministic: true` + `seed: 42`**（seed 在每个 send 注入前重置，固定行为）；必要时 `--repeat N --fixture` 聚合文本证据，`_count_evidence` 统计触发次数；宗门随机池/事件用例同此策略；`--repeat` 仅在确定性不可靠时兑底。**插件侧补充（`gm-test-time-and-rng-controls` 起）**：GM「随机种子 <整数>」为当前进程注入固定全局 `random.seed`（突破机缘轮盘等唯一未播种调用点已一并收编），「随机种子 重置」恢复系统熵；与平台 deterministic 同机制、后执行者生效——平台用例开 `deterministic: true` 时每次 send 前会覆盖 GM 种子，故 GM 种子适用于未开 deterministic 的用例与手动探测；进程级污染同进程其他插件，仅限独立测试实例 |
 | 技能/功法授予 | 平台无“直接授予已学技能”命令 | 只能通过聊天命令学习，路径长且随机 | fixture 脚本直接写 `player_skills` 表，固定 `skill_id` 与星级 |
 | 心法/功法装配 | 插件 GM `给予装备` 的 `_item_exists` 不识别 `heart_methods.json` | 无法用 GM 命令把心法放储物戒 | fixture 直接把 `长春功`/`疾风迅雷功` 写入 `storage_ring_items`；用例不再依赖 GM 给心法 |
 | `@` 目标选择 | 平台只注入 `Plain` 文本，没有结构化 `At` 消息段 | GM 命令无法走 `@目标` 分支 | 用例使用纯数字 ID 参数，走 `_resolve_target` 数字分支 |
 | 状态/DB 断言 | 平台只能断言“回复文本” | 不能直接查 DB 验证玩家属性/储物戒/`user_cd` | fixture 直接写库 + 战斗文本证据；GM 命令作为间接断言 |
-| 时间推进 | 平台无虚拟时钟/时间加速 | 闭关、历练、Boss 等长周期不可真实等待 | 用例只做“入口可达”冒烟；需要结算时用插件 GM 强制结算命令 |
+| 时间推进 | 平台无虚拟时钟/时间加速 | 闭关、历练、Boss 等长周期不可真实等待 | **插件侧已补齐（`gm-test-time-and-rng-controls` 起）**：GM「时间快进 <秒> 确认」将枚举的到期类时间戳（user_cd/闭关/决斗切磋/双修/悬赏/贷款/悬赏放弃冷却/Boss·灵眼下次刷新/传承冷却与保护期）全库前移，冷却与长周期等待立即到期；按玩家粒度清零用 GM「清除全部冷却 [@玩家/ID] 确认」（忙碌/战斗/双修/悬赏/传承/历练路线休整一键归零）；「入口可达」冒烟与 GM 强制结算（触发历练/秘境结算）仍保留用于"立即结算"语义 |
 | 结果归档 | 平台有运行记录但没有“导出目录包” | 结果需自行拉取并组织 | 本项目 `scripts/test_suite_ctl.py export` 本地生成 `results/<date>_<target>/` |
 | GM 目标解析单数字参数 | 通用 `_resolve_target` 将剩余参数中「唯一数字」视为命令自身数值参数并回落到发送者，强制命令（`触发历练结算 900000002`）曾因此作用到错误目标（检查到 GM 自身，被 sect-master-chain-gm 用例暴露） | 无法通过纯数字单参数定位目标 | v3.9.1 起强制结算类（触发历练/秘境结算/师承推进/清除CD）单数字参数即视为目标 ID |
 | 师承链进度推进 | 插件 GM `触发秘境结算`/`触发历练结算`（`core/gm_manager.py` `cmd_force_rift`/`cmd_force_adventure`）**v3.9.1 起**强制结算与正常完成流程一致追加 `sect_manager.advance_master_progress`（adventure_complete 必然推进；win_pve 受 PvE 遭遇概率限制），并新增 GM「师承推进」（`cmd_advance_master`，事件 战斗/历练/突破/捐献）确定性直推 | PvE 遭遇战为概率事件（`pve_combat_manager._should_trigger_combat` adventure low 30% / rift low 50-95%），真实结算的 win_pve 计数不保证递增 | `sect-master-chain-gm` 用例用「师承推进」确定性覆盖三阶段全链（win_pve×3→adventure_complete→breakthrough）；真实历练结算只断言 adventure_complete 阶段（与 PvE 胜负无关） |
@@ -49,7 +49,7 @@
 |---|---|---|
 | 结构化消息组件注入 | GM `@目标`、图片/文件/引用等路径无法覆盖 | `send` 步骤支持 `components` 数组（At/Image/Reply） |
 | 直接 DB 断言 | 强断言需要核对库内落盘状态 | 提供 `GET /api/ops/db-query` 白名单查询或运行后 DB 快照 API |
-| 时间加速/虚拟时钟 | 长周期玩法（闭关 1 分钟、Boss 冷却）不适合真实等待 | 支持 `run.time_offset` / `POST /api/ops/tick` 推进测试会话 |
+| 时间加速/虚拟时钟 | 长周期玩法（闭关 1 分钟、Boss 冷却）不适合真实等待。**插件侧已补齐主链路**（`gm-test-time-and-rng-controls`：GM 时间快进/清除全部冷却）；平台增强仍保留给定时任务完整语义——字段前移不唤醒 `asyncio.sleep` 中的 Boss/灵眼循环（仅保证其下次醒来立即触发），要"快进即触发"仍需平台 tick 能力 | 支持 `run.time_offset` / `POST /api/ops/tick` 推进测试会话 |
 
 ## 已解决的平台侧问题
 

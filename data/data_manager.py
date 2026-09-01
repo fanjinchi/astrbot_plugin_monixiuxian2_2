@@ -141,8 +141,14 @@ class DataBase:
         await self.conn.execute("DELETE FROM players WHERE user_id = ?", (user_id,))
         await self.conn.commit()
 
-    async def delete_player_cascade(self, user_id: str):
-        """级联删除玩家及所有关联数据"""
+    async def delete_player_cascade(self, user_id: str, commit: bool = True):
+        """级联删除玩家及所有关联数据
+
+        Args:
+            user_id: 用户ID
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
+                （单语句失败仍由 safe_execute 吞掉并记日志，语义不变）
+        """
 
         async def safe_execute(sql: str, params: tuple):
             """Run one cascade statement, logging and swallowing errors so a missing table does not abort the rest."""
@@ -190,7 +196,8 @@ class DataBase:
             await safe_execute(sql, params)
 
         await self.conn.execute("DELETE FROM players WHERE user_id = ?", (user_id,))
-        await self.conn.commit()
+        if commit:
+            await self.conn.commit()
 
     async def get_all_players(self):
         """获取所有玩家"""

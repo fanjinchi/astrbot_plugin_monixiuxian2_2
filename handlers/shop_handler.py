@@ -252,14 +252,14 @@ class ShopHandler:
                     result_lines.append(f"⚠️ 存入储物戒失败：{msg}")
             elif item_type in ["pill", "exp_pill", "utility_pill"]:
                 await self.pill_manager.add_pill_to_inventory(
-                    player, target_item["name"], count=quantity
+                    player, target_item["name"], count=quantity, commit=False
                 )
                 result_lines.append(
                     f"成功购买【{target_item['name']}】x{quantity}，已添加到背包。"
                 )
             elif item_type == "legacy_pill":
                 success, message = await self._apply_legacy_pill_effects(
-                    player, target_item, quantity
+                    player, target_item, quantity, commit=False
                 )
                 if not success:
                     await self.db.conn.rollback()
@@ -298,7 +298,7 @@ class ShopHandler:
                 return
 
             player.gold -= total_price
-            await self.db.update_player(player)
+            await self.db.update_player(player, commit=False)
             await self.db.conn.commit()
 
             result_lines.append(f"花费灵石: {total_price}，剩余: {player.gold}")
@@ -343,7 +343,7 @@ class ShopHandler:
         yield event.plain_result("\n".join(lines))
 
     async def _apply_legacy_pill_effects(
-        self, player: Player, item: dict, quantity: int
+        self, player: Player, item: dict, quantity: int, commit: bool = True
     ) -> tuple:
         """应用旧系统丹药效果（items.json中的丹药）
 
@@ -351,6 +351,7 @@ class ShopHandler:
             player: 玩家对象
             item: 物品配置字典
             quantity: 购买数量
+            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
 
         Returns:
             (是否成功, 消息)
@@ -451,7 +452,7 @@ class ShopHandler:
         player.hp = max(1, player.hp)
         player.armor_value = max(0, player.armor_value)
 
-        await self.db.update_player(player)
+        await self.db.update_player(player, commit=commit)
 
         # 去重效果消息
         unique_effects = list(dict.fromkeys(effect_msgs))

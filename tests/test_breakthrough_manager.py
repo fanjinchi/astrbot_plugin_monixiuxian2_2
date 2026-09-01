@@ -299,16 +299,12 @@ class TestGrowthByRoute:
         assert weights_early["damage"] < weights_late["damage"]
         assert weights_early["speed"] > weights_late["speed"]
 
-    def test_cross_realm_breakthrough_uses_originating_band(
-        self, breakthrough_manager
-    ):
+    def test_cross_realm_breakthrough_uses_originating_band(self, breakthrough_manager):
         """练气九阶(level 9) 升入筑基的突破按练气段结算，筑基初期(level 10) 起按筑基段。"""
         assert breakthrough_manager._get_growth_params("体修", 9)[0] == 17
         assert breakthrough_manager._get_growth_params("体修", 10)[0] == 16
 
-    def test_fallback_without_route_table(
-        self, breakthrough_manager, config_manager
-    ):
+    def test_fallback_without_route_table(self, breakthrough_manager, config_manager):
         """Legacy configs without growth_by_route keep the global behavior."""
         skill_cfg = dict(config_manager.game_config["skill_system"])
         skill_cfg.pop("growth_by_route", None)
@@ -349,3 +345,26 @@ class TestGrowthByRoute:
         # 战斗点总量恒为 random_growth_step=5，只验证分配守恒不锁定随机落点
         assert (player.damage - 10) + (player.agility - 5) + (player.speed - 5) == 5
         assert "气血 +17" in msg
+
+    @pytest.mark.asyncio
+    async def test_fortune_storage_ring_full_uses_narrative_scene(
+        self, breakthrough_manager, db_mock, monkeypatch
+    ):
+        """储物戒已满的机缘掉落句渲染 fortune.storage_full_drop（逐字默认）。"""
+        monkeypatch.setattr(
+            _bm_mod,
+            "roll_breakthrough_fortune",
+            lambda *args, **kwargs: {"type": "weapon", "items": [{"name": "木剑"}]},
+        )
+        # Ring holds only unrelated items and has no free slot -> cannot store.
+        breakthrough_manager.storage_ring_manager.get_available_slots = MagicMock(
+            return_value=0
+        )
+        player = Player(user_id="u1", user_name="Test", level_index=1)
+        player.set_storage_ring_items({"玄铁": 3})
+
+        msg = await breakthrough_manager._apply_breakthrough_fortune(player, 1)
+
+        assert msg == "🎁 机缘天降，获得【木剑】，但储物戒已满无法存入。"
+        # The drop is lost: nothing persisted on this branch.
+        db_mock.update_player.assert_not_called()

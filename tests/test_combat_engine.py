@@ -18,6 +18,7 @@ _mod = load_module("combat_manager", "managers/combat_manager.py")
 CombatEngine = _mod.CombatEngine
 CombatManager = _mod.CombatManager
 FighterState = _mod.FighterState
+StatusEffect = _mod.StatusEffect
 
 
 class FakeConfigManager:
@@ -988,3 +989,127 @@ class TestConfigDefaults:
         assert engine._damage_reduction_cap == 0.2
         assert engine._armor_k_base == 50
         assert engine._armor_k_level_coeff == 5
+
+
+# ------------------------------------------------------------------
+# Narrative leftover scenes render from config (narrative-text-migration-leftovers)
+# ------------------------------------------------------------------
+
+
+def make_engine_with_narrative(combat_scenes):
+    """Build an engine whose fake config manager carries a narrative_config."""
+    config = FakeConfigManager({})
+    config.narrative_config = {"combat": combat_scenes}
+    return CombatEngine(config, FakeSkillManager())
+
+
+class TestNarrativeLeftoverScenes:
+    """The 7 leftover combat scenes are rendered from narrative_config."""
+
+    def test_round_header_uses_configured_copy(self):
+        engine = make_engine_with_narrative({"round_header": "ROUND {rounds} 开战"})
+        f1 = make_fighter("A", 10, 100, 5, 10)
+        f2 = make_fighter("B", 10, 100, 5, 10)
+        result = engine.resolve_combat(f1, f2)
+        # resolve_combat merges the raw log lines into chunks; join to search.
+        report = "\n".join(result.combat_log)
+        assert "ROUND 1 开战" in report
+        assert "-- 第" not in report
+
+    def test_round_header_default_matches_original(self):
+        engine = make_engine()
+        f1 = make_fighter("A", 10, 100, 5, 10)
+        f2 = make_fighter("B", 10, 100, 5, 10)
+        result = engine.resolve_combat(f1, f2)
+        assert "-- 第 1 回合 --" in "\n".join(result.combat_log)
+
+    def test_static_handler_renders_via_engine_narrative(self):
+        """_handler_heal (a staticmethod) must reach the engine's _narrative
+        wrapper through state["engine"] and pick up configured copy."""
+        engine = make_engine_with_narrative(
+            {"effect_heal": "治疗:{actor_name}|{skill_name}|{heal}"}
+        )
+        actor = make_fighter("A", 50, 100, 5, 10)
+        log: list[str] = []
+        CombatEngine._handler_heal(
+            actor,
+            actor,
+            {"name": "回春术", "effect_value": 0.5},
+            {"log": log, "engine": engine},
+        )
+        assert log == ["治疗:A|回春术|25"]
+
+    def test_static_handler_skill_name_fallback_becomes_variable(self):
+        """The skill.get('name', '反击') fallback is resolved at the render
+        point and passed in as skill_name."""
+        engine = make_engine()
+        actor = make_fighter("A", 100, 100, 5, 10)
+        target = make_fighter("B", 1000, 100, 5, 10)
+        log: list[str] = []
+        CombatEngine._handler_counter(
+            actor, target, {"effect_value": 0.5}, {"log": log, "engine": engine}
+        )
+        assert log == ["A 触发【反击】反击，对 B 造成 50 点伤害！"]
+
+    def test_dot_tick_uses_configured_copy(self):
+        engine = make_engine_with_narrative(
+            {"effect_dot_tick": "DOT {name}/{effect_name}/{dot_dmg}"}
+        )
+        fighter = make_fighter("A", 100, 10, 5, 10)
+        fighter.status_effects.append(
+            StatusEffect(
+                source_name="蛊毒",
+                kind="dot",
+                effect_value=0.5,
+                duration=2,
+                remaining=2,
+                snapshot_damage=20,
+            )
+        )
+        log: list[str] = []
+        engine._tick_status_effects(fighter, log)
+        assert "DOT A/蛊毒/10" in log
+
+    def test_dot_tick_default_matches_original(self):
+        engine = make_engine()
+        fighter = make_fighter("A", 100, 10, 5, 10)
+        fighter.status_effects.append(
+            StatusEffect(
+                source_name="蛊毒",
+                kind="dot",
+                effect_value=0.5,
+                duration=2,
+                remaining=2,
+                snapshot_damage=20,
+            )
+        )
+        log: list[str] = []
+        engine._tick_status_effects(fighter, log)
+        assert "A 受【蛊毒】侵蚀，损失 10 气血！" in log
+
+    def test_stack_cap_rejection_uses_configured_copy(self):
+        engine = make_engine_with_narrative(
+            {"effect_stack_cap_rejected": "拒绝:{actor_name}/{effect_name}/{stack_cap}"}
+        )
+        actor = make_fighter("A", 100, 10, 5, 10)
+        # Fill the (kind, stat) bucket up to the cap so the next attach fails.
+        for _ in range(engine._status_stack_cap):
+            actor.status_effects.append(
+                StatusEffect(
+                    source_name="嗜血",
+                    kind="buff",
+                    effect_value=0.1,
+                    duration=9,
+                    remaining=9,
+                    params={"stat": "damage"},
+                )
+            )
+        log: list[str] = []
+        engine._attach_stat_status(
+            actor,
+            {"name": "战意", "effect_value": 0.2, "stat": "damage"},
+            kind="buff",
+            log=log,
+            who=actor,
+        )
+        assert log == [f"拒绝:A/战意/{engine._status_stack_cap}"]

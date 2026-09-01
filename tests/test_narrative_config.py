@@ -268,3 +268,126 @@ def test_repo_spirit_root_config_matches_original_table():
     assert len(entries) == 47
     assert entries["先天道体"]["description"] == "【禁忌】天生道体，与天地同寿"
     assert entries["伪"]["description"] == "【废柴】资质低劣，修炼如龟速"
+
+
+# --- 遗留句式外移核对（narrative-text-migration-leftovers） --------------------
+
+# Expected verbatim templates and variable contracts for the 8 leftover scenes
+# (design D2): fortune.storage_full_drop plus the 7 combat scenes.
+_LEFTOVER_SCENES = {
+    ("fortune", "storage_full_drop"): (
+        "🎁 机缘天降，获得【{name}】，但储物戒已满无法存入。",
+        {"name"},
+    ),
+    ("combat", "round_header"): ("-- 第 {rounds} 回合 --", {"rounds"}),
+    ("combat", "effect_counter"): (
+        "{actor_name} 触发【{skill_name}】反击，对 {target_name} 造成 {counter_dmg} 点伤害！",
+        {"actor_name", "skill_name", "target_name", "counter_dmg"},
+    ),
+    ("combat", "effect_heal"): (
+        "{actor_name} 触发【{skill_name}】，恢复 {heal} 气血！",
+        {"actor_name", "skill_name", "heal"},
+    ),
+    ("combat", "effect_dot_attach"): (
+        "{actor_name} 使【{skill_name}】附着于 {target_name}",
+        {"actor_name", "skill_name", "target_name"},
+    ),
+    ("combat", "effect_stack_cap_rejected"): (
+        "{actor_name} 的【{effect_name}】未生效：同类效果已达叠加上限（{stack_cap}）",
+        {"actor_name", "effect_name", "stack_cap"},
+    ),
+    ("combat", "effect_survive_grant"): (
+        "{actor_name} 获得【{skill_name}】庇护！",
+        {"actor_name", "skill_name"},
+    ),
+    ("combat", "effect_dot_tick"): (
+        "{name} 受【{effect_name}】侵蚀，损失 {dot_dmg} 气血！",
+        {"name", "effect_name", "dot_dmg"},
+    ),
+}
+
+
+def test_leftover_fragment_defaults_are_verbatim():
+    """The 8 leftover scenes' embedded defaults match the original strings."""
+    for (section, scene), (template, _declared) in _LEFTOVER_SCENES.items():
+        assert DEFAULT_NARRATIVE_CONFIG[section][scene] == template, (
+            f"{section}.{scene} 默认文案与原文不一致"
+        )
+
+
+def test_leftover_scene_vars_match_design_contract():
+    """SCENE_VARS registrations match the design D2 contract table."""
+    for (section, scene), (_template, declared) in _LEFTOVER_SCENES.items():
+        assert NARRATIVE_SCENE_VARS[section][scene] == declared, (
+            f"{section}.{scene} 变量契约不符"
+        )
+
+
+def test_leftover_scenes_render_like_original_fstring():
+    """Rendered output (embedded defaults) equals the original f-string output.
+
+    Sentinel values stand in for the original expressions (actor.name,
+    skill.get('name', '反击'), ...); a byte-level mismatch in any literal
+    segment (emoji, full/half-width punctuation, spacing) fails the check.
+    """
+
+    class _BareFake:
+        pass
+
+    cases = [
+        (
+            ("fortune", "storage_full_drop"),
+            {"name": "木剑"},
+            "🎁 机缘天降，获得【木剑】，但储物戒已满无法存入。",
+        ),
+        (("combat", "round_header"), {"rounds": 7}, "-- 第 7 回合 --"),
+        (
+            ("combat", "effect_counter"),
+            {
+                "actor_name": "甲",
+                "skill_name": "荆棘术",
+                "target_name": "乙",
+                "counter_dmg": 42,
+            },
+            "甲 触发【荆棘术】反击，对 乙 造成 42 点伤害！",
+        ),
+        (
+            ("combat", "effect_heal"),
+            {"actor_name": "甲", "skill_name": "回春术", "heal": 99},
+            "甲 触发【回春术】，恢复 99 气血！",
+        ),
+        (
+            ("combat", "effect_dot_attach"),
+            {"actor_name": "甲", "skill_name": "蛊毒", "target_name": "乙"},
+            "甲 使【蛊毒】附着于 乙",
+        ),
+        (
+            ("combat", "effect_stack_cap_rejected"),
+            {"actor_name": "甲", "effect_name": "嗜血", "stack_cap": 3},
+            "甲 的【嗜血】未生效：同类效果已达叠加上限（3）",
+        ),
+        (
+            ("combat", "effect_survive_grant"),
+            {"actor_name": "甲", "skill_name": "金钟罩"},
+            "甲 获得【金钟罩】庇护！",
+        ),
+        (
+            ("combat", "effect_dot_tick"),
+            {"name": "丙", "effect_name": "蛊毒", "dot_dmg": 17},
+            "丙 受【蛊毒】侵蚀，损失 17 气血！",
+        ),
+    ]
+    for (section, scene), variables, expected in cases:
+        assert render_narrative(_BareFake(), section, scene, variables) == expected
+
+
+def test_repo_narrative_config_carries_leftover_scenes():
+    """The committed narrative_config.json ships the 8 new scenes verbatim."""
+    import json
+
+    with open(PLUGIN_ROOT / "config" / "narrative_config.json", encoding="utf-8") as f:
+        cfg = json.load(f)
+    for (section, scene), (template, _declared) in _LEFTOVER_SCENES.items():
+        assert cfg[section][scene] == template, (
+            f"config/narrative_config.json {section}.{scene} 与内嵌默认不一致"
+        )
