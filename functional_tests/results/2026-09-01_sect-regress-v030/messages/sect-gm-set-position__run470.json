@@ -1,0 +1,128 @@
+[
+  {
+    "id": 6169,
+    "conversation_id": 478,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除CD 900000002 确认",
+    "rich": null,
+    "created_at": 1788223986.0800154
+  },
+  {
+    "id": 6170,
+    "conversation_id": 478,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 目标玩家当前不在任何忙碌状态！",
+    "rich": [],
+    "created_at": 1788223986.0911763
+  },
+  {
+    "id": 6171,
+    "conversation_id": 478,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置职位 900000002 0",
+    "rich": null,
+    "created_at": 1788223986.389081
+  },
+  {
+    "id": 6172,
+    "conversation_id": 478,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的职位设置为「宗主」",
+    "rich": [],
+    "created_at": 1788223986.416821
+  },
+  {
+    "id": 6173,
+    "conversation_id": 478,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 信息",
+    "rich": null,
+    "created_at": 1788223986.7067516
+  },
+  {
+    "id": 6174,
+    "conversation_id": 478,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏛️ 宗门信息\n━━━━━━━━━━━━━━━\n\n宗门名称：青云门\n宗主：无（掌门云游在外）\n建设度：100\n宗门灵石：0\n宗门资材：500\n丹房等级：0\n成员数量：1人\n\n你的职位：宗主\n你的贡献：2500",
+    "rich": [],
+    "created_at": 1788223986.7235777
+  },
+  {
+    "id": 6175,
+    "conversation_id": 478,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 晋升",
+    "rich": null,
+    "created_at": 1788223987.0214543
+  },
+  {
+    "id": 6176,
+    "conversation_id": 478,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 你已是一宗之主，无需晋升！",
+    "rich": [],
+    "created_at": 1788223987.0385134
+  },
+  {
+    "id": 6177,
+    "conversation_id": 478,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置职位 900000002 亲传弟子",
+    "rich": null,
+    "created_at": 1788223987.3361154
+  },
+  {
+    "id": 6178,
+    "conversation_id": 478,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的职位设置为「亲传弟子」",
+    "rich": [],
+    "created_at": 1788223987.353607
+  },
+  {
+    "id": 6179,
+    "conversation_id": 478,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 晋升",
+    "rich": null,
+    "created_at": 1788223987.6447682
+  },
+  {
+    "id": 6180,
+    "conversation_id": 478,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 晋升【长老】未达门槛：\n贡献不足（2500/30000）\n境界不足（需达到练气九阶）",
+    "rich": [],
+    "created_at": 1788223987.6616676
+  },
+  {
+    "id": 6181,
+    "conversation_id": 478,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置职位 900000002 4",
+    "rich": null,
+    "created_at": 1788223987.9597187
+  },
+  {
+    "id": 6182,
+    "conversation_id": 478,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的职位设置为「外门弟子」",
+    "rich": [],
+    "created_at": 1788223987.9771664
+  }
+]

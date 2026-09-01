@@ -1,0 +1,329 @@
+{
+  "id": 475,
+  "case_name": "sect-promotion",
+  "run_index": 19,
+  "status": "passed",
+  "conversation_id": 483,
+  "steps_result": [
+    {
+      "index": -1,
+      "type": "pre_run_hook",
+      "note": "",
+      "ok": true,
+      "detail": "hook 退出码 0：已备份现有固定 ID 数据 -> /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/functional_tests/.fixture-backup.json\nfixture sect 完成：2 个固定测试玩家已重置",
+      "actual": [],
+      "duration": 0.05
+    },
+    {
+      "index": 0,
+      "type": "send",
+      "note": "清理忙碌状态（防 run-all 跨用例污染）",
+      "ok": true,
+      "detail": "已注入（消息 #6249）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #6250：❌ 目标玩家当前不在任何忙碌状态！）",
+      "actual": [
+        "❌ 目标玩家当前不在任何忙碌状态！"
+      ],
+      "expected": "re:已清除【测试玩家1】的忙碌状态|不在任何忙碌状态",
+      "matched": {
+        "id": 6250,
+        "window_index": 0,
+        "text": "❌ 目标玩家当前不在任何忙碌状态！"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "满足内门弟子境界门槛（4 级）",
+      "ok": true,
+      "detail": "已注入（消息 #6251）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 3,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #6252：✅ 已将【测试玩家1】的境界设置为「练气五阶」）",
+      "actual": [
+        "❌ 目标玩家当前不在任何忙碌状态！",
+        "✅ 已将【测试玩家1】的境界设置为「练气五阶」"
+      ],
+      "expected": "re:境界设置为「练气五阶」",
+      "matched": {
+        "id": 6252,
+        "window_index": 1,
+        "text": "✅ 已将【测试玩家1】的境界设置为「练气五阶」"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 4,
+      "type": "send",
+      "note": "达标晋升：贡献 2500≥2000，境界 5≥4",
+      "ok": true,
+      "detail": "已注入（消息 #6253）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 5,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #6254：🎖️ 晋升成功！你已成为【内门弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+100 灵石\n商店折）",
+      "actual": [
+        "❌ 目标玩家当前不在任何忙碌状态！",
+        "✅ 已将【测试玩家1】的境界设置为「练气五阶」",
+        "🎖️ 晋升成功！你已成为【内门弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+100 灵石\n商店折扣：9.5折\n传承解锁：heart_qy_001"
+      ],
+      "expected": "re:晋升成功！你已成为【内门弟子】！[\\s\\S]*每日签到俸禄：\\+100 灵石[\\s\\S]*商店折扣：9.5折",
+      "matched": {
+        "id": 6254,
+        "window_index": 2,
+        "text": "🎖️ 晋升成功！你已成为【内门弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+100 灵石\n商店折扣：9.5折\n传承解锁：heart_qy_001"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 6,
+      "type": "send",
+      "note": "双缺失拒绝：贡献 2500<8000、境界 5<6",
+      "ok": true,
+      "detail": "已注入（消息 #6255）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 7,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #6256：❌ 晋升【亲传弟子】未达门槛：\n贡献不足（2500/8000）\n境界不足（需达到练气六阶））",
+      "actual": [
+        "❌ 目标玩家当前不在任何忙碌状态！",
+        "✅ 已将【测试玩家1】的境界设置为「练气五阶」",
+        "🎖️ 晋升成功！你已成为【内门弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+100 灵石\n商店折扣：9.5折\n传承解锁：heart_qy_001",
+        "❌ 晋升【亲传弟子】未达门槛：\n贡献不足（2500/8000）\n境界不足（需达到练气六阶）"
+      ],
+      "expected": "re:晋升【亲传弟子】未达门槛：[\\s\\S]*贡献不足（2500/8000）[\\s\\S]*境界不足（需达到练气六阶）",
+      "matched": {
+        "id": 6256,
+        "window_index": 3,
+        "text": "❌ 晋升【亲传弟子】未达门槛：\n贡献不足（2500/8000）\n境界不足（需达到练气六阶）"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 8,
+      "type": "send",
+      "note": "职阶俸禄加发",
+      "ok": true,
+      "detail": "已注入（消息 #6257）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 9,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #6258：✅ 签到成功！\n━━━━━━━━━━━━━━━\n💰 获得灵石：243\n🏛️ 宗门俸禄（内门弟子）：+100 灵石\n💎 当）",
+      "actual": [
+        "❌ 目标玩家当前不在任何忙碌状态！",
+        "✅ 已将【测试玩家1】的境界设置为「练气五阶」",
+        "🎖️ 晋升成功！你已成为【内门弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+100 灵石\n商店折扣：9.5折\n传承解锁：heart_qy_001",
+        "❌ 晋升【亲传弟子】未达门槛：\n贡献不足（2500/8000）\n境界不足（需达到练气六阶）",
+        "✅ 签到成功！\n━━━━━━━━━━━━━━━\n💰 获得灵石：243\n🏛️ 宗门俸禄（内门弟子）：+100 灵石\n💎 当前灵石：100343\n━━━━━━━━━━━━━━━\n明日再来，莫要忘记哦~"
+      ],
+      "expected": "re:签到成功！[\\s\\S]*宗门俸禄（内门弟子）：\\+100 灵石",
+      "matched": {
+        "id": 6258,
+        "window_index": 4,
+        "text": "✅ 签到成功！\n━━━━━━━━━━━━━━━\n💰 获得灵石：243\n🏛️ 宗门俸禄（内门弟子）：+100 灵石\n💎 当前灵石：100343\n━━━━━━━━━━━━━━━\n明日再来，莫要忘记哦~"
+      },
+      "duration": 0.3
+    }
+  ],
+  "case_snapshot": {
+    "name": "sect-promotion",
+    "description": "spec Requirement「职阶晋升与福利」：晋升双门槛（贡献+境界）达标晋升成功并展示职阶福利（签到俸禄/商店折扣），缺任一项即拒绝并列出缺失项；签到发放职阶俸禄。",
+    "scenario": "fixture 预置青云门成员（贡献 2500，境界 2）；GM 抬至练气五阶后第一次宗门晋升达标（内门弟子：贡献 2000/4 级）成功；第二次晋升亲传弟子（贡献 8000/6 级）双缺失被拒；随后签到获得内门弟子俸禄 +100 灵石。",
+    "tags": [
+      "sect"
+    ],
+    "pre_run_hook": {
+      "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile sect --yes",
+      "timeout": 60
+    },
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_sect_005",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000002"
+      }
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 清除CD 900000002 确认",
+        "note": "清理忙碌状态（防 run-all 跨用例污染）"
+      },
+      {
+        "type": "expect",
+        "match": "re:已清除【测试玩家1】的忙碌状态|不在任何忙碌状态",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置境界 900000002 练气五阶",
+        "note": "满足内门弟子境界门槛（4 级）"
+      },
+      {
+        "type": "expect",
+        "match": "re:境界设置为「练气五阶」",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#宗门 晋升",
+        "note": "达标晋升：贡献 2500≥2000，境界 5≥4"
+      },
+      {
+        "type": "expect",
+        "match": "re:晋升成功！你已成为【内门弟子】！[\\s\\S]*每日签到俸禄：\\+100 灵石[\\s\\S]*商店折扣：9.5折",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#宗门 晋升",
+        "note": "双缺失拒绝：贡献 2500<8000、境界 5<6"
+      },
+      {
+        "type": "expect",
+        "match": "re:晋升【亲传弟子】未达门槛：[\\s\\S]*贡献不足（2500/8000）[\\s\\S]*境界不足（需达到练气六阶）",
+        "timeout": 10
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#签到",
+        "note": "职阶俸禄加发"
+      },
+      {
+        "type": "expect",
+        "match": "re:签到成功！[\\s\\S]*宗门俸禄（内门弟子）：\\+100 灵石",
+        "timeout": 10
+      }
+    ]
+  },
+  "run_messages": [
+    {
+      "id": 6249,
+      "conversation_id": 483,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 清除CD 900000002 确认",
+      "rich": null,
+      "created_at": 1788224000.2095578
+    },
+    {
+      "id": 6250,
+      "conversation_id": 483,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 目标玩家当前不在任何忙碌状态！",
+      "rich": [],
+      "created_at": 1788224000.2216225
+    },
+    {
+      "id": 6251,
+      "conversation_id": 483,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置境界 900000002 练气五阶",
+      "rich": null,
+      "created_at": 1788224000.519638
+    },
+    {
+      "id": 6252,
+      "conversation_id": 483,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家1】的境界设置为「练气五阶」",
+      "rich": [],
+      "created_at": 1788224000.5432255
+    },
+    {
+      "id": 6253,
+      "conversation_id": 483,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#宗门 晋升",
+      "rich": null,
+      "created_at": 1788224000.8342745
+    },
+    {
+      "id": 6254,
+      "conversation_id": 483,
+      "direction": "out",
+      "sender": "bot",
+      "text": "🎖️ 晋升成功！你已成为【内门弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+100 灵石\n商店折扣：9.5折\n传承解锁：heart_qy_001",
+      "rich": [],
+      "created_at": 1788224000.8575025
+    },
+    {
+      "id": 6255,
+      "conversation_id": 483,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#宗门 晋升",
+      "rich": null,
+      "created_at": 1788224001.149151
+    },
+    {
+      "id": 6256,
+      "conversation_id": 483,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 晋升【亲传弟子】未达门槛：\n贡献不足（2500/8000）\n境界不足（需达到练气六阶）",
+      "rich": [],
+      "created_at": 1788224001.1608045
+    },
+    {
+      "id": 6257,
+      "conversation_id": 483,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#签到",
+      "rich": null,
+      "created_at": 1788224001.4587038
+    },
+    {
+      "id": 6258,
+      "conversation_id": 483,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 签到成功！\n━━━━━━━━━━━━━━━\n💰 获得灵石：243\n🏛️ 宗门俸禄（内门弟子）：+100 灵石\n💎 当前灵石：100343\n━━━━━━━━━━━━━━━\n明日再来，莫要忘记哦~",
+      "rich": [],
+      "created_at": 1788224001.4832268
+    }
+  ],
+  "started_at": 1788224000.1189415,
+  "finished_at": 1788224001.7675927
+}
