@@ -1,0 +1,128 @@
+[
+  {
+    "id": 6513,
+    "conversation_id": 503,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1788224753.4806085
+  },
+  {
+    "id": 6514,
+    "conversation_id": 503,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1788224753.4950218
+  },
+  {
+    "id": 6515,
+    "conversation_id": 503,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 给予装备 900000002 青铜剑 1",
+    "rich": null,
+    "created_at": 1788224753.7927244
+  },
+  {
+    "id": 6516,
+    "conversation_id": 503,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已向【测试玩家1】的储物戒放入 青铜剑 x1",
+    "rich": [],
+    "created_at": 1788224753.8267124
+  },
+  {
+    "id": 6517,
+    "conversation_id": 503,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#装备 青铜剑",
+    "rich": null,
+    "created_at": 1788224754.113051
+  },
+  {
+    "id": 6518,
+    "conversation_id": 503,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已装备武器【青铜剑】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：每击基础伤害+9、护甲+15、武器系数K×0.5",
+    "rich": [],
+    "created_at": 1788224754.1526396
+  },
+  {
+    "id": 6519,
+    "conversation_id": 503,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我的装备",
+    "rich": null,
+    "created_at": 1788224754.4308121
+  },
+  {
+    "id": 6520,
+    "conversation_id": 503,
+    "direction": "out",
+    "sender": "bot",
+    "text": "=== p1 的装备 ===\n【武器】青铜剑\n【防具】未装备\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--- 装备属性加成 ---\n🗡️ 每击基础伤害 +9\n🛡️ 护甲 +15\n============================",
+    "rich": [],
+    "created_at": 1788224754.4512215
+  },
+  {
+    "id": 6521,
+    "conversation_id": 503,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#卸下 武器",
+    "rich": null,
+    "created_at": 1788224754.7474098
+  },
+  {
+    "id": 6522,
+    "conversation_id": 503,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已卸下武器【青铜剑】\n已存入储物戒",
+    "rich": [],
+    "created_at": 1788224754.7824154
+  },
+  {
+    "id": 6523,
+    "conversation_id": 503,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#装备 长春功",
+    "rich": null,
+    "created_at": 1788224755.0599391
+  },
+  {
+    "id": 6524,
+    "conversation_id": 503,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已装备主修心法【长春功】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：无属性加成",
+    "rich": [],
+    "created_at": 1788224755.0993888
+  },
+  {
+    "id": 6525,
+    "conversation_id": 503,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我的装备",
+    "rich": null,
+    "created_at": 1788224755.3784041
+  },
+  {
+    "id": 6526,
+    "conversation_id": 503,
+    "direction": "out",
+    "sender": "bot",
+    "text": "=== p1 的装备 ===\n【武器】未装备\n【防具】未装备\n【主修心法】长春功\n【功法】(0/4)\n  未装备\n============================",
+    "rich": [],
+    "created_at": 1788224755.392239
+  }
+]

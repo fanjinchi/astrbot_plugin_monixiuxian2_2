@@ -81,6 +81,19 @@ SECT_SECT_SKILL_IDS = ("qy_001",)  # 青云剑诀：师承任务来源 + 宗门�
 SECT_INITIAL_MATERIALS = 500  # 供建设用例升级洞天(200)+丹房(200)
 # 商店种子：丹阁固定上架筑基丹（原价 5000），供折扣用例结算价格断言。
 SECT_SHOP_SEED = [{"name": "筑基丹", "type": "pill", "price": 5000, "stock": 5}]
+# 器阁种子：确定性武器（display 需要 rank/price/stock；data 留空即无效果描述行）。
+SECT_WEAPON_SEED = [
+    {
+        "name": "狼牙棒",
+        "type": "weapon",
+        "rank": "灵品",
+        "original_price": 6000,
+        "discount": 1.0,
+        "price": 6000,
+        "stock": 5,
+        "data": {},
+    }
+]
 
 PVP_PROFILE_SKILL_IDS = (
     "common_001",  # 基础吐纳 damage_bonus
@@ -935,15 +948,21 @@ def _reset_sect_rows(conn: sqlite3.Connection) -> None:
 
 
 def _seed_shop(conn: sqlite3.Connection) -> None:
-    """Seed the pill pavilion with a deterministic item for discount math.
+    """Seed deterministic shop baselines (pill + weapon pavilions).
 
     Args:
         conn: Open sqlite connection.
     """
+    now = int(time.time())
     conn.execute(
         "INSERT OR REPLACE INTO shop (shop_id, last_refresh_time, current_items) "
         "VALUES ('pill_pavilion', ?, ?)",
-        (int(time.time()), json.dumps(SECT_SHOP_SEED, ensure_ascii=False)),
+        (now, json.dumps(SECT_SHOP_SEED, ensure_ascii=False)),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO shop (shop_id, last_refresh_time, current_items) "
+        "VALUES ('weapon_pavilion', ?, ?)",
+        (now, json.dumps(SECT_WEAPON_SEED, ensure_ascii=False)),
     )
 
 

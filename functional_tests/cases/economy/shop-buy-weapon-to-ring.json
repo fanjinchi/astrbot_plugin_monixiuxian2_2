@@ -1,0 +1,84 @@
+{
+  "name": "shop-buy-weapon-to-ring",
+  "description": "回归实证 bug（v3.13.0 事务原子性修复，store_item external_transaction 路径）：普通商店（器阁）购买武器必须成功存入储物戒并正确扣减灵石（购买丢货扣钱 bug 根因：写锁内二次重取 player 对象被旧对象覆盖）。",
+  "scenario": "群聊：fixture 预置器阁狼牙棒（6000 灵石、库存 5）+ 新建玩家 p1 → 我要修仙 → GM 设置灵石 10000 → 器阁列表见狼牙棒 → 购买 狼牙棒 → 成功购买武器已存入储物戒 → 储物戒列表含狼牙棒且容量 1/20。",
+  "tags": [
+    "economy",
+    "shop",
+    "gm"
+  ],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile sect --yes",
+    "timeout": 60
+  },
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_econ_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000004"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "新建玩家（fixture 已复位为无宗门初始态）"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "玩家就绪"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置灵石 900000004 10000",
+      "note": "准备购买资金"
+    },
+    {
+      "type": "expect",
+      "match": "re:已将【[^】]*】的灵石设置为 10,000",
+      "timeout": 30,
+      "note": "灵石设置成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#器阁",
+      "note": "fixture 预置：狼牙棒 6000 灵石、库存 5"
+    },
+    {
+      "type": "expect",
+      "match": "re:=== 器阁 ===[\\s\\S]*狼牙棒[\\s\\S]*价格: 6000 灵石",
+      "timeout": 30,
+      "note": "器阁列表可见狼牙棒"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#购买 狼牙棒",
+      "note": "实证 bug 回归：购买武器入戒并扣灵石"
+    },
+    {
+      "type": "expect",
+      "match": "re:成功购买武器【狼牙棒】x1，已存入储物戒。[\\s\\S]*花费灵石: 6000，剩余: 4000",
+      "timeout": 30,
+      "note": "武器入戒且正确扣费"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#储物戒",
+      "note": "确认武器已在储物戒中"
+    },
+    {
+      "type": "expect",
+      "match": "re:=== [^\\n]* 的储物戒 ===[\\s\\S]*容量：1/[\\s\\S]*· 狼牙棒",
+      "timeout": 30,
+      "note": "储物戒含狼牙棒"
+    }
+  ]
+}

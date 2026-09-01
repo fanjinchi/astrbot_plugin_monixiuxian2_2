@@ -1,0 +1,128 @@
+{
+  "name": "gm-time-tools",
+  "description": "GM 测试工具三命令回归（design D1/D3/D4）：时间快进使闭关到期可正常出关、清除全部冷却复位忙碌状态、随机种子设定/重置/非法参数。",
+  "scenario": "群聊：p1 闭关 → GM 时间快进 3600 确认（闭关开始时间前移）→ p1 出关成功（闭关时长 1 小时）；p1 再闭关 → GM 清除全部冷却 900000002 确认（忙碌状态 1 条）→ p1 开始历练成功；GM 随机种子 42 → 重置 → 非法参数报错。",
+  "tags": ["gm"],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile sect --yes",
+    "timeout": 60
+  },
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_gm_002",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#闭关",
+      "note": "进入修炼中状态"
+    },
+    {
+      "type": "expect",
+      "match": "已进入闭关状态",
+      "timeout": 30,
+      "note": "闭关开始"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 时间快进 3600 确认",
+      "note": "D1：全库到期类时间戳前移 3600 秒"
+    },
+    {
+      "type": "expect",
+      "match": "re:✅ 时间已快进 3600 秒（共前移 \\d+ 条记录）：[\\s\\S]*闭关开始时间：1 条",
+      "timeout": 30,
+      "note": "闭关开始时间被前移"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#出关",
+      "note": "时长约 1 小时 ≥ 1 分钟，正常结算修为"
+    },
+    {
+      "type": "expect",
+      "match": "re:🌟 道友出关成功！[\\s\\S]*闭关时长：1小时[\\s\\S]*获得修为：[\\d,]+",
+      "timeout": 30,
+      "note": "出关成功（若时间未快进会提示不足1分钟）"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#闭关",
+      "note": "再次进入修炼中"
+    },
+    {
+      "type": "expect",
+      "match": "已进入闭关状态",
+      "timeout": 30,
+      "note": "二次闭关开始"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 清除全部冷却 900000002 确认",
+      "note": "D3：一键归零忙碌状态与全部冷却"
+    },
+    {
+      "type": "expect",
+      "match": "re:✅ 已清除【[^】]*】的全部冷却状态：[\\s\\S]*忙碌状态：1 条",
+      "timeout": 30,
+      "note": "忙碌状态被清除"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#开始历练 巡山",
+      "note": "忙碌已清除，可正常开始历练"
+    },
+    {
+      "type": "expect",
+      "match": "re:你选择了「巡山问道」|你踏上了历练之路|历练开始",
+      "timeout": 30,
+      "note": "历练开始成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 随机种子 42",
+      "note": "D4：进程级固定全局随机种子"
+    },
+    {
+      "type": "expect",
+      "match": "re:✅ 已设定全局随机种子：42",
+      "timeout": 30,
+      "note": "种子设定成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 随机种子 重置",
+      "note": "恢复系统熵随机源"
+    },
+    {
+      "type": "expect",
+      "match": "re:✅ 已恢复系统熵随机源",
+      "timeout": 30,
+      "note": "种子重置成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 随机种子 abc",
+      "note": "非法参数给出用法提示"
+    },
+    {
+      "type": "expect",
+      "match": "re:❌ 参数错误：/修仙GM 随机种子 <整数>",
+      "timeout": 30,
+      "note": "非法参数报错"
+    }
+  ]
+}

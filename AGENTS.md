@@ -227,7 +227,7 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
   - 写入 `functional_tests/results/<YYYY-MM-DD>_<target>/summary.md` + `cases/` + `messages/`；
   - **结果目录命名固定** `<YYYY-MM-DD>_<target>`（如 `2026-08-17_pvp-effects`）；已存在时自动加后缀，不覆盖历史。
 - **fixture 基线数据**（兼容保留；平台 v0.3.0 起宗门用例已在用例内声明 `pre_run_hook` 调用它，无需外部编排）：`uv run python scripts/test_suite_ctl.py fixture --profile pvp|sect`
-  - 向专用测试实例的插件数据库写入固定测试 ID（`900000001`/`900000002`/`900000003`，sect 另含新建型 `900000004`/`900000005`/`900000006`/`900000008`）的玩家属性、储物戒、`player_skills`、清除冷却/忙碌状态，并复位宗门行与商店种子；
+  - 向专用测试实例的插件数据库写入固定测试 ID（`900000001`/`900000002`/`900000003`，sect 另含新建型 `900000004`/`900000005`/`900000006`/`900000008`）的玩家属性、储物戒、`player_skills`、清除冷却/忙碌状态，并复位宗门行与商店种子（丹阁筑基丹、器阁狼牙棒）；
   - ⚠ 仅用于独立测试实例，禁止对正式数据执行；操作前脚本会确认。
 - **新玩法/功能变更后**：先看 `functional_tests/` 是否有对应域用例；有则补/改用例并跑一次对应 tag；发现的功能 Bug 用 `bd` 登记，不在本套件中直接修游戏代码。
 - **平台能力边界**：`functional_tests/platform-gap-report.md` 列出当前平台 Supported / Partially supported / Unsupported 清单；新用例优先只依赖 Supported 能力。

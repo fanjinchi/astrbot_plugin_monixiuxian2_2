@@ -1,0 +1,218 @@
+[
+  {
+    "id": 6583,
+    "conversation_id": 508,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除CD 900000002 确认",
+    "rich": null,
+    "created_at": 1788224765.5893373
+  },
+  {
+    "id": 6584,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 目标玩家当前不在任何忙碌状态！",
+    "rich": [],
+    "created_at": 1788224765.6018271
+  },
+  {
+    "id": 6585,
+    "conversation_id": 508,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 师承",
+    "rich": null,
+    "created_at": 1788224765.8991823
+  },
+  {
+    "id": 6586,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "📜 师承任务 · 青云门\n━━━━━━━━━━━━━━━\n▶ 【入门演武】历练/秘境战斗胜利：0/3\n  玄诚子：新入门弟子，先去后山演武场活动筋骨，胜三场妖兽来见我。\n  奖励：贡献+50、修为+200\n🔒 【采药历练】未解锁\n🔒 【破境之礼】未解锁\n—— 玄诚子",
+    "rich": [],
+    "created_at": 1788224765.911838
+  },
+  {
+    "id": 6587,
+    "conversation_id": 508,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 师承推进 900000002 战斗",
+    "rich": null,
+    "created_at": 1788224766.207548
+  },
+  {
+    "id": 6588,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已推进师承任务：\n\n📜 师承任务【入门演武】进度：1/3",
+    "rich": [],
+    "created_at": 1788224766.2333012
+  },
+  {
+    "id": 6589,
+    "conversation_id": 508,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 师承推进 900000002 战斗",
+    "rich": null,
+    "created_at": 1788224766.522299
+  },
+  {
+    "id": 6590,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已推进师承任务：\n\n📜 师承任务【入门演武】进度：2/3",
+    "rich": [],
+    "created_at": 1788224766.5479608
+  },
+  {
+    "id": 6591,
+    "conversation_id": 508,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 师承推进 900000002 战斗",
+    "rich": null,
+    "created_at": 1788224766.8370264
+  },
+  {
+    "id": 6592,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已推进师承任务：\n\n📜 师承任务【入门演武】完成！\n玄诚子：新入门弟子，先去后山演武场活动筋骨，胜三场妖兽来见我。\n—— 玄诚子\n奖励：宗门贡献 +50、修为 +200\n下一阶段：【采药历练】",
+    "rich": [],
+    "created_at": 1788224766.8577464
+  },
+  {
+    "id": 6593,
+    "conversation_id": 508,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 师承推进 900000002 战斗",
+    "rich": null,
+    "created_at": 1788224767.1475291
+  },
+  {
+    "id": 6594,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已推进师承任务：当前阶段与该事件不匹配（查看 /师承任务 了解阶段）。",
+    "rich": [],
+    "created_at": 1788224767.165754
+  },
+  {
+    "id": 6595,
+    "conversation_id": 508,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 师承",
+    "rich": null,
+    "created_at": 1788224767.4618113
+  },
+  {
+    "id": 6596,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "📜 师承任务 · 青云门\n━━━━━━━━━━━━━━━\n✅ 【入门演武】已完成\n▶ 【采药历练】完成历练：0/1\n  玄诚子：丹房缺几味常见灵草，你去历练一趟，顺便把采药的规矩学了。\n  奖励：贡献+80、宗门功法领悟机会\n🔒 【破境之礼】未解锁\n—— 玄诚子",
+    "rich": [],
+    "created_at": 1788224767.4802334
+  },
+  {
+    "id": 6597,
+    "conversation_id": 508,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#开始历练",
+    "rich": null,
+    "created_at": 1788224767.7766366
+  },
+  {
+    "id": 6598,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 你选择了「巡山问道」——巡视宗门附近的山麓，收集灵药与情报，风险最低，适合试探与凑进度。\n路线风险：低 | 历练时长：30 分钟\n（该路线完成后需要休整 5 分钟）",
+    "rich": [],
+    "created_at": 1788224767.7951412
+  },
+  {
+    "id": 6599,
+    "conversation_id": 508,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 触发历练结算 900000002",
+    "rich": null,
+    "created_at": 1788224768.0854282
+  },
+  {
+    "id": 6600,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已强制结算【测试玩家1】的历练\n🚶 历练归来 · 巡山问道\n━━━━━━━━━━━━━━━\n路遇前辈赠予心得与灵石，你受益良多。\n\n本次历练：0 分钟\n获得修为：+405\n获得灵石：+183\n━━━━━━━━━━━━━━━\n当前修为：605\n当前灵石：100,183\n⏳ 该路线休整：5 分钟\n\n📜 师承任务【采药历练】完成！\n玄诚子：丹房缺几味常见灵草，你去历练一趟，顺便把采药的规矩学了。\n—— 玄诚子\n奖励：【青云剑诀】升至 2 星、宗门贡献 +80\n下一阶段：【破境之礼】",
+    "rich": [],
+    "created_at": 1788224768.1339672
+  },
+  {
+    "id": 6601,
+    "conversation_id": 508,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置修为 900000002 999999",
+    "rich": null,
+    "created_at": 1788224768.4003088
+  },
+  {
+    "id": 6602,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的修为设置为 999,999",
+    "rich": [],
+    "created_at": 1788224768.4249039
+  },
+  {
+    "id": 6603,
+    "conversation_id": 508,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#突破",
+    "rich": null,
+    "created_at": 1788224768.7156281
+  },
+  {
+    "id": 6604,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "开始尝试突破...",
+    "rich": [],
+    "created_at": 1788224768.7334726
+  },
+  {
+    "id": 6605,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 突破成功！✨\n━━━━━━━━━━━━━━━\n基础成功率：100.0%\n永久加成：+100.0%\n最终成功率：100.0%\n━━━━━━━━━━━━━━━\n恭喜你从【练气二阶】突破至【练气三阶】！\n\n【属性增长】\n气血 +15\n伤害 +4\n身法 +0\n迅捷 +1\n\n【当前属性】\n伤害：104\n身法：50\n迅捷：51\n气血：1015\n护甲：0\n\n🎁 仙缘际会，获得丹药【小法盾丹】x1、【小力量丹】x1！",
+    "rich": [],
+    "created_at": 1788224768.767956
+  },
+  {
+    "id": 6606,
+    "conversation_id": 508,
+    "direction": "out",
+    "sender": "bot",
+    "text": "📜 师承任务【破境之礼】完成！\n清微道长：破境乃修行第一关，成之后来执事堂登记，门中自有嘉奖。\n—— 玄诚子\n奖励：宗门贡献 +150、修为 +1000\n🎓 师承任务已全部完成！",
+    "rich": [],
+    "created_at": 1788224768.7856133
+  }
+]

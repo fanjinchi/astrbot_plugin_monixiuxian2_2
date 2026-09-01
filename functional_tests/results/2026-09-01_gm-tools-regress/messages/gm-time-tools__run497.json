@@ -1,0 +1,164 @@
+[
+  {
+    "id": 6539,
+    "conversation_id": 505,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#闭关",
+    "rich": null,
+    "created_at": 1788224758.0126503
+  },
+  {
+    "id": 6540,
+    "conversation_id": 505,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🧘 道友已进入闭关状态\n━━━━━━━━━━━━━━━\n闭关期间，你将与世隔绝，潜心修炼。\n💡 发送「出关」结束闭关\n⏱️ 每分钟将获得修为，受灵根资质影响。",
+    "rich": [],
+    "created_at": 1788224758.039232
+  },
+  {
+    "id": 6541,
+    "conversation_id": 505,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 时间快进 3600 确认",
+    "rich": null,
+    "created_at": 1788224758.3222005
+  },
+  {
+    "id": 6542,
+    "conversation_id": 505,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 时间已快进 3600 秒（共前移 5 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：1 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  贷款到期时间：0 条\n  悬赏放弃冷却：0 条\n  Boss/灵眼下次刷新时间：2 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+    "rich": [],
+    "created_at": 1788224758.3479385
+  },
+  {
+    "id": 6543,
+    "conversation_id": 505,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#出关",
+    "rich": null,
+    "created_at": 1788224758.6363926
+  },
+  {
+    "id": 6544,
+    "conversation_id": 505,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🌟 道友出关成功！\n━━━━━━━━━━━━━━━\n⏱️ 闭关时长：1小时\n📈 获得修为：6,000\n💫 当前修为：6,000\n━━━━━━━━━━━━━━━\n道友已回归红尘，可继续修行。",
+    "rich": [],
+    "created_at": 1788224758.6679235
+  },
+  {
+    "id": 6545,
+    "conversation_id": 505,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#闭关",
+    "rich": null,
+    "created_at": 1788224758.9512138
+  },
+  {
+    "id": 6546,
+    "conversation_id": 505,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🧘 道友已进入闭关状态\n━━━━━━━━━━━━━━━\n闭关期间，你将与世隔绝，潜心修炼。\n💡 发送「出关」结束闭关\n⏱️ 每分钟将获得修为，受灵根资质影响。",
+    "rich": [],
+    "created_at": 1788224758.983673
+  },
+  {
+    "id": 6547,
+    "conversation_id": 505,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除全部冷却 900000002 确认",
+    "rich": null,
+    "created_at": 1788224759.2660992
+  },
+  {
+    "id": 6548,
+    "conversation_id": 505,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已清除【测试玩家1】的全部冷却状态：\n  忙碌状态：1 条",
+    "rich": [],
+    "created_at": 1788224759.299967
+  },
+  {
+    "id": 6549,
+    "conversation_id": 505,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#开始历练 巡山",
+    "rich": null,
+    "created_at": 1788224759.580544
+  },
+  {
+    "id": 6550,
+    "conversation_id": 505,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 你选择了「巡山问道」——巡视宗门附近的山麓，收集灵药与情报，风险最低，适合试探与凑进度。\n路线风险：低 | 历练时长：30 分钟\n（该路线完成后需要休整 5 分钟）",
+    "rich": [],
+    "created_at": 1788224759.6048386
+  },
+  {
+    "id": 6551,
+    "conversation_id": 505,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 随机种子 42",
+    "rich": null,
+    "created_at": 1788224759.8952303
+  },
+  {
+    "id": 6552,
+    "conversation_id": 505,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已设定全局随机种子：42\n⚠️ 仅限测试场景：进程级生效——同进程所有使用全局 random 的组件（含宿主其他插件）都进入固定序列；「随机种子 重置」或重启进程即恢复。\n💡 与测试平台 deterministic+seed 同机制（双方都重置全局种子），后执行者生效：平台用例开启 deterministic 时会在每次 send 前覆盖 GM 种子。",
+    "rich": [],
+    "created_at": 1788224759.906644
+  },
+  {
+    "id": 6553,
+    "conversation_id": 505,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 随机种子 重置",
+    "rich": null,
+    "created_at": 1788224760.2049532
+  },
+  {
+    "id": 6554,
+    "conversation_id": 505,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已恢复系统熵随机源，后续随机行为不再按固定序列产出。\n⚠️ 仅限测试场景使用。",
+    "rich": [],
+    "created_at": 1788224760.2206876
+  },
+  {
+    "id": 6555,
+    "conversation_id": 505,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 随机种子 abc",
+    "rich": null,
+    "created_at": 1788224760.520564
+  },
+  {
+    "id": 6556,
+    "conversation_id": 505,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 参数错误：/修仙GM 随机种子 <整数> 设定固定种子，或 /修仙GM 随机种子 重置 恢复随机。",
+    "rich": [],
+    "created_at": 1788224760.5363154
+  }
+]

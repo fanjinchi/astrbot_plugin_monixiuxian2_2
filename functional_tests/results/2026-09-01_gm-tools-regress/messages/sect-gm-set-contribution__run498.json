@@ -1,0 +1,110 @@
+[
+  {
+    "id": 6557,
+    "conversation_id": 506,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除CD 900000002 确认",
+    "rich": null,
+    "created_at": 1788224761.0456157
+  },
+  {
+    "id": 6558,
+    "conversation_id": 506,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 目标玩家当前不在任何忙碌状态！",
+    "rich": [],
+    "created_at": 1788224761.0572078
+  },
+  {
+    "id": 6559,
+    "conversation_id": 506,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置贡献 900000002 30000",
+    "rich": null,
+    "created_at": 1788224761.3541486
+  },
+  {
+    "id": 6560,
+    "conversation_id": 506,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的宗门贡献设置为 30,000",
+    "rich": [],
+    "created_at": 1788224761.378832
+  },
+  {
+    "id": 6561,
+    "conversation_id": 506,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000002 练气九阶",
+    "rich": null,
+    "created_at": 1788224761.6682093
+  },
+  {
+    "id": 6562,
+    "conversation_id": 506,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的境界设置为「练气九阶」",
+    "rich": [],
+    "created_at": 1788224761.6925704
+  },
+  {
+    "id": 6563,
+    "conversation_id": 506,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 晋升",
+    "rich": null,
+    "created_at": 1788224761.981944
+  },
+  {
+    "id": 6564,
+    "conversation_id": 506,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎖️ 晋升成功！你已成为【内门弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+100 灵石\n商店折扣：9.5折\n传承解锁：heart_qy_001",
+    "rich": [],
+    "created_at": 1788224762.007281
+  },
+  {
+    "id": 6565,
+    "conversation_id": 506,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 晋升",
+    "rich": null,
+    "created_at": 1788224762.295943
+  },
+  {
+    "id": 6566,
+    "conversation_id": 506,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎖️ 晋升成功！你已成为【亲传弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+300 灵石\n商店折扣：9折\n传承解锁：wpn_qy_001",
+    "rich": [],
+    "created_at": 1788224762.3211358
+  },
+  {
+    "id": 6567,
+    "conversation_id": 506,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 晋升",
+    "rich": null,
+    "created_at": 1788224762.6100764
+  },
+  {
+    "id": 6568,
+    "conversation_id": 506,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎖️ 晋升成功！你已成为【长老】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+800 灵石\n商店折扣：8.5折",
+    "rich": [],
+    "created_at": 1788224762.635626
+  }
+]

@@ -1,0 +1,110 @@
+[
+  {
+    "id": 6527,
+    "conversation_id": 504,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1788224756.0136127
+  },
+  {
+    "id": 6528,
+    "conversation_id": 504,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1788224756.0282571
+  },
+  {
+    "id": 6529,
+    "conversation_id": 504,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000002 练气一阶",
+    "rich": null,
+    "created_at": 1788224756.3253975
+  },
+  {
+    "id": 6530,
+    "conversation_id": 504,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的境界设置为「练气一阶」",
+    "rich": [],
+    "created_at": 1788224756.3554652
+  },
+  {
+    "id": 6531,
+    "conversation_id": 504,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置攻击 900000002 200",
+    "rich": null,
+    "created_at": 1788224756.6433444
+  },
+  {
+    "id": 6532,
+    "conversation_id": 504,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的攻击设置为 200",
+    "rich": [],
+    "created_at": 1788224756.6734564
+  },
+  {
+    "id": 6533,
+    "conversation_id": 504,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 给予装备 900000002 青铜剑 1",
+    "rich": null,
+    "created_at": 1788224756.9601038
+  },
+  {
+    "id": 6534,
+    "conversation_id": 504,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已向【测试玩家1】的储物戒放入 青铜剑 x1",
+    "rich": [],
+    "created_at": 1788224756.9865284
+  },
+  {
+    "id": 6535,
+    "conversation_id": 504,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#闭关",
+    "rich": null,
+    "created_at": 1788224757.276064
+  },
+  {
+    "id": 6536,
+    "conversation_id": 504,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🧘 道友已进入闭关状态\n━━━━━━━━━━━━━━━\n闭关期间，你将与世隔绝，潜心修炼。\n💡 发送「出关」结束闭关\n⏱️ 每分钟将获得修为，受灵根资质影响。",
+    "rich": [],
+    "created_at": 1788224757.3082516
+  },
+  {
+    "id": 6537,
+    "conversation_id": 504,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除CD 900000002 确认",
+    "rich": null,
+    "created_at": 1788224757.5903978
+  },
+  {
+    "id": 6538,
+    "conversation_id": 504,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已清除【测试玩家1】的忙碌状态",
+    "rich": [],
+    "created_at": 1788224757.6220374
+  }
+]

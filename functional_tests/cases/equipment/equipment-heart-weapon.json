@@ -7,6 +7,10 @@
     "gm",
     "core-smoke"
   ],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pvp --yes",
+    "timeout": 60
+  },
   "conversation": {
     "kind": "group",
     "group_id": "webtest_pvp_001",

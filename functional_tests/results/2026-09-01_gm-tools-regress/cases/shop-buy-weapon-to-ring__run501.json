@@ -1,0 +1,336 @@
+{
+  "id": 501,
+  "case_name": "shop-buy-weapon-to-ring",
+  "run_index": 5,
+  "status": "passed",
+  "conversation_id": 509,
+  "steps_result": [
+    {
+      "index": -1,
+      "type": "pre_run_hook",
+      "note": "",
+      "ok": true,
+      "detail": "hook 退出码 0：已备份现有固定 ID 数据 -> /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/functional_tests/.fixture-backup.json\nfixture sect 完成：2 个固定测试玩家已重置",
+      "actual": [],
+      "duration": 0.05
+    },
+    {
+      "index": 0,
+      "type": "send",
+      "note": "新建玩家（fixture 已复位为无宗门初始态）",
+      "ok": true,
+      "detail": "已注入（消息 #6607）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "玩家就绪",
+      "ok": true,
+      "detail": "匹配（消息 #6608：道友，你已踏入仙途，无需重复此举。）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。"
+      ],
+      "expected": "re:恭喜道友|已踏入仙途",
+      "matched": {
+        "id": 6608,
+        "window_index": 0,
+        "text": "道友，你已踏入仙途，无需重复此举。"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "准备购买资金",
+      "ok": true,
+      "detail": "已注入（消息 #6609）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 3,
+      "type": "expect",
+      "note": "灵石设置成功",
+      "ok": true,
+      "detail": "匹配（消息 #6610：✅ 已将【测试玩家4】的灵石设置为 10,000）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已将【测试玩家4】的灵石设置为 10,000"
+      ],
+      "expected": "re:已将【[^】]*】的灵石设置为 10,000",
+      "matched": {
+        "id": 6610,
+        "window_index": 1,
+        "text": "✅ 已将【测试玩家4】的灵石设置为 10,000"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 4,
+      "type": "send",
+      "note": "fixture 预置：狼牙棒 6000 灵石、库存 5",
+      "ok": true,
+      "detail": "已注入（消息 #6611）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 5,
+      "type": "expect",
+      "note": "器阁列表可见狼牙棒",
+      "ok": true,
+      "detail": "匹配（消息 #6612：=== 器阁 ===\n1. [灵品] 狼牙棒 (武器)\n   价格: 6000 灵石 库存:5\n\n下次刷新: 5小时59）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已将【测试玩家4】的灵石设置为 10,000",
+        "=== 器阁 ===\n1. [灵品] 狼牙棒 (武器)\n   价格: 6000 灵石 库存:5\n\n下次刷新: 5小时59分钟后\n提示: 使用 '购买 [物品名]' 购买物品"
+      ],
+      "expected": "re:=== 器阁 ===[\\s\\S]*狼牙棒[\\s\\S]*价格: 6000 灵石",
+      "matched": {
+        "id": 6612,
+        "window_index": 2,
+        "text": "=== 器阁 ===\n1. [灵品] 狼牙棒 (武器)\n   价格: 6000 灵石 库存:5\n\n下次刷新: 5小时59分钟后\n提示: 使用 '购买 [物品名]' 购买物品"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 6,
+      "type": "send",
+      "note": "实证 bug 回归：购买武器入戒并扣灵石",
+      "ok": true,
+      "detail": "已注入（消息 #6613）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 7,
+      "type": "expect",
+      "note": "武器入戒且正确扣费",
+      "ok": true,
+      "detail": "匹配（消息 #6614：成功购买武器【狼牙棒】x1，已存入储物戒。\n花费灵石: 6000，剩余: 4000\n剩余库存: 4）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已将【测试玩家4】的灵石设置为 10,000",
+        "=== 器阁 ===\n1. [灵品] 狼牙棒 (武器)\n   价格: 6000 灵石 库存:5\n\n下次刷新: 5小时59分钟后\n提示: 使用 '购买 [物品名]' 购买物品",
+        "成功购买武器【狼牙棒】x1，已存入储物戒。\n花费灵石: 6000，剩余: 4000\n剩余库存: 4"
+      ],
+      "expected": "re:成功购买武器【狼牙棒】x1，已存入储物戒。[\\s\\S]*花费灵石: 6000，剩余: 4000",
+      "matched": {
+        "id": 6614,
+        "window_index": 3,
+        "text": "成功购买武器【狼牙棒】x1，已存入储物戒。\n花费灵石: 6000，剩余: 4000\n剩余库存: 4"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 8,
+      "type": "send",
+      "note": "确认武器已在储物戒中",
+      "ok": true,
+      "detail": "已注入（消息 #6615）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 9,
+      "type": "expect",
+      "note": "储物戒含狼牙棒",
+      "ok": true,
+      "detail": "匹配（消息 #6616：=== p1 的储物戒 ===\n【乾坤储物戒】（圣品）\n高阶储物法器，内含小型乾坤，空间广阔。\n\n容量：1/120格\n━）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已将【测试玩家4】的灵石设置为 10,000",
+        "=== 器阁 ===\n1. [灵品] 狼牙棒 (武器)\n   价格: 6000 灵石 库存:5\n\n下次刷新: 5小时59分钟后\n提示: 使用 '购买 [物品名]' 购买物品",
+        "成功购买武器【狼牙棒】x1，已存入储物戒。\n花费灵石: 6000，剩余: 4000\n剩余库存: 4",
+        "=== p1 的储物戒 ===\n【乾坤储物戒】（圣品）\n高阶储物法器，内含小型乾坤，空间广阔。\n\n容量：1/120格\n━━━━━━━━━━━━━━━\n【其他】\n  · 狼牙棒\n\n============================\n存入：存入 物品名 [数量]\n取出：取出 物品名 [数量]\n搜索：搜索物品 关键词\n升级：更换储物戒 储物戒名"
+      ],
+      "expected": "re:=== [^\\n]* 的储物戒 ===[\\s\\S]*容量：1/[\\s\\S]*· 狼牙棒",
+      "matched": {
+        "id": 6616,
+        "window_index": 4,
+        "text": "=== p1 的储物戒 ===\n【乾坤储物戒】（圣品）\n高阶储物法器，内含小型乾坤，空间广阔。\n\n容量：1/120格\n━━━━━━━━━━━━━━━\n【其他】\n  · 狼牙棒\n\n============================\n存入"
+      },
+      "duration": 0.3
+    }
+  ],
+  "case_snapshot": {
+    "name": "shop-buy-weapon-to-ring",
+    "description": "回归实证 bug（v3.13.0 事务原子性修复，store_item external_transaction 路径）：普通商店（器阁）购买武器必须成功存入储物戒并正确扣减灵石（购买丢货扣钱 bug 根因：写锁内二次重取 player 对象被旧对象覆盖）。",
+    "scenario": "群聊：fixture 预置器阁狼牙棒（6000 灵石、库存 5）+ 新建玩家 p1 → 我要修仙 → GM 设置灵石 10000 → 器阁列表见狼牙棒 → 购买 狼牙棒 → 成功购买武器已存入储物戒 → 储物戒列表含狼牙棒且容量 1/20。",
+    "tags": [
+      "economy",
+      "shop",
+      "gm"
+    ],
+    "pre_run_hook": {
+      "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile sect --yes",
+      "timeout": 60
+    },
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_econ_001",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000004"
+      }
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#我要修仙 灵修",
+        "note": "新建玩家（fixture 已复位为无宗门初始态）"
+      },
+      {
+        "type": "expect",
+        "match": "re:恭喜道友|已踏入仙途",
+        "timeout": 30,
+        "note": "玩家就绪"
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置灵石 900000004 10000",
+        "note": "准备购买资金"
+      },
+      {
+        "type": "expect",
+        "match": "re:已将【[^】]*】的灵石设置为 10,000",
+        "timeout": 30,
+        "note": "灵石设置成功"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#器阁",
+        "note": "fixture 预置：狼牙棒 6000 灵石、库存 5"
+      },
+      {
+        "type": "expect",
+        "match": "re:=== 器阁 ===[\\s\\S]*狼牙棒[\\s\\S]*价格: 6000 灵石",
+        "timeout": 30,
+        "note": "器阁列表可见狼牙棒"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#购买 狼牙棒",
+        "note": "实证 bug 回归：购买武器入戒并扣灵石"
+      },
+      {
+        "type": "expect",
+        "match": "re:成功购买武器【狼牙棒】x1，已存入储物戒。[\\s\\S]*花费灵石: 6000，剩余: 4000",
+        "timeout": 30,
+        "note": "武器入戒且正确扣费"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#储物戒",
+        "note": "确认武器已在储物戒中"
+      },
+      {
+        "type": "expect",
+        "match": "re:=== [^\\n]* 的储物戒 ===[\\s\\S]*容量：1/[\\s\\S]*· 狼牙棒",
+        "timeout": 30,
+        "note": "储物戒含狼牙棒"
+      }
+    ]
+  },
+  "run_messages": [
+    {
+      "id": 6607,
+      "conversation_id": 509,
+      "direction": "in",
+      "sender": "900000004",
+      "text": "#我要修仙 灵修",
+      "rich": null,
+      "created_at": 1788224769.6191514
+    },
+    {
+      "id": 6608,
+      "conversation_id": 509,
+      "direction": "out",
+      "sender": "bot",
+      "text": "道友，你已踏入仙途，无需重复此举。",
+      "rich": [],
+      "created_at": 1788224769.6306775
+    },
+    {
+      "id": 6609,
+      "conversation_id": 509,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置灵石 900000004 10000",
+      "rich": null,
+      "created_at": 1788224769.9285715
+    },
+    {
+      "id": 6610,
+      "conversation_id": 509,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家4】的灵石设置为 10,000",
+      "rich": [],
+      "created_at": 1788224769.965667
+    },
+    {
+      "id": 6611,
+      "conversation_id": 509,
+      "direction": "in",
+      "sender": "900000004",
+      "text": "#器阁",
+      "rich": null,
+      "created_at": 1788224770.2526648
+    },
+    {
+      "id": 6612,
+      "conversation_id": 509,
+      "direction": "out",
+      "sender": "bot",
+      "text": "=== 器阁 ===\n1. [灵品] 狼牙棒 (武器)\n   价格: 6000 灵石 库存:5\n\n下次刷新: 5小时59分钟后\n提示: 使用 '购买 [物品名]' 购买物品",
+      "rich": [],
+      "created_at": 1788224770.2695417
+    },
+    {
+      "id": 6613,
+      "conversation_id": 509,
+      "direction": "in",
+      "sender": "900000004",
+      "text": "#购买 狼牙棒",
+      "rich": null,
+      "created_at": 1788224770.568436
+    },
+    {
+      "id": 6614,
+      "conversation_id": 509,
+      "direction": "out",
+      "sender": "bot",
+      "text": "成功购买武器【狼牙棒】x1，已存入储物戒。\n花费灵石: 6000，剩余: 4000\n剩余库存: 4",
+      "rich": [],
+      "created_at": 1788224770.594804
+    },
+    {
+      "id": 6615,
+      "conversation_id": 509,
+      "direction": "in",
+      "sender": "900000004",
+      "text": "#储物戒",
+      "rich": null,
+      "created_at": 1788224770.88304
+    },
+    {
+      "id": 6616,
+      "conversation_id": 509,
+      "direction": "out",
+      "sender": "bot",
+      "text": "=== p1 的储物戒 ===\n【乾坤储物戒】（圣品）\n高阶储物法器，内含小型乾坤，空间广阔。\n\n容量：1/120格\n━━━━━━━━━━━━━━━\n【其他】\n  · 狼牙棒\n\n============================\n存入：存入 物品名 [数量]\n取出：取出 物品名 [数量]\n搜索：搜索物品 关键词\n升级：更换储物戒 储物戒名",
+      "rich": [],
+      "created_at": 1788224770.8962858
+    }
+  ],
+  "started_at": 1788224769.5277073,
+  "finished_at": 1788224771.192518
+}

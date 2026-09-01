@@ -1,0 +1,92 @@
+[
+  {
+    "id": 6607,
+    "conversation_id": 509,
+    "direction": "in",
+    "sender": "900000004",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1788224769.6191514
+  },
+  {
+    "id": 6608,
+    "conversation_id": 509,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1788224769.6306775
+  },
+  {
+    "id": 6609,
+    "conversation_id": 509,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置灵石 900000004 10000",
+    "rich": null,
+    "created_at": 1788224769.9285715
+  },
+  {
+    "id": 6610,
+    "conversation_id": 509,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家4】的灵石设置为 10,000",
+    "rich": [],
+    "created_at": 1788224769.965667
+  },
+  {
+    "id": 6611,
+    "conversation_id": 509,
+    "direction": "in",
+    "sender": "900000004",
+    "text": "#器阁",
+    "rich": null,
+    "created_at": 1788224770.2526648
+  },
+  {
+    "id": 6612,
+    "conversation_id": 509,
+    "direction": "out",
+    "sender": "bot",
+    "text": "=== 器阁 ===\n1. [灵品] 狼牙棒 (武器)\n   价格: 6000 灵石 库存:5\n\n下次刷新: 5小时59分钟后\n提示: 使用 '购买 [物品名]' 购买物品",
+    "rich": [],
+    "created_at": 1788224770.2695417
+  },
+  {
+    "id": 6613,
+    "conversation_id": 509,
+    "direction": "in",
+    "sender": "900000004",
+    "text": "#购买 狼牙棒",
+    "rich": null,
+    "created_at": 1788224770.568436
+  },
+  {
+    "id": 6614,
+    "conversation_id": 509,
+    "direction": "out",
+    "sender": "bot",
+    "text": "成功购买武器【狼牙棒】x1，已存入储物戒。\n花费灵石: 6000，剩余: 4000\n剩余库存: 4",
+    "rich": [],
+    "created_at": 1788224770.594804
+  },
+  {
+    "id": 6615,
+    "conversation_id": 509,
+    "direction": "in",
+    "sender": "900000004",
+    "text": "#储物戒",
+    "rich": null,
+    "created_at": 1788224770.88304
+  },
+  {
+    "id": 6616,
+    "conversation_id": 509,
+    "direction": "out",
+    "sender": "bot",
+    "text": "=== p1 的储物戒 ===\n【乾坤储物戒】（圣品）\n高阶储物法器，内含小型乾坤，空间广阔。\n\n容量：1/120格\n━━━━━━━━━━━━━━━\n【其他】\n  · 狼牙棒\n\n============================\n存入：存入 物品名 [数量]\n取出：取出 物品名 [数量]\n搜索：搜索物品 关键词\n升级：更换储物戒 储物戒名",
+    "rich": [],
+    "created_at": 1788224770.8962858
+  }
+]
