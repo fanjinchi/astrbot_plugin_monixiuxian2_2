@@ -3,6 +3,10 @@
   "description": "spec Requirement「拜入与出师」：默认宗门按境界区间招收——区间内拜入成功、区间外拒绝；出师后可改投他派。",
   "scenario": "新建玩家（练气一阶）拜入青云门（区间 0-5）成功；出师后拜入合欢宗（区间 2-6）被拒（练气一阶超区间）；GM 抬到练气三阶后拜入成功。",
   "tags": ["sect", "smoke"],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile sect --yes",
+    "timeout": 60
+  },
   "conversation": {
     "kind": "group",
     "group_id": "webtest_sect_002",

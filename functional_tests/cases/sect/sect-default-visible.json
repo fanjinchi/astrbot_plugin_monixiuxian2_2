@@ -3,6 +3,10 @@
   "description": "spec Requirement「默认宗门配置与播种」：默认宗门（青云门/合欢宗）在宗门列表可见，且玩家不可用同名创建宗门（系统名保留）。",
   "scenario": "新建玩家在群聊中查询宗门列表看到两个默认宗门；GM 将等级/灵石抬高后尝试创建同名宗门被保留名拦截。",
   "tags": ["sect", "smoke"],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile sect --yes",
+    "timeout": 60
+  },
   "conversation": {
     "kind": "group",
     "group_id": "webtest_sect_001",

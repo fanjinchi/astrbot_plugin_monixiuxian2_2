@@ -212,21 +212,22 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 
 > 统一存放本项目功能测试用例源文件与测试结果：`functional_tests/`。用例源文件在 `functional_tests/cases/`，按功能域分子目录；测试平台数据目录 `data/plugin_data/astrbot_plugin_testplatform/cases/` 只保留同步后的拍平副本。流程说明见 `functional_tests/README.md`。
 
-- **用例存放**：`functional_tests/cases/<domain>/<name>.json`；用例 `name` 必须等于文件名且全局唯一，JSON 兼容测试平台 `loader.validate_case`（必填 `description`/`scenario`/`steps`）。
+- **用例存放**：`functional_tests/cases/<domain>/<name>.json`；用例 `name` 必须等于文件名且全局唯一，JSON 兼容测试平台 `loader.validate_case`（必填 `description`/`scenario`/`steps`；顶层可声明 `pre_run_hook`，平台 v0.3.0 起每轮首步前由服务端执行复位命令——宗门用例已内嵌 fixture 复位）。
 - **同步到平台**：`uv run python scripts/test_suite_ctl.py sync-cases`
   - 扫描 `functional_tests/cases/**/*.json` → 校验合法性 + 名称全局唯一 → 拍平复制到平台 `cases/` 顶层。
 - **运行用例**：支持脚本或平台 CLI：
   - `uv run python scripts/test_suite_ctl.py run --tag <tag> [--repeat N]`
   - `uv run python scripts/test_suite_ctl.py run --case <name> [--repeat N]`
   - one-shot 编排（推荐）：`run --sync --reload <plugin> --export <dir> [--quiet]`——跑前同步用例 + 热重载被测插件 + 结果落盘 `summary.json`（插件名用平台注册名 `astrbot_plugin_monixiuxian2_2`）。
+  - 宗门域：用例已内嵌 `pre_run_hook`（command 调 `fixture --profile sect --yes`）自动复位基线，`run --tag sect` 无需 `--fixture`（该参数保留兼容，PvP 抽样仍可用）。
   - 或平台 CLI（详细用法见 SKILL.md）：`uv run python data/plugins/astrbot_plugin_testplatform/scripts/test_platform_cli.py case run <case>` / `case run-all --tag <tag> --sync-from <dir> --reload <plugin> --export <dir>`。
   - 依赖环境变量 `WEBTEST_URL` / `WEBTEST_TOKEN`（同平台 CLI）。
   - 注意：平台 CLI 的 `--sync-from`/`check --source` 为非递归 `*.json` glob，只能处理拍平目录；分域子目录源必须用 `test_suite_ctl.py sync-cases` 同步。
 - **结果归档**：`uv run python scripts/test_suite_ctl.py export --target <target> [--date <YYYY-MM-DD>]`
   - 写入 `functional_tests/results/<YYYY-MM-DD>_<target>/summary.md` + `cases/` + `messages/`；
   - **结果目录命名固定** `<YYYY-MM-DD>_<target>`（如 `2026-08-17_pvp-effects`）；已存在时自动加后缀，不覆盖历史。
-- **PvP fixture**（可选）：`uv run python scripts/test_suite_ctl.py fixture --profile pvp`
-  - 向专用测试实例的插件数据库写入固定测试 ID（`900000001`/`900000002`/`900000003`）的玩家属性、储物戒、`player_skills`、清除冷却/忙碌状态；
+- **fixture 基线数据**（兼容保留；平台 v0.3.0 起宗门用例已在用例内声明 `pre_run_hook` 调用它，无需外部编排）：`uv run python scripts/test_suite_ctl.py fixture --profile pvp|sect`
+  - 向专用测试实例的插件数据库写入固定测试 ID（`900000001`/`900000002`/`900000003`，sect 另含新建型 `900000004`/`900000005`/`900000006`/`900000008`）的玩家属性、储物戒、`player_skills`、清除冷却/忙碌状态，并复位宗门行与商店种子；
   - ⚠ 仅用于独立测试实例，禁止对正式数据执行；操作前脚本会确认。
 - **新玩法/功能变更后**：先看 `functional_tests/` 是否有对应域用例；有则补/改用例并跑一次对应 tag；发现的功能 Bug 用 `bd` 登记，不在本套件中直接修游戏代码。
 - **平台能力边界**：`functional_tests/platform-gap-report.md` 列出当前平台 Supported / Partially supported / Unsupported 清单；新用例优先只依赖 Supported 能力。

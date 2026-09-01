@@ -3,6 +3,10 @@
   "description": "spec Requirement「宗门指令统一」入口导航与错误处理：无参数展示指令导航；未知子命令报错并回显导航；缺参给出对应用法提示（以创建为例）。",
   "scenario": "新建玩家在群聊依次发送：宗门（无参）→得到导航；宗门 未知子命令→未识别报错+导航；宗门 创建（缺参）→创建用法提示。",
   "tags": ["sect"],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile sect --yes",
+    "timeout": 60
+  },
   "conversation": {
     "kind": "group",
     "group_id": "webtest_sect_020",

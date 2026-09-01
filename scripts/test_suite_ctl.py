@@ -5,7 +5,10 @@ Commands:
   sync-cases          Deploy functional_tests/cases/**/*.json to the platform flat cases dir.
   run                 Run cases by --case or --tag, with optional --repeat N.
   export              Export recent runs into functional_tests/results/<date>_<target>/.
-  fixture --profile pvp  Prepare fixed PvP test player rows in the plugin test database.
+  fixture --profile pvp|sect  Write fixed test player baseline rows into the plugin test DB.
+                            (Legacy: platform v0.3.0 supports case-level pre_run_hook —
+                            sect cases declare it calling fixture --profile sect --yes;
+                            CLI mode and run --fixture kept for compatibility.)
 
 This script intentionally uses only the Python standard library (urllib/sqlite3)
 and mirrors the REST calls used by the platform CLI. It never ships as game code.
@@ -20,9 +23,11 @@ Examples:
       --reload astrbot_plugin_monixiuxian2_2 --export /tmp/pvp-out --quiet
   WEBTEST_URL=http://127.0.0.1:8765 WEBTEST_TOKEN=secret \\
     uv run python scripts/test_suite_ctl.py export --target pvp-effects
-  uv run python scripts/test_suite_ctl.py fixture --profile pvp --yes
-  uv run python scripts/test_suite_ctl.py run --tag sect --fixture --fixture-profile sect
-  uv run python scripts/test_suite_ctl.py fixture --profile sect --yes
+  uv run python scripts/test_suite_ctl.py fixture --profile pvp --yes   # legacy: compat only
+  uv run python scripts/test_suite_ctl.py run --tag sect    # 宗门用例已内嵌 pre_run_hook，无需 --fixture
+  uv run python scripts/test_suite_ctl.py run --tag pvp --repeat 3 --fixture --fixture-profile pvp
+  # 用例内 pre_run_hook 示例（case JSON 顶层，平台 v0.3.0，每轮首步前由服务端执行）：
+  # "pre_run_hook": {"command": "python3 \\"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\\" fixture --profile sect --yes", "timeout": 60}
 """
 
 from __future__ import annotations
@@ -52,7 +57,8 @@ PVP_TEST_IDS = ("900000001", "900000002", "900000003")
 # （青云门成员预置）与 900000003（无宗门，用于反例/对照组）。
 SECT_TEST_IDS = ("900000002", "900000003")
 # 新建型用例使用的固定 ID（GM 指令需数字 ID 定位），fixture 每次重置为无宗门初始态。
-SECT_FRESH_TEST_IDS = ("900000004", "900000005", "900000006")
+# “900000008” 供 sect-command-entry（无 GM 的入口导航用例）使用，同样随 hook/fixture 复位。
+SECT_FRESH_TEST_IDS = ("900000004", "900000005", "900000006", "900000008")
 SECT_FACTION_ID = "qingyun"
 SECT_SECT_NAME = "青云门"
 # 成员预置：贡献 2500（达标内门 2000/4 级、不达标亲传 8000/6 级）、境界 2
@@ -218,6 +224,20 @@ def _validate_case(case: dict, path: Path) -> None:
         not isinstance(case["seed"], int) or isinstance(case["seed"], bool)
     ):
         raise CtlError(f"{path}: case.seed 必须是整数")
+    hook = case.get("pre_run_hook")
+    if hook is not None:
+        # pre_run_hook contract mirrors platform loader.validate_case (v0.3.0).
+        if not isinstance(hook, dict):
+            raise CtlError(f"{path}: 用例 pre_run_hook 必须是对象")
+        if not (isinstance(hook.get("command"), str) and hook["command"].strip()):
+            raise CtlError(f"{path}: pre_run_hook.command 必填（非空字符串）")
+        timeout = hook.get("timeout", 60)
+        if (
+            not isinstance(timeout, (int, float))
+            or isinstance(timeout, bool)
+            or timeout <= 0
+        ):
+            raise CtlError(f"{path}: pre_run_hook.timeout 必须是正数")
     conversation = case.get("conversation") or {}
     misplaced = [k for k in ("deterministic", "seed", "combine") if k in conversation]
     if misplaced:
@@ -962,7 +982,9 @@ def cmd_fixture(args: argparse.Namespace) -> int:
     """Implement ``fixture``: write a deterministic baseline to the test DB.
 
     ``pvp`` writes the PvP verification baseline; ``sect`` writes the sect
-    domain baseline (member preset, sect rows, shop seed, idle cds).
+    domain baseline (member preset, sect rows, shop seed, idle cds). May be
+    invoked from the CLI or as a case-level ``pre_run_hook`` command
+    (platform v0.3.0); the CLI form is kept for compatibility.
     """
     db_path = _resolve_db_path(args)
     if args.profile == "pvp":
@@ -983,7 +1005,9 @@ def cmd_fixture(args: argparse.Namespace) -> int:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
-        _backup_players(conn, ids + ["900000001"], backup_path)
+        # Back up every id this run mutates (profile ids, fresh ids, GM) for restore.
+        fresh_ids = list(SECT_FRESH_TEST_IDS) if args.profile == "sect" else []
+        _backup_players(conn, ids + fresh_ids + ["900000001"], backup_path)
         names = {
             "900000001": "测试GM",
             "900000002": "测试玩家1",
@@ -1072,7 +1096,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--fixture",
         action="store_true",
-        help="每轮重复前执行 fixture（用于随机效果采样/固定基线）",
+        help=(
+            "每轮重复前执行 fixture（用于随机效果采样/固定基线；"
+            "平台 v0.3.0 起宗门用例已内嵌 pre_run_hook 原生复位，本参数保留兼容）"
+        ),
     )
     run.add_argument(
         "--fixture-profile",

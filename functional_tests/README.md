@@ -47,12 +47,14 @@ functional_tests/
   - `sleep`：等待秒数，必填 `seconds`。
 - 用例顶层可声明 `deterministic: true` + `seed`（整数，默认 42）：每个 `send` 注入前重置全局随机种子，尽力让概率型行为（随机效果、悬赏/事件池）可复现；必要时配合 `--repeat N` 采样兑底。
 - `expect`/`expect_not` 步骤可带 `combine: true`：把窗口内全部回复按换行拼接后再匹配（跨条断言）。
+- 用例顶层可声明 `pre_run_hook`（对象 `{"command": "<shell>", "timeout": 60}`，`timeout` 可选正数秒、默认 60）：每次运行（含 `--repeat` 每轮）首个步骤前由平台服务端执行该 shell 命令并注入 `WEBTEST_CASE_NAME`/`WEBTEST_RUN_INDEX`/`WEBTEST_CONVERSATION_ID`/`WEBTEST_PLAYERS`（JSON：player 标签→实际 user_id）环境变量，用于复位被测插件持久基线。宗门域用例已全部内嵌该钩子（command 调 `scripts/test_suite_ctl.py fixture --profile sect --yes`），`run --tag sect` 无需再带 `--fixture`（该参数保留兼容）。
 - `conversation.kind`：`private` 或 `group`；群聊用例可带固定 `group_id` 与 `pin_players`。
 - 群聊用例的每个 `send` 文本必须以 AstrBot 全局 `wake_prefix`（当前为 `#`）开头，例如 `#我要修仙 灵修`；否则群消息不会唤醒插件 Filter。
 - PvP 用例固定身份约定：
   - 群聊 `group_id` 使用 `webtest_pvp_001`；
   - `pin_players` 固定：`gm=900000001`、`p1=900000002`、`p2=900000003`；
   - 若测试实例开了白名单，需把该群加入 `WHITELIST_GROUPS`；GM 命令需要 `900000001` 在 `GM_ADMINS`。
+- 身份派生与隔离（v0.3.0）：`pin_players` 值可为对象 `{"user_id": "...", "isolate": true}`（可再带 `fresh: true`）派生隔离身份——派生身份与被测插件中按 `user_id` 精确匹配的特权（如 `GM_ADMINS`）不再匹配，需要 GM 指令的用例必须保留固定 pin 并配合 `pre_run_hook` 复位基线。
 - 每个用例至少有一个功能域 `tag`（如 `player`、`equipment`、`pvp`、`pve`、`gm`、`economy`、`sect`、`social`），便于 `run-all --tag <tag>` 定向回归。
 - 随机/概率效果用例在 `description` 或 `scenario` 中写明“抽样验证”，并配合 `--repeat N` 聚合证据。
 
@@ -70,7 +72,8 @@ export WEBTEST_TOKEN=<token>
 uv run python scripts/test_suite_ctl.py sync-cases
 
 # 2. 按标签运行（例如所有 PvP 用例；重复 3 次用于随机效果聚合）
-#    随机效果用例建议加 --fixture --db <测试库>：每轮前重置固定测试玩家/冷却
+#    随机效果用例可加 --fixture --db <测试库>：每轮前重置固定测试玩家/冷却
+#    （平台 v0.3.0 起宗门用例已内嵌 pre_run_hook 自动复位：run --tag sect 无需 --fixture，该参数保留兼容）
 uv run python scripts/test_suite_ctl.py run --tag pvp --repeat 3 --fixture --db /path/to/xiuxian_data_lite.db
 uv run python scripts/test_suite_ctl.py run --tag player
 
@@ -78,8 +81,9 @@ uv run python scripts/test_suite_ctl.py run --tag player
 uv run python scripts/test_suite_ctl.py export --target pvp-effects
 uv run python scripts/test_suite_ctl.py export --target core-smoke --date 2026-08-17
 
-# 4. PvP 效果测试前准备固定身份玩家（写专用测试实例数据库，仅限固定测试 ID）
+# 4. （兼容保留）PvP 效果测试前准备固定身份玩家（写专用测试实例数据库，仅限固定测试 ID）
 #    ⚠ 仅应在独立测试 AstrBot 数据目录/实例上执行
+#    宗门域已由用例内 pre_run_hook 调用（fixture --profile sect --yes），无需外部执行本命令
 uv run python scripts/test_suite_ctl.py fixture --profile pvp
 ```
 

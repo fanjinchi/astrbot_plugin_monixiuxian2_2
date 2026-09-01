@@ -3,6 +3,10 @@
   "description": "spec Requirement「悬赏拆分双向分流」+「宗门内容联动」：宗门专属悬赏只能从宗门入口接取，公共悬赏只能从全局入口接取——双向分流拒绝；分流校验（类型/归属）先于冷却校验。",
   "scenario": "青云门成员清悬赏后：从全局 /接取悬赏 307 应被拒绝并提示改走宗门入口；从宗门悬赏接取 307 成功，随即从全局 /悬赏状态 操作被指向宗门入口（类型分流）；最后 GM 清除悬赏收尾。",
   "tags": ["sect", "bounty"],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile sect --yes",
+    "timeout": 60
+  },
   "conversation": {
     "kind": "group",
     "group_id": "webtest_sect_022",

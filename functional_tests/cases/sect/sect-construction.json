@@ -3,6 +3,10 @@
   "description": "spec Requirement「宗门建设」：建设任务结算贡献/资材/建设度，建筑升级消耗宗门资材并触发全宗加成，宗门丹房每日领取丹药。",
   "scenario": "fixture 预置青云门资材 500；成员按 宗门建设 → 升级洞天（资材 -200，全员闭关修为 +2%）→ 升级丹房（可领取炼气丹）→ 丹房领取/重复领取拦截 → 执行一次建设任务（随机任务，断言结算行与贡献增益）。",
   "tags": ["sect"],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile sect --yes",
+    "timeout": 60
+  },
   "conversation": {
     "kind": "private",
     "pin_players": { "p1": "900000002" }
