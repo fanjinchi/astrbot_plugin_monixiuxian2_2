@@ -2,7 +2,7 @@
 
 > **文档状态**：
 > - 创建：**2026-07-29**（重设计起点，与 `redesign-combat-skills` 变更同批，commit 8fa47f7）
-> - 最近更新：**2026-08-20**（`unify-sect-commands`：宗门功能收敛为「宗门」单入口子命令，宗门悬赏/商店/秘境可见性独立）
+> - 最近更新：**2026-09-03**（`add-rift-encounters`：秘境结算后遭遇机制——古阵谜题/可选妖兽挑战/传承应邀制，秘境 PvE 由强制改为可选）
 > - 定位：**数值细节基线（活文档，非归档）**——架构总览见 `project-architecture.md`，行为契约见
 >   `openspec/specs/`；本文是数值/公式/数据库的权威基线，被 `project-architecture.md` §1/§3 引用。
 > - 维护义务：内容必须与代码同步（插件根 `AGENTS.md` §14，影响玩法的修改须同步修正本文）；
@@ -210,9 +210,9 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 ### 4.7 PvE 与世界 Boss（过渡期状态）
 
 - **功能开关**：`game_config.json` 的 `pve.enabled` / `boss.enabled`（当前均为 true）。开关关闭时对应玩法入口不可用并提示"玩法维护中"；历练（纯收益玩法）与 PvP 不受影响
-- **触发概率**：历练 low/mid/high/extreme = 30/45/65/75%；秘境 = 50/70/90/95%（秘境 1-5 层映射 low/mid/high/extreme/extreme）
+- **触发概率**：历练 low/mid/high/extreme = 30/45/65/75%（结算自动战斗，不变）；**秘境结算自 v3.14.0 起不再自动触发战斗**——改为结算后按 `puzzle_rate`/`beast_rate` 独立判定谜题/妖兽遭遇（秘境条目 `encounter_rate` 可覆盖，见 §4.12）
 - **敌人生成**（enemy_manager.py:336-348，过渡方案）：从 `config_manager.level_data`（由公式配置运行时合成的 shim，仅含 level/level_name/exp_needed/success_rate）读取基准；因合成数据**不含 base_\* 字段**，实际走 exp 派生回退（`damage ≈ exp_needed//10`、`hp ≈ exp_needed//2`），再乘模板/类别（normal 0.85/elite 1.0/boss 1.2）/全局难度系数，±10% 随机
-- **奖励**：胜利 `exp = base × 1.2 + 敌人exp`；失败 `exp = base × 0.3` + 安慰灵石 + HP→1；平局不变
+- **奖励**：历练自动战斗——胜利 `exp = base × 1.2 + 敌人exp`；失败 `exp = base × 0.3` + 安慰灵石 + HP→1；平局不变。**秘境迎战（可选）**：胜利 = 敌人修为 + 一次掉落 roll（item_chance=100）；失败/平局 HP→1、机缘消耗，不动已结算基础奖励
 - **世界 Boss**（boss_manager.py）：8 档境界 hp_mult 1.0→6.0；数值同样经 level_data shim 派生；Boss 会心率固定 30%（combat.boss_crit_rate）；败给 Boss 安慰奖 `reward = int(boss经验 × 总伤害 / max_hp)`；自动刷 Boss `base_exp = 全服平均exp × 1.2`（无玩家时 50000）
 - **已知缺口**：独立于 level_config 的境界基准区间表将在 Boss/PvE 模块重做（bd-9u2，attribute-numerics 的 PvE 数值生成基准需求）落地
 
@@ -228,7 +228,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **职阶晋升**：「宗门 晋升」自助晋升，双门槛（贡献 + 境界）读 positions.`promotion`（sect_manager.py:1276）；`promotion: null`（宗主档）不设晋升通道，默认宗门无宗主晋升，玩家宗主保留任命/传位；宗主死亡自动按（职位, -贡献）传位
 - **职阶福利**（positions.`benefits`）：`daily_stones` 每日俸禄并入「签到」加发（handlers/player_handler.py:459-474）；`shop_discount` 商店结算折扣（core/shop_manager.py:430，handlers/shop_handler.py:188）；`unlocks`/`min_position` 控制宝库领取资格
 - **宗门宝库**：默认宗门按 faction `treasures`/`heart_methods` 生成传承列表（玩家宗门为空），领取按 min_position 或 benefits.unlocks 校验，`sect_treasure_claims` 记录已领取 id 防重复领取（跨退宗/重入生效）（sect_manager.py:1415/1454）
-- **师承任务链**：默认宗门专属，`sect_tasks.json` master_chains 按境界段匹配，已存储的链优先于境界段重新匹配（sect_manager.py:1567）；阶段目标挂钩 PvE 胜场/历练完成/突破成功/捐献，进度存 players.sect_master_progress；阶段奖励贡献/修为/宗门功法领悟机会
+- **师承任务链**：默认宗门专属，`sect_tasks.json` master_chains 按境界段匹配，已存储的链优先于境界段重新匹配（sect_manager.py:1567）；阶段目标挂钩 PvE 胜场/历练完成/突破成功/捐献，进度存 players.sect_master_progress；阶段奖励贡献/修为/宗门功法领悟机会。v3.14.0 起秘境侧 PvE 胜场计数来源由"结算自动战斗胜利"改为「探索秘境 迎战」胜利（main.py 迎战分支消费 `pve_won`），GM 触发秘境结算不再有战斗、win_pve 恒不推进
 - **离宗回收**（退出 sect_manager.py:446 / 踢出 :729 / 弃道重修 handlers/player_handler.py:537-542 三路径统一走 `reclaim_sect_treasures` :211）：`treasure` 宝物（含装备槽）回收归还宗门；`sect_bound` 功法/心法不回收不封印、离宗保留可用；储物戒赠予路径拦截一切宗门绑定物（core/storage_ring_manager.py:64，handlers/storage_ring_handler.py:271）
 - **宗门商店**：「宗门 商店 [购买 <名称>]」，贡献点结算（非灵石），商品池配在 faction `shop` 字段（`{id, price, min_position}`，id 引用 weapons.json/heart_methods.json，min_position 缺省 4=全员），购买走 `buy_sect_shop_item`（BEGIN IMMEDIATE 事务，先职阶门槛后贡献校验，物品入储物戒）（sect_manager.py §6.3）
 - **内容联动**：宗门悬赏与全局悬赏全生命周期独立——「宗门 悬赏」子命令组处理 sect_id 悬赏，全局悬赏指令只处理公共悬赏，分流校验先于缓存/冷却/活跃检查，悬赏缓存按 scope 分键（managers/bounty_manager.py scope 参数）；秘境 `sect_id`+`access=sect_member` 仅本宗成员可见（列表直接过滤，不再 🔒 标注）且准入校验不变（managers/rift_manager.py:145）；历练按权重 15 追加本宗事件组、结算消息带「🏯 宗门际遇」前缀标记（managers/adventure_manager.py:50/:331）；功法领悟全渠道注入宗门池并打 origin_sect_id/sect_bound 归属标记（core/skill_manager.py:94-105）
@@ -263,7 +263,12 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - 探索时长 1800s；奖励 `exp/gold = randint(*rewards配置区间)`
 - 物品掉落按 game_config.json 的 drop_tables 权重表掉 1 件，中/高级 50% 追加 1 件
 - 稀有丹概率：1 层 3% / 2 层 5% / 3 层 10%（pill_drop_tables）
-- 中途退出无奖励；PvE 战败不掉物品；PvE 战斗入口受 pve.enabled 开关控制
+- 中途退出无奖励；秘境入口受 pve.enabled 开关控制
+- **结算后遭遇机制（v3.14.0，`add-rift-encounters`）**：基础结算完成后独立概率判定三类遭遇——古阵谜题（`puzzle_rate`）/妖兽拦路（`beast_rate`）/传承之地（沿用 `legacy_chance`），互不互斥可同时触发；秘境条目 `encounter_rate` 存在时覆盖谜题/妖兽两者（传承不受覆盖）。遭遇以内存 `EncounterStore`（core/encounter_store.py）按玩家挂起（每类最多一个，`encounter_ttl_seconds` 默认 600s 惰性过期，同类覆盖刷新，热重载丢失→"机缘已消散"），不写 UserStatus；响应入口为「探索秘境」子命令：`破阵 <答案>`/`迎战`/`传承`
+- **古阵谜题**（core/rift_puzzle_manager.py）：谜题族程序生成（五行破阵/洛书数阵/灵龟辨窟），题面自带解题线索；`puzzle_attempts`（默认 2）次机会，非法形式不耗次；答对 = 一次掉落 roll（item_chance=100）+ 修为基数×0.2；答错/耗尽/过期零惩罚
+- **可选妖兽挑战**：迎战胜利 = 敌人修为 + 掉落 roll，并推进师承 win_pve 计数（main.py 迎战分支消费 `pve_won`）；失败/平局 HP→1、机缘消耗；无视零损失。秘境条目 `enemy_group` 指定定向怪物组（enemies.json 无 `level_range` 的组，经 `spawn_enemy_from_group` 触达，不被普通匹配命中），缺省回落按玩家境界的全局池
+- **传承之地应邀制**：秘境/历练命中 `legacy_chance` 改为挂起传承遭遇（记录来源 rift/adventure），时限内以「探索秘境 传承」应邀才挑战守护 NPC；宗门宝库领取保持"领取即挑战"不变
+- 测试脚手架（验证后拆除）：试炼古境 id 7（v33 播种，`encounter_rate: 1.0` + `enemy_group: "rift_test"` 石傀儡测试组）
 
 ### 4.13 洞天福地（managers/blessed_land_manager.py）
 
@@ -303,7 +308,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **传承实例**：一人可持多条（`legacy_instances` 表）；类型 common/sect/adventure/rift，宗门传承绑定宗门、离宗/被踢自动回收（sect_manager.py:472/:780 + `delete_legacy_instances_by_owner_sect`），且**不可被 PK 夺取**
 - **传承值累积**：仅修炼出关时结算（`handle_end_cultivation` 尾部），每 15 分钟 1 点，**仅累积激活中的传承**（「激活传承」指令切换，同玩家同时仅一条，部分唯一索引 `idx_legacy_active_owner` 保证）；传承值不参与 PK 计算，也不进战力公式
 - **传承 PK（夺取制）**：走 CombatEngine 统一结算（`combat_type="impart_pk"`）；胜利夺走对方最新一条非宗门实例（整个实例转移，传承值/已领奖励清零，新持有者重新修炼）；失败扣 1% 修为 + 5 天同人冷却（`impart_pk_cooldown`）；被夺方 3 日保护期（`impart_snatch_protection`）；平局不转移不计冷却
-- **获取途径**：①宗门宝库（`sect_factions.json` `legacies` 列表，领取需先胜守护 NPC，每人限领一条本宗传承）②历练机缘（adventure_config.json `legacy_chance`）③秘境机缘（rift_config.json `legacy_chance`）；②③触发 `spawn_enemy_from_group("legacy_guardian")` 守护挑战，胜利后获得实例
+- **获取途径**：①宗门宝库（`sect_factions.json` `legacies` 列表，领取即挑战守护 NPC，每人限领一条本宗传承）②历练机缘（adventure_config.json `legacy_chance`）③秘境机缘（rift_config.json `legacy_chance`）；v3.14.0 起②③命中后**挂起传承之地遭遇**（内存 pending，10 分钟惰性过期），玩家以「探索秘境 传承」应邀才触发 `spawn_enemy_from_group("legacy_guardian")` 守护挑战，胜利后按遭遇来源类型获得实例；失败/平局机缘消耗、气血下限 1；无视/过期机缘消散零惩罚
 - **等阶奖励**：达到类型对应 tiers 阈值（默认 20/40/60/80/100）自动发放（传承心法→储物戒/传承功法→player_skills source="impart"/等级提升封顶），按实例独立记录，复发防重。奖励 id 来自 content-design 管道（传承心法·吐纳/归元、传承·破妄一击/归元护体）
 - **GM 支持**：给予传承/清除传承/清除传承状态（测试预置与清理，仅 GM_ADMINS）
 
@@ -316,7 +321,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 - 统一入口 `修仙GM <子命令> [目标玩家] [参数]` + `修仙GM帮助`；权限独立于 BOSS_ADMINS，由 `_conf_schema.json` 的 `GM_ADMINS` 配置（main.py `_check_gm_admin`）
 - 目标解析优先级：@提及 → 数字 user_id → 省略时作用于命令发送者自身
-- 子命令：设置境界（境界名 → 1-based level_index，两种修炼路线通用）/设置修为/灵石/气血/真元/攻击/精神力、给予装备/给予物品（进储物戒）、卸下装备（入戒）、清除CD（需 `确认` 参数，同步 user_cd 与 player.state）、触发历练/秘境结算（推进 scheduled_time 后调正常结算）、生成Boss（委托 BossManager）
+- 子命令：设置境界（境界名 → 1-based level_index，两种修炼路线通用）/设置修为/灵石/气血/真元/攻击/精神力、给予装备/给予物品（进储物戒）、卸下装备（入戒）、清除CD（需 `确认` 参数，同步 user_cd 与 player.state）、触发历练/秘境结算（推进 scheduled_time 后调正常结算；秘境强制结算不再有战斗）、生成Boss（委托 BossManager）、触发秘境谜题/触发秘境妖兽/触发秘境传承（v3.14.0，强制挂起对应秘境遭遇供测试，目标解析 `single_token_is_target=True`）
 - **审计日志**：每次调用写一行 JSON 到插件数据目录 `gm_operations.log`（时间戳/GM id/目标 id/子命令/参数/成功与否），达 500MB 滚动改名保留
 
 ### 4.20 设计表→config 同步管道（scripts/sync_content_to_config.py）
@@ -340,7 +345,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | `sects` | sect_id (AI) | 宗门（sect_name UNIQUE，建设度/灵石/资材/功法 buff/丹房等级；v28 起含 is_system/faction_id/status/destruction_tier） |
 | `buff_info` | id (AI)，user_id UNIQUE | 用户功法/法器 buff（预留字段） |
 | `boss` | boss_id (AI) | 世界 Boss（hp/atk/defense/stone_reward/status） |
-| `rifts` | rift_id (AI) | 秘境定义（预置 6 个：青云秘境→上古遗迹 + id 6 青云剑冢，后者为 rift_config.json 标记的青云门专属秘境，v31 播种） |
+| `rifts` | rift_id (AI) | 秘境定义（预置 6 个：青云秘境→上古遗迹 + id 6 青云剑冢，后者为 rift_config.json 标记的青云门专属秘境，v31 播种；v33 播种 id 7 试炼古境——遭遇机制测试脚手架，验证后拆除） |
 | `legacy_instances` | id (AI) | 传承实例：owner_id/legacy_type/impart_value/claimed_tiers/sect_id/is_active（v32 重做，替代 impart_info；部分唯一索引 idx_legacy_active_owner 保证同玩家仅一条激活） |
 | `impart_pk_cooldown` | challenger_id+target_id | 传承挑战失败冷却（5 天） |
 | `impart_snatch_protection` | user_id | 被夺保护期（3 日） |
@@ -387,7 +392,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | v29 | players +sect_treasure_claims（宗门宝库领取记录，防跨退宗重复领取） |
 | v30 | players +sect_master_progress（师承任务链进度 JSON） |
 | v31 | rifts 播种青云剑冢（id 6，青云门专属秘境；config/rift_config.json 该条目 id 同步 4→6，消除与 id 4 玄冰地宫的冲突） |
-| v32 | 传承系统改版：legacy_instances/impart_pk_cooldown/impart_snatch_protection 三表，impart_info 数据拷贝后 DROP（当前最新） |
+| v32 | 传承系统改版：legacy_instances/impart_pk_cooldown/impart_snatch_protection 三表，impart_info 数据拷贝后 DROP |
+| v33 | rifts 播种试炼古境（id 7，遭遇机制测试脚手架；增量任务链仅对 ≥ TASK_CHAIN_MIN_VERSION(=32) 的库开放，更早旧库走重建路径）（当前最新） |
 
 ---
 

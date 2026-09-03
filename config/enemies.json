@@ -372,6 +372,31 @@
           "crit_rate": 12
         }
       ]
+    },
+    {
+      "key": "rift_test",
+      "name": "试炼古境傀儡",
+      "description": "试炼古境中沉睡的傀儡造物，强度极低，仅供遭遇机制测试（验证后拆除）",
+      "templates": [
+        {
+          "key": "stone_golem",
+          "name": "石傀儡",
+          "description": "古境碎石拼合而成的傀儡，行动迟缓，力道涣散",
+          "elite_prefixes": [
+            "历战的",
+            "坚固的",
+            "龟裂的"
+          ],
+          "boss_names": [
+            "古境石灵",
+            "镇境石尊"
+          ],
+          "hp_mult": 0.5,
+          "atk_mult": 0.5,
+          "defense": 2,
+          "crit_rate": 3
+        }
+      ]
     }
   ],
   "drop_tables": {

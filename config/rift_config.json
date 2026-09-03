@@ -98,6 +98,24 @@
       "description": "",
       "settlement_desc": "",
       "legacy_type": "rift"
+    },
+    {
+      "id": 7,
+      "name": "试炼古境",
+      "level": 0,
+      "exp_range": [
+        100,
+        200
+      ],
+      "gold_range": [
+        50,
+        100
+      ],
+      "description": "云雾深处的一座残破古境，唯有石傀儡徘徊其中。（测试秘境）",
+      "settlement_desc": "你离开了试炼古境，身后傀儡重归沉寂。（测试秘境）",
+      "legacy_type": "rift",
+      "enemy_group": "rift_test",
+      "encounter_rate": 1.0
     }
   ],
   "explore_events": [

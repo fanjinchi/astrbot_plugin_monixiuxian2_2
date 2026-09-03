@@ -182,6 +182,9 @@ class GMManager:
             "清除悬赏": self.cmd_clear_bounty,
             "触发历练结算": self.cmd_force_adventure,
             "触发秘境结算": self.cmd_force_rift,
+            "触发秘境谜题": self.cmd_force_rift_puzzle,
+            "触发秘境妖兽": self.cmd_force_rift_beast,
+            "触发秘境传承": self.cmd_force_rift_legacy,
             "生成boss": self.cmd_spawn_boss,
             "生成Boss": self.cmd_spawn_boss,
             "生成BOSS": self.cmd_spawn_boss,
@@ -412,6 +415,11 @@ class GMManager:
             "  清除悬赏 [@玩家/ID] 确认 （进行中悬赏+放弃冷却）\n"
             "  触发历练结算 [@玩家/ID]\n"
             "  触发秘境结算 [@玩家/ID]\n"
+            "\n"
+            "🌀 秘境遭遇（功能测试）\n"
+            "  触发秘境谜题 [@玩家/ID] （挂起古阵谜题遭遇并回显题面）\n"
+            "  触发秘境妖兽 [@玩家/ID] （挂起妖兽遭遇，玩家以「探索秘境 迎战」响应）\n"
+            "  触发秘境传承 [@玩家/ID] （挂起传承之地遭遇，玩家以「探索秘境 传承」应邀）\n"
             "\n"
             "👹 系统\n"
             "  生成Boss\n"
@@ -1082,6 +1090,50 @@ class GMManager:
             True,
             f"✅ 已强制结算【{player.user_name or target_id}】的秘境探索\n{msg}",
         )
+
+    async def cmd_force_rift_puzzle(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """Force-pend a puzzle encounter for the target (add-rift-encounters task 4.1).
+
+        Target resolution uses single_token_is_target=True (cmd_give_legacy
+        precedent, design D4) so that a bare numeric token like
+        「触发秘境谜题 900000002」 targets that player instead of falling back
+        to the sender as a numeric command argument. The puzzle question text
+        is echoed back to the GM by the manager's return message.
+        """
+        if not self.rift_manager:
+            return False, "❌ 秘境管理器未初始化！"
+        target_id, _ = self._resolve_target(event, args, single_token_is_target=True)
+        return await self.rift_manager.force_puzzle_encounter(target_id)
+
+    async def cmd_force_rift_beast(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """Force-pend a beast encounter for the target (add-rift-encounters task 4.1).
+
+        Uses single_token_is_target=True for the same reason as
+        cmd_force_rift_puzzle. Default context (rift_level=1, global enemy
+        pool) is defined by the manager (design D4).
+        """
+        if not self.rift_manager:
+            return False, "❌ 秘境管理器未初始化！"
+        target_id, _ = self._resolve_target(event, args, single_token_is_target=True)
+        return await self.rift_manager.force_beast_encounter(target_id)
+
+    async def cmd_force_rift_legacy(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """Force-pend a legacy-site encounter for the target (add-rift-encounters task 4.1).
+
+        Uses single_token_is_target=True for the same reason as
+        cmd_force_rift_puzzle. The pended encounter carries legacy_type
+        "rift" (design D4/D8).
+        """
+        if not self.rift_manager:
+            return False, "❌ 秘境管理器未初始化！"
+        target_id, _ = self._resolve_target(event, args, single_token_is_target=True)
+        return await self.rift_manager.force_legacy_encounter(target_id)
 
     async def cmd_spawn_boss(
         self, event: "AstrMessageEvent", args: str

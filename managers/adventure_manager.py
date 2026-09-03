@@ -15,12 +15,13 @@ from typing import TYPE_CHECKING
 from astrbot.api import logger
 
 try:
+    from ..core.encounter_store import KIND_LEGACY, EncounterStore
     from ..data.data_manager import DataBase
     from ..data.default_configs import ADVENTURE_CONFIG
     from ..managers.pve_combat_manager import PVECombatManager
     from ..models import Player
     from ..models_extended import UserStatus
-    from ..utils.narrative_text import render_narrative, select_narrative_pool
+    from ..utils.narrative_text import select_narrative_pool
 except ImportError:
     # 独立运行（测试）时降级加载依赖
     def _load_module(name, rel_path):
@@ -66,9 +67,11 @@ except ImportError:
     _mde = _load_module("models_extended", "models_extended.py")
     UserStatus = _mde.UserStatus
     _nt = _load_module("narrative_text", "utils/narrative_text.py")
-    render_narrative = _nt.render_narrative
     select_narrative_pool = _nt.select_narrative_pool
     ADVENTURE_CONFIG = _load_default_configs().ADVENTURE_CONFIG
+    _es = _load_module("encounter_store", "core/encounter_store.py")
+    EncounterStore = _es.EncounterStore
+    KIND_LEGACY = _es.KIND_LEGACY
 
 if TYPE_CHECKING:
     from ..core import StorageRingManager
@@ -94,14 +97,20 @@ class AdventureManager:
         pve_combat_mgr: PVECombatManager = None,
         impart_mgr=None,
         config_manager=None,
+        encounter_store=None,
     ):
         self.db = db
         self.storage_ring_manager = storage_ring_manager
         self.pve_combat_mgr = pve_combat_mgr
         # 传承管理器：可选注入（main.py 装配后），用于历练触发传承机缘
         self.impart_mgr = impart_mgr
-        # 配置管理器：可选注入，供叙事文案渲染（缺失时 render_narrative 回落内嵌默认）
+        # 配置管理器：可选注入（当前仅保留接口位；叙事选择走模块级 select_narrative_pool）
         self.config_manager = config_manager
+        # 遭遇存储：可选注入共享单例（main.py 装配，与 RiftManager 共用，
+        # design D8）；默认自建，保证既有测试/独立使用不炸
+        self.encounter_store = (
+            encounter_store if encounter_store is not None else EncounterStore()
+        )
         self._route_cooldowns: dict[str, dict[str, int]] = {}
         self.routes: dict[str, dict] = {}
         self.route_alias_index: dict[str, str] = {}
@@ -288,7 +297,7 @@ class AdventureManager:
         else:
             dropped_items, item_msg = [], ""
 
-        # 传承机缘：按概率触发守护挑战，胜利则获得历练传承实例。
+        # 传承机缘：按概率挂起传承之地 pending 遭遇（应邀制，不再内联挑战）。
         # 可选概率功能：异常降级为日志，绝不中断历练正常结算（防卡 ADVENTURING 状态）
         legacy_msg = ""
         if self.impart_mgr and self.legacy_chance > 0:
@@ -357,35 +366,30 @@ class AdventureManager:
         return True, msg, reward_data
 
     async def _maybe_trigger_legacy(self, player: Player) -> str:
-        """按配置概率触发传承机缘：守护挑战胜利则发放历练传承实例。
+        """按配置概率触发传承机缘：挂起传承之地 pending 遭遇（应邀制，design D8）。
+
+        不再内联挑战守护者；玩家经「探索秘境 传承」应邀（探索秘境为遭遇响应
+        枢纽，含历练来源——命名取舍见 design D8）。
 
         Returns:
-            追加到结算消息的文本（未触发/未配置/失败时为空串）。
+            追加到结算消息的提示文本（未触发时为空串）。
         """
         if random.random() >= self.legacy_chance:
             return ""
-        if not self.pve_combat_mgr:
+        if self.encounter_store is None:
             return ""
-        won, battle_msg = await self.pve_combat_mgr.challenge_legacy_guardian(player)
-        if not won:
-            # 传承之地文案单源：narrative legacy_encounter 模板簇（与秘境/宗门同簇）
-            return render_narrative(
-                self.config_manager,
-                "legacy_encounter",
-                "encounter_lose",
-                {"battle_msg": battle_msg},
-            )
-        instance = await self.impart_mgr.create_legacy(
-            player.user_id, self.legacy_type, activate=False
+        # TTL 不显式传：用 store 默认值——装配时（main.py）已注入
+        # encounter_ttl_seconds 配置值，历练/秘境两条路径时限语义一致
+        self.encounter_store.pend(
+            player.user_id,
+            KIND_LEGACY,
+            {"legacy_type": self.legacy_type, "source": "adventure"},
         )
-        if not instance:
-            return ""
-        name = self.impart_mgr.get_type_name(self.legacy_type)
-        return render_narrative(
-            self.config_manager,
-            "legacy_encounter",
-            "encounter_win",
-            {"battle_msg": battle_msg, "name": name, "instance_id": instance.id},
+        # 提示文案与 RiftManager._pend_legacy_encounter 保持逐字一致
+        # （两处各写一份，避免为单行文案引入跨管理器依赖）
+        return (
+            "\n\n🗿 你偶遇上古传承之地，传承禁制悄然开启。\n"
+            "💡 发送「探索秘境 传承」应邀挑战守护者（不响应则机缘自行消散，无任何惩罚）"
         )
 
     async def check_adventure_status(self, user_id: str) -> tuple[bool, str]:

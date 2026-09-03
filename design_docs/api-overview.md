@@ -55,7 +55,7 @@
 | `SectHandlers` | 「宗门」单入口 `handle_sect_entry` 子命令分发（信息/列表/创建/加入/退出/捐献/任务/丹房/建设/镇派功法/晋升/宝库/师承/商店/悬赏/排行/贡献排行 + 管理类 踢出/传位/职位） | 原 18 个宗门顶层指令已删除，子命令自行解析消息文本；悬赏/商店子命令组委托 BountyManager/SectManager |
 | `CombatHandlers` | 切磋/决斗 | `_get_target_id` 解析 @提及/数字目标；各自冷却 |
 | `BossHandlers` | 世界Boss/挑战Boss/生成Boss | 挑战走 `BossManager.challenge_boss` |
-| `RiftHandlers` | 秘境列表/探索秘境/完成探索/退出秘境 | |
+| `RiftHandlers` | 秘境列表/探索秘境（子命令分发：数字ID进入/破阵 <答案>/传承；迎战由 main.py 拦截直调 manager）/完成探索/退出秘境 | |
 | `AdventureHandlers` | 历练信息/开始历练/完成历练/历练状态 | |
 | `BountyHandlers` | 悬赏令/接取/状态/完成/放弃悬赏 | 仅处理公共悬赏（无 sect_id）；宗门专属悬赏走「宗门 悬赏」子命令组 |
 | `AlchemyHandlers` | 丹药配方/炼丹 | |
@@ -80,7 +80,7 @@
 | `BountyManager` | `get_bounty_list` / `accept_bounty` / `complete_bounty` / `abandon_bounty` / `add_bounty_progress` / `check_and_expire_bounties` | 悬赏列表按境界分难度、10 分钟缓存（按 scope 分键 `user:global|sect`）；前四者带 `scope` 参数分流公共/宗门悬赏，分流校验先于缓存/冷却/活跃检查；接取/结算均 `BEGIN IMMEDIATE` 事务；`add_bounty_progress` 由历练/秘境回调推进进度 |
 | `SectManager` | `create_sect` / `join_sect` / `donate_to_sect` / `kick_member` / `transfer_ownership` / `perform_sect_task` / `handle_owner_death`；宗门成长：`ensure_system_sects` / `reclaim_sect_treasures` / `get_fairyland_exp_bonus` / `claim_elixir` / `upgrade_building` / `manage_sect_buff` / `promote_position` / `get_treasury_info` / `claim_treasure` / `get_master_task_status` / `get_position_benefits` / `get_sect_shop_info` / `buy_sect_shop_item` | 宗门全生命周期；宗主死亡自动传位/解散；默认宗门播种、离宗回收、洞天/丹房/镇派功法/晋升/宝库/师承任务链、宗门商店（贡献点结算，商品池读 faction `shop` 字段）（详见 current-design-report.md §4.8） |
 | `BankManager` | `deposit` / `withdraw` / `borrow` / `repay` / `claim_interest` / `check_and_process_overdue_loans` | 银行存贷；**逾期贷款追杀致死**（定时任务入口 `check_and_process_overdue_loans`） |
-| `RiftManager` | `list_rifts` / `enter_rift` / `finish_exploration` / `exit_rift` | 秘境探索与结算 |
+| `RiftManager` | `list_rifts` / `enter_rift` / `finish_exploration` / `exit_rift` / `answer_puzzle` / `accept_beast_challenge` / `accept_legacy_challenge` / `force_puzzle_encounter` / `force_beast_encounter` / `force_legacy_encounter` | 秘境探索与结算；结算后遭遇判定（谜题/妖兽/传承三类内存 pending，EncounterStore）；迎战胜利返回 `pve_won` 供 main.py 推进师承链；force_* 为 GM 强触入口 |
 | `AdventureManager` | `start_adventure` / `finish_adventure` / `check_adventure_status` / `get_route_overview` | 历练路线（config 驱动事件权重/掉落表），结算时联动悬赏进度 |
 | `AlchemyManager` | `get_available_recipes` / `craft_pill` | 炼丹（材料从储物戒扣） |
 | `BlessedLandManager` | `purchase_blessed_land` / `upgrade_blessed_land` / `collect_income` | 洞天购买/升级/固定收益产出 |
@@ -103,7 +103,9 @@
 | `PillManager` | `use_pill` / `handle_resurrection` / `calculate_pill_attribute_effects` / `get_breakthrough_modifiers` / `consume_breakthrough_effects` | 丹药服用/回生丹复活/属性乘算加成/突破临时加成生命周期 |
 | `StorageRingManager` | `store_item` / `retrieve_item` / `discard_item` / `upgrade_ring` / `has_item` / `is_sect_bound_item` | 储物戒存取（事务保护，每物品占 1 格）；**所有物品发放的统一入口**；`is_sect_bound_item` 识别宗门绑定物（treasure/sect_bound/sect_id）供赠予拦截 |
 | `ShopManager` | `generate_shop_items` / `should_refresh_shop` / `get_item_details` / `get_sect_shop_discount` / 三阁展示方法 | 商店刷新（库存+折扣）、丹阁/器阁/百宝阁展示；`get_sect_shop_discount` 读宗门职阶 benefits.shop_discount |
-| `GMManager` | `dispatch` / `cmd_set_*` / `cmd_give_*` / `cmd_force_adventure|rift` / `cmd_advance_master` / `cmd_clear_cd` / `cmd_clear_bounty` / `cmd_clear_all_cooldowns` / `cmd_time_skip` / `cmd_seed` / `cmd_spawn_boss` | GM 子命令分发（目标解析 @提及→数字id→发送者）；全操作写审计日志（500MB 滚动）；`cmd_set_mp/atk/mental_power` 为废弃属性别名；`设置贡献/设置职位` 写宗门字段；`师承推进`（战斗/历练/突破/捐献）确定性推进师承链；`清除悬赏` 清进行中悬赏+放弃冷却（供测试环境重置悬赏状态）；强制结算与正常流程一致追加师承链推进并清除历练休整冷却；测试工具三件套：`时间快进` 按 `_TIME_SKIP_RULES` 枚举全库前移到期判定时间戳（不可逆，需「确认」）、`清除全部冷却` 按玩家归零全部冷却（既有清除命令并集）、`随机种子` 注入/重置全局 `random.seed`（进程级、不持久化） |
+| `GMManager` | `dispatch` / `cmd_set_*` / `cmd_give_*` / `cmd_force_adventure|rift` / `cmd_force_rift_puzzle|beast|legacy` / `cmd_advance_master` / `cmd_clear_cd` / `cmd_clear_bounty` / `cmd_clear_all_cooldowns` / `cmd_time_skip` / `cmd_seed` / `cmd_spawn_boss` | GM 子命令分发（目标解析 @提及→数字id→发送者；触发秘境谜题/妖兽/传承用 `single_token_is_target=True` 使单数字 token 视为目标）；全操作写审计日志（500MB 滚动）；`cmd_set_mp/atk/mental_power` 为废弃属性别名；`设置贡献/设置职位` 写宗门字段；`师承推进`（战斗/历练/突破/捐献）确定性推进师承链；`清除悬赏` 清进行中悬赏+放弃冷却（供测试环境重置悬赏状态）；强制结算与正常流程一致追加师承链推进并清除历练休整冷却；测试工具三件套：`时间快进` 按 `_TIME_SKIP_RULES` 枚举全库前移到期判定时间戳（不可逆，需「确认」）、`清除全部冷却` 按玩家归零全部冷却（既有清除命令并集）、`随机种子` 注入/重置全局 `random.seed`（进程级、不持久化） |
+| `EncounterStore`（encounter_store.py） | `pend` / `get_active` / `consume` | 秘境/历练遭遇的内存 pending 表（每玩家 puzzle/beast/legacy 各一，惰性过期、同类覆盖刷新；热重载丢失零惩罚）；main.py 装配单例注入 RiftManager/AdventureManager |
+| `RiftPuzzleManager`（rift_puzzle_manager.py） | `generate` / `RiftPuzzle.check` | 古阵谜题纯逻辑引擎：谜题族注册表随机抽取（五行破阵/洛书数阵/灵龟辨窟），三态校验（正确/错误/非法形式不耗次），无 IO 可单测 |
 | （`breakthrough_fortune.py`） | 模块级函数 | 突破运势文案 |
 
 ## 6. data/ 数据层

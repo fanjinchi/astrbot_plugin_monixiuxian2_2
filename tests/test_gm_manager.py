@@ -1312,3 +1312,110 @@ class TestSeed:
         assert success is True
         for fragment in ("时间快进", "清除全部冷却", "随机种子", "仅限测试实例"):
             assert fragment in msg
+
+
+class TestForceRiftEncounters:
+    """GM 强制触发秘境遭遇子命令（add-rift-encounters task 4.1/4.2）。"""
+
+    @pytest.mark.asyncio
+    async def test_dispatch_registers_three_subcommands(self, gm_manager):
+        for sub_command in ("触发秘境谜题", "触发秘境妖兽", "触发秘境传承"):
+            assert sub_command in gm_manager._commands
+
+    @pytest.mark.asyncio
+    async def test_force_puzzle_self_target_echoes_question(
+        self, gm_manager, mock_managers
+    ):
+        """省略目标 → 作用于发送者；谜题题面随返回消息回显给 GM（spec）。"""
+        mock_managers["rift_manager"].force_puzzle_encounter = AsyncMock(
+            return_value=(True, "✅ 已为【测试道友】触发古阵谜题遭遇：题面内容")
+        )
+        event = make_event(sender_id="gm_001")
+
+        success, msg = await gm_manager.cmd_force_rift_puzzle(event, "")
+
+        assert success is True
+        assert "题面内容" in msg
+        mock_managers[
+            "rift_manager"
+        ].force_puzzle_encounter.assert_awaited_once_with("gm_001")
+
+    @pytest.mark.asyncio
+    async def test_force_beast_single_numeric_token_targets_that_player(
+        self, gm_manager, mock_managers
+    ):
+        """回归（design D4）：「触发秘境妖兽 900000002」的单个数字 token 必须
+        作用于 900000002——single_token_is_target=True 防止被当作命令数值
+        参数而回落到发送者。"""
+        mock_managers["rift_manager"].force_beast_encounter = AsyncMock(
+            return_value=(True, "ok")
+        )
+        event = make_event(sender_id="gm_001")
+
+        success, _ = await gm_manager.cmd_force_rift_beast(event, "900000002")
+
+        assert success is True
+        mock_managers[
+            "rift_manager"
+        ].force_beast_encounter.assert_awaited_once_with("900000002")
+
+    @pytest.mark.asyncio
+    async def test_force_legacy_at_mention_takes_priority(
+        self, gm_manager, mock_managers
+    ):
+        """@提及 优先于参数与发送者（目标解析既有优先级）。"""
+        mock_managers["rift_manager"].force_legacy_encounter = AsyncMock(
+            return_value=(True, "ok")
+        )
+        at = At()
+        at.qq = "88888"
+        event = make_event(sender_id="gm_001", mentions=[at])
+
+        success, _ = await gm_manager.cmd_force_rift_legacy(event, "@玩家")
+
+        assert success is True
+        mock_managers[
+            "rift_manager"
+        ].force_legacy_encounter.assert_awaited_once_with("88888")
+
+    @pytest.mark.asyncio
+    async def test_dispatch_full_path_with_numeric_target(
+        self, gm_manager, mock_managers
+    ):
+        """经 dispatch 全链路：「修仙GM 触发秘境妖兽 900000002」。"""
+        mock_managers["rift_manager"].force_beast_encounter = AsyncMock(
+            return_value=(True, "✅ 已触发")
+        )
+        event = make_event(sender_id="gm_001")
+
+        success, msg = await gm_manager.dispatch(
+            "gm_001", event, "触发秘境妖兽", "900000002"
+        )
+
+        assert success is True
+        assert "已触发" in msg
+        mock_managers[
+            "rift_manager"
+        ].force_beast_encounter.assert_awaited_once_with("900000002")
+
+    @pytest.mark.asyncio
+    async def test_rift_manager_not_ready(self, gm_manager):
+        gm_manager.rift_manager = None
+        event = make_event(sender_id="gm_001")
+
+        for cmd in (
+            gm_manager.cmd_force_rift_puzzle,
+            gm_manager.cmd_force_rift_beast,
+            gm_manager.cmd_force_rift_legacy,
+        ):
+            success, msg = await cmd(event, "")
+            assert success is False
+            assert "未初始化" in msg
+
+    @pytest.mark.asyncio
+    async def test_help_lists_three_subcommands(self, gm_manager):
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_help(event, "")
+        assert success is True
+        for fragment in ("触发秘境谜题", "触发秘境妖兽", "触发秘境传承"):
+            assert fragment in msg

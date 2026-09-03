@@ -153,6 +153,14 @@ BOSS_CONFIG = {
 RIFT_CONFIG = {
     "default_duration": 1800,  # 30分钟
     "legacy_chance": 0.10,  # 探索完成触发秘境传承机缘的概率（0 关闭）
+    # 遭遇机制（add-rift-encounters design D4/D6）：结算后独立判定谜题/妖兽遭遇；
+    # 秘境条目 encounter_rate 存在时覆盖 puzzle_rate/beast_rate 两者。
+    # 存量 rift_config.json 不会被自动合并新键，读取处按 explore_events 先例
+    # 回落到本默认值（见 managers/rift_manager.py）
+    "puzzle_rate": 0.3,  # 结算后触发古阵谜题遭遇的概率
+    "beast_rate": 0.5,  # 结算后触发妖兽拦路遭遇的概率（沿用旧 rift low 难度 50% 量级）
+    "encounter_ttl_seconds": 600,  # pending 遭遇惰性过期时限（秒，design D1）
+    "puzzle_attempts": 2,  # 谜题作答机会次数（design D6）
     # 探索事件变体池（外移自 rift_manager 原硬编码，文案逐字保留）；
     # 旧版 rift_config.json 缺该键时运行时回落到本默认池
     "explore_events": [
@@ -222,6 +230,20 @@ RIFT_CONFIG = {
             "access": "sect_member",  # 仅本宗成员可探索（7.2 接线准入校验）
             "description": "",
             "settlement_desc": "",
+        },
+        {
+            # add-rift-encounters 临时测试秘境（验证后拆除）：enemy_group 指向
+            # enemies.json 的 rift_test 定向组；encounter_rate 1.0 必触发保证测试确定性
+            "id": 7,
+            "name": "试炼古境",
+            "level": 0,
+            "exp_range": [100, 200],
+            "gold_range": [50, 100],
+            "description": "云雾深处的一座残破古境，唯有石傀儡徘徊其中。（测试秘境）",
+            "settlement_desc": "你离开了试炼古境，身后傀儡重归沉寂。（测试秘境）",
+            "legacy_type": "rift",
+            "enemy_group": "rift_test",
+            "encounter_rate": 1.0,
         },
     ],
 }
@@ -683,6 +705,26 @@ ENEMY_CONFIG = {
                     "defense": 20,
                     "crit_rate": 0.1,
                 },
+            ],
+        },
+        {
+            # add-rift-encounters 临时测试组（验证后拆除）：与 enemies.json 的
+            # rift_test 组保持一致；不带 level_range，只能定向触达
+            "key": "rift_test",
+            "name": "试炼古境傀儡",
+            "description": "试炼古境中沉睡的傀儡造物，强度极低，仅供遭遇机制测试（验证后拆除）",
+            "templates": [
+                {
+                    "key": "stone_golem",
+                    "name": "石傀儡",
+                    "description": "古境碎石拼合而成的傀儡，行动迟缓，力道涣散",
+                    "elite_prefixes": ["历战的", "坚固的", "龟裂的"],
+                    "boss_names": ["古境石灵", "镇境石尊"],
+                    "hp_mult": 0.5,
+                    "atk_mult": 0.5,
+                    "defense": 2,
+                    "crit_rate": 3,
+                }
             ],
         },
     ],

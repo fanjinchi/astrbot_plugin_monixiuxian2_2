@@ -15,7 +15,12 @@ if TYPE_CHECKING:
 # v3.11.0 起不再向前兼容：历史逐版本迁移（v1→v32）已全部删除，
 # 全新安装与旧库统一直接生成最新 schema。MIGRATION_TASKS 注册机制
 # 保留，供后续版本（v33+）做真正的增量升级。
-LATEST_DB_VERSION = 32  # v32: 传承系统改版（legacy_instances/impart_pk_cooldown/impart_snatch_protection）
+LATEST_DB_VERSION = 33  # v33: 播种测试秘境「试炼古境」（add-rift-encounters 脚手架）
+
+# 增量任务链的适用下限：v32 是 _create_all_tables 冻结的完整 schema 基线，
+# 只有达到该版本的库才具备迁移任务依赖的全部表结构；更早的旧库必须走
+# migrate() 的重建路径，否则增量任务会在缺失的表上崩溃
+TASK_CHAIN_MIN_VERSION = 32
 
 MIGRATION_TASKS: dict[
     int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]
@@ -33,6 +38,25 @@ def migration(version: int):
         return func
 
     return decorator
+
+
+@migration(33)
+async def _seed_trial_rift_v33(
+    conn: aiosqlite.Connection, config_manager: ConfigManager
+):
+    """Seed test rift 「试炼古境」 (id 7) into existing v32 databases.
+
+    add-rift-encounters D7 双播种的存量库半边：全新安装/重建由
+    _create_all_tables 的 default_rifts 种子覆盖，存量 v32 库由本任务
+    INSERT OR IGNORE 补种同一行（幂等）。临时测试脚手架，验证通过后拆除
+    （含删除该行的迁移版本）。
+    """
+    import json
+
+    await conn.execute(
+        "INSERT OR IGNORE INTO rifts (rift_id, rift_name, rift_level, required_level, rewards) VALUES (?, ?, ?, ?, ?)",
+        (7, "试炼古境", 1, 0, json.dumps({"exp": [100, 200], "gold": [50, 100]})),
+    )
 
 
 async def _create_all_tables(conn: aiosqlite.Connection):
@@ -472,6 +496,9 @@ async def _create_all_tables(conn: aiosqlite.Connection):
             3,
             json.dumps({"exp": [300, 900], "gold": [100, 400]}),
         ),
+        # 试炼古境：add-rift-encounters 临时测试秘境（D7 双播种的种子半边，
+        # 验证后拆除）；存量 v32 库由 v33 迁移任务 _seed_trial_rift_v33 补种同一行
+        (7, "试炼古境", 1, 0, json.dumps({"exp": [100, 200], "gold": [50, 100]})),
     ]
     for rift in default_rifts:
         await conn.execute(
@@ -520,10 +547,12 @@ class MigrationManager:
 
         三种路径：
         1. 全新安装（无 db_info）：直接 `_create_all_tables()` 生成最新 schema；
-        2. 存在已注册的后续迁移任务（未来 v33+，MIGRATION_TASKS 非空且
-           版本高于当前）：按版本升序逐任务升级，每个版本一个事务；
-        3. 旧版数据库（version < LATEST 且没有可用的迁移任务）：v3.11.0
-           起不再向前兼容——警告后重建为最新 schema（数据重置）。
+        2. 当前库已具备 v32 完整 schema（>= TASK_CHAIN_MIN_VERSION）且存在
+           已注册的后续迁移任务（版本高于当前）：按版本升序逐任务升级，
+           每个版本一个事务；
+        3. 旧版数据库（version < LATEST 且没有可用的迁移任务，含低于
+           TASK_CHAIN_MIN_VERSION 的库）：v3.11.0 起不再向前兼容——警告后
+           重建为最新 schema（数据重置）。
         """
         await self.conn.execute("PRAGMA foreign_keys = ON")
         async with self.conn.execute(
@@ -552,12 +581,16 @@ class MigrationManager:
             f"当前数据库版本: v{current_version}, 最新版本: v{LATEST_DB_VERSION}"
         )
 
-        # 后续版本注册的增量迁移（v33+）优先走任务链
-        pending = [
-            v
-            for v in sorted(MIGRATION_TASKS.keys())
-            if current_version < v <= LATEST_DB_VERSION
-        ]
+        # 后续版本注册的增量迁移（v33+）优先走任务链，但仅限已具备 v32 完整
+        # schema 的库：更早的旧库缺少任务依赖的表结构（如 rifts），进任务链
+        # 只会在缺失的表上崩溃，必须落入下方重建路径
+        pending = []
+        if current_version >= TASK_CHAIN_MIN_VERSION:
+            pending = [
+                v
+                for v in sorted(MIGRATION_TASKS.keys())
+                if current_version < v <= LATEST_DB_VERSION
+            ]
         if pending:
             logger.info("检测到数据库需要升级...")
             for version in pending:

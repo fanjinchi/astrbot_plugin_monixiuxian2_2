@@ -7,7 +7,9 @@ Covers:
 - the explore-event pool read from config with the RIFT_CONFIG default fallback;
 - adventure ``desc_variants`` bucket selection (current segment + 通用 merged,
   route filtering) and the verbatim ``desc`` fallback;
-- the legacy-encounter template cluster converging adventure/rift/sect copy.
+- the legacy-encounter template cluster converging adventure/rift/sect copy;
+- legacy triggers pending an应邀制 encounter (add-rift-encounters D8) instead
+  of running an inline guardian challenge.
 """
 
 import json
@@ -75,23 +77,11 @@ def _make_finished_rift_db(rift_id: int = 1):
     db.ext.set_user_free = AsyncMock()
     db.update_player = AsyncMock()
     player = MagicMock()
+    player.user_id = "u1"
     player.experience = 0
     player.gold = 0
     db.get_player_by_id = AsyncMock(return_value=player)
     return db
-
-
-class _StubPve:
-    """PVE stub: skips encounter combat, fixes the guardian-challenge outcome."""
-
-    def __init__(self, won: bool):
-        self.won = won
-
-    async def trigger_pve_combat(self, *args, **kwargs):
-        return None
-
-    async def challenge_legacy_guardian(self, player):
-        return self.won, "守护者战斗详情"
 
 
 class _StubImpart:
@@ -178,6 +168,10 @@ async def test_rift_settlement_renders_settlement_desc():
             }
         ],
         "explore_events": [{"desc": "固定事件", "item_chance": 0}],
+        # 关闭随机遭遇判定，聚焦叙事位断言（add-rift-encounters 后结算会按
+        # puzzle_rate/beast_rate 挂起遭遇并追加文案）
+        "puzzle_rate": 0.0,
+        "beast_rate": 0.0,
     }
     mgr = RiftManager(_make_finished_rift_db(1), FakeRiftConfigManager(cfg))
 
@@ -201,6 +195,8 @@ async def test_rift_settlement_unchanged_without_settlement_desc():
             }
         ],
         "explore_events": [{"desc": "固定事件", "item_chance": 0}],
+        "puzzle_rate": 0.0,
+        "beast_rate": 0.0,
     }
     mgr = RiftManager(_make_finished_rift_db(1), FakeRiftConfigManager(cfg))
 
@@ -219,6 +215,8 @@ async def test_explore_events_come_from_config():
     cfg = {
         "rifts": [],
         "explore_events": [{"desc": "配置化事件甲", "item_chance": 0}],
+        "puzzle_rate": 0.0,
+        "beast_rate": 0.0,
     }
     mgr = RiftManager(_make_finished_rift_db(1), FakeRiftConfigManager(cfg))
 
@@ -232,7 +230,11 @@ async def test_explore_events_come_from_config():
 @pytest.mark.asyncio
 async def test_explore_events_fall_back_to_rift_default_pool():
     """Old configs without explore_events use the RIFT_CONFIG default pool."""
-    cfg = {"rifts": []}  # legacy shape: no explore_events key
+    cfg = {
+        "rifts": [],
+        "puzzle_rate": 0.0,
+        "beast_rate": 0.0,
+    }  # legacy shape: no explore_events key
     mgr = RiftManager(_make_finished_rift_db(1), FakeRiftConfigManager(cfg))
 
     with patch.object(mgr, "_roll_rift_drops", new=AsyncMock(return_value=[])):
@@ -255,6 +257,10 @@ def test_repo_rift_config_explore_events_match_original_pool():
         {"desc": "你在秘境中遇到了前辈留下的传承！", "item_chance": 90},
     ]
     for rift in cfg["rifts"]:
+        if rift["id"] == 7:
+            # 试炼古境是 add-rift-encounters 的临时测试秘境（验证后拆除），
+            # 自带测试文案，不受"叙事占位空串"约定约束
+            continue
         assert rift["description"] == ""
         assert rift["settlement_desc"] == ""
 
@@ -286,52 +292,59 @@ def test_legacy_encounter_fragment_defaults_are_verbatim():
 
 
 @pytest.mark.asyncio
-async def test_adventure_legacy_uses_converged_encounter_copy():
-    """Adventure 偶遇制 win/lose messages render from the shared cluster."""
+async def test_adventure_legacy_pends_encounter_with_invite_hint():
+    """Adventure 命中 legacy_chance → 挂起来源 adventure 的传承遭遇并提示应邀方式
+    （add-rift-encounters D8 应邀制，不再内联挑战守护者）。"""
     adv = AdventureManager(MagicMock())
     adv.legacy_chance = 1.0
     adv.impart_mgr = _StubImpart("历练传承", 7)
-    adv.pve_combat_mgr = _StubPve(won=True)
+    pve_probe = MagicMock()
+    adv.pve_combat_mgr = pve_probe
 
     msg = await adv._maybe_trigger_legacy(SimpleNamespace(user_id="u1"))
-    assert msg == (
-        "\n\n🗿 你偶遇上古传承之地，战胜了守护者！\n守护者战斗详情\n"
-        "🌟 获得【历练传承】#7，发送「激活传承」可开始修炼解锁。"
-    )
 
-    adv.pve_combat_mgr = _StubPve(won=False)
-    msg = await adv._maybe_trigger_legacy(SimpleNamespace(user_id="u1"))
-    assert msg == "\n\n🗿 你偶遇上古传承之地，但未能战胜守护者。\n守护者战斗详情"
+    # 结算消息含传承之地开启提示与「探索秘境 传承」指引
+    assert "传承之地" in msg
+    assert "探索秘境 传承" in msg
+    # 不再内联战斗
+    pve_probe.challenge_legacy_guardian.assert_not_called()
+    # pending 遭遇记录来源与类型
+    entry = adv.encounter_store.get_active("u1", "legacy")
+    assert entry is not None
+    assert entry.payload["source"] == "adventure"
+    assert entry.payload["legacy_type"] == "adventure"
 
 
 @pytest.mark.asyncio
-async def test_rift_legacy_uses_converged_encounter_copy():
-    """Rift 偶遇制 win/lose messages render from the shared cluster."""
+async def test_rift_legacy_pends_encounter_with_invite_hint():
+    """Rift 命中 legacy_chance → 挂起来源 rift 的传承遭遇，结算消息提示应邀方式
+    （add-rift-encounters D8 应邀制，不再内联挑战守护者）。"""
     cfg = {
         "legacy_chance": 1.0,
+        "puzzle_rate": 0.0,
+        "beast_rate": 0.0,
         "rifts": [],
         "explore_events": [{"desc": "固定事件", "item_chance": 0}],
     }
     mgr = RiftManager(_make_finished_rift_db(1), FakeRiftConfigManager(cfg))
-    mgr.pve_combat_mgr = _StubPve(won=True)
+    pve_probe = MagicMock()
+    mgr.pve_combat_mgr = pve_probe
     mgr.impart_mgr = _StubImpart("秘境传承", 42)
 
     success, msg, _ = await mgr.finish_exploration("u1")
 
     assert success
-    assert (
-        "\n\n🗿 你偶遇上古传承之地，战胜了守护者！\n守护者战斗详情\n"
-        "🌟 获得【秘境传承】#42，发送「激活传承」可开始修炼解锁。" in msg
-    )
-
-    mgr = RiftManager(_make_finished_rift_db(1), FakeRiftConfigManager(cfg))
-    mgr.pve_combat_mgr = _StubPve(won=False)
-    mgr.impart_mgr = _StubImpart("秘境传承", 42)
-
-    success, msg, _ = await mgr.finish_exploration("u1")
-
-    assert success
-    assert "🗿 你偶遇上古传承之地，但未能战胜守护者。\n守护者战斗详情" in msg
+    # 结算消息含传承之地开启提示与「探索秘境 传承」指引
+    assert "传承之地" in msg
+    assert "探索秘境 传承" in msg
+    # 不再内联战斗（守护挑战与结算自动 PvE 均不发生）
+    pve_probe.challenge_legacy_guardian.assert_not_called()
+    pve_probe.trigger_pve_combat.assert_not_called()
+    # pending 遭遇记录来源与类型
+    entry = mgr.encounter_store.get_active("u1", "legacy")
+    assert entry is not None
+    assert entry.payload["source"] == "rift"
+    assert entry.payload["legacy_type"] == "rift"
 
 
 # ===== 5.5/5.6/5.7 历练事件 desc_variants 分桶 =====

@@ -1,0 +1,177 @@
+{
+  "name": "rift-encounters",
+  "description": "秘境遭遇系统全链路：GM 强制触发谜题/妖兽/传承三类遭遇，验证探索秘境子命令响应与零惩罚负路径。",
+  "scenario": "前置条件：群 webtest_pvp_001 已白名单，900000001 在 GM_ADMINS，pre_run_hook 复位基线；测试库需已应用 v33 迁移（试炼古境播种，重载插件后生效）。覆盖：试炼古境播种可见、GM 强触三类遭遇、破阵（无答案→用法提示/非法形式不耗次/作答判定）、迎战（战报三分支）、传承应邀（胜负双分支）、无 pending 的机缘消散提示。谜题族与答案、战斗胜负均为随机：作答与迎战断言用多分支正则判定『系统给出判定响应』，属抽样验证，必要时 --repeat 采样；分支级正确性由 pytest 单测兜底。",
+  "tags": ["pve", "gm"],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile sect --yes",
+    "timeout": 60
+  },
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000003"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "创建测试玩家"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "玩家创建成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#秘境列表",
+      "note": "验证 v33 迁移播种的测试秘境可见"
+    },
+    {
+      "type": "expect",
+      "match": "试炼古境",
+      "timeout": 30,
+      "note": "测试秘境（id 7）已在列表中"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 触发秘境谜题 900000002",
+      "note": "GM 强触谜题遭遇（单数字 token 须作用于目标而非 GM 本人）"
+    },
+    {
+      "type": "expect",
+      "match": "触发古阵谜题遭遇",
+      "timeout": 30,
+      "note": "GM 确认且回显题面"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#探索秘境 破阵",
+      "note": "破阵未带答案"
+    },
+    {
+      "type": "expect",
+      "match": "用法",
+      "timeout": 30,
+      "note": "用法提示，不消耗尝试次数"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#探索秘境 破阵 abc",
+      "note": "非法形式输入（对三个谜题族均非法）"
+    },
+    {
+      "type": "expect",
+      "match": "答案形式不对",
+      "timeout": 30,
+      "note": "形式非法提示，不消耗尝试次数"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#探索秘境 破阵 土",
+      "note": "正式作答（随机实例，结果分支不定）"
+    },
+    {
+      "type": "expect",
+      "match": "re:碑纹大亮|答案不对|机会耗尽|答案形式不对",
+      "timeout": 30,
+      "note": "系统给出判定响应（成功/错误/耗尽/形式非法均接受）"
+    },
+    {
+      "type": "send",
+      "player": "p2",
+      "text": "#探索秘境 破阵 土",
+      "note": "p2 无 pending 谜题（零惩罚负路径）"
+    },
+    {
+      "type": "expect",
+      "match": "当前没有待破解的古阵谜题",
+      "timeout": 30,
+      "note": "机缘消散提示，无副作用"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 触发秘境妖兽 900000002",
+      "note": "GM 强触妖兽遭遇"
+    },
+    {
+      "type": "expect",
+      "match": "触发妖兽拦路遭遇",
+      "timeout": 30,
+      "note": "GM 确认"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#探索秘境 迎战",
+      "note": "接受妖兽挑战（胜负随机）"
+    },
+    {
+      "type": "expect",
+      "match": "re:击败了拦路妖兽|不敌妖兽|战成平手",
+      "timeout": 30,
+      "note": "战报输出（胜/负/平三分支均接受）"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#探索秘境 迎战",
+      "note": "机缘已消耗，再次迎战"
+    },
+    {
+      "type": "expect",
+      "match": "当前没有可迎战的妖兽",
+      "timeout": 30,
+      "note": "无 pending 提示，机缘不重复消耗"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 触发秘境传承 900000002",
+      "note": "GM 强触传承之地遭遇"
+    },
+    {
+      "type": "expect",
+      "match": "触发传承之地遭遇",
+      "timeout": 30,
+      "note": "GM 确认"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#探索秘境 传承",
+      "note": "应邀挑战守护 NPC（胜负随机）"
+    },
+    {
+      "type": "expect",
+      "match": "re:战胜了守护者|未能战胜守护者|战成平手",
+      "timeout": 30,
+      "note": "守护战战报（胜/负/平均接受）"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#探索秘境 传承",
+      "note": "机缘已消耗，再次应邀"
+    },
+    {
+      "type": "expect",
+      "match": "当前没有可应邀的传承之地",
+      "timeout": 30,
+      "note": "无 pending 提示"
+    }
+  ]
+}

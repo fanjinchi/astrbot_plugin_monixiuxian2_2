@@ -628,11 +628,15 @@ class TestAdventureDropSkipping:
         assert reward_data["items"] == [("灵草", 2)]
 
 
-class TestRiftDropSkipping:
-    """RiftManager skips _roll_rift_drops when combat rewards carry hp_penalty."""
+class TestRiftSettlementNoAutoPve:
+    """finish_exploration 不再自动触发 PvE（add-rift-encounters design D5）。
+
+    新契约：结算奖励不被战斗修改（旧失败扣 exp×0.3/gold=0/hp=1 语义移除），
+    掉落恒按事件 item_chance roll，pve_won 恒 False，hp 不被结算触碰。
+    """
 
     @pytest.mark.asyncio
-    async def test_skips_drops_on_defeat(
+    async def test_settlement_does_not_trigger_pve_and_rolls_drops(
         self,
         rift_manager,
         mock_db,
@@ -640,43 +644,18 @@ class TestRiftDropSkipping:
         mock_player,
         finished_user_cd_rift,
     ):
-        """hp_penalty=True means _roll_rift_drops is not awaited and no items drop."""
+        """结算不调用 trigger_pve_combat；掉落照常 roll 并入库。"""
         mock_db.ext.get_user_cd.return_value = finished_user_cd_rift
         mock_db.get_player_by_id.return_value = mock_player
         mock_player.experience = 0
         mock_player.gold = 0
-        mock_pve_combat_mgr.trigger_pve_combat = AsyncMock(
-            return_value=("战败", {"exp": 1000, "gold": 500, "hp_penalty": True})
-        )
-
-        with patch.object(
-            rift_manager, "_roll_rift_drops", new=AsyncMock(return_value=[])
-        ) as mock_roll:
-            success, _msg, reward_data = await rift_manager.finish_exploration(
-                "player_001"
-            )
-
-        assert success
-        mock_roll.assert_not_awaited()
-        assert reward_data["items"] == []
-
-    @pytest.mark.asyncio
-    async def test_proceeds_drops_on_victory(
-        self,
-        rift_manager,
-        mock_db,
-        mock_pve_combat_mgr,
-        mock_player,
-        finished_user_cd_rift,
-    ):
-        """hp_penalty=False means _roll_rift_drops is awaited normally."""
-        mock_db.ext.get_user_cd.return_value = finished_user_cd_rift
-        mock_db.get_player_by_id.return_value = mock_player
-        mock_player.experience = 0
-        mock_player.gold = 0
-        mock_pve_combat_mgr.trigger_pve_combat = AsyncMock(
-            return_value=("胜利", {"exp": 3000, "gold": 1500, "hp_penalty": False})
-        )
+        # 关闭随机遭遇判定，聚焦结算本体
+        rift_manager.config = {
+            "puzzle_rate": 0.0,
+            "beast_rate": 0.0,
+            "legacy_chance": 0.0,
+            "explore_events": [{"desc": "固定事件", "item_chance": 100}],
+        }
 
         with patch.object(
             rift_manager,
@@ -688,5 +667,44 @@ class TestRiftDropSkipping:
             )
 
         assert success
+        mock_pve_combat_mgr.trigger_pve_combat.assert_not_called()
         mock_roll.assert_awaited_once()
         assert reward_data["items"] == [("灵草", 3)]
+        assert reward_data["pve_won"] is False
+
+    @pytest.mark.asyncio
+    async def test_settlement_keeps_hp_and_full_base_rewards(
+        self,
+        rift_manager,
+        mock_db,
+        mock_pve_combat_mgr,
+        mock_player,
+        finished_user_cd_rift,
+    ):
+        """无战斗则 hp 不动、基础修为/灵石不打折（旧失败惩罚随自动 PvE 移除）。"""
+        mock_db.ext.get_user_cd.return_value = finished_user_cd_rift
+        mock_db.get_player_by_id.return_value = mock_player
+        mock_player.experience = 0
+        mock_player.gold = 0
+        mock_player.hp = 500
+        rift_manager.config = {
+            "puzzle_rate": 0.0,
+            "beast_rate": 0.0,
+            "legacy_chance": 0.0,
+            "explore_events": [{"desc": "固定事件", "item_chance": 0}],
+        }
+
+        with patch.object(
+            rift_manager, "_roll_rift_drops", new=AsyncMock(return_value=[])
+        ) as mock_roll:
+            success, _msg, reward_data = await rift_manager.finish_exploration(
+                "player_001"
+            )
+
+        assert success
+        mock_pve_combat_mgr.trigger_pve_combat.assert_not_called()
+        # 掉落不再因战斗失败被跳过，恒按 item_chance 判定
+        mock_roll.assert_awaited_once()
+        assert reward_data["exp"] > 0 and reward_data["gold"] > 0
+        assert reward_data["pve_won"] is False
+        assert mock_player.hp == 500

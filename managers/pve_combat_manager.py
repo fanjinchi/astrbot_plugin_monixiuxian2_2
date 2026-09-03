@@ -8,6 +8,7 @@ import importlib.util
 import os
 import random
 import sys
+from typing import NamedTuple
 
 
 def _load_module(name, rel_path):
@@ -48,6 +49,21 @@ RIFT_LEVEL_DIFFICULTY_MAP = {
     4: "extreme",
     5: "extreme",
 }
+
+
+class RiftBeastResult(NamedTuple):
+    """Combat-only outcome of an optional rift beast challenge (design D5).
+
+    Reward assembly (enemy exp credit, drop roll) stays in
+    ``RiftManager.accept_beast_challenge``; this layer only reports what the
+    fight decided. ``draw`` is reported separately so the caller can treat it
+    as a failed challenge (与传承口径一致).
+    """
+
+    won: bool  # True only when the engine winner is the player (explicit compare)
+    draw: bool  # 平局单列：调用方视同挑战失败
+    battle_msg: str  # 战报（无奖励结算内容）
+    enemy_exp: int  # 敌人修为，胜利时由调用方入账
 
 
 class PVECombatManager:
@@ -345,6 +361,70 @@ class PVECombatManager:
         # 8. 格式化并返回结果
         msg = self._format_combat_result(legacy_result, enemy, rewards)
         return msg, rewards
+
+    async def challenge_rift_beast(
+        self, player: Player, enemy_group_key: str | None = None
+    ) -> RiftBeastResult | None:
+        """Fight the rift beast of a pending encounter (combat only, design D5).
+
+        只负责战斗：敌人选择 + 引擎结算 + HP 写回；修为/掉落奖励组装留在
+        RiftManager.accept_beast_challenge，本方法不反向依赖 rift 管理器。
+
+        Args:
+            player: 应战的玩家。
+            enemy_group_key: 秘境条目配置的定向怪物组 key；None 时回落按玩家
+                境界匹配的全局怪物池（spec「缺省回落全局池」）。
+
+        Returns:
+            RiftBeastResult；敌人生成失败（配置缺失等异常）时返回 None。
+        """
+        from astrbot.api import logger
+
+        # 1. 生成妖兽：有组 key 走定向生成（user_id 为 guardian_ 前缀，绕开普通
+        #    分组匹配）；无则回落全局池，类别沿用秘境 low 难度分布
+        #    （normal 80%/elite 20%，即旧结算自动 PvE low 档的选择口径）
+        try:
+            if enemy_group_key:
+                enemy = self.enemy_mgr.spawn_enemy_from_group(
+                    enemy_group_key, player.level_index
+                )
+            else:
+                category = self._select_enemy_category("rift", "low")
+                enemy = self.enemy_mgr.spawn_enemy(player.level_index, category)
+        except Exception as e:
+            logger.error(f"生成秘境妖兽失败: {e}")
+            return None
+
+        # 2. 构建双方 FighterState 并结算
+        player_fighter = await self.combat_engine.build_fighter_from_player(player)
+        enemy_fighter = self._build_enemy_fighter(enemy)
+        result = self.combat_engine.resolve_combat(
+            player_fighter, enemy_fighter, combat_type="pve"
+        )
+
+        # 3. 胜负必须显式比较 user_id（design D5）：定向组敌人 user_id 是
+        #    guardian_ 前缀，沿用 _calculate_rewards 的 enemy_ 前缀判定会把
+        #    定向组妖兽获胜误判为玩家胜利。平局单列，调用方视同挑战失败。
+        won = result.winner == player.user_id
+        is_draw = result.winner == "draw"
+
+        # 4. HP 写回：胜利按战斗结果；失败/平局不致死但气血降为 1
+        #    （challenge_legacy_guardian 同款口径，惩罚语义由调用方消费）
+        final_hp = result.fighter1_final_hp if won else 1
+        player.hp = final_hp
+
+        # 5. 组织战报（无奖励结算；奖励由 RiftManager 组装）
+        lines = list(result.combat_log or [])
+        lines.append("")
+        lines.append(f"🐺 拦路妖兽：{enemy.name}")
+        if is_draw:
+            lines.append("⚖️ 你与妖兽战成平手，它咆哮着退回了密林。")
+        elif won:
+            lines.append("🏆 你击败了拦路妖兽！")
+        else:
+            lines.append("💀 你不敌妖兽，被重创而退（气血受损，需休养恢复）。")
+        lines.append(f"💚 剩余气血：{final_hp}")
+        return RiftBeastResult(won, is_draw, "\n".join(lines), enemy.exp)
 
     async def challenge_legacy_guardian(self, player: Player) -> tuple[bool, str]:
         """发起传承之地守护 NPC 挑战（获取传承的前置门槛）。

@@ -124,7 +124,9 @@ def bounty_manager_cls():
         )
         yield mod.BountyManager
     finally:
-        sys.modules.pop("astrbot_plugin_monixiuxian2_2.managers.bounty_manager_cl", None)
+        sys.modules.pop(
+            "astrbot_plugin_monixiuxian2_2.managers.bounty_manager_cl", None
+        )
         if previous is sentinel:
             del data_pkg.DataBase
         else:
@@ -300,9 +302,7 @@ async def test_bounty_accept_normal_template_unchanged(db, bounty_manager_cls):
 
 
 @pytest.mark.asyncio
-async def test_bounty_scope_mismatch_on_status_complete_abandon(
-    db, bounty_manager_cls
-):
+async def test_bounty_scope_mismatch_on_status_complete_abandon(db, bounty_manager_cls):
     """Status/complete/abandon reject cross-scope operations with guidance to the other entry."""
     sect_mgr = await _make_sect_mgr(db)
     bounty_mgr = _make_bounty_mgr(db, bounty_manager_cls)

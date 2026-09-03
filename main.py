@@ -228,6 +228,7 @@ class XiuXianPlugin(Star):
             SkillManager,
             StorageRingManager,
         )
+        from .core.encounter_store import EncounterStore
 
         self.skill_manager = SkillManager(self.config_manager, self.db)
         self.storage_ring_mgr = StorageRingManager(self.db, self.config_manager)
@@ -282,8 +283,26 @@ class XiuXianPlugin(Star):
             self.config_manager,
             self.storage_ring_mgr,
         )
+        # 遭遇存储单例：秘境/历练共享（add-rift-encounters design D8）；内存态，
+        # 热重载即清空——零惩罚设计下玩家无损失（design D1）。
+        # store 默认 TTL 取 rift_config 的 encounter_ttl_seconds（缺键回落
+        # RIFT_CONFIG 默认，D4 存量兼容）：历练侧 pend 不显式传 ttl（用 store
+        # 默认值），在此处注入配置值才能保证两条路径时限语义一致
+        from .data.default_configs import RIFT_CONFIG
+
+        _rift_cfg = self.config_manager.rift_config if self.config_manager else {}
+        _encounter_ttl = int(
+            _rift_cfg.get(
+                "encounter_ttl_seconds", RIFT_CONFIG.get("encounter_ttl_seconds", 600)
+            )
+        )
+        self.encounter_store = EncounterStore(ttl_seconds=_encounter_ttl)
         self.rift_mgr = RiftManager(
-            self.db, self.config_manager, self.storage_ring_mgr, self.pve_combat_mgr
+            self.db,
+            self.config_manager,
+            self.storage_ring_mgr,
+            self.pve_combat_mgr,
+            encounter_store=self.encounter_store,
         )
         # 秘境传承机缘需要传承管理器（init 顺序在其后，此处注入）
         self.rift_mgr.impart_mgr = self.impart_mgr
@@ -293,6 +312,7 @@ class XiuXianPlugin(Star):
             self.storage_ring_mgr,
             self.pve_combat_mgr,
             config_manager=self.config_manager,
+            encounter_store=self.encounter_store,
         )
         # 历练传承机缘需要传承管理器（init 顺序在其后，此处注入）
         self.adventure_mgr.impart_mgr = self.impart_mgr
@@ -1185,12 +1205,36 @@ class XiuXianPlugin(Star):
 
     @filter.command(CMD_RIFT_EXPLORE, "探索秘境")
     @require_whitelist
-    async def handle_rift_explore(self, event: AstrMessageEvent, rift_id: int = 0):
-        """Command 「探索秘境」- 探索秘境; routes to rift_handlers.handle_rift_explore."""
+    async def handle_rift_explore(
+        self, event: AstrMessageEvent, action: str = "", value: str = ""
+    ):
+        """Command 「探索秘境」- 进入秘境或响应遭遇子命令(数字ID进入/破阵 <答案>/迎战/传承); routes to rift_handlers.handle_rift_explore (迎战直调 rift_mgr.accept_beast_challenge)."""
         if not self._is_pve_enabled():
             yield event.plain_result("🛠️ 秘境玩法正在维护中，敬请期待！")
             return
-        async for r in self.rift_handlers.handle_rift_explore(event, rift_id):
+        action = str(action or "").strip()
+        if action == "迎战":
+            # 迎战直调 manager（不经 rift_handlers 的 yield 字符串，与
+            # handle_rift_complete 直调 finish_exploration 的模式一致，
+            # design D5）：结果数据的 pve_won 需在本层消费以推进师承任务链
+            user_id = event.get_sender_id()
+            _, msg, result_data = await self.rift_mgr.accept_beast_challenge(user_id)
+            if result_data.get("pve_won"):
+                # 师承任务链：PvE 胜利计数（复用 handle_rift_complete 的
+                # try/except 模式——推进失败不影响迎战主反馈）
+                try:
+                    master_msg = await self.sect_mgr.advance_master_progress(
+                        user_id, "win_pve"
+                    )
+                    if master_msg:
+                        msg += master_msg
+                except Exception:
+                    logger.warning(
+                        "【修仙插件】师承任务PvE胜场推进失败（秘境迎战）", exc_info=True
+                    )
+            yield event.plain_result(msg)
+            return
+        async for r in self.rift_handlers.handle_rift_explore(event, action, value):
             yield r
 
     @filter.command(CMD_RIFT_COMPLETE, "完成秘境探索")

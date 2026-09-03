@@ -122,12 +122,10 @@ async def test_fresh_install_reaches_latest_version():
             )
 
         # sect_id 类型统一为 INTEGER（不再有 v22 TEXT 与 v32 INTEGER 两路径漂移）
-        async with db_conn2.execute(
-            "PRAGMA table_info(legacy_instances)"
-        ) as cursor:
-            sect_id_type = {
-                row[1]: row[2] for row in await cursor.fetchall()
-            }["sect_id"]
+        async with db_conn2.execute("PRAGMA table_info(legacy_instances)") as cursor:
+            sect_id_type = {row[1]: row[2] for row in await cursor.fetchall()}[
+                "sect_id"
+            ]
         assert sect_id_type == "INTEGER"
 
         # 系统宗门列 / 技能归属列 / 师承进度列
@@ -146,7 +144,7 @@ async def test_fresh_install_reaches_latest_version():
 
 @pytest.mark.asyncio
 async def test_fresh_install_seeds_rifts_and_eyes():
-    """Fresh installs seed 6 rifts (incl. 青云剑冢) and 3 spirit eyes."""
+    """Fresh installs seed 7 rifts (incl. 青云剑冢与 v33 测试秘境试炼古境) and 3 spirit eyes."""
     import json
 
     async with aiosqlite.connect(":memory:") as db_conn:
@@ -157,7 +155,7 @@ async def test_fresh_install_seeds_rifts_and_eyes():
         ) as cursor:
             rows = await cursor.fetchall()
         by_id = {row[0]: row for row in rows}
-        assert set(by_id) == {1, 2, 3, 4, 5, 6}
+        assert set(by_id) == {1, 2, 3, 4, 5, 6, 7}
         assert by_id[4][1] == "玄冰地宫"
         tomb = by_id[6]
         assert tomb[1] == "青云剑冢"
@@ -165,9 +163,14 @@ async def test_fresh_install_seeds_rifts_and_eyes():
         assert tomb[3] == 3  # required_level
         assert json.loads(tomb[4]) == {"exp": [300, 900], "gold": [100, 400]}
 
-        async with db_conn.execute(
-            "SELECT COUNT(*) FROM spirit_eyes"
-        ) as cursor:
+        # v33 双播种：add-rift-encounters 临时测试秘境（验证后拆除）
+        trial = by_id[7]
+        assert trial[1] == "试炼古境"
+        assert trial[2] == 1  # rift_level
+        assert trial[3] == 0  # required_level
+        assert json.loads(trial[4]) == {"exp": [100, 200], "gold": [50, 100]}
+
+        async with db_conn.execute("SELECT COUNT(*) FROM spirit_eyes") as cursor:
             assert (await cursor.fetchone())[0] == 3
 
 
@@ -245,7 +248,8 @@ async def test_newer_db_version_raises_without_touching_data():
 @pytest.mark.asyncio
 async def test_legacy_db_rebuilt_to_latest_schema():
     """v3.11.0 不再向前兼容：旧版库（version < LATEST 且无迁移任务）整体重建——
-    schema 达最新，旧数据清空。"""
+    schema 达最新，旧数据清空。低于 v32 完整 schema 基线的库即使存在已注册的
+    增量任务（v33+）也不得进任务链，仍走本重建路径。"""
     async with aiosqlite.connect(":memory:") as db_conn:
         # 模拟遗留 v21 库：旧 players 列
         await db_conn.execute("CREATE TABLE db_info (version INTEGER NOT NULL)")
@@ -323,11 +327,9 @@ async def test_legacy_db_rebuilt_to_latest_schema():
             "impart_snatch_protection",
         } <= tables
 
-        # 重建后种子数据可用
-        async with db_conn.execute(
-            "SELECT COUNT(*) FROM rifts"
-        ) as cursor:
-            assert (await cursor.fetchone())[0] == 6
+        # 重建后种子数据可用（含 v33 播种的试炼古境）
+        async with db_conn.execute("SELECT COUNT(*) FROM rifts") as cursor:
+            assert (await cursor.fetchone())[0] == 7
 
 
 @pytest.mark.asyncio
@@ -338,21 +340,17 @@ async def test_registered_migration_task_chain(monkeypatch):
 
     async def _v33_task(conn, config_manager):
         """Demo next-version task: create a marker table."""
-        await conn.execute(
-            "CREATE TABLE demo_v33_table (k TEXT PRIMARY KEY)"
-        )
+        await conn.execute("CREATE TABLE demo_v33_table (k TEXT PRIMARY KEY)")
         ran.append(True)
 
-    # 临时注册 v33 并抬高 LATEST，验证任务链；结束后恢复
+    # 临时以演示任务覆盖真实 v33 任务并抬高 LATEST，验证任务链；monkeypatch 结束后恢复
     monkeypatch.setitem(_migration_mod.MIGRATION_TASKS, 33, _v33_task)
     monkeypatch.setattr(_migration_mod, "LATEST_DB_VERSION", 33)
 
     async with aiosqlite.connect(":memory:") as db_conn:
-        # 先建 v32 库（当前最新），再升级到 v33
+        # 先建 v32 库，再升级到 v33
         await _create_all_tables(db_conn)
-        await db_conn.execute(
-            "INSERT INTO db_info (version) VALUES (32)"
-        )
+        await db_conn.execute("INSERT INTO db_info (version) VALUES (32)")
         await db_conn.commit()
 
         assert _migration_mod.MIGRATION_TASKS[33] is _v33_task
@@ -393,6 +391,40 @@ async def test_registered_migration_task_chain(monkeypatch):
             "SELECT name FROM sqlite_master WHERE type='table' AND name='demo_v34_table'"
         ) as cursor:
             assert await cursor.fetchone() is None
+
+
+@pytest.mark.asyncio
+async def test_v33_task_seeds_trial_rift_on_existing_v32_db():
+    """真实的 v33 注册任务：为存量 v32 库补种试炼古境（id 7），重复执行幂等。"""
+    import json
+
+    async with aiosqlite.connect(":memory:") as db_conn:
+        # 模拟无 id 7 的存量 v32 库（_create_all_tables 种子已含 id 7，先删掉）
+        await _create_all_tables(db_conn)
+        await db_conn.execute("DELETE FROM rifts WHERE rift_id = 7")
+        await db_conn.execute("INSERT INTO db_info (version) VALUES (32)")
+        await db_conn.commit()
+
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+
+        async with db_conn.execute("SELECT version FROM db_info") as cursor:
+            assert (await cursor.fetchone())[0] == 33
+        async with db_conn.execute(
+            "SELECT rift_name, rift_level, required_level, rewards FROM rifts WHERE rift_id = 7"
+        ) as cursor:
+            row = await cursor.fetchone()
+        assert row is not None
+        assert row[0] == "试炼古境"
+        assert row[1] == 1  # rift_level
+        assert row[2] == 0  # required_level
+        assert json.loads(row[3]) == {"exp": [100, 200], "gold": [50, 100]}
+
+        # 幂等：再次 migrate 不产生重复行（INSERT OR IGNORE）
+        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        async with db_conn.execute(
+            "SELECT COUNT(*) FROM rifts WHERE rift_id = 7"
+        ) as cursor:
+            assert (await cursor.fetchone())[0] == 1
 
 
 @pytest.mark.asyncio

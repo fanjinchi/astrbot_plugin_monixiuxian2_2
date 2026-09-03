@@ -211,14 +211,18 @@ class TestMigrationV27:
             for node in ast.walk(tree)
             if isinstance(node, ast.AsyncFunctionDef)
         ]
-        assert not any(
-            n.startswith("_migrate_to_") for n in async_fns
-        ), "历史逐版本迁移函数应已全部移除"
-        assert not any(
-            n.startswith("_create_all_tables_v") for n in async_fns
-        ), "历史多套建表函数应已全部移除"
+        assert not any(n.startswith("_migrate_to_") for n in async_fns), (
+            "历史逐版本迁移函数应已全部移除"
+        )
+        assert not any(n.startswith("_create_all_tables_v") for n in async_fns), (
+            "历史多套建表函数应已全部移除"
+        )
 
     def test_latest_version_bumped(self):
+        import re
+
         with open(PLUGIN_ROOT / "data/migration.py", encoding="utf-8") as f:
             source = f.read()
-        assert "LATEST_DB_VERSION = 32" in source
+        # v32 为不再向前兼容的完整 schema 基线；v33+ 增量版本在其上递增
+        match = re.search(r"LATEST_DB_VERSION = (\d+)", source)
+        assert match and int(match.group(1)) >= 32

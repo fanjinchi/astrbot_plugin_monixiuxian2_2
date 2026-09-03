@@ -425,9 +425,7 @@ async def test_skill_learn_chance_star_up_and_max_star_compensation(db):
 
 
 @pytest.mark.asyncio
-async def test_skill_grant_failure_keeps_stage_unsettled_and_retryable(
-    db, monkeypatch
-):
+async def test_skill_grant_failure_keeps_stage_unsettled_and_retryable(db, monkeypatch):
     """M7: when the skill grant fails, the stage is NOT settled — no
     contribution/exp is granted, stored progress is kept, and the next
     matching event retries the settlement."""
