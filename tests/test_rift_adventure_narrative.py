@@ -257,10 +257,6 @@ def test_repo_rift_config_explore_events_match_original_pool():
         {"desc": "你在秘境中遇到了前辈留下的传承！", "item_chance": 90},
     ]
     for rift in cfg["rifts"]:
-        if rift["id"] == 7:
-            # 试炼古境是 add-rift-encounters 的临时测试秘境（验证后拆除），
-            # 自带测试文案，不受"叙事占位空串"约定约束
-            continue
         assert rift["description"] == ""
         assert rift["settlement_desc"] == ""
 

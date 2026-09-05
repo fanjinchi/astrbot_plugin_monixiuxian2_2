@@ -15,7 +15,8 @@ if TYPE_CHECKING:
 # v3.11.0 起不再向前兼容：历史逐版本迁移（v1→v32）已全部删除，
 # 全新安装与旧库统一直接生成最新 schema。MIGRATION_TASKS 注册机制
 # 保留，供后续版本（v33+）做真正的增量升级。
-LATEST_DB_VERSION = 33  # v33: 播种测试秘境「试炼古境」（add-rift-encounters 脚手架）
+# v34: 删除测试秘境「试炼古境」（add-rift-encounters 脚手架验证完毕拆除）
+LATEST_DB_VERSION = 34
 
 # 增量任务链的适用下限：v32 是 _create_all_tables 冻结的完整 schema 基线，
 # 只有达到该版本的库才具备迁移任务依赖的全部表结构；更早的旧库必须走
@@ -40,23 +41,17 @@ def migration(version: int):
     return decorator
 
 
-@migration(33)
-async def _seed_trial_rift_v33(
+@migration(34)
+async def _remove_trial_rift_v34(
     conn: aiosqlite.Connection, config_manager: ConfigManager
 ):
-    """Seed test rift 「试炼古境」 (id 7) into existing v32 databases.
+    """Delete test rift 「试炼古境」 (id 7) — teardown of the add-rift-encounters scaffold.
 
-    add-rift-encounters D7 双播种的存量库半边：全新安装/重建由
-    _create_all_tables 的 default_rifts 种子覆盖，存量 v32 库由本任务
-    INSERT OR IGNORE 补种同一行（幂等）。临时测试脚手架，验证通过后拆除
-    （含删除该行的迁移版本）。
+    v33（已随拆除移除）曾双播种该测试秘境；本任务对已升级的库存续删
+    （幂等：行不存在时 DELETE 为 no-op）。全新安装/重建路径的
+    _create_all_tables default_rifts 种子行已同步移除，不再产生该行。
     """
-    import json
-
-    await conn.execute(
-        "INSERT OR IGNORE INTO rifts (rift_id, rift_name, rift_level, required_level, rewards) VALUES (?, ?, ?, ?, ?)",
-        (7, "试炼古境", 1, 0, json.dumps({"exp": [100, 200], "gold": [50, 100]})),
-    )
+    await conn.execute("DELETE FROM rifts WHERE rift_id = 7")
 
 
 async def _create_all_tables(conn: aiosqlite.Connection):
@@ -496,9 +491,6 @@ async def _create_all_tables(conn: aiosqlite.Connection):
             3,
             json.dumps({"exp": [300, 900], "gold": [100, 400]}),
         ),
-        # 试炼古境：add-rift-encounters 临时测试秘境（D7 双播种的种子半边，
-        # 验证后拆除）；存量 v32 库由 v33 迁移任务 _seed_trial_rift_v33 补种同一行
-        (7, "试炼古境", 1, 0, json.dumps({"exp": [100, 200], "gold": [50, 100]})),
     ]
     for rift in default_rifts:
         await conn.execute(

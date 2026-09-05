@@ -49,5 +49,5 @@
 
 ## 8. 收尾（用户验证通过后执行）
 
-- [ ] 8.1 用户在测试平台验证完毕 → 拆除测试脚手架：删 rift_config id 7 条目、enemies.json `rift_test` 组、移除双播种（`default_rifts` 种子行 + 对应迁移任务），新增删除 rifts 表 id 7 行的迁移版本
+- [x] 8.1 用户在测试平台验证完毕 → 拆除测试脚手架：删 rift_config id 7 条目、enemies.json `rift_test` 组、移除双播种（`default_rifts` 种子行 + 对应迁移任务），新增删除 rifts 表 id 7 行的迁移版本
 - [ ] 8.2 正式秘境怪物生态配置立项（走 §15 design_docs 内容管线，另行提案）

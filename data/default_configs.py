@@ -231,20 +231,6 @@ RIFT_CONFIG = {
             "description": "",
             "settlement_desc": "",
         },
-        {
-            # add-rift-encounters 临时测试秘境（验证后拆除）：enemy_group 指向
-            # enemies.json 的 rift_test 定向组；encounter_rate 1.0 必触发保证测试确定性
-            "id": 7,
-            "name": "试炼古境",
-            "level": 0,
-            "exp_range": [100, 200],
-            "gold_range": [50, 100],
-            "description": "云雾深处的一座残破古境，唯有石傀儡徘徊其中。（测试秘境）",
-            "settlement_desc": "你离开了试炼古境，身后傀儡重归沉寂。（测试秘境）",
-            "legacy_type": "rift",
-            "enemy_group": "rift_test",
-            "encounter_rate": 1.0,
-        },
     ],
 }
 
@@ -705,26 +691,6 @@ ENEMY_CONFIG = {
                     "defense": 20,
                     "crit_rate": 0.1,
                 },
-            ],
-        },
-        {
-            # add-rift-encounters 临时测试组（验证后拆除）：与 enemies.json 的
-            # rift_test 组保持一致；不带 level_range，只能定向触达
-            "key": "rift_test",
-            "name": "试炼古境傀儡",
-            "description": "试炼古境中沉睡的傀儡造物，强度极低，仅供遭遇机制测试（验证后拆除）",
-            "templates": [
-                {
-                    "key": "stone_golem",
-                    "name": "石傀儡",
-                    "description": "古境碎石拼合而成的傀儡，行动迟缓，力道涣散",
-                    "elite_prefixes": ["历战的", "坚固的", "龟裂的"],
-                    "boss_names": ["古境石灵", "镇境石尊"],
-                    "hp_mult": 0.5,
-                    "atk_mult": 0.5,
-                    "defense": 2,
-                    "crit_rate": 3,
-                }
             ],
         },
     ],

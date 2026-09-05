@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.14.0
+> **版本:** v3.14.1
 > **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -314,6 +314,14 @@ astrbot_plugin_monixiuxian2_2/
 ---
 
 ## 📝 更新日志
+
+---
+
+### v3.14.1 - 拆除秘境遭遇测试脚手架
+
+- 删除测试秘境「试炼古境」（id 7）：`config/rift_config.json` 条目、`config/enemies.json` 的 `rift_test` 石傀儡测试组、数据库双播种（新建种子 + v33 迁移任务）全部移除
+- 新增 v34 迁移：存量数据库删除 rifts 表 id 7 行（幂等）
+- 秘境遭遇机制本身（古阵谜题/妖兽拦路/传承之地）与 GM 强触命令保留不变；正式秘境怪物生态配置将走 design_docs 内容管线另行立项
 
 ---
 

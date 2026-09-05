@@ -2,13 +2,13 @@
 
 > **文档状态**：
 > - 创建：**2026-07-29**（重设计起点，与 `redesign-combat-skills` 变更同批，commit 8fa47f7）
-> - 最近更新：**2026-09-03**（`add-rift-encounters`：秘境结算后遭遇机制——古阵谜题/可选妖兽挑战/传承应邀制，秘境 PvE 由强制改为可选）
+> - 最近更新：**2026-09-05**（`add-rift-encounters` 收尾：拆除试炼古境测试脚手架（v34 迁移），遭遇机制本身保留）
 > - 定位：**数值细节基线（活文档，非归档）**——架构总览见 `project-architecture.md`，行为契约见
 >   `openspec/specs/`；本文是数值/公式/数据库的权威基线，被 `project-architecture.md` §1/§3 引用。
 > - 维护义务：内容必须与代码同步（插件根 `AGENTS.md` §14，影响玩法的修改须同步修正本文）；
 >   若未来被新报告取代，移入 archive 并更新本标注。
 >
-> 生成方式：基于源码静态分析（含 `file:line` 引用），数据库结构以 `data/migration.py` 最新版本 **v30** 为准。
+> 生成方式：基于源码静态分析（含 `file:line` 引用），数据库结构以 `data/migration.py` 最新版本 **v34** 为准。
 > 战斗与属性体系为 **CombatEngine 四主属性框架**（伤害/身法/迅捷/气血 + 护甲），规范见 `openspec/specs/`（attribute-numerics / combat-core / level-progression / skill-system）。
 
 ---
@@ -268,7 +268,6 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **古阵谜题**（core/rift_puzzle_manager.py）：谜题族程序生成（五行破阵/洛书数阵/灵龟辨窟），题面自带解题线索；`puzzle_attempts`（默认 2）次机会，非法形式不耗次；答对 = 一次掉落 roll（item_chance=100）+ 修为基数×0.2；答错/耗尽/过期零惩罚
 - **可选妖兽挑战**：迎战胜利 = 敌人修为 + 掉落 roll，并推进师承 win_pve 计数（main.py 迎战分支消费 `pve_won`）；失败/平局 HP→1、机缘消耗；无视零损失。秘境条目 `enemy_group` 指定定向怪物组（enemies.json 无 `level_range` 的组，经 `spawn_enemy_from_group` 触达，不被普通匹配命中），缺省回落按玩家境界的全局池
 - **传承之地应邀制**：秘境/历练命中 `legacy_chance` 改为挂起传承遭遇（记录来源 rift/adventure），时限内以「探索秘境 传承」应邀才挑战守护 NPC；宗门宝库领取保持"领取即挑战"不变
-- 测试脚手架（验证后拆除）：试炼古境 id 7（v33 播种，`encounter_rate: 1.0` + `enemy_group: "rift_test"` 石傀儡测试组）
 
 ### 4.13 洞天福地（managers/blessed_land_manager.py）
 
@@ -345,7 +344,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | `sects` | sect_id (AI) | 宗门（sect_name UNIQUE，建设度/灵石/资材/功法 buff/丹房等级；v28 起含 is_system/faction_id/status/destruction_tier） |
 | `buff_info` | id (AI)，user_id UNIQUE | 用户功法/法器 buff（预留字段） |
 | `boss` | boss_id (AI) | 世界 Boss（hp/atk/defense/stone_reward/status） |
-| `rifts` | rift_id (AI) | 秘境定义（预置 6 个：青云秘境→上古遗迹 + id 6 青云剑冢，后者为 rift_config.json 标记的青云门专属秘境，v31 播种；v33 播种 id 7 试炼古境——遭遇机制测试脚手架，验证后拆除） |
+| `rifts` | rift_id (AI) | 秘境定义（预置 6 个：青云秘境→上古遗迹 + id 6 青云剑冢，后者为 rift_config.json 标记的青云门专属秘境，v31 播种） |
 | `legacy_instances` | id (AI) | 传承实例：owner_id/legacy_type/impart_value/claimed_tiers/sect_id/is_active（v32 重做，替代 impart_info；部分唯一索引 idx_legacy_active_owner 保证同玩家仅一条激活） |
 | `impart_pk_cooldown` | challenger_id+target_id | 传承挑战失败冷却（5 天） |
 | `impart_snatch_protection` | user_id | 被夺保护期（3 日） |
@@ -393,7 +392,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | v30 | players +sect_master_progress（师承任务链进度 JSON） |
 | v31 | rifts 播种青云剑冢（id 6，青云门专属秘境；config/rift_config.json 该条目 id 同步 4→6，消除与 id 4 玄冰地宫的冲突） |
 | v32 | 传承系统改版：legacy_instances/impart_pk_cooldown/impart_snatch_protection 三表，impart_info 数据拷贝后 DROP |
-| v33 | rifts 播种试炼古境（id 7，遭遇机制测试脚手架；增量任务链仅对 ≥ TASK_CHAIN_MIN_VERSION(=32) 的库开放，更早旧库走重建路径）（当前最新） |
+| v33 | rifts 播种试炼古境（id 7，遭遇机制测试脚手架；增量任务链仅对 ≥ TASK_CHAIN_MIN_VERSION(=32) 的库开放，更早旧库走重建路径） |
+| v34 | 拆除试炼古境测试脚手架：删除 rifts 表 id 7 行（幂等；v33 播种的验证用秘境，功能验证通过后移除）（当前最新） |
 
 ---
 

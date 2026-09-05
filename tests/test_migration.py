@@ -144,7 +144,10 @@ async def test_fresh_install_reaches_latest_version():
 
 @pytest.mark.asyncio
 async def test_fresh_install_seeds_rifts_and_eyes():
-    """Fresh installs seed 7 rifts (incl. 青云剑冢与 v33 测试秘境试炼古境) and 3 spirit eyes."""
+    """Fresh installs seed 6 rifts (incl. 青云剑冢) and 3 spirit eyes.
+
+    v34 起不再播种试炼古境（add-rift-encounters 脚手架验证完毕拆除）。
+    """
     import json
 
     async with aiosqlite.connect(":memory:") as db_conn:
@@ -155,20 +158,13 @@ async def test_fresh_install_seeds_rifts_and_eyes():
         ) as cursor:
             rows = await cursor.fetchall()
         by_id = {row[0]: row for row in rows}
-        assert set(by_id) == {1, 2, 3, 4, 5, 6, 7}
+        assert set(by_id) == {1, 2, 3, 4, 5, 6}
         assert by_id[4][1] == "玄冰地宫"
         tomb = by_id[6]
         assert tomb[1] == "青云剑冢"
         assert tomb[2] == 3  # rift_level
         assert tomb[3] == 3  # required_level
         assert json.loads(tomb[4]) == {"exp": [300, 900], "gold": [100, 400]}
-
-        # v33 双播种：add-rift-encounters 临时测试秘境（验证后拆除）
-        trial = by_id[7]
-        assert trial[1] == "试炼古境"
-        assert trial[2] == 1  # rift_level
-        assert trial[3] == 0  # required_level
-        assert json.loads(trial[4]) == {"exp": [100, 200], "gold": [50, 100]}
 
         async with db_conn.execute("SELECT COUNT(*) FROM spirit_eyes") as cursor:
             assert (await cursor.fetchone())[0] == 3
@@ -327,9 +323,9 @@ async def test_legacy_db_rebuilt_to_latest_schema():
             "impart_snatch_protection",
         } <= tables
 
-        # 重建后种子数据可用（含 v33 播种的试炼古境）
+        # 重建后种子数据可用（v34 起 6 个秘境：试炼古境脚手架已拆除）
         async with db_conn.execute("SELECT COUNT(*) FROM rifts") as cursor:
-            assert (await cursor.fetchone())[0] == 7
+            assert (await cursor.fetchone())[0] == 6
 
 
 @pytest.mark.asyncio
@@ -343,7 +339,8 @@ async def test_registered_migration_task_chain(monkeypatch):
         await conn.execute("CREATE TABLE demo_v33_table (k TEXT PRIMARY KEY)")
         ran.append(True)
 
-    # 临时以演示任务覆盖真实 v33 任务并抬高 LATEST，验证任务链；monkeypatch 结束后恢复
+    # 临时注册演示任务并抬高 LATEST 验证任务链；monkeypatch 结束后恢复
+    # （v33 的真实任务已随脚手架拆除移除，此处 key 33 为纯演示占用）
     monkeypatch.setitem(_migration_mod.MIGRATION_TASKS, 33, _v33_task)
     monkeypatch.setattr(_migration_mod, "LATEST_DB_VERSION", 33)
 
@@ -394,37 +391,40 @@ async def test_registered_migration_task_chain(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_v33_task_seeds_trial_rift_on_existing_v32_db():
-    """真实的 v33 注册任务：为存量 v32 库补种试炼古境（id 7），重复执行幂等。"""
+async def test_v34_task_removes_trial_rift_on_existing_db():
+    """真实的 v34 注册任务：删除 v33 时代播种的试炼古境（id 7），重复执行幂等。
+
+    add-rift-encounters 脚手架验证完毕拆除：模拟已含 id 7 行的存量 v33 库，
+    升级到 v34 后该行应被删除；从 v32 直接升级时 v33 任务已不存在，
+    v34 的 DELETE 对无该行库为 no-op。
+    """
     import json
 
     async with aiosqlite.connect(":memory:") as db_conn:
-        # 模拟无 id 7 的存量 v32 库（_create_all_tables 种子已含 id 7，先删掉）
+        # 模拟经 v33 播种的存量库（_create_all_tables 已不再播种 id 7，手动补回）
         await _create_all_tables(db_conn)
-        await db_conn.execute("DELETE FROM rifts WHERE rift_id = 7")
-        await db_conn.execute("INSERT INTO db_info (version) VALUES (32)")
+        await db_conn.execute(
+            "INSERT INTO rifts (rift_id, rift_name, rift_level, required_level, rewards) VALUES (?, ?, ?, ?, ?)",
+            (7, "试炼古境", 1, 0, json.dumps({"exp": [100, 200], "gold": [50, 100]})),
+        )
+        await db_conn.execute("INSERT INTO db_info (version) VALUES (33)")
         await db_conn.commit()
 
         await MigrationManager(db_conn, DummyConfigManager()).migrate()
 
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
-            assert (await cursor.fetchone())[0] == 33
+            assert (await cursor.fetchone())[0] == 34
         async with db_conn.execute(
-            "SELECT rift_name, rift_level, required_level, rewards FROM rifts WHERE rift_id = 7"
+            "SELECT COUNT(*) FROM rifts WHERE rift_id = 7"
         ) as cursor:
-            row = await cursor.fetchone()
-        assert row is not None
-        assert row[0] == "试炼古境"
-        assert row[1] == 1  # rift_level
-        assert row[2] == 0  # required_level
-        assert json.loads(row[3]) == {"exp": [100, 200], "gold": [50, 100]}
+            assert (await cursor.fetchone())[0] == 0
 
-        # 幂等：再次 migrate 不产生重复行（INSERT OR IGNORE）
+        # 幂等：再次 migrate 仍为 0（DELETE no-op）
         await MigrationManager(db_conn, DummyConfigManager()).migrate()
         async with db_conn.execute(
             "SELECT COUNT(*) FROM rifts WHERE rift_id = 7"
         ) as cursor:
-            assert (await cursor.fetchone())[0] == 1
+            assert (await cursor.fetchone())[0] == 0
 
 
 @pytest.mark.asyncio
