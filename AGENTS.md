@@ -282,18 +282,16 @@ bd close <id> --reason "Done" --json
 1. **File issues for remaining work** — Create bd issues for anything that needs follow-up
 2. **Run quality gates** — `uv run ruff format . && uv run ruff check .`，代码变更后运行 `uv run python -m pytest tests/ -v`
 3. **Update issue status** — Close finished work, update in-progress items
-4. **PUSH TO REMOTE** — This is MANDATORY:
+4. **COMMIT LOCALLY** — Commit the finished work with a conventional commit message:
 
    ```bash
-   git pull --rebase
-   git push
-   git status  # MUST show "up to date with origin"
+   git add <paths>
+   git commit -m "feat: ..."
    ```
 
-5. **Verify** — All changes committed AND pushed
+5. **Verify** — `git status` shows a clean working tree (local commits are enough)
 
 **CRITICAL RULES:**
 
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing
-- NEVER say "ready to push when you are" — YOU must push
+- Pushing to remote is the user's decision — do NOT run `git push` unless explicitly asked.
+- NEVER block task completion waiting for a push; report the local commit and stop.
