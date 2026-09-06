@@ -201,6 +201,9 @@ class PVECombatManager:
             agility=enemy.agility,
             speed=enemy.speed,
             armor_value=enemy.armor_value,
+            # PvE 敌人护甲语义等同天生护甲，全额参与格挡（design D2：
+            # cfg 构建路径回退 block_armor_value = armor_value，行为逐点不变）。
+            block_armor_value=enemy.armor_value,
         )
 
     def _calculate_rewards(

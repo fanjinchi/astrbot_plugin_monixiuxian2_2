@@ -164,6 +164,9 @@ def make_fighter(
         agility=agility,
         speed=speed,
         armor_value=armor_value,
+        # 模拟器护甲语义 = 天生面板 + 武器槽，正是格挡来源（design D1），
+        # 校准结论需保持旧公式 block = 5% + armor×0.001 逐点不变。
+        block_armor_value=armor_value,
         weapon_k=weapon_k,
         base_damage=base_damage,
         trigger_skills=[],

@@ -117,7 +117,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 **属性来源**（attribute-numerics 规范）：创角随机初始值 + 突破成功随机成长累加；**不从修为 exp 派生战斗属性，不从境界配置读逐級基础值**。
 
-**总属性计算**（models.py `get_total_attributes`）：基础四主属性 + 装备累加（含 route_multiplier 路线倍率）+ 心法被动（被动加成同样按心法的 route_multiplier 与修炼路线乘算——百分比项与 armor_value 平加项均乘，exp_multiplier 不乘），最后乘丹药倍率（乘区在最后）。
+**总属性计算**（models.py `get_total_attributes`）：基础四主属性 + 装备累加（含 route_multiplier 路线倍率）+ 心法被动（被动加成同样按心法的 route_multiplier 与修炼路线乘算——百分比项与 armor_value 平加项均乘，exp_multiplier 不乘），最后乘丹药倍率（乘区在最后）。另返回 `block_armor_value`（天生护甲 + 武器槽护甲，同源乘区；格挡率来源，防具/功法/心法槽不计，见 combat-core 「格挡率来源分离」规约）。
 
 ### 3.2 扩展模型（models_extended.py）
 
@@ -185,10 +185,11 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **全自动回合制**：战中零操作，胜负由战前配装与随机判定链决定
 - **出手权**（迅捷加权）：`P(甲出手) = 迅捷甲 / (迅捷甲 + 迅捷乙)`，每次出手一次攻击；总行动上限 `action_limit=200`（combat.action_limit），达限判平
 - **伤害公式**（Muxxu 式，两步结算）：
-  1. 原始伤害 `_calc_damage`（:548）：`raw = floor((武器基础伤害 + 伤害属性 × 武器系数K) × 技能倍率 × uniform(0.95, 1.05))`，下限 1；空手保底 base_damage=5、K=0.5
-  2. 护甲减伤 `_apply_armor_and_reduction`（:575）：百分比减伤 `减伤率 = 护甲 / (护甲 + K)`，`K = armor_k_base(100) + armor_k_level_coeff(10) × 防守方等级`；`最终伤害 = floor(raw × (1 − 减伤率) × 技能减伤系数)`，总减伤率不超过 `damage_reduction_cap`（0.4），下限 1
+  1. 原始伤害 `_calc_damage`（:1267）：`raw = floor((武器基础伤害 + 伤害属性 × 武器系数K) × 技能倍率 × uniform(0.95, 1.05))`，下限 1；空手保底 base_damage=5、K=0.5
+  2. 护甲减伤 `_apply_armor_and_reduction`（:1294）：百分比减伤 `减伤率 = 护甲 / (护甲 + K)`，`K = armor_k_base(100) + armor_k_level_coeff(10) × 防守方等级`；`最终伤害 = floor(raw × (1 − 减伤率) × 技能减伤系数)`，总减伤率不超过 `damage_reduction_cap`（0.4），下限 1。减伤用**合并护甲**（含防具槽）
 - **统一判定链**：出手权 → 闪避 → 格挡 → 暴击 → 触发技 → 大招 → 伤害结算
-  - 闪避率由双方身法差决定，上限 `dodge_cap`（0.4）；格挡上限 `block_cap`（0.3）
+  - 闪避率由双方身法差决定，上限 `dodge_cap`（0.4）
+  - 格挡 `_calc_block_rate`（:1257）：**来源分离**（openspec `separate-block-armor-source`）——`格挡率 = min(5% + block_armor_value × 0.001, block_cap(0.3))`，`block_armor_value` 仅含天生护甲 + 武器槽护甲（models.py `get_total_attributes` 汇总层产出，:258），防具/功法/心法槽护甲不计入；PvE 敌人/Boss（cfg 构建路径）护甲视为天生，回退 `block_armor_value = armor_value` 行为不变。格挡成功伤害减半（在护甲减伤之前结算，不受 40% 总减伤上限约束）
   - 暴击率基础 `base_crit_rate`（0.15，仅代码默认值，combat 段未配置）、上限 `crit_rate_cap`（0.5），暴击倍率 ×1.5（`crit_damage_multiplier`），减伤上限 `damage_reduction_cap`（0.4）
 - **胜负**：一方气血 ≤ 0 即败；切磋无实质惩罚，决斗败者气血置 1
 - **战报**：叙事化判定记录按合并条数输出（玩家可配 `battle_report_merge_count`，默认 10）

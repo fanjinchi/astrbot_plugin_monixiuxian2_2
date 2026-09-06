@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.14.1
+> **版本:** v3.15.0
 > **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -314,6 +314,17 @@ astrbot_plugin_monixiuxian2_2/
 ---
 
 ## 📝 更新日志
+
+---
+
+### v3.15.0 - 格挡率来源分离（防具护甲退出格挡判定）
+
+**🎯 核心改动**
+
+- **战斗行为变更**（openspec: separate-block-armor-source）：格挡率改为 `min(5% + (天生护甲 + 武器护甲) × 0.001, block_cap)`，防具/功法/心法槽护甲不再提升格挡率；护甲减伤与 40% 总减伤上限、格挡独立结算层（减半、不受上限约束）均不变，PvE 敌人/Boss 行为逐点不变
+- `Player.get_total_attributes` 新增 `block_armor_value` 键（汇总层产出格挡来源），`FighterState` 新增同名字段，`_calc_block_rate` 换源
+- 动机：为防具供给曲线（armor-content-design）上线前解耦格挡与减伤，避免双系统耦合缩放顶穿减伤天花板
+- 玩家当前可感知影响极小（现网防具仅 3 件占位，格挡率变化 ≤1pp）；新增回归测试 `tests/test_block_armor_source.py`，跨路线胜率校准复跑不变（满级 49.1%）
 
 ---
 

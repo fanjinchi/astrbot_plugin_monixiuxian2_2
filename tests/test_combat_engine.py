@@ -62,6 +62,8 @@ def make_fighter(
         agility=agility,
         speed=speed,
         armor_value=armor,
+        # 直建 fighter 等同 cfg 路径：护甲视为天生，全额参与格挡（design D2）
+        block_armor_value=armor,
         weapon_k=weapon_k,
         base_damage=base_dmg,
         level_index=level_index,
