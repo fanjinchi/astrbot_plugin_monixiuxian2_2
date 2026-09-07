@@ -1445,30 +1445,3 @@ class CombatManager:
             "player2_final_mp": player2.hp,
             "rounds": result.rounds,
         }
-
-    async def player_vs_boss(self, player: Player, boss: Player) -> dict:
-        """Legacy PvE entry point (Boss battle)."""
-        f1 = await self.engine.build_fighter_from_player(player, is_attacker=True)
-        f2 = await self.engine.build_fighter_from_player(boss, is_attacker=False)
-
-        merge_count = self._get_merge_count(player)
-        result = self.engine.resolve_combat(f1, f2, "pve", merge_count=merge_count)
-
-        # Calculate reward based on damage dealt
-        damage_dealt = f2.max_hp - result.fighter2_final_hp
-        damage_ratio = damage_dealt / f2.max_hp if f2.max_hp > 0 else 0
-        reward = (
-            int(boss.experience * damage_ratio)
-            if result.winner != player.user_id
-            else boss.experience
-        )
-
-        return {
-            "winner": result.winner,
-            "combat_log": result.combat_log,
-            "player_final_hp": max(1, result.fighter1_final_hp),
-            "player_final_mp": player.hp,
-            "boss_final_hp": result.fighter2_final_hp,
-            "reward": reward,
-            "rounds": result.rounds,
-        }

@@ -75,7 +75,7 @@
 | Manager | 关键公开方法 | 作用 |
 |---|---|---|
 | `CombatEngine`（combat_manager.py） | `resolve_combat(fighter1, fighter2, combat_type="spar", merge_count=None)` / `build_fighter_from_player(player, ...)` | **统一战斗引擎**：回合制 PvP/PvE 共用；触发技 `EFFECT_HANDLERS` 注册表分发 14 种效果键（13 个处理函数，combo 复用 damage_bonus）、持续状态（dot/buff/debuff/fatigue）生命周期、大招必放。配 `FighterState/StatusEffect/CombatResult` |
-| `CombatManager`（同文件） | `player_vs_player` / `player_vs_boss` | 旧接口适配器，全部委托 `CombatEngine`；`calculate_*` 系列为 deprecated 兼容保留 |
+| `CombatManager`（同文件） | `player_vs_player` | 旧接口适配器，委托 `CombatEngine`；`calculate_*` 系列为 deprecated 兼容保留 |
 | `BossManager` | `spawn_boss` / `challenge_boss` / `get_boss_info` / `auto_spawn_boss` | 世界 Boss 生成（`auto_spawn_boss` 供定时任务）、挑战、奖励 |
 | `BountyManager` | `get_bounty_list` / `accept_bounty` / `complete_bounty` / `abandon_bounty` / `add_bounty_progress` / `check_and_expire_bounties` | 悬赏列表按境界分难度、10 分钟缓存（按 scope 分键 `user:global|sect`）；前四者带 `scope` 参数分流公共/宗门悬赏，分流校验先于缓存/冷却/活跃检查；接取/结算均 `BEGIN IMMEDIATE` 事务；`add_bounty_progress` 由历练/秘境回调推进进度 |
 | `SectManager` | `create_sect` / `join_sect` / `donate_to_sect` / `kick_member` / `transfer_ownership` / `perform_sect_task` / `handle_owner_death`；宗门成长：`ensure_system_sects` / `reclaim_sect_treasures` / `get_fairyland_exp_bonus` / `claim_elixir` / `upgrade_building` / `manage_sect_buff` / `promote_position` / `get_treasury_info` / `claim_treasure` / `get_master_task_status` / `get_position_benefits` / `get_sect_shop_info` / `buy_sect_shop_item` | 宗门全生命周期；宗主死亡自动传位/解散；默认宗门播种、离宗回收、洞天/丹房/镇派功法/晋升/宝库/师承任务链、宗门商店（贡献点结算，商品池读 faction `shop` 字段）（详见 current-design-report.md §4.8） |
