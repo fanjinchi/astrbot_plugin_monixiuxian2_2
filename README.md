@@ -324,7 +324,7 @@ astrbot_plugin_monixiuxian2_2/
 - **战斗行为变更**（openspec: separate-block-armor-source）：格挡率改为 `min(5% + (天生护甲 + 武器护甲) × 0.001, block_cap)`，防具/功法/心法槽护甲不再提升格挡率；护甲减伤与 40% 总减伤上限、格挡独立结算层（减半、不受上限约束）均不变，PvE 敌人/Boss 行为逐点不变
 - `Player.get_total_attributes` 新增 `block_armor_value` 键（汇总层产出格挡来源），`FighterState` 新增同名字段，`_calc_block_rate` 换源
 - 动机：为防具供给曲线（armor-content-design）上线前解耦格挡与减伤，避免双系统耦合缩放顶穿减伤天花板
-- 玩家当前可感知影响极小（现网防具仅 3 件占位，格挡率变化 ≤1pp）；新增回归测试 `tests/test_block_armor_source.py`，跨路线胜率校准复跑不变（满级 49.1%）
+- 玩家可感知影响：按现网内容最大约 5.5pp（防具 25 + 不动明王功平加护甲 30 同时退出格挡），防具与心法平加护甲退出格挡属实质性 nerf，内容数值重做将在 armor-content-design 统一设计；新增回归测试 `tests/test_block_armor_source.py`，跨路线胜率校准复跑不变（满级 49.1%，3000 局噪声带内）
 
 ---
 

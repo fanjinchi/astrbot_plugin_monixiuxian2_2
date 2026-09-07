@@ -8,7 +8,7 @@
 
 - [x] 2.1 `managers/combat_manager.py` `FighterState` 新增 `block_armor_value: int = 0` 字段
 - [x] 2.2 玩家构建路径（`get_total_attributes` 调用处）接线 `block_armor_value=total_attrs["block_armor_value"]`
-- [x] 2.3 cfg 构建路径回退 `block_armor_value = cfg.get("block_armor_value", armor_value)`，保持 PvE/测试行为不变
+- [x] 2.3 敌人/Boss 构建路径回退 `block_armor_value = armor_value`（`pve_combat_manager._build_enemy_fighter` 用 getattr、`boss_manager` 用 boss_stats.get），保持 PvE/测试行为不变
 - [x] 2.4 `_calc_block_rate` 改用 `defender.block_armor_value`，系数与上限不变；同步 docstring
 
 ## 3. 测试

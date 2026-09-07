@@ -336,13 +336,12 @@ class Player:
             )
             total["speed"] = int(total["speed"] * pill_multipliers.get("speed", 1.0))
             total["hp"] = int(total["hp"] * pill_multipliers.get("hp", 1.0))
-            armor_pill_mult = pill_multipliers.get("armor_value", 1.0)
-            total["armor_value"] = int(total["armor_value"] * armor_pill_mult)
-            # Scale the block source with the same pill multiplier to keep
-            # block_armor_value <= armor_value consistent on display paths
-            # (combat passes pill_multipliers=None, so this is display-only).
-            total["block_armor_value"] = int(
-                total["block_armor_value"] * armor_pill_mult
+            total["armor_value"] = int(
+                total["armor_value"] * pill_multipliers.get("armor_value", 1.0)
             )
+            # NB: the pill armor multiplier deliberately does NOT scale
+            # block_armor_value — block source is strictly innate + weapon
+            # (spec: combat-core 格挡率来源分离); scaling it would silently let
+            # pills feed block if the pill layer is ever wired into combat.
 
         return total

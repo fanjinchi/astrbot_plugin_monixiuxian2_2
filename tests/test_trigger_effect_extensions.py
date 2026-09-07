@@ -80,6 +80,7 @@ def make_fighter(
         agility=agility,
         speed=speed,
         armor_value=armor,
+        block_armor_value=armor,
         weapon_k=weapon_k,
         base_damage=base_dmg,
         level_index=level_index,

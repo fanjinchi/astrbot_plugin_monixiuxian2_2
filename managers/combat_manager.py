@@ -1051,7 +1051,8 @@ class CombatEngine:
             )
             return
 
-        # 2. Block (simplified: 10% base + equipment bonuses; exempt when unavoidable)
+        # 2. Block: 5% base + block-source armor (innate + weapon only, see
+        # _calc_block_rate); exempt when unavoidable
         block_rate = self._calc_block_rate(defender)
         blocked = (not unavoidable) and random.random() < block_rate
         if blocked:

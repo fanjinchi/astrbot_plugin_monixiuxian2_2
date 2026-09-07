@@ -122,7 +122,9 @@ class TestBlockArmorAggregation:
         weapon = make_item(
             "体修重剑", "weapon", armor=15, route_multiplier='{"体修": 1.5}'
         )
-        armor = make_item("测试甲", "armor", armor=100, route_multiplier='{"体修": 1.5}')
+        armor = make_item(
+            "测试甲", "armor", armor=100, route_multiplier='{"体修": 1.5}'
+        )
 
         total = player.get_total_attributes([weapon, armor])
 
@@ -148,8 +150,8 @@ class TestBlockArmorAggregation:
         assert total["armor_value"] == 5 + 30 + 20 + 10
         assert total["block_armor_value"] == 5
 
-    def test_pill_multiplier_scales_both_armor_keys(self):
-        """丹药护甲乘区同步缩放格挡来源，保证 block ≤ 总护甲一致（展示路径）。"""
+    def test_pill_multiplier_does_not_scale_block_source(self):
+        """丹药护甲乘区只作用合并护甲；格挡来源严格为天生+武器（spec）。"""
         player = Player(user_id="u1", cultivation_type="灵修", armor_value=10)
         weapon = make_item("测试剑", "weapon", armor=15)
 
@@ -158,7 +160,8 @@ class TestBlockArmorAggregation:
         )
 
         assert total["armor_value"] == 50  # (10 + 15) * 2.0
-        assert total["block_armor_value"] == 50  # 同一乘区，来源分离不受影响
+        # 丹药既非天生亦非武器，不进格挡来源（防未来接战静默增益）
+        assert total["block_armor_value"] == 25  # 10 + 15，不随丹药缩放
 
 
 # ------------------------------------------------------------------

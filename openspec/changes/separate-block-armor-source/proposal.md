@@ -27,5 +27,5 @@
 - **配置**：`config/game_config.json` 战斗参数无需变更（block_cap 不变）。
 - **文档**：`design_docs/attribute-growth/growth-balance-proposals.md` §3.3、`design_docs/current-design-report.md` 防御公式节。
 - **测试**：`tests/` 战斗引擎相关用例需补格挡来源断言（同护甲总量下，护甲来自武器 vs 防具时格挡率不同）。
-- **玩家可感知影响**：极小——当前全游戏防具仅 3 件占位（armor_value 1/10/25），格挡率变化 ≤1pp。
+- **玩家可感知影响**：按现网内容最大约 5.5pp——防具 3 件占位（armor_value 1/10/25）之外，心法被动的平加护甲（金罡诀 15/战神诀 20/不动明王功 30，`passive_bonus.armor_value`）同属退出格挡的存量来源；对体修向 build 是实打实 nerf，非噪声级改动。
 - **后续依赖**：armor-content-design 变更依赖本变更先行落地（防具供给曲线以格挡解耦为前提）。
