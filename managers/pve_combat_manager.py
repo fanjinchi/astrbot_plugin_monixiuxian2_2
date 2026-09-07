@@ -201,6 +201,10 @@ class PVECombatManager:
             agility=enemy.agility,
             speed=enemy.speed,
             armor_value=enemy.armor_value,
+            # PvE 敌人护甲语义等同天生护甲，全额参与格挡（design D2）；
+            # getattr 回退兑现「敌可携 block_armor_value 覆盖」的契约，当前
+            # Enemy 无此属性 → 回退合并护甲，行为逐点不变。
+            block_armor_value=getattr(enemy, "block_armor_value", enemy.armor_value),
         )
 
     def _calculate_rewards(

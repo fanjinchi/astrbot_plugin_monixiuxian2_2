@@ -262,12 +262,18 @@ class Player:
 
         The new framework uses four main attributes plus armor (percent damage reduction).
 
+        ``armor_value`` is the merged total used by percent damage reduction.
+        ``block_armor_value`` is the block-rate source: innate armor plus weapon-slot
+        armor only — armor/technique/heart-method slots never feed block rate
+        (spec: combat-core 「格挡率来源分离」, design D1).
+
         Args:
             equipped_items: List of equipped items
             pill_multipliers: Optional pill attribute multipliers
 
         Returns:
-            Dict with damage, agility, speed, hp, armor_value and exp_multiplier.
+            Dict with damage, agility, speed, hp, armor_value, block_armor_value
+            and exp_multiplier.
         """
         # Base attributes from player
         total = {
@@ -276,6 +282,9 @@ class Player:
             "speed": self.speed,
             "hp": self.hp,
             "armor_value": self.armor_value,
+            # Block-rate armor starts from the innate panel value; only weapon-slot
+            # equipment adds to it below (design D1: 格挡来自肉身功夫与持械卸力).
+            "block_armor_value": self.armor_value,
             "exp_multiplier": 0.0,
         }
 
@@ -289,6 +298,10 @@ class Player:
             total["speed"] += int(item.speed * mult)
             total["hp"] += int(item.hp * mult)
             total["armor_value"] += int(item.armor_value * mult)
+            # Weapon armor also feeds block rate; armor/technique/main_technique slot
+            # armor is reduction-only by design (spec: combat-core 格挡率来源分离).
+            if item.item_type == "weapon":
+                total["block_armor_value"] += int(item.armor_value * mult)
 
             # Heart method exclusive passive bonuses
             if item.item_type == "main_technique":
@@ -326,5 +339,9 @@ class Player:
             total["armor_value"] = int(
                 total["armor_value"] * pill_multipliers.get("armor_value", 1.0)
             )
+            # NB: the pill armor multiplier deliberately does NOT scale
+            # block_armor_value — block source is strictly innate + weapon
+            # (spec: combat-core 格挡率来源分离); scaling it would silently let
+            # pills feed block if the pill layer is ever wired into combat.
 
         return total

@@ -84,6 +84,8 @@ def mock_combat_engine():
             agility=p.agility,
             speed=p.speed,
             armor_value=p.armor_value,
+            # mirror build_fighter_from_player: block source always present
+            block_armor_value=p.armor_value,
         )
     )
     engine.resolve_combat.return_value = CombatResult(

@@ -26,8 +26,8 @@
 汇总层是唯一知道每件装备 `item_type` 的地方（`Item.item_type == "armor"` 即防具槽）；战斗引擎只拿到聚合数字，反推不可得。`block_armor_value = 天生 armor_value + 武器槽 item.armor_value`（功法/心法槽理论上无 armor_value，如有也不计入——风味定位：格挡来自肉身功夫与持械卸力）。
 备选：在 FighterState 上挂"逐槽 armor 明细"。否决：引擎不需要逐槽信息，单标量足够，明细增加构建成本与测试面。
 
-**D2：FighterState 新增 `block_armor_value: int = 0` 字段，cfg 构建路径默认回退 `armor_value`。**
-PvE 敌人/测试 mock 走 cfg 构建（:397-418），其护甲语义等同天生护甲；默认 `block_armor_value = cfg.get("block_armor_value", armor_value)` 保持现网 PvE 行为逐点不变，只有玩家构建路径（:327-337）传入分离值。
+**D2：FighterState 新增 `block_armor_value: int = 0` 字段，非玩家构建路径回退 `armor_value`。**
+敌人侧 FighterState 构建的实际回退点有两处：`managers/pve_combat_manager.py::_build_enemy_fighter`（`getattr(enemy, "block_armor_value", enemy.armor_value)`，敌方可携独立格挡值覆盖）与 `managers/boss_manager.py` 的 boss_stats 构建（`boss_stats.get("block_armor_value", armor_value)`）。敌人护甲语义等同天生护甲，回退使现网 PvE 行为逐点不变；只有玩家构建路径 `combat_manager.build_fighter_from_player` 传入分离值。（评审修正：原稿误称为「cfg 构建路径 combat_manager.py:397-418」，该处实为 _parse_item_config，无 cfg→FighterState 构建器。）
 
 **D3：`_calc_block_rate` 改用 `defender.block_armor_value`，系数 0.001 与 5% 基础不变。**
 不改系数的原因：创角护甲 3-10 与武器护甲（现 weapons.csv 挂 armor_value 的件，如青铜剑 15）共同贡献的格挡率上限约 5%+2.5%=7.5%，天然远离 30% cap，无需重新校准；改动越小，对 route-matchup 校准结论的扰动越小。

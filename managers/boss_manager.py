@@ -417,6 +417,10 @@ HP：{max_hp}
             agility=boss_stats["agility"],
             speed=boss_stats["speed"],
             armor_value=boss_stats["armor_value"],
+            # cfg 构建路径回退：Boss 护甲视为天生，仍全额参与格挡（design D2）。
+            block_armor_value=boss_stats.get(
+                "block_armor_value", boss_stats["armor_value"]
+            ),
         )
 
         # 6. 开始战斗

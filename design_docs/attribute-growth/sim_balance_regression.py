@@ -239,6 +239,8 @@ def _make_fighter(
         agility=agility,
         speed=speed,
         armor_value=armor_value,
+        # 模拟器护甲语义 = 天生+武器槽，格挡来源同步（design D1/D2 校准不变）
+        block_armor_value=armor_value,
         weapon_k=weapon_k,
         base_damage=base_damage,
         level_index=level_index,

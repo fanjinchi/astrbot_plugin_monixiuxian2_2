@@ -108,6 +108,11 @@ class FighterState:
     agility: int
     speed: int
     armor_value: int
+    # Armor feeding block rate only: innate + weapon-slot (spec: combat-core
+    # 「格挡率来源分离」, design D1). Reduction settlement still uses armor_value.
+    # Default 0 is a safe floor; cfg/enemy builders set it equal to armor_value
+    # so PvE behavior stays point-identical (design D2).
+    block_armor_value: int = 0
     # Level index for armor K calculation (percent armor formula)
     level_index: int = 1
     # Equipment
@@ -335,6 +340,12 @@ class CombatEngine:
             agility=total_attrs["agility"],
             speed=total_attrs["speed"],
             armor_value=total_attrs["armor_value"],
+            # Block source from the aggregation layer (innate + weapon only).
+            # Legacy/mock players without the key fall back to merged armor so
+            # their block behavior is unchanged (design D2).
+            block_armor_value=total_attrs.get(
+                "block_armor_value", total_attrs["armor_value"]
+            ),
             level_index=player.level_index,
             weapon_k=loadout.get("weapon_coefficient_k", 1.0),
             base_damage=loadout.get("base_damage", 0),
@@ -1040,7 +1051,8 @@ class CombatEngine:
             )
             return
 
-        # 2. Block (simplified: 10% base + equipment bonuses; exempt when unavoidable)
+        # 2. Block: 5% base + block-source armor (innate + weapon only, see
+        # _calc_block_rate); exempt when unavoidable
         block_rate = self._calc_block_rate(defender)
         blocked = (not unavoidable) and random.random() < block_rate
         if blocked:
@@ -1244,9 +1256,14 @@ class CombatEngine:
         return min(max(rate, 0.0), cap)
 
     def _calc_block_rate(self, defender: FighterState) -> float:
-        """Calculate block rate from armor and skills, capped by config."""
-        # Base 5% + small bonus from armor
-        return min(0.05 + defender.armor_value * 0.001, self._block_cap)
+        """Calculate block rate from block-source armor, capped by config.
+
+        Only ``block_armor_value`` (innate + weapon armor) counts; armor-slot
+        equipment feeds percent reduction but never block (spec: combat-core
+        「格挡率来源分离」). Base 5% and coefficient 0.001 unchanged (design D3).
+        """
+        # Base 5% + small bonus from block-source armor
+        return min(0.05 + defender.block_armor_value * 0.001, self._block_cap)
 
     def _calc_damage(
         self,
@@ -1426,32 +1443,5 @@ class CombatManager:
                 player2.hp if combat_type == 1 else max(1, result.fighter2_final_hp)
             ),
             "player2_final_mp": player2.hp,
-            "rounds": result.rounds,
-        }
-
-    async def player_vs_boss(self, player: Player, boss: Player) -> dict:
-        """Legacy PvE entry point (Boss battle)."""
-        f1 = await self.engine.build_fighter_from_player(player, is_attacker=True)
-        f2 = await self.engine.build_fighter_from_player(boss, is_attacker=False)
-
-        merge_count = self._get_merge_count(player)
-        result = self.engine.resolve_combat(f1, f2, "pve", merge_count=merge_count)
-
-        # Calculate reward based on damage dealt
-        damage_dealt = f2.max_hp - result.fighter2_final_hp
-        damage_ratio = damage_dealt / f2.max_hp if f2.max_hp > 0 else 0
-        reward = (
-            int(boss.experience * damage_ratio)
-            if result.winner != player.user_id
-            else boss.experience
-        )
-
-        return {
-            "winner": result.winner,
-            "combat_log": result.combat_log,
-            "player_final_hp": max(1, result.fighter1_final_hp),
-            "player_final_mp": player.hp,
-            "boss_final_hp": result.fighter2_final_hp,
-            "reward": reward,
             "rounds": result.rounds,
         }
