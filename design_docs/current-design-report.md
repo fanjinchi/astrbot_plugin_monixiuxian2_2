@@ -2,7 +2,7 @@
 
 > **文档状态**：
 > - 创建：**2026-07-29**（重设计起点，与 `redesign-combat-skills` 变更同批，commit 8fa47f7）
-> - 最近更新：**2026-09-05**（`add-rift-encounters` 收尾：拆除试炼古境测试脚手架（v34 迁移），遭遇机制本身保留）
+> - 最近更新：**2026-09-08**（`armor-content-design`：§4.4 新增防具供给体系定稿框架——两族 × 9 品级 18 标杆件、供给曲线与对称 EHP/M 序列，待用户确认后导入）
 > - 定位：**数值细节基线（活文档，非归档）**——架构总览见 `project-architecture.md`，行为契约见
 >   `openspec/specs/`；本文是数值/公式/数据库的权威基线，被 `project-architecture.md` §1/§3 引用。
 > - 维护义务：内容必须与代码同步（插件根 `AGENTS.md` §14，影响玩法的修改须同步修正本文）；
@@ -175,6 +175,21 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 - **装备词条**（四主属性框架，equipment_manager.py 解析）：`damage/agility/speed/hp/armor_value` 直接加成；`base_damage + weapon_coefficient_k` 进入伤害公式；`route_multiplier`（灵修/体修路线倍率）；`trigger_skills`（武器/功法触发技）；`passive_bonus`（心法常驻被动）；`skill_pool`（心法配套功法池）。items.json 法器仍走 `equip_effects(attack/defense)` 映射
 - 槽位 = 武器 + 防具 + 主修心法 + 功法×3；要求 `level_index ≥ required_level_index`（1-based，0=无门槛）
+- **防具供给体系**（2026-09-08 `armor-content-design` 定稿框架；数据 `content-design/armors.csv`、推导与留档 `content-design/armors.md`；待用户确认后经 sync 管线导入 items.json，3 件占位玄铁甲/月华袍/泰坦之铠届时删除不映射）：
+  - 重甲/法袍两族 × 9 品级 = 18 标杆件，品级门槛与武器同一套（凡0/灵11/…/混元81）；标杆批全通用件（route_mult 1.0，向性件留变体扩展）；防具护甲只参与百分比减伤、**不计格挡**（格挡来源分离）
+  - 供给曲线（门槛级总口径 = 天生护甲 + 同品级武器护甲 + 本件，`A = K×r/(1−r)`，K=100+10L）：
+
+    | 品级（门槛） | 凡 L1 | 灵 L11 | 地 L21 | 天 L31 | 皇 L41 | 帝 L51 | 道 L61 | 仙 L71 | 混元 L81 |
+    |---|---|---|---|---|---|---|---|---|---|
+    | 重甲 armor_value | 7 | 17 | 27 | 37 | 47 | 57 | 67 | 77 | 87 |
+    | 重甲 bonus_hp | 0 | 3 | 9 | 18 | 27 | 33 | 39 | 45 | 51 |
+    | 法袍 armor_value | 3 | 4 | 5 | 7 | 8 | 9 | 11 | 12 | 13 |
+    | 法袍 bonus_hp | 8 | 23 | 41 | 63 | 83 | 101 | 117 | 136 | 154 |
+
+    重甲门槛级实测减伤 20.0~20.3%（带 18~22%），法袍 13.9~14.1%（带 12~16%，以武器护甲门槛级自带 ~12.5% 为现实基底；原 6~10% 带数学不可达）
+  - 对称 EHP：同品级两族等效生命倍率相等（机器校验实测偏差 ≤0.5%，容差 ±5%）；`EHP倍率 = (1+bonus_hp/H)/(1−r)`，目标 M 序列 = 凡品 1.25、每品 +0.0125、皇品起封顶 1.30（v1 缓坡：原案 +0.025/cap1.35 在带装验收中 L40 胜率不达标，2026-09-08 改案；M 下限 1.25 由重甲零血量 EHP=1/(1−0.2) 锁死）；`bonus_hp = H×(M×(1−r)−1)`，H 第一季取 route-identity 期望面板（重甲↔体修 150/319/478/628、法袍↔灵修 110/261/422/592），皇品起取中立基准 `100+15×(L−1)`
+  - 属性池纪律：防具只挂 armor_value / bonus_hp，永不挂身法/迅捷/伤害词条
+  - 机器校验 `validate_budget.py` check_armors（带/EHP/属性池/通用件占比）；验收模拟 `sim_route_matchup.py --loadout`（镜像 TTK ≥5、满级跨路线 50%±2，结果留档 route-matchup-report.md 附录）
 - **商店**（core/shop_manager.py）：6 小时刷新；折扣 `uniform(0.8, 1.2)`；库存 `max(1, ceil(shop_weight/100))`；按权重加权不放回抽取
 - **储物戒**（core/storage_ring_manager.py）：容量默认 20，**每种物品占 1 格**（与数量无关）；丹药不可入戒；升级需容量递增 + 境界达标 + 付费
 

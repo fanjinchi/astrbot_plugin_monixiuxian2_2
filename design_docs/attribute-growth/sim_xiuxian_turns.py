@@ -150,11 +150,22 @@ def make_fighter(
     agility: int,
     speed: int,
     armor_value: int = 0,
+    block_armor_value: int | None = None,
     weapon_k: float = 1.0,
     base_damage: int = 0,
+    level_index: int = 1,
     name: str = "修士A",
 ) -> FighterState:
-    """Build a fresh FighterState for one side of a battle."""
+    """Build a fresh FighterState for one side of a battle.
+
+    ``block_armor_value`` 缺省回退为 ``armor_value``（模拟器旧语义：合并护甲
+    全额计入格挡）；带装场景须显式传"天生 + 武器槽"护甲——防具槽不计格挡
+    （spec combat-core「格挡率来源分离」）。
+
+    ``level_index`` 决定百分比减伤的 K = 100 + 10×level_index（引擎公式）；
+    缺省 1 是历史遗留（旧调用全按 K=110 跑），新调用必须按实际等级传入，
+    否则减伤率会被严重高估（armor-content-design 验收曾因此失真）。
+    """
     return FighterState(
         user_id=name,
         name=name,
@@ -166,9 +177,12 @@ def make_fighter(
         armor_value=armor_value,
         # 模拟器护甲语义 = 天生面板 + 武器槽，正是格挡来源（design D1），
         # 校准结论需保持旧公式 block = 5% + armor×0.001 逐点不变。
-        block_armor_value=armor_value,
+        block_armor_value=armor_value
+        if block_armor_value is None
+        else block_armor_value,
         weapon_k=weapon_k,
         base_damage=base_damage,
+        level_index=level_index,
         trigger_skills=[],
         ultimates=[],
     )

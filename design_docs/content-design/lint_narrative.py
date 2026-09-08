@@ -265,6 +265,11 @@ def _load_name_maps() -> dict[str, dict[str, str]]:
     maps["bounty"] = {
         str(t.get("id", "")): t.get("name", "") for t in bounty.get("templates", [])
     }
+    # items.json（dict[id → entry]，防具/饰品/丹药混合，按 id 对齐 armors.csv）
+    items = _load_json(CONFIG_DIR / "items.json")
+    maps["armors"] = {
+        str(k): str(v.get("name", "")) for k, v in items.items() if isinstance(v, dict)
+    }
     return maps
 
 
@@ -610,6 +615,7 @@ def main() -> int:
         ("weapons.csv", "weapons", "id"),
         ("skills.csv", "skills", "id"),
         ("heart_methods.csv", "heart_methods", "id"),
+        ("armors.csv", "armors", "id"),
     )
     # 无 description 列的 canon 表：canon 列 + 名字一致 + 叙事待写 backlog
     canon_tables = (

@@ -2,6 +2,10 @@
 """Validate content-design CSVs against the numeric budgets in
 design_docs/attribute-growth/growth-balance-proposals.md (§3 caps / §4 budgets).
 
+Checks: weapon per-hit budgets / mounted-skill tax / mechanics band, skill
+expected gain, heart-method passive caps, route-multiplier three-family rule,
+and armor supply-curve bands + symmetric EHP (spec armor-content-design).
+
 Rows with status ``legacy`` are existing config values kept for reference:
 they are printed as informational WARN lines and do not affect the exit code.
 Rows with status ``draft`` or ``final`` must pass every check.
@@ -347,6 +351,172 @@ def check_heart_methods(rows: list[dict]) -> list[str]:
     return results
 
 
+# ===== 防具校验（openspec change armor-content-design，2026-09-08 重锚版） =====
+# 口径（spec armor-content-design「防具供给曲线」）：总护甲 = 天生护甲 + 同品级
+# 武器护甲 + 本件，在品级门槛级（L = max(1, required_level_index)，K = 100+10L）
+# 折算减伤率落族带；带校验以通用件（路线乘区 1.0）为基准，向性件允许出带但
+# 乘区后 MUST 保持同级总减伤 ≤25% 框架约束（growth-balance-proposals §3.3）。
+ARMOR_BANDS = {"重甲": (0.18, 0.22), "法袍": (0.12, 0.16)}
+ARMOR_FRAMEWORK_CAP = 0.25
+# 典型配装天生护甲：重甲↔体修 6（创角 3-10 期望延续）、法袍↔灵修 0（route-identity §2）
+ARMOR_INNATE = {"重甲": 6, "法袍": 0}
+# 对称 EHP 基准气血（spec「对称 EHP 预算」）：第一季品级取 route-identity §2
+# 期望面板（创角均值 + 成长表推算；满级锚点 体修 763 / 灵修 745），皇品（L41）
+# 起回落到中立验算基准 benchmark_hp。
+ARMOR_ROUTE_HP = {
+    "重甲": {1: 150, 11: 319, 21: 478, 31: 628},  # 体修面板
+    "法袍": {1: 110, 11: 261, 21: 422, 31: 592},  # 灵修面板
+}
+EHP_TOLERANCE = 0.05
+GENERIC_SHARE_MIN = 0.5  # 通用件占比硬约束（route-identity §3）
+# 属性池纪律（spec「防具属性池纪律」）：这些词条在防具上必须为空或 0
+ARMOR_FORBIDDEN_STATS = (
+    "damage",
+    "bonus_damage",
+    "agility",
+    "speed",
+    "base_damage",
+    "weapon_coefficient_k",
+)
+
+
+def _weapon_armor_by_rank() -> dict[str, float]:
+    """Build rank -> typical weapon armor from weapons.csv non-legacy rows.
+
+    The typical loadout uses the same-rank weapon standard piece; if variants
+    later add more rows per rank, the max is kept (conservative against
+    band-top breaches).
+    """
+    with (DESIGN_DIR / "weapons.csv").open(encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    armor: dict[str, float] = {}
+    for r in rows:
+        if r["status"] == "legacy":
+            continue  # legacy 行不计入典型配装（旧框架数值待重做）
+        rank = r["rank"]
+        armor[rank] = max(armor.get(rank, 0.0), float(r["armor_value"]))
+    return armor
+
+
+def check_armors(rows: list[dict]) -> list[str]:
+    """Check armor pieces: supply-curve band, attribute pool, symmetric EHP.
+
+    Per spec armor-content-design: each generic piece's total-armor reduction
+    at its rank threshold (innate + same-rank weapon + piece, route-mult 1.0)
+    must land in its family band; leaning pieces may leave the band after
+    route multipliers but must stay under the 25% framework cap on both
+    routes. Same-rank 重甲/法袍 EHP multipliers must agree within ±5%.
+    Legacy rows are informational WARN (consistent with other checkers).
+    """
+    weapon_armor = _weapon_armor_by_rank()
+    results: list[str] = []
+    ehp_by_rank: dict[str, dict[str, float]] = {}
+    active_rows = [r for r in rows if r["status"] != "legacy"]
+
+    for r in rows:
+        rid = r["id"]
+        legacy = r["status"] == "legacy"
+        verdict = "WARN" if legacy else "FAIL"
+
+        # --- 属性池纪律 ---
+        for col in ARMOR_FORBIDDEN_STATS:
+            val = (r.get(col) or "").strip()
+            if val and val not in ("0", "0.0"):
+                results.append(
+                    f"{verdict} {rid:<12} 属性池纪律违规：防具不得挂 {col}（得 {val}） {r['name']}"
+                )
+
+        fam = (r.get("armor_family") or "").strip()
+        if fam not in ARMOR_BANDS:
+            results.append(
+                f"{verdict} {rid:<12} 未知 armor_family「{fam}」 {r['name']}"
+            )
+            continue
+        level = max(1, int(r["required_level_index"]))
+        k = 100 + 10 * level
+        if r["rank"] not in weapon_armor:
+            results.append(
+                f"{verdict} {rid:<12} 找不到同品级（{r['rank']}）武器标杆件护甲，无法核算 {r['name']}"
+            )
+            continue
+        w_armor = weapon_armor[r["rank"]]
+        piece = float(r["armor_value"])
+        bonus_hp = float(r["bonus_hp"])
+        ling = float(r["route_mult_ling"])
+        ti = float(r["route_mult_ti"])
+        generic = _in_range(ling, GENERIC_RANGE) and _in_range(ti, GENERIC_RANGE)
+
+        # --- 供给曲线带 ---
+        def _reduction(mult: float, innate: float) -> float:
+            total = innate + w_armor + piece * mult
+            return total / (total + k)
+
+        if generic:
+            # 通用件基准口径：族典型配装（重甲↔体修天生 6，法袍↔灵修 0）
+            rr = _reduction(1.0, ARMOR_INNATE[fam])
+            band = ARMOR_BANDS[fam]
+            ok = _in_range(rr, band)
+            v = "PASS" if ok else verdict
+            results.append(
+                f"{v} {rid:<12} L{level:<3} {fam} 总减伤={rr:6.2%} "
+                f"带=[{band[0]:.0%},{band[1]:.0%}]（天生{ARMOR_INNATE[fam]}+武器{w_armor:.0f}+件{piece:.0f}） {r['name']}"
+            )
+        else:
+            # 向性件：允许出族带，但两条路线乘区后均 MUST ≤25% 框架上限
+            for route, mult, innate in (
+                ("灵修", ling, 0.0),
+                ("体修", ti, 6.0),
+            ):
+                rr = _reduction(mult, innate)
+                if rr > ARMOR_FRAMEWORK_CAP:
+                    results.append(
+                        f"{verdict} {rid:<12} {route}侧乘区后总减伤 {rr:.2%} 超框架上限 "
+                        f"{ARMOR_FRAMEWORK_CAP:.0%} {r['name']}"
+                    )
+                else:
+                    results.append(
+                        f"PASS {rid:<12} 向性件 {route}侧总减伤={rr:6.2%} ≤25%（族带外出带允许） {r['name']}"
+                    )
+            rr = _reduction(1.0, ARMOR_INNATE[fam])  # EHP 基准口径仍按 1.0
+
+        # --- 对称 EHP（按族典型配装、通用件基准口径核算） ---
+        h = ARMOR_ROUTE_HP[fam].get(level) or benchmark_hp(level)
+        ehp = (1 + bonus_hp / h) / (1 - rr)
+        if not legacy:  # legacy 参照行不进对称比较（当前防具无 legacy 行，防御性处理）
+            ehp_by_rank.setdefault(r["rank"], {})[fam] = ehp
+        results.append(
+            f"PASS {rid:<12} {fam} EHP倍率={ehp:.4f}（H={h:.0f} bonus_hp={bonus_hp:.0f}） {r['name']}"
+        )
+
+    # --- 同品级两族 EHP 拉平 ---
+    for rank, fams in ehp_by_rank.items():
+        if "重甲" not in fams or "法袍" not in fams:
+            continue
+        heavy, robe = fams["重甲"], fams["法袍"]
+        dev = abs(heavy - robe) / max(heavy, robe)
+        ok = dev <= EHP_TOLERANCE
+        results.append(
+            f"{'PASS' if ok else 'FAIL'} {rank:<6} 对称EHP 重甲={heavy:.4f} 法袍={robe:.4f} "
+            f"偏差={dev:.2%}（容差 ±{EHP_TOLERANCE:.0%}）"
+        )
+
+    # --- 通用件占比 ≥50%（硬约束） ---
+    if active_rows:
+        generic_count = sum(
+            1
+            for r in active_rows
+            if _in_range(float(r["route_mult_ling"]), GENERIC_RANGE)
+            and _in_range(float(r["route_mult_ti"]), GENERIC_RANGE)
+        )
+        share = generic_count / len(active_rows)
+        ok = share >= GENERIC_SHARE_MIN
+        results.append(
+            f"{'PASS' if ok else 'FAIL'} 通用件占比 {generic_count}/{len(active_rows)}"
+            f" = {share:.0%}（硬约束 ≥{GENERIC_SHARE_MIN:.0%}）"
+        )
+    return results
+
+
 def main() -> int:
     """Run all budget checks and print a report. Returns process exit code."""
     all_lines: list[str] = []
@@ -359,6 +529,8 @@ def main() -> int:
         ("skills.csv", check_route_multipliers),
         ("heart_methods.csv", check_heart_methods),
         ("heart_methods.csv", check_route_multipliers),
+        ("armors.csv", check_armors),
+        ("armors.csv", check_route_multipliers),
     ):
         path = DESIGN_DIR / filename
         with path.open(encoding="utf-8") as f:

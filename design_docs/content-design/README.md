@@ -19,6 +19,8 @@
 | `weapons.csv` | 武器设计表（每行一件武器） |
 | `skills.csv` | 功法设计表（每行一个功法，含触发技） |
 | `heart_methods.csv` | 心法设计表（每行一个心法） |
+| `armors.csv` | 防具设计表（每行一件防具：重甲/法袍 × 9 品级标杆件，2026-09-08 armor-content-design） |
+| `armors.md` | 防具设计说明（供给曲线/对称 EHP 推导、M 序列、占位防具删除留档） |
 | `events-canon.csv` | 历练事件叙事表（事件组 key/name + 叙事四列，无数值列） |
 | `enemies-canon.csv` | 敌人叙事表（模板 key/name + 叙事四列 + 精英前缀/Boss 名备注） |
 | `rifts-canon.csv` | 秘境叙事表（id/name + 叙事四列 + 文案待工程变更备注） |
@@ -82,6 +84,18 @@
 - `passive_bonus_json`：如 `{"hp_percent": 0.1}`；`skill_pool_json`：决定功法池（心法是 build 的"职业"）
 - `route_mult_ling` / `route_mult_ti`：设计列，入库后对应 `route_multiplier.灵修` / `route_multiplier.体修`；取值规则（三族：通用/体修向/灵修向，通用件保持 1.0）见 `route-identity.md` §3
 
+### armors.csv
+
+`id,name,armor_family,rank,required_level_index,armor_value,bonus_hp,price,shop_weight,`
+`route_mult_ling,route_mult_ti,description,ref_source,design_note,status,canon_origin,tone_tier,story_hook,narrative_status`
+
+- `armor_family`：**设计列**（不入库），重甲 / 法袍两族；入库后统一 `type=法器, subtype=防具`（对齐 items.json 现状）
+- `armor_value`：同名；防具护甲只参与百分比减伤、**不计格挡**（格挡来源分离，`separate-block-armor-source`）
+- `bonus_hp`：入库后对应 `equip_effects.max_hp`（对齐 items.json 月华袍/泰坦之铠现有字段）
+- 属性池纪律：防具**只有** armor_value / bonus_hp 两个数值列，永不挂身法/迅捷/伤害词条（armor-content-design spec「防具属性池纪律」）
+- 品级与门槛等级沿用武器同一套（凡0/灵11/…/混元81）；数值由供给曲线 + 对称 EHP 推导，见 `armors.md`
+- `status` / 叙事四列约定同 weapons.csv
+
 ## 3. 数值预算速查（机器校验规则）
 
 源自 `growth-balance-proposals.md` §3/§4，验算脚本即按此实现：
@@ -129,6 +143,9 @@
 - **心法**：现仅 5 个 —— 需要按路线/品级成体系；
 - **武器**：120 件但数值为旧框架（legacy 行验算普遍超预算），且 L36-L99 无
   境界档位（bd issue `wxg`）—— 需要全量按新预算重做 + 补齐高档。
+- **防具**：~~仅 3 件占位（玄铁甲/月华袍/泰坦之铠，armor 1/10/25）~~ —— 2026-09-08 起由
+  `armors.csv` 两族 × 9 品级 18 标杆件补齐（armor-content-design，对称 EHP 框架；占位 3 件
+  删除不映射，待用户确认后经 sync 管线导入 config）；
 
 ## 7. 当前进度
 

@@ -14,6 +14,9 @@ Output: ``route-matchup.csv`` and ``route-matchup-report.md``.
 
 Usage:
     uv run python design_docs/attribute-growth/sim_route_matchup.py [battles]
+    uv run python design_docs/attribute-growth/sim_route_matchup.py --loadout [battles]
+        带装验收（armor-content-design spec「带装战斗验收」）：同级同装镜像 TTK
+        + 跨路线带装胜率，默认 3000 场/格，结果写入 route-matchup-report.md 附录。
 """
 
 from __future__ import annotations
@@ -115,6 +118,7 @@ def build_route_fighter(route: str, level: int, armed: bool):
         armor_value=armor,
         weapon_k=weapon_k,
         base_damage=base_damage,
+        level_index=level,
         name=route,
     )
 
@@ -252,13 +256,263 @@ def write_report(rows: list[dict[str, Any]], verdicts: list[str]) -> Path:
     return path
 
 
+# ---------------------------------------------------------------------------
+# 带装场景（armor-content-design spec「带装战斗验收」，2026-09-08）
+# ---------------------------------------------------------------------------
+
+ARMORS_CSV = SCRIPT_DIR.parent / "content-design" / "armors.csv"
+# 路线适配防具族（对称 EHP 典型配装口径，design D2）：体修↔重甲、灵修↔法袍
+_ROUTE_ARMOR_FAMILY = {"体修": "重甲", "灵修": "法袍"}
+# 镜像 TTK 格：凡/灵/地/天门槛级 + L40（天品老化装，装备汰换节奏的最坏格）
+_LOADOUT_MIRROR_LEVELS = [1, 11, 21, 31, 40]
+_LOADOUT_CROSS_LEVELS = [10, 20, 30, 40]
+_MIRROR_TTK_MIN = 5  # G1 下限延续（spec：镜像 ≥5 回合且不秒杀）
+_CROSS_WIN_BAND = (0.48, 0.52)  # spec：满级跨路线带装胜率 50%±2
+
+
+def load_armor_pieces() -> dict[str, list[dict]]:
+    """Parse armors.csv into family -> rows sorted by required_level_index."""
+    with ARMORS_CSV.open(encoding="utf-8", newline="") as f:
+        rows = [r for r in csv.DictReader(f) if r.get("status") != "legacy"]
+    by_family: dict[str, list[dict]] = {}
+    for row in rows:
+        by_family.setdefault(row["armor_family"], []).append(row)
+    for fam_rows in by_family.values():
+        fam_rows.sort(key=lambda r: int(r["required_level_index"]))
+    return by_family
+
+
+def pick_armor(by_family: dict[str, list[dict]], family: str, level: int) -> dict:
+    """Return the highest-threshold armor piece of ``family`` usable at level."""
+    candidates = [
+        r for r in by_family[family] if int(r["required_level_index"]) <= level
+    ]
+    if not candidates:
+        raise ValueError(f"No {family} armor available for level {level}")
+    return candidates[-1]
+
+
+WEAPONS_CSV = SCRIPT_DIR.parent / "content-design" / "weapons.csv"
+
+
+def load_standard_weapons() -> list[dict]:
+    """Parse weapons.csv non-legacy rows (design-time standard pieces)."""
+    with WEAPONS_CSV.open(encoding="utf-8", newline="") as f:
+        rows = [r for r in csv.DictReader(f) if r.get("status") != "legacy"]
+    return sorted(rows, key=lambda r: int(r["required_level_index"]))
+
+
+def pick_standard_weapon(weapons: list[dict], level: int) -> dict:
+    """Return the same-rank standard weapon usable at ``level``.
+
+    Loadout acceptance is measured against the design-time typical loadout:
+    legacy weapons (e.g. 青云镇山剑 armor 80, a sect treasure outside the
+    weapon ladder) distort it and are excluded — the standard armed cells
+    carry that distortion caveat separately.
+    """
+    candidates = [r for r in weapons if int(r["required_level_index"]) <= level]
+    if not candidates:
+        raise ValueError(f"No standard weapon available for level {level}")
+    return candidates[-1]
+
+
+def build_loadout_fighter(
+    route: str,
+    level: int,
+    by_family: dict[str, list[dict]],
+    weapons: list[dict],
+):
+    """Create a FighterState with the standard weapon + route-fitted armor.
+
+    Generic-piece calibration: route multipliers are treated as 1.0 (same as
+    the armed cells). The armor slot's armor feeds percent reduction only,
+    never block rate (spec combat-core 「格挡率来源分离」), so
+    ``block_armor_value`` is pinned to innate + weapon-slot armor.
+    """
+    attrs = expected_route_attrs(route, level)
+    innate = int(attrs["armor_value"])
+    weapon = pick_standard_weapon(weapons, level)
+    piece = pick_armor(by_family, _ROUTE_ARMOR_FAMILY[route], level)
+    return make_fighter(
+        hp=int(attrs["hp"]) + int(piece["bonus_hp"]),
+        damage=int(attrs["damage"]) + int(weapon["bonus_damage"]),
+        agility=int(attrs["agility"]),
+        speed=int(attrs["speed"]),
+        armor_value=innate + int(weapon["armor_value"]) + int(piece["armor_value"]),
+        block_armor_value=innate + int(weapon["armor_value"]),
+        weapon_k=float(weapon["weapon_coefficient_k"]),
+        base_damage=int(weapon["base_damage"]),
+        level_index=level,
+        name=route,
+    )
+
+
+def run_loadout_cells(
+    battles: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Run loadout mirror-TTK cells and cross-route cells."""
+    by_family = load_armor_pieces()
+    weapons = load_standard_weapons()
+    mirror_rows: list[dict[str, Any]] = []
+    for level in _LOADOUT_MIRROR_LEVELS:
+        for route in ("体修", "灵修"):
+            piece = pick_armor(by_family, _ROUTE_ARMOR_FAMILY[route], level)
+            rounds_list: list[int] = []
+            for _ in range(battles):
+                f_a = build_loadout_fighter(route, level, by_family, weapons)
+                f_b = build_loadout_fighter(route, level, by_family, weapons)
+                result = ENGINE.resolve_combat(
+                    f_a, f_b, combat_type="spar", merge_count=10
+                )
+                rounds_list.append(result.rounds)
+            mirror_rows.append(
+                {
+                    "level": level,
+                    "route": route,
+                    "armor": piece["name"],
+                    "rank": piece["rank"],
+                    "rounds_mean": round(statistics.mean(rounds_list), 2),
+                    "rounds_p10": round(_percentile(rounds_list, 0.10), 1),
+                    "rounds_min": min(rounds_list),
+                }
+            )
+    cross_rows: list[dict[str, Any]] = []
+    for level in _LOADOUT_CROSS_LEVELS:
+        tixiu_wins = 0
+        draws = 0
+        rounds_list = []
+        for _ in range(battles):
+            f_ti = build_loadout_fighter("体修", level, by_family, weapons)
+            f_ling = build_loadout_fighter("灵修", level, by_family, weapons)
+            result = ENGINE.resolve_combat(
+                f_ti, f_ling, combat_type="spar", merge_count=10
+            )
+            rounds_list.append(result.rounds)
+            if result.winner == "draw":
+                draws += 1
+            elif result.winner == "体修":
+                tixiu_wins += 1
+        decided = battles - draws
+        cross_rows.append(
+            {
+                "level": level,
+                "ti_armor": pick_armor(by_family, "重甲", level)["name"],
+                "li_armor": pick_armor(by_family, "法袍", level)["name"],
+                "battles": battles,
+                "tixiu_wins": tixiu_wins,
+                "draws": draws,
+                "tixiu_win_rate": round(tixiu_wins / decided if decided else 0.0, 4),
+                "rounds_mean": round(statistics.mean(rounds_list), 2),
+            }
+        )
+    return mirror_rows, cross_rows
+
+
+def evaluate_loadout(
+    mirror_rows: list[dict[str, Any]], cross_rows: list[dict[str, Any]]
+) -> list[str]:
+    """Check loadout acceptance targets and return human-readable verdicts."""
+    verdicts = []
+    for row in mirror_rows:
+        ok = row["rounds_mean"] >= _MIRROR_TTK_MIN and row["rounds_min"] >= 2
+        verdicts.append(
+            f"{'PASS' if ok else 'FAIL'} L{row['level']:>2} {row['route']}镜像"
+            f"[{row['armor']}]：平均 TTK {row['rounds_mean']:.1f}"
+            f"（下限 {_MIRROR_TTK_MIN}）、p10 {row['rounds_p10']:.0f}、"
+            f"最短 {row['rounds_min']}（禁秒杀）"
+        )
+    for row in cross_rows:
+        rate = row["tixiu_win_rate"]
+        if row["level"] == 40:
+            ok = _CROSS_WIN_BAND[0] <= rate <= _CROSS_WIN_BAND[1]
+            verdicts.append(
+                f"{'PASS' if ok else 'FAIL'} L40 跨路线带装：体修胜率 {rate:.1%}"
+                f"（目标 50%±2，{_CROSS_WIN_BAND[0]:.0%}~{_CROSS_WIN_BAND[1]:.0%}）"
+            )
+        else:
+            verdicts.append(
+                f"INFO L{row['level']} 跨路线带装：体修胜率 {rate:.1%}"
+                "（参考格，spec 仅约束满级）"
+            )
+    return verdicts
+
+
+def write_loadout_appendix(
+    mirror_rows: list[dict[str, Any]],
+    cross_rows: list[dict[str, Any]],
+    verdicts: list[str],
+    battles: int,
+) -> Path:
+    """Idempotently replace the loadout appendix in route-matchup-report.md."""
+    path = SCRIPT_DIR / "route-matchup-report.md"
+    marker = "\n## 附录：带装验收"
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    head = text.split(marker)[0].rstrip() if marker in text else text.rstrip()
+    lines = [
+        f"## 附录：带装验收（armor-content-design，{battles} 场/格）",
+        "",
+        "口径：期望值属性 + 同品级标杆武器（weapons.csv 非 legacy 行；排除青云镇山剑等宗门遗宝",
+        "对典型配装的扭曲）+ 路线适配防具标杆件（体修↔重甲、灵修↔法袍，通用件乘区 1.0）；",
+        "防具护甲只参与减伤、不计格挡（格挡来源分离后口径）。",
+        "",
+        "### 同级同装镜像 TTK（下限 ≥5 回合，不允许秒杀）",
+        "",
+        "| 等级 | 路线镜像 | 防具（品级） | 平均回合 | p10 | 最短 |",
+        "|---|---|---|---|---|---|",
+    ]
+    for row in mirror_rows:
+        lines.append(
+            f"| L{row['level']} | {row['route']} | {row['armor']}（{row['rank']}）"
+            f" | {row['rounds_mean']} | {row['rounds_p10']} | {row['rounds_min']} |"
+        )
+    lines += [
+        "",
+        "### 跨路线带装胜率（满级 50%±2）",
+        "",
+        "| 等级 | 体修防具 | 灵修防具 | 体修胜率 | 平均回合 |",
+        "|---|---|---|---|---|",
+    ]
+    for row in cross_rows:
+        lines.append(
+            f"| L{row['level']} | {row['ti_armor']} | {row['li_armor']}"
+            f" | {row['tixiu_win_rate']:.1%} | {row['rounds_mean']} |"
+        )
+    lines += [
+        "",
+        "判定：",
+        "",
+        *[f"- {v}" for v in verdicts],
+        "",
+        "复跑：`uv run python design_docs/attribute-growth/sim_route_matchup.py --loadout [battles]`",
+        "",
+    ]
+    section = "\n".join(lines)
+    path.write_text((head + "\n\n" + section) if head else section, encoding="utf-8")
+    return path
+
+
 if __name__ == "__main__":
-    battles = int(sys.argv[1]) if len(sys.argv) > 1 else BATTLES_DEFAULT
-    rows = run_matchup_cells(battles)
-    verdicts = evaluate(rows)
-    csv_path = write_csv(rows)
-    report_path = write_report(rows, verdicts)
-    for v in verdicts:
-        print(v)
-    print(f"\nCSV written: {csv_path}")
-    print(f"Report written: {report_path}")
+    argv = sys.argv[1:]
+    loadout = "--loadout" in argv
+    if loadout:
+        argv.remove("--loadout")
+    if loadout:
+        battles = int(argv[0]) if argv else 3000  # spec：带装验收 3000 场/格
+        mirror_rows, cross_rows = run_loadout_cells(battles)
+        loadout_verdicts = evaluate_loadout(mirror_rows, cross_rows)
+        report_path = write_loadout_appendix(
+            mirror_rows, cross_rows, loadout_verdicts, battles
+        )
+        for v in loadout_verdicts:
+            print(v)
+        print(f"\nReport appendix written: {report_path}")
+    else:
+        battles = int(argv[0]) if argv else BATTLES_DEFAULT
+        rows = run_matchup_cells(battles)
+        verdicts = evaluate(rows)
+        csv_path = write_csv(rows)
+        report_path = write_report(rows, verdicts)
+        for v in verdicts:
+            print(v)
+        print(f"\nCSV written: {csv_path}")
+        print(f"Report written: {report_path}")
