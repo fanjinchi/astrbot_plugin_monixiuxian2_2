@@ -1,7 +1,12 @@
 {
   "breakthrough": {
     "success": "✨ 突破成功！✨{streak_bonus_msg}\n━━━━━━━━━━━━━━━\n{rate_info}\n━━━━━━━━━━━━━━━\n恭喜你从【{current_level_name}】突破至【{next_level_name}】！\n\n【属性增长】\n气血 +{hp_growth}\n伤害 +{damage_growth}\n身法 +{agility_growth}\n迅捷 +{speed_growth}\n\n【当前属性】\n伤害：{damage}\n身法：{agility}\n迅捷：{speed}\n气血：{hp}\n护甲：{armor_value}",
-    "lose_streak_reward": "\n💪 苦尽甘来，天道不负有心人！",
+    "lose_streak_reward": {
+      "通用": [
+        "闭关处的墙角，你踢到一枚石子——不是普通石子，是温养石，摸着暖融融的，不知是哪位前辈随手落的。你揣进怀里，心想：败了这么多回，总该捡点什么。这石头后来一直跟着你，比许多法宝都贴心。",
+        "下山散心，师门塞给你一道平安符：不突破，也得平安。你捏着那枚歪歪扭扭缝的符，鼻子有点酸——符上绣的是一只胖乎乎的乌龟。你把它挂在腰间，觉得这句话，比突破口诀入耳。\n---"
+      ]
+    },
     "comprehend_success": "🎁 福至心灵，领悟功法【{name}】！",
     "comprehend_fail": "🎁 破而后立，领悟功法【{name}】！",
     "comprehend_universal": "🎁 破境感悟，领悟通用功法【{name}】！",
@@ -11,30 +16,126 @@
     "survive": "❌ 突破失败 ❌\n━━━━━━━━━━━━━━━\n{rate_info}\n━━━━━━━━━━━━━━━\n突破【{next_level_name}】失败，但幸运地保住了性命\n修为受损，损失了 {exp_penalty} 点修为\n当前修为：{experience}{pity_msg}"
   },
   "combat": {
-    "battle_opening": "☆━━━━ 战斗开始 ━━━━☆",
-    "battle_vs": "{name1} VS {name2}",
-    "battle_mutual_destruction": "☆━━━━ 同归于尽！平局！━━━━☆",
-    "battle_victory": "☆━━━━ {name} 胜利！━━━━☆",
-    "battle_draw_stalemate": "☆━━━━ 战斗胶着，双方罢手，平局！━━━━☆",
-    "battle_draw": "☆━━━━ 平局！━━━━☆",
+    "battle_opening": {
+      "通用": [
+        "荒野尽头，风忽然停了。一道身影立在枯草尖上，不动，也不说话——你握紧兵刃，知道这一战躲不过，脚步却一步未退。",
+        "密林静得只剩自己的心跳。枝头鸟不鸣，虫声也收了——杀气先于人到，你侧身站定，林深处传来一声极轻的兵刃出鞘声。",
+        "断崖之上，两道人影遥遥相对。山风把衣袍吹得猎猎作响，谁都没先动——先动的人先露出破绽，这个道理，你懂，对方也懂。"
+      ]
+    },
+    "battle_vs": {
+      "通用": [
+        "{name1} 与 {name2} 相对而立，互道一声名号。江湖规矩，先通名，后动手——名字落了地，这场架才算数。",
+        "{name1} 与 {name2} 隔着三步站定，杀气在半空凝成一线。谁先眨眼，谁先矮半截——对峙比的是耐性，耐性本身就是功夫。"
+      ]
+    },
+    "battle_mutual_destruction": {
+      "通用": [
+        "最后一击同时落定——你的兵刃递进对方胸口，对方的掌力也拍在你肩头。两道身影同时退开，又同时站不住，一起跌坐在地，谁也没能站到最后。",
+        "烟尘散尽，两人都撑着兵刃没松手。你看着他，他也在看你——这一战，同归于尽，谁也没能再站起来。地上，只剩两道深深的脚印。"
+      ]
+    },
+    "battle_victory": {
+      "通用": [
+        "{name} 收剑归鞘，铮的一声响，落在满场寂静里。风重新流动，鸟鸣重新响起——胜了，但架子不能倒，转身时步子要稳。",
+        "{name} 抱拳一礼，不乘胜，不补刀。胜负是胜负，气度是气度——对方也回了一礼，这一战，服了。",
+        "打斗扬起的尘土慢慢落回地面，{name} 立在原地，衣角还在抖，手已经稳了。赢了这一场，山还是山，路还是路，只是脚下又踏实了一分。",
+        "{name} 越过倒地之人，脚步不停。胜者不必回头——身后的喘息声渐远，前方的路自己铺开。"
+      ]
+    },
+    "battle_draw_stalemate": {
+      "通用": [
+        "斗到三百招开外，两人都住了手，喘着气，互相盯着。谁都没剩几分气力，谁也不敢先动——僵在这里，比的是谁先撑不住。",
+        "兵刃架在一起，谁也压不过谁。你咬着牙，对方也咬着牙，力道一分一分地加，又一分一分地收——再打下去，两败俱伤，划不来。"
+      ]
+    },
+    "battle_draw": {
+      "通用": [
+        "两人同时收招，各退半步。这一战，拆了个平手——你抱拳，对方也抱拳，山道上让开一条路，谁也没输，谁也没赢。",
+        "气力都见了底，再打只是耗着。你先收了势，对方也顺势收了——平局收场，倒也算一段不打不相识的缘分。"
+      ]
+    },
     "round_header": "-- 第 {rounds} 回合 --",
-    "stun_skip": "{name} 处于眩晕状态，无法出手！",
+    "stun_skip": {
+      "通用": [
+        "{name} 脑中嗡的一声，眼前一黑——天旋地转，招式全忘了，只剩本能在原地晃了两晃，这一回合，是出不了手了。",
+        "{name} 挨了这一下，眼前直冒金星。星星还怪好看的，可惜这会子不是赏星的时候——这一回合，且先数着星星过吧。"
+      ]
+    },
     "dodge": "{defender_name} 身形一闪，躲过了 {attacker_name} 的攻击！",
-    "block": "{defender_name} 举盾格挡，化解了部分攻势！",
-    "crit_notice": "{attacker_name} 目光如电，寻得破绽！",
+    "block": {
+      "通用": [
+        "对方攻势当头落下，{defender_name} 沉肩架臂，硬接这一击——脚下纹丝不动，只有衣袍被劲风压得贴了身。硬桥硬马，挡得住，就还站着。",
+        "{defender_name} 双臂交错挡在身前，脚下一沉，扎进土里半寸。攻势撞上来，如浪撞礁石——礁石不后退，浪自己碎了。"
+      ]
+    },
+    "crit_notice": {
+      "通用": [
+        "杀意先于招式而至——{attacker_name} 的刀光在半空一顿，像是蓄满了整条河的力道，下一刻就要劈下来。",
+        "{attacker_name} 衣袍无风自鼓，罡风卷起满地尘土。这一击不寻常——懂行的人已经看出，接下来这一下，是要见真章的。"
+      ]
+    },
     "ultimate_cast": "{attacker_name} 施展大招【{ult_name}】，天地变色！",
     "damage_crit": "{attacker_name} 暴击！造成 {final_damage} 点伤害！",
     "damage_normal": "{attacker_name} 发起攻击，造成 {final_damage} 点伤害",
-    "reflect": "{defender_name} 反弹 {reflect_dmg} 点伤害！",
-    "lifesteal": "{attacker_name} 吸取 {heal} 气血！",
-    "remaining_hp": "{defender_name} 剩余气血: {remaining_hp}",
-    "survive": "{name} 触发【免死】，于绝境中存活！",
-    "buff_applied": "{actor_name} 的【{effect_name}】作用于 {target_name}",
+    "reflect": {
+      "通用": [
+        "反震之力如数奉还——{defender_name} 借力打力，把袭来的攻势原路弹回，{reflect_dmg} 的力道在对方自己身上炸开。",
+        "{defender_name} 不接硬招，只一引一带——攻势撞上护体真劲，弹了回去，{reflect_dmg} 的反噬让对方自己吃了个哑巴亏。"
+      ]
+    },
+    "lifesteal": {
+      "通用": [
+        "{attacker_name} 掌势一收，竟从对方伤口处牵出一道血线，吸入口中——{heal} 气血入体，苍白的脸色回了些血色，招式却愈发凶狠。",
+        "伤敌，也补己——{attacker_name} 借这一击之力，将对方的气血纳为己用，{heal} 生机入体，久战的气力又续上了几分。"
+      ]
+    },
+    "remaining_hp": {
+      "通用": [
+        "{defender_name} 气血将尽，{remaining_hp} 一线吊着——腿在抖，手没松。这口气只要还在，人就还站着，战就还没完。",
+        "{defender_name} 身上带伤，{remaining_hp} 堪堪撑着。地上已经溅了血，眼神却比方才更亮——越是残局，越见心性。",
+        "{defender_name} 晃了两晃，{remaining_hp} 的气血勉强稳住身形。身后没路可退，前面的人还在逼近——那就站着，站着就有说法。",
+        "打到这时，{defender_name} 的 {remaining_hp} 已经薄如纸，掌心却还扣着一招没用——残局里藏着后手的人，最不好惹。"
+      ]
+    },
+    "survive": {
+      "通用": [
+        "{name} 气机将断之际，护身之物忽然一亮——绝境中硬生生吊住一条命。生死线上走了一遭，再睁眼时，眼神比方才更冷更稳。",
+        "{name} 力竭欲倒，却于最后一刻撑住了——这一击没能放倒他，反倒激出一股狠劲。命还在，那就接着打。"
+      ]
+    },
+    "buff_applied": {
+      "通用": [
+        "{actor_name} 的【{effect_name}】落在 {target_name} 身上——灵光一闪，气机一振，接下来的路，好走多了。",
+        "{actor_name} 施出【{effect_name}】，{target_name} 周身一暖，如披了件看不见的甲。有这层加护在，出手都敢放开了。"
+      ]
+    },
     "status_expired": "{name} 的【{effect_name}】效果消散",
-    "trigger_round_start_boost": "{name} 触发【{skill_name}】，下回合攻势更盛！",
-    "trigger_attack_boost": "{actor_name} 触发【{skill_name}】，攻势更盛！",
-    "trigger_stun": "{actor_name} 触发【{skill_name}】，{target_name} 被眩晕，下回合无法出手！",
-    "trigger_damage_reduction": "{actor_name} 触发【{skill_name}】，受到的伤害降低！",
+    "trigger_round_start_boost": {
+      "通用": [
+        "回合将启，{name} 触发了【{skill_name}】——气机先一步鼓荡起来，下一回合的攻势，先声夺人。",
+        "{name} 的【{skill_name}】悄然发动——没有什么比开打前先给自己加个码更实在的了。对面的脸色，肉眼可见地沉了三分。",
+        "{name} 的【{skill_name}】先行一步鼓荡——抢在交手之前把势头立住，下一回合的每一招，都从这股先机里起手。"
+      ]
+    },
+    "trigger_attack_boost": {
+      "通用": [
+        "{actor_name} 触发了【{skill_name}】，招式陡然凌厉——同一招，此刻使出来，劲风呼呼地跟长了牙似的。",
+        "{actor_name} 的【{skill_name}】一发动，出手都带风——按老话说，这是热汤下肚，浑身来劲。对面修士心里直犯嘀咕：这人也太不经夸了。"
+      ]
+    },
+    "trigger_stun": {
+      "通用": [
+        "{actor_name} 触发【{skill_name}】，{target_name} 身形一僵，招式凝在半空——这一瞬的破绽，够对手做很多事了。",
+        "{actor_name} 的【{skill_name}】结结实实砸在 {target_name} 身上——眩晕上脸，动作慢得像在演皮影戏。这回合，且先当个看客吧。"
+      ]
+    },
+    "trigger_damage_reduction": {
+      "通用": [
+        "{actor_name} 触发【{skill_name}】，护体罡气一层层卸去来势——同样的一击落在身上，分量轻了大半。",
+        "{actor_name} 的【{skill_name}】一开，站在那里跟座门神似的——对面砸了几招，自己手先酸了。打不动的对手最磨人，这话一点不假。\n---"
+      ]
+    },
     "effect_counter": "{actor_name} 触发【{skill_name}】反击，对 {target_name} 造成 {counter_dmg} 点伤害！",
     "effect_heal": "{actor_name} 触发【{skill_name}】，恢复 {heal} 气血！",
     "effect_dot_attach": "{actor_name} 使【{skill_name}】附着于 {target_name}",
@@ -46,11 +147,34 @@
     "retreat_start": "🧘 道友已进入闭关状态\n━━━━━━━━━━━━━━━\n闭关期间，你将与世隔绝，潜心修炼。\n💡 发送「{end_cmd}」结束闭关\n⏱️ 每分钟将获得修为，受灵根资质影响。",
     "retreat_settlement": "🌟 道友出关成功！\n━━━━━━━━━━━━━━━\n⏱️ 闭关时长：{time_str}\n{fairyland_line}📈 获得修为：{gained_exp:,}{exceed_msg}\n💫 当前修为：{current_exp:,}\n━━━━━━━━━━━━━━━\n道友已回归红尘，可继续修行。",
     "retreat_epiphany": "🎁 闭关悟道，领悟功法【{skill_name}】！",
-    "impart_value_inactive_hint": "\n\n💡 你持有传承但未激活，本次闭关未累积传承值。\n使用「激活传承 <编号>」激活后再闭关。",
-    "creation_help_welcome": "🌟 欢迎踏入修仙之路！\n━━━━━━━━━━━━━━━\n请选择你的修炼方式：\n\n",
-    "creation_welcome": "🎉 恭喜道友 {name} 踏上仙途！\n",
-    "creation_warning": "⚠️ 修仙有风险，突破需谨慎！\n突破失败或生命值归零会导致\n身死道消，所有数据清除！\n",
-    "rebirth_farewell": "💀 你选择了弃道重修，旧生一切化为尘埃。\n━━━━━━━━━━━━━━━\n可立即使用「我要修仙」重新踏上仙途。\n"
+    "impart_value_inactive_hint": {
+      "通用": [
+        "你持有传承但尚未激活，本次闭关未累积传承值。发送「激活传承 <编号>」激活后再闭关。",
+        "传承未激活，闭关期间传承值不会累积。先发送「激活传承 <编号>」，下次出关即可结算。"
+      ]
+    },
+    "creation_help_welcome": {
+      "通用": [
+        "欢迎踏入修仙之路！灵修体修，各有一番天地。请选择你的修炼方式："
+      ]
+    },
+    "creation_welcome": {
+      "通用": [
+        "恭喜道友 {name} 踏上仙途！"
+      ]
+    },
+    "creation_warning": {
+      "通用": [
+        "修仙路上多凶险：突破失败或生命值归零，会身死道消，一切归于尘土。修行之前，先把这条路看清。"
+      ]
+    },
+    "rebirth_farewell": {
+      "通用": [
+        "你把这一世的恩怨情仇放下，旧身入土，一点灵光不灭。山还是那座山，路还是那条路——只是走的人，换了副皮囊。",
+        "弃道重修，前尘如灯灭。但灯芯还在魂里，点过的东西总留些余温——来世重逢，老友相见不相识，你笑一笑，也算是拜过了。",
+        "旧身入土，灵光转世。这一世的账，且留到下一世再算——到时候，你不再是今日的你，可那口气，还是这口气。\n---"
+      ]
+    }
   },
   "fortune": {
     "weapon_drop": "🎁 机缘天降，获得武器【{name}】（{rank}）！",
