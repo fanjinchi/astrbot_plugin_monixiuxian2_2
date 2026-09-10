@@ -1,0 +1,164 @@
+[
+  {
+    "id": 7261,
+    "conversation_id": 541,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#闭关",
+    "rich": null,
+    "created_at": 1789061658.2739284
+  },
+  {
+    "id": 7262,
+    "conversation_id": 541,
+    "direction": "out",
+    "sender": "bot",
+    "text": "一炷香燃在案头，烟直直地升，无风无扰。你看着那缕烟出了神，等回过神，烟已去了半炷——修炼先修定，定下来了，才算是开了头。\n🧘 道友已进入闭关状态\n━━━━━━━━━━━━━━━\n闭关期间，你将与世隔绝，潜心修炼。\n💡 发送「出关」结束闭关\n⏱️ 每分钟将获得修为，受灵根资质影响。",
+    "rich": [],
+    "created_at": 1789061658.307924
+  },
+  {
+    "id": 7263,
+    "conversation_id": 541,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 时间快进 3600 确认",
+    "rich": null,
+    "created_at": 1789061658.5871534
+  },
+  {
+    "id": 7264,
+    "conversation_id": 541,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 时间已快进 3600 秒（共前移 5 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：1 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  贷款到期时间：0 条\n  悬赏放弃冷却：0 条\n  Boss/灵眼下次刷新时间：2 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+    "rich": [],
+    "created_at": 1789061658.618776
+  },
+  {
+    "id": 7265,
+    "conversation_id": 541,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#出关",
+    "rich": null,
+    "created_at": 1789061658.9054582
+  },
+  {
+    "id": 7266,
+    "conversation_id": 541,
+    "direction": "out",
+    "sender": "bot",
+    "text": "推门时，山门外那株桃树落了满地花瓣。闭关前它正含苞，此刻已结了青果——你错过一树花期，换来一截清净修为。\n🌟 道友出关成功！\n━━━━━━━━━━━━━━━\n⏱️ 闭关时长：1小时\n📈 获得修为：6,000\n💫 当前修为：6,000\n━━━━━━━━━━━━━━━\n道友已回归红尘，可继续修行。你持有传承但尚未激活，本次闭关未累积传承值。发送「激活传承 <编号>」激活后再闭关。",
+    "rich": [],
+    "created_at": 1789061658.9463205
+  },
+  {
+    "id": 7267,
+    "conversation_id": 541,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#闭关",
+    "rich": null,
+    "created_at": 1789061659.2237198
+  },
+  {
+    "id": 7268,
+    "conversation_id": 541,
+    "direction": "out",
+    "sender": "bot",
+    "text": "一炷香燃在案头，烟直直地升，无风无扰。你看着那缕烟出了神，等回过神，烟已去了半炷——修炼先修定，定下来了，才算是开了头。\n🧘 道友已进入闭关状态\n━━━━━━━━━━━━━━━\n闭关期间，你将与世隔绝，潜心修炼。\n💡 发送「出关」结束闭关\n⏱️ 每分钟将获得修为，受灵根资质影响。",
+    "rich": [],
+    "created_at": 1789061659.264394
+  },
+  {
+    "id": 7269,
+    "conversation_id": 541,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除全部冷却 900000002 确认",
+    "rich": null,
+    "created_at": 1789061659.542353
+  },
+  {
+    "id": 7270,
+    "conversation_id": 541,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已清除【测试玩家1】的全部冷却状态：\n  忙碌状态：1 条",
+    "rich": [],
+    "created_at": 1789061659.5825
+  },
+  {
+    "id": 7271,
+    "conversation_id": 541,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#开始历练 巡山",
+    "rich": null,
+    "created_at": 1789061659.8605187
+  },
+  {
+    "id": 7272,
+    "conversation_id": 541,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 你选择了「巡山问道」——巡视宗门附近的山麓，收集灵药与情报，风险最低，适合试探与凑进度。\n路线风险：低 | 历练时长：30 分钟\n（该路线完成后需要休整 5 分钟）",
+    "rich": [],
+    "created_at": 1789061659.8911328
+  },
+  {
+    "id": 7273,
+    "conversation_id": 541,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 随机种子 42",
+    "rich": null,
+    "created_at": 1789061660.1791441
+  },
+  {
+    "id": 7274,
+    "conversation_id": 541,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已设定全局随机种子：42\n⚠️ 仅限测试场景：进程级生效——同进程所有使用全局 random 的组件（含宿主其他插件）都进入固定序列；「随机种子 重置」或重启进程即恢复。\n💡 与测试平台 deterministic+seed 同机制（双方都重置全局种子），后执行者生效：平台用例开启 deterministic 时会在每次 send 前覆盖 GM 种子。",
+    "rich": [],
+    "created_at": 1789061660.201785
+  },
+  {
+    "id": 7275,
+    "conversation_id": 541,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 随机种子 重置",
+    "rich": null,
+    "created_at": 1789061660.4975693
+  },
+  {
+    "id": 7276,
+    "conversation_id": 541,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已恢复系统熵随机源，后续随机行为不再按固定序列产出。\n⚠️ 仅限测试场景使用。",
+    "rich": [],
+    "created_at": 1789061660.519818
+  },
+  {
+    "id": 7277,
+    "conversation_id": 541,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 随机种子 abc",
+    "rich": null,
+    "created_at": 1789061660.81637
+  },
+  {
+    "id": 7278,
+    "conversation_id": 541,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 参数错误：/修仙GM 随机种子 <整数> 设定固定种子，或 /修仙GM 随机种子 重置 恢复随机。",
+    "rich": [],
+    "created_at": 1789061660.8379333
+  }
+]
