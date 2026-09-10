@@ -46,7 +46,7 @@
 - [x] 7.1 `scripts/sync_copy_variants_to_config.py`：内置 6 个 B 场景清单；B 场景 panel 迁移（旧值 str → panel，**仅此迁移分支**在 survive 面板 `{pity_msg}` 前补 `\n`；旧值已是双槽 → 取其 `panel` 键原样保留，不重复补）；flavor 行按 level_band/route 写分桶；B 场景 flavor 导入校验改为 ⊆ 声明变量集
 - [x] 7.2 dry-run 确认 19 个场景全部放行（0 FAIL），执行导入 `config/narrative_config.json`（43 场景写入，0 跳过；含 6 双槽 + 13 A 场景）
 - [x] 7.3 导入后 pytest 全绿（762 passed；ConfigManager 加载新 config 零告警）
-- [ ] 7.4 跑一遍 `functional_tests/` 相关用例确认（gm-basics、gm-time-tools、player-lifecycle；断言均为 contains/未锚定 re，预期不破）——按项目约定由用户手动发起
+- [x] 7.4 跑一遍 `functional_tests/` 相关用例确认（gm-basics、gm-time-tools、player-lifecycle；断言均为 contains/未锚定 re，预期不破）——已跑（2026-09-11，`--sync --reload` + `--tag core-smoke` 8 例 + `--case gm-time-tools`，归档 `functional_tests/results/2026-09-11_flavor-copy-webtest/`）：三条具名用例全绿（gm-time-tools 需先清理平台虚拟玩家残留，见 -777），flavor 前置未打破任何闭关/结算断言。**但「预期不破」的前提只在被断言字面量上成立**：本轮导入删除了 `ultimate_cast`「施展大招」、`dodge`「身形一闪，躲过了」，加上上一轮 b1ff0c8 删除的「】作用于 / 受到的伤害降低 / 反弹 / 吸取 / 触发【」，pvp-effect*/pvp-ultimate*/pvp-weapon-trigger 的断言首分支已永久失配、只剩 `|战斗开始` 兜底（假绿，登记 -khh）；`battle_opening`/`battle_victory` 横幅在 b1ff0c8 已被文学句替换，pvp-basic-duel(526)/pvp-basic-spar(527) 真失败（登记 -r0a）；`remaining_hp` 恒定追加导致满血也被描述为濒死（登记 -hcn）；route B（突破双槽）零 webtest 覆盖（登记 -b5h）
 
 ## 8. 收尾
 
