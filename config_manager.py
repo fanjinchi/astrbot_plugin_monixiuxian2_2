@@ -520,8 +520,11 @@ class ConfigManager:
         """Validate narrative template variable contracts against declared scenes.
 
         For every scene declared in ``NARRATIVE_SCENE_VARS``, each configured
-        template (all three shapes, including bucketed pools and route-tagged
-        entries) may only reference variables the code render point declares.
+        template (all four shapes: single str, flat pool, bucketed pool —
+        including route-tagged entries — and the dual-slot shape whose string
+        ``panel`` value is validated as a ``[panel]#0`` entry while the key
+        itself is exempt from bucket-key warnings) may only reference
+        variables the code render point declares.
         A violating scene is replaced with the embedded default so the plugin
         keeps running; the error log names the scene key, location, and
         offending variables. Unknown bucket keys only warn — the content side
@@ -557,10 +560,34 @@ class ConfigManager:
 
         Returns True when the scene is usable. Violations are logged with the
         scene key, entry location, and offending variable names.
+
+        Dual-slot shape (dict with a string ``panel`` key, no ``text`` key):
+        the panel string is validated as a ``[panel]#0`` entry by the shared
+        entry loop, and the ``panel`` key is exempt from bucket-key warnings.
+        A non-string ``panel`` value, or a dict carrying both ``text`` and
+        ``panel``, is a malformed half-shape — warn and reject the whole
+        scene so it falls back to the embedded default.
         """
+        if isinstance(value, dict) and "panel" in value:
+            # 短路特判必须先于 _iter_scene_entries 遍历：非字符串 panel 会被
+            # 当 flavor 桶条目校验，掩盖"双槽形态非法"的真实诊断。
+            if not isinstance(value.get("panel"), str) or isinstance(
+                value.get("text"), str
+            ):
+                logger.warning(
+                    f"叙事配置[{source}] {section}.{scene} 双槽形态非法："
+                    "panel 键必须为字符串模板，且场景值不得同含 text 键；"
+                    "整场景回退内嵌默认。"
+                )
+                return False
         ok = True
         if isinstance(value, dict) and not isinstance(value.get("text"), str):
             for bucket in value:
+                # 双槽形态的 panel 键是机械面板模板，不是分桶键——豁免桶键
+                # 告警（其字符串值仍经 _iter_scene_entries 作为 [panel]#0 条目
+                # 接受变量子集校验）。
+                if bucket == "panel":
+                    continue
                 if bucket not in NARRATIVE_BUCKET_KEYS:
                     logger.warning(
                         f"叙事配置[{source}] {section}.{scene} 存在未知分桶键 "

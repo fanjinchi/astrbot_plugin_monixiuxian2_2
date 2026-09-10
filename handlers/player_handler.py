@@ -47,16 +47,32 @@ class PlayerHandler:
         )
         self.pill_manager = PillManager(self.db, self.config_manager)
 
-    def _render_narrative(self, scene: str, variables: dict | None = None) -> str:
+    def _render_narrative(
+        self,
+        scene: str,
+        variables: dict | None = None,
+        *,
+        route: str | None = None,
+        level_index: int | None = None,
+    ) -> str:
         """Render a cultivation-domain narrative template for this handler.
 
         Falls back to the embedded default copy when ``config_manager`` is
         absent — some tests build the handler via ``__new__`` with only the
         collaborators under test attached, and ``render_narrative`` treats any
         object without a ``narrative_config`` attribute as "use defaults".
+
+        Dual-slot scenes (retreat_start/retreat_settlement) need ``route`` and
+        ``level_index`` for the bucketed flavor pool and route tags to take
+        effect; callers with a player in scope should pass both.
         """
         return render_narrative(
-            getattr(self, "config_manager", None), "cultivation", scene, variables
+            getattr(self, "config_manager", None),
+            "cultivation",
+            scene,
+            variables,
+            route=route,
+            level_index=level_index,
         )
 
     async def handle_start_xiuxian(
@@ -314,7 +330,12 @@ class PlayerHandler:
         await self.db.ext.set_user_busy(player.user_id, UserStatus.CULTIVATING, 0)
 
         yield event.plain_result(
-            self._render_narrative("retreat_start", {"end_cmd": CMD_END_CULTIVATION})
+            self._render_narrative(
+                "retreat_start",
+                {"end_cmd": CMD_END_CULTIVATION},
+                route=player.cultivation_type,
+                level_index=player.level_index,
+            )
         )
 
     @player_required
@@ -482,6 +503,8 @@ class PlayerHandler:
                 "exceed_msg": exceed_msg,
                 "current_exp": player.experience,
             },
+            route=player.cultivation_type,
+            level_index=player.level_index,
         )
         if learn_msgs:
             reply_msg += "\n\n" + "\n".join(learn_msgs)

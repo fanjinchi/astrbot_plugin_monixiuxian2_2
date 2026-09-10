@@ -67,14 +67,17 @@ SCENES: dict[str, object] = {
         "若想重新修仙，请使用'我要修仙'命令重新开始"
     ),
     # Lose-streak pity hint appended to the survive panel. {next_bonus} keeps
-    # the original ``:.0%`` format spec from the f-string.
+    # the original ``:.0%`` format spec from the f-string. The separating
+    # newline lives in the survive panel (``{experience}\n{pity_msg}``), not
+    # in this template — CSV variants cannot carry a leading newline through
+    # the importer's strip (flavor-copy-assembly D6).
     "pity_hint": (
-        "\n连败 {streak} 次，天道酬勤："
+        "连败 {streak} 次，天道酬勤："
         "下次成功率 +{next_bonus:.0%}"
         "（再败 {remaining} 次必成）"
     ),
     # Failure without death (保命 branch). {pity_msg} carries the rendered
-    # ``pity_hint`` line.
+    # ``pity_hint`` line; the newline before it is owned by this template.
     "survive": (
         "❌ 突破失败 ❌\n"
         "━━━━━━━━━━━━━━━\n"
@@ -82,7 +85,7 @@ SCENES: dict[str, object] = {
         "━━━━━━━━━━━━━━━\n"
         "突破【{next_level_name}】失败，但幸运地保住了性命\n"
         "修为受损，损失了 {exp_penalty} 点修为\n"
-        "当前修为：{experience}"
+        "当前修为：{experience}\n"
         "{pity_msg}"
     ),
 }

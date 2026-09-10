@@ -1,26 +1,31 @@
 # Scene Key 登记表（tasks 1.4：scene key ↔ 载体位置 ↔ 插值变量白名单）
 
-> 用途：copy_variants.csv 写作/灌入前先对照本表；lint_narrative.py 按本表（运行时事实源）
-> 校验 text 列 `{var}` 白名单。四宗（金刚寺/天机阁/万毒门/血魔宗）事件复用同源 key，
-> config 立组随 bd `n6o`（当前未登记）。
+> 用途：copy_variants.csv 写作/灌入前先对照本表；lint_narrative.py 校验 text 列
+> `{var}` 白名单。白名单权威来源为代码声明契约 `NARRATIVE_SCENE_VARS`
+> （`data/narrative_defaults/`，按路径加载）——此前从 narrative_config.json 的
+> str 形态模板正则提取，场景转分桶/双槽 dict 后失效，且盲视 `{var:spec}` 格式符
+> （2026-09-10 flavor-copy-assembly 修复，本表按声明集全量重生成）。
+> 标注「双槽」的场景为 flavor 分桶 + panel 单源形态（flavor-copy-assembly 新增）。
+> 四宗（金刚寺/天机阁/万毒门/血魔宗）事件复用同源 key，config 立组随 bd `n6o`（当前未登记）。
 
-## narrative_config.json 场景（externalize-narrative-texts 已落地）
+## narrative_config.json 场景
 
-- `breakthrough.success` — 变量白名单: ['agility', 'agility_growth', 'armor_value', 'current_level_name', 'damage', 'damage_growth', 'hp', 'hp_growth', 'next_level_name', 'rate_info', 'speed', 'speed_growth', 'streak_bonus_msg']
+- `breakthrough.success`（双槽：flavor 分桶 + panel 单源） — 变量白名单: ['agility', 'agility_growth', 'armor_value', 'current_level_name', 'damage', 'damage_growth', 'hp', 'hp_growth', 'next_level_name', 'rate_info', 'speed', 'speed_growth', 'streak_bonus_msg']
 - `breakthrough.lose_streak_reward` — 变量白名单: （无）
 - `breakthrough.comprehend_success` — 变量白名单: ['name']
 - `breakthrough.comprehend_fail` — 变量白名单: ['name']
 - `breakthrough.comprehend_universal` — 变量白名单: ['name']
-- `breakthrough.revive` — 变量白名单: ['next_level_name', 'rate_info']
-- `breakthrough.death` — 变量白名单: ['next_level_name', 'rate_info']
-- `breakthrough.pity_hint` — 变量白名单: ['remaining', 'streak']
-- `breakthrough.survive` — 变量白名单: ['exp_penalty', 'experience', 'next_level_name', 'pity_msg', 'rate_info']
+- `breakthrough.revive`（双槽：flavor 分桶 + panel 单源） — 变量白名单: ['next_level_name', 'rate_info']
+- `breakthrough.death`（双槽：flavor 分桶 + panel 单源） — 变量白名单: ['next_level_name', 'rate_info']
+- `breakthrough.pity_hint` — 变量白名单: ['next_bonus', 'remaining', 'streak']
+- `breakthrough.survive`（双槽：flavor 分桶 + panel 单源） — 变量白名单: ['exp_penalty', 'experience', 'next_level_name', 'pity_msg', 'rate_info']
 - `combat.battle_opening` — 变量白名单: （无）
 - `combat.battle_vs` — 变量白名单: ['name1', 'name2']
 - `combat.battle_mutual_destruction` — 变量白名单: （无）
 - `combat.battle_victory` — 变量白名单: ['name']
 - `combat.battle_draw_stalemate` — 变量白名单: （无）
 - `combat.battle_draw` — 变量白名单: （无）
+- `combat.round_header` — 变量白名单: ['rounds']
 - `combat.stun_skip` — 变量白名单: ['name']
 - `combat.dodge` — 变量白名单: ['attacker_name', 'defender_name']
 - `combat.block` — 变量白名单: ['defender_name']
@@ -38,8 +43,14 @@
 - `combat.trigger_attack_boost` — 变量白名单: ['actor_name', 'skill_name']
 - `combat.trigger_stun` — 变量白名单: ['actor_name', 'skill_name', 'target_name']
 - `combat.trigger_damage_reduction` — 变量白名单: ['actor_name', 'skill_name']
-- `cultivation.retreat_start` — 变量白名单: ['end_cmd']
-- `cultivation.retreat_settlement` — 变量白名单: ['exceed_msg', 'fairyland_line', 'time_str']
+- `combat.effect_counter` — 变量白名单: ['actor_name', 'counter_dmg', 'skill_name', 'target_name']
+- `combat.effect_heal` — 变量白名单: ['actor_name', 'heal', 'skill_name']
+- `combat.effect_dot_attach` — 变量白名单: ['actor_name', 'skill_name', 'target_name']
+- `combat.effect_stack_cap_rejected` — 变量白名单: ['actor_name', 'effect_name', 'stack_cap']
+- `combat.effect_survive_grant` — 变量白名单: ['actor_name', 'skill_name']
+- `combat.effect_dot_tick` — 变量白名单: ['dot_dmg', 'effect_name', 'name']
+- `cultivation.retreat_start`（双槽：flavor 分桶 + panel 单源） — 变量白名单: ['end_cmd']
+- `cultivation.retreat_settlement`（双槽：flavor 分桶 + panel 单源） — 变量白名单: ['current_exp', 'exceed_msg', 'fairyland_line', 'gained_exp', 'time_str']
 - `cultivation.retreat_epiphany` — 变量白名单: ['skill_name']
 - `cultivation.impart_value_inactive_hint` — 变量白名单: （无）
 - `cultivation.creation_help_welcome` — 变量白名单: （无）
@@ -49,6 +60,7 @@
 - `fortune.weapon_drop` — 变量白名单: ['name', 'rank']
 - `fortune.heart_method_drop` — 变量白名单: ['name', 'rank']
 - `fortune.pill_drop` — 变量白名单: ['items']
+- `fortune.storage_full_drop` — 变量白名单: ['name']
 
 ## narrative_config.json 遗留簇（legacy_encounter，传承之地；externalize 落地时新增）
 

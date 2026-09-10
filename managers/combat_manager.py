@@ -200,6 +200,10 @@ class CombatEngine:
         """
         rng_state = random.getstate()
         try:
+            # 不传 route/level_index：当前全部 combat 文案变体都在通用桶且无
+            # 路线标注（copy_variants.csv 已核实），传参无行为差别；且战斗有
+            # 攻/守双方（可能不同路线），视角取舍需内容规则。未来 combat 文案
+            # 加路线标注时，需先给 FighterState 加 route 字段并定取值规则。
             return render_narrative(self.config_manager, "combat", scene, variables)
         finally:
             random.setstate(rng_state)

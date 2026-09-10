@@ -278,7 +278,13 @@ def _fortune_variables(result: dict) -> dict:
     return {"name": first.get("name", ""), "rank": data.get("rank", "")}
 
 
-def format_fortune_message(result: dict | None, config_manager=None) -> str:
+def format_fortune_message(
+    result: dict | None,
+    config_manager=None,
+    *,
+    route: str | None = None,
+    level_index: int | None = None,
+) -> str:
     """Format a fortune result for appending to the breakthrough success message.
 
     Args:
@@ -287,6 +293,8 @@ def format_fortune_message(result: dict | None, config_manager=None) -> str:
             re-rendered through ``render_narrative`` so configured copy pools
             take effect. When omitted (unit tests), the default copy already
             rendered into ``result["message"]`` by the roll is returned as-is.
+        route: Optional player route (灵修/体修) for route-tagged pool entries.
+        level_index: Optional player level for bucket selection.
 
     Returns:
         A Chinese message, or an empty string when there is no drop.
@@ -299,5 +307,10 @@ def format_fortune_message(result: dict | None, config_manager=None) -> str:
     if scene is None:
         return result.get("message", "")
     return render_narrative(
-        config_manager, "fortune", scene, _fortune_variables(result)
+        config_manager,
+        "fortune",
+        scene,
+        _fortune_variables(result),
+        route=route,
+        level_index=level_index,
     )

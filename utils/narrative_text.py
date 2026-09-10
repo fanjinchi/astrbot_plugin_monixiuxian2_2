@@ -116,7 +116,7 @@ def select_narrative_pool(
 ) -> list[str]:
     """Normalize a narrative scene value into a flat list of template strings.
 
-    Supports the three scene shapes from the narrative-text-config spec: a
+    Supports the three pool scene shapes from the narrative-text-config spec: a
     single template (str), a flat variant pool (list), and a realm-segment
     bucketed pool (dict keyed by ``NARRATIVE_BUCKET_KEYS``). Bucketed pools
     merge the player's current segment bucket with the 通用 bucket; unknown
@@ -124,6 +124,12 @@ def select_narrative_pool(
     ``{"text": ..., "route": "灵修"|"体修"}`` dicts — route-tagged entries
     only participate for players of that route, and callers that do not know
     the route (``route=None``) exclude tagged entries conservatively.
+
+    The fourth scene shape (dual-slot: bucketed flavor pool + single-source
+    ``panel`` template) is handled by :func:`render_narrative`, which strips
+    the ``panel`` key before delegating pool selection here — this function
+    deliberately stays dual-slot-agnostic so the adventure ``desc_variants``
+    reuse path is unaffected.
 
     This is the single shared implementation used both by narrative scenes and
     by adventure event ``desc_variants`` bucket selection.
@@ -151,6 +157,58 @@ def select_narrative_pool(
     return pool
 
 
+def _is_dual_slot(value: Any) -> bool:
+    """Return True when the scene value is the dual-slot shape.
+
+    Dual-slot = dict with a string ``panel`` key (single-source mechanical
+    panel) and no ``text`` key (which would make it a single route-tagged
+    pool entry). The remaining keys hold the bucketed flavor pool.
+    """
+    return (
+        isinstance(value, dict)
+        and isinstance(value.get("panel"), str)
+        and not isinstance(value.get("text"), str)
+    )
+
+
+def _render_dual_slot(
+    value: dict,
+    variables: dict | None,
+    *,
+    route: str | None,
+    level_index: int | None,
+    scene_label: str,
+) -> str:
+    """Render a dual-slot scene: one flavor intro from the bucketed pool, then the panel.
+
+    Pool selection reuses :func:`select_narrative_pool` with the ``panel`` key
+    stripped. An empty flavor pool (unconfigured or emptied by route
+    filtering) yields panel-only output — this path never falls back to the
+    embedded default pool, because the panel is the scene's authoritative
+    mechanical carrier and mixing in default flavor copy would duplicate it.
+    Render failures degrade without raising: a broken flavor entry is skipped
+    (panel only), a broken panel renders as the raw template.
+    """
+    flavor_source = {k: v for k, v in value.items() if k != "panel"}
+    flavor_pool = select_narrative_pool(
+        flavor_source, route=route, level_index=level_index
+    )
+    flavor = ""
+    if flavor_pool:
+        candidate = random.choice(flavor_pool)
+        try:
+            flavor = candidate.format_map(dict(variables or {}))
+        except (KeyError, IndexError, ValueError) as exc:
+            logger.error(f"叙事 flavor 渲染失败 {scene_label}: {exc}")
+    panel_template = value["panel"]
+    try:
+        panel = panel_template.format_map(dict(variables or {}))
+    except (KeyError, IndexError, ValueError) as exc:
+        logger.error(f"叙事面板渲染失败 {scene_label}: {exc}")
+        panel = panel_template
+    return f"{flavor}\n{panel}" if flavor else panel
+
+
 def render_narrative(
     config_manager: Any,
     section: str,
@@ -167,6 +225,14 @@ def render_narrative(
     ``narrative_config`` attribute (test fakes) silently use the embedded
     defaults. Never raises: a missing scene, empty pool, or broken template is
     logged and falls back; "" is returned only when no default exists either.
+
+    Scene values support four shapes: single template (str), flat variant pool
+    (list), bucketed pool (dict keyed by NARRATIVE_BUCKET_KEYS), and dual-slot
+    (dict with a string ``panel`` key). Dual-slot scenes compose one flavor
+    intro from the bucketed pool with the single-source panel template
+    (``flavor + "\\n" + panel``) — see :func:`_render_dual_slot`. Dual-slot
+    call sites should pass ``route``/``level_index`` so the bucketed flavor
+    pool and route tags actually take effect.
     """
     value = None
     cfg = getattr(config_manager, "narrative_config", None)
@@ -174,6 +240,17 @@ def render_narrative(
         section_cfg = cfg.get(section)
         if isinstance(section_cfg, dict):
             value = section_cfg.get(scene)
+
+    if _is_dual_slot(value):
+        # Dual-slot scenes short-circuit before the default-pool fallback: the
+        # panel is authoritative, and an empty flavor pool means panel-only.
+        return _render_dual_slot(
+            value,
+            variables,
+            route=route,
+            level_index=level_index,
+            scene_label=f"{section}.{scene}",
+        )
 
     default_value = DEFAULT_NARRATIVE_CONFIG.get(section, {}).get(scene)
     pool = select_narrative_pool(value, route=route, level_index=level_index)

@@ -14,9 +14,11 @@ Fragment contract: each domain module exposes
   variables each scene's render point provides, used by load-time contract
   validation (``ConfigManager._validate_narrative_config``).
 
-Scene values support three shapes (see ``utils/narrative_text.py``):
-a single template (str), a flat variant pool (list), and a realm-segment
-bucketed pool (dict keyed by 通用/练气/筑基/金丹/元婴). Pool entries may be
+Scene values support four shapes (see ``utils/narrative_text.py``):
+a single template (str), a flat variant pool (list), a realm-segment
+bucketed pool (dict keyed by 通用/练气/筑基/金丹/元婴), and the dual-slot
+shape (dict with a string ``panel`` key = single-source mechanical panel,
+remaining keys = bucketed flavor pool). Pool entries may be
 plain strings or ``{"text": ..., "route": "灵修"|"体修"}`` dicts.
 
 The ImportError fallback lets ``utils/narrative_text.py`` load this package by

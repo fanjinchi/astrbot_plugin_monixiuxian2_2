@@ -113,7 +113,9 @@ DOMAIN_MAX_LEN = {
     "adventure_event": 180,
 }
 
-_WHITELIST_VAR_RE = re.compile(r"\{([a-zA-Z_0-9]+)\}")
+# 脱槽/白名单共用：同时匹配 {var} 与 {var:spec}（如 {next_bonus:.0%}）。
+# 格式符部分必须是非捕获组——否则 findall 返回元组，白名单核对全崩。
+_WHITELIST_VAR_RE = re.compile(r"\{([a-zA-Z_0-9]+)(?::[^}]*)?\}")
 
 # canon 四列取值域（spec content-sync-pipeline）
 TONE_TIERS = ("正经", "正经+冷幽默", "玩梗灰", "平淡")
@@ -456,24 +458,28 @@ def _check_config_descriptions(strict: bool, max_len: int) -> list[str]:
 
 
 def _load_var_whitelist() -> dict[str, set[str]]:
-    """Build {domain.scene: set(var)} from runtime narrative templates.
+    """Build {domain.scene: set(var)} from the code-declared scene contracts.
 
-    scene key 登记表（tasks 1.4）的运行时事实源：narrative_config.json 各
-    场景模板的 ``{var}`` 插值 + adventure_config 事件 desc（静态文本，白名单
-    多为空）。事件域 scene 用事件 key；四宗组复用同源 key（config 立组随
-    bd n6o，未登记前 lint 按未知 scene WARN 提示）。
+    权威来源是 ``NARRATIVE_SCENE_VARS``（代码渲染点声明的变量集）——先前从
+    narrative_config.json 的 str 形态模板正则提取，场景转为分桶/双槽 dict 后
+    白名单整体失效（盲视缺陷）。按路径加载 narrative_defaults（与
+    sync_copy_variants_to_config.py 的 _default_scene_vars 同一套路），
+    stdlib 脚本不依赖插件包导入链。事件域不在声明集内，保留从
+    adventure_config 事件 desc 提取的分支（静态文本，白名单多为空）。
     """
+    import importlib.util
+
     whitelist: dict[str, set[str]] = {}
-    try:
-        narr = _load_json(CONFIG_DIR / "narrative_config.json")
-    except FileNotFoundError:
-        narr = {}
-    for domain, scenes in narr.items():
-        if not isinstance(scenes, dict):
-            continue
-        for scene, tpl in scenes.items():
-            if isinstance(tpl, str):
-                whitelist[f"{domain}.{scene}"] = set(_WHITELIST_VAR_RE.findall(tpl))
+    init_path = (
+        DESIGN_DIR.parent.parent / "data" / "narrative_defaults" / "__init__.py"
+    )
+    spec = importlib.util.spec_from_file_location("narrative_defaults_lint", init_path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    for domain, scenes in mod.NARRATIVE_SCENE_VARS.items():
+        for scene, declared in scenes.items():
+            whitelist[f"{domain}.{scene}"] = set(declared)
     try:
         adv = _load_json(CONFIG_DIR / "adventure_config.json")
     except FileNotFoundError:

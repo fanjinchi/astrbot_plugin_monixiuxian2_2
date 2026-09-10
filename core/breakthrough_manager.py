@@ -280,7 +280,11 @@ class BreakthroughManager:
             streak_bonus_msg = ""
             if prev_fail_streak >= 3:
                 streak_bonus_msg = render_narrative(
-                    self.config_manager, "breakthrough", "lose_streak_reward"
+                    self.config_manager,
+                    "breakthrough",
+                    "lose_streak_reward",
+                    route=player.cultivation_type,
+                    level_index=player.level_index,
                 )
 
             # 领悟判定（成功 20%）
@@ -298,6 +302,8 @@ class BreakthroughManager:
                             "breakthrough",
                             "comprehend_success",
                             {"name": learned.get("name", "未知")},
+                            route=player.cultivation_type,
+                            level_index=player.level_index,
                         )
                     )
                 fallback = await self.skill_manager.roll_universal_pool_breakthrough(
@@ -310,6 +316,8 @@ class BreakthroughManager:
                             "breakthrough",
                             "comprehend_universal",
                             {"name": fallback.get("name", "未知")},
+                            route=player.cultivation_type,
+                            level_index=player.level_index,
                         )
                     )
 
@@ -339,6 +347,10 @@ class BreakthroughManager:
                     "hp": player.hp,
                     "armor_value": player.armor_value,
                 },
+                # success 渲染发生在 level_index 已 +1 之后，段位桶按突破后
+                # 境界选取（design D3：新境界庆功文案口径）。
+                route=player.cultivation_type,
+                level_index=player.level_index,
             )
             if learn_msgs:
                 success_msg += "\n\n" + "\n".join(learn_msgs)
@@ -389,6 +401,8 @@ class BreakthroughManager:
                         "breakthrough",
                         "revive",
                         {"rate_info": rate_info, "next_level_name": next_level_name},
+                        route=player.cultivation_type,
+                        level_index=player.level_index,
                     )
 
                     logger.info(f"玩家 {player.user_id} 突破失败触发回生丹，成功复活")
@@ -404,6 +418,9 @@ class BreakthroughManager:
                     "breakthrough",
                     "death",
                     {"rate_info": rate_info, "next_level_name": next_level_name},
+                    # player 数据已级联删除，但对象仍在内存，仅取展示用字段
+                    route=player.cultivation_type,
+                    level_index=player.level_index,
                 )
 
                 logger.info(
@@ -442,6 +459,8 @@ class BreakthroughManager:
                         "next_bonus": next_bonus,
                         "remaining": remaining,
                     },
+                    route=player.cultivation_type,
+                    level_index=player.level_index,
                 )
 
                 # 领悟判定（失败 10% 软保底）
@@ -459,6 +478,8 @@ class BreakthroughManager:
                                 "breakthrough",
                                 "comprehend_fail",
                                 {"name": learned.get("name", "未知")},
+                                route=player.cultivation_type,
+                                level_index=player.level_index,
                             )
                         )
                     fallback = (
@@ -473,6 +494,8 @@ class BreakthroughManager:
                                 "breakthrough",
                                 "comprehend_universal",
                                 {"name": fallback.get("name", "未知")},
+                                route=player.cultivation_type,
+                                level_index=player.level_index,
                             )
                         )
 
@@ -487,6 +510,8 @@ class BreakthroughManager:
                         "experience": player.experience,
                         "pity_msg": pity_msg,
                     },
+                    route=player.cultivation_type,
+                    level_index=player.level_index,
                 )
                 if learn_msgs:
                     fail_msg += "\n\n" + "\n".join(learn_msgs)
@@ -547,6 +572,8 @@ class BreakthroughManager:
                     "fortune",
                     "storage_full_drop",
                     {"name": item_name},
+                    route=player.cultivation_type,
+                    level_index=player.level_index,
                 )
 
         elif result["type"] == "pill":
@@ -555,7 +582,12 @@ class BreakthroughManager:
                     player, item["name"], item["count"]
                 )
 
-        return format_fortune_message(result, config_manager=self.config_manager)
+        return format_fortune_message(
+            result,
+            config_manager=self.config_manager,
+            route=player.cultivation_type,
+            level_index=player.level_index,
+        )
 
     async def _handle_breakthrough_loan_repay(self, player: Player) -> str:
         """处理突破贷款自动还款

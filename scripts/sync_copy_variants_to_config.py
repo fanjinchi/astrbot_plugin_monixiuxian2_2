@@ -18,11 +18,15 @@ Deliberate exclusions (reported, not silently dropped):
 - ``state != 通用`` rows（州条，~186 行）：运行时没有州/世界状态选择轴，
   导入会让州专属文案混进通用池——待运行时出现 state 选择器后再入库。
 - config 中不存在的事件 key（sect_duel/sect_trial，随 bd n6o 五宗落地）。
-- **变量契约不满足的短句场景**：变体是纯 flavor 句、未携带默认模板的机械
-  变量（如 breakthrough.survive 的损失修为/连败保底）时，整体替换会让机械
-  信息从玩家消息里消失。此类场景跳过并逐条报告，待内容侧决定"flavor 句 +
-  机械行"的拼装方式后另行导入。事件域无此问题（desc 本身就是纯叙事槽位，
-  机械信息在结算消息的独立行）。
+- **双槽场景**（``DUAL_SLOT_SCENES``，breakthrough.success/survive/death/
+  revive、cultivation.retreat_start/retreat_settlement）：机械面板与 flavor
+  引子分离（change flavor-copy-assembly D1/D7）。导入时旧字符串值整体搬入
+  ``panel`` 键（survive 按 D6 补 ``\n{pity_msg}`` 换行；二次运行保留已迁移
+  panel），CSV 行作为 flavor 写入分桶池，校验为 ⊆ 该场景声明变量集
+  （``NARRATIVE_SCENE_VARS``）。
+- **变量契约不满足的其余短句场景**：变体未携带默认模板的全部机械变量时
+  整体替换会让机械信息从玩家消息里消失，跳过并逐条报告。事件域无此问题
+  （desc 本身就是纯叙事槽位，机械信息在结算消息的独立行）。
 
 level_band 映射：单段直达同名桶；``练气-筑基`` / ``金丹-元婴`` 双段各投两桶；
 ``通用`` 入通用桶。幂等：每次从 CSV 全量重建池（仅 ``narrative_status=定稿``
@@ -38,6 +42,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import subprocess
 import sys
 from collections import defaultdict
@@ -51,6 +56,20 @@ COPY_VARIANTS_CSV = DESIGN_DIR / "copy_variants.csv"
 
 # narrative_config.json 顶层域键与 copy_variants.domain 一一同名
 SHORT_TEXT_DOMAINS = ("breakthrough", "combat", "cultivation", "fortune")
+
+# 双槽场景（flavor 分桶池 + panel 单源面板），与 flavor-copy-assembly 设计的
+# A/B 拆分同源。清单刻意硬编码：新增双槽场景必须同步本清单，避免配置侧
+# 意外产生双槽形态。
+DUAL_SLOT_SCENES = frozenset(
+    {
+        ("breakthrough", "success"),
+        ("breakthrough", "survive"),
+        ("breakthrough", "death"),
+        ("breakthrough", "revive"),
+        ("cultivation", "retreat_settlement"),
+        ("cultivation", "retreat_start"),
+    }
+)
 
 # level_band → 运行时桶（utils/narrative_text.py NARRATIVE_BUCKET_KEYS）；
 # 复合段向两桶各投一份（选择时当前段桶与通用桶合并，不存在跨段泄漏）。
@@ -74,20 +93,23 @@ def _load_variants() -> list[dict]:
     return [r for r in rows if (r.get("narrative_status") or "").strip() == "定稿"]
 
 
-def _default_scene_vars() -> dict[tuple[str, str], set[str]]:
-    """Load embedded default templates' variable sets, keyed by (domain, scene).
-
-    Loaded by file path (same standalone trick as utils/narrative_text.py) so
-    the script does not depend on the plugin package import chain.
-    """
+def _load_narrative_defaults():
+    """Load ``data/narrative_defaults`` by file path (same standalone trick as
+    utils/narrative_text.py) so the script does not depend on the plugin
+    package import chain."""
     import importlib.util
-    import re
 
     init_path = PLUGIN_ROOT / "data" / "narrative_defaults" / "__init__.py"
     spec = importlib.util.spec_from_file_location("narrative_defaults_sync", init_path)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
+    return mod
+
+
+def _default_scene_vars() -> dict[tuple[str, str], set[str]]:
+    """Load embedded default templates' variable sets, keyed by (domain, scene)."""
+    mod = _load_narrative_defaults()
     result: dict[tuple[str, str], set[str]] = {}
     for domain, scenes in mod.DEFAULT_NARRATIVE_CONFIG.items():
         if not isinstance(scenes, dict):
@@ -98,10 +120,19 @@ def _default_scene_vars() -> dict[tuple[str, str], set[str]]:
     return result
 
 
+def _declared_scene_vars() -> dict[tuple[str, str], set[str]]:
+    """Load the render-point declared variable sets (``NARRATIVE_SCENE_VARS``),
+    keyed by (domain, scene). Authority for dual-slot flavor validation."""
+    mod = _load_narrative_defaults()
+    return {
+        (domain, scene): set(vars_)
+        for domain, scenes in mod.NARRATIVE_SCENE_VARS.items()
+        for scene, vars_ in scenes.items()
+    }
+
+
 def _template_vars(text: str) -> set[str]:
     """Extract ``{var}`` names from one template (mirror of the lint rule)."""
-    import re
-
     return set(re.findall(r"\{(\w+)", text))
 
 
@@ -131,14 +162,66 @@ def _build_pools(rows: list[dict]) -> dict:
     return pools
 
 
+def _migrate_dual_slot(
+    old_value, label: str, buckets: dict, declared: set[str] | None
+) -> dict | None:
+    """Build the dual-slot scene value from the current config value + CSV pools.
+
+    The old single-string value moves wholesale into ``panel`` (per design D7;
+    survive gets the D6 ``\\n{pity_msg}`` newline fix on migration). A second
+    run finds the dual-slot dict and keeps its ``panel`` verbatim (idempotent).
+    Flavor validation is ⊆ the declared variable set — flavor never carries
+    mechanical variables. Returns None (scene left untouched) when the current
+    value is malformed or any variant violates the contract.
+    """
+    if isinstance(old_value, str):
+        panel = old_value
+        if (
+            label == "breakthrough.survive"
+            and "{pity_msg}" in panel
+            and "\n{pity_msg}" not in panel
+        ):
+            # D6: newline duty moves from the pity_hint copy into the panel
+            panel = panel.replace("{pity_msg}", "\n{pity_msg}", 1)
+    elif (
+        isinstance(old_value, dict)
+        and isinstance(old_value.get("panel"), str)
+        and "text" not in old_value
+    ):
+        panel = old_value["panel"]
+    else:
+        print(f"  WARN {label} 现有值既不是字符串也不是双槽 dict，整场景跳过")
+        return None
+    if declared is not None:
+        bad = [
+            e
+            for entries in buckets.values()
+            for e in entries
+            if not _template_vars(e if isinstance(e, str) else e.get("text", ""))
+            <= declared
+        ]
+        if bad:
+            print(
+                f"  WARN {label} 有 {len(bad)} 条 flavor 变量越出声明集 "
+                f"{sorted(declared)}，整场景跳过"
+            )
+            return None
+    return {"panel": panel, **dict(sorted(buckets.items()))}
+
+
 def _apply_short_text(
-    ncfg: dict, pools: dict, default_vars: dict[tuple[str, str], set[str]]
+    ncfg: dict,
+    pools: dict,
+    default_vars: dict[tuple[str, str], set[str]],
+    declared_vars: dict[tuple[str, str], set[str]],
 ) -> tuple[int, list[str], list[str]]:
     """Write contract-safe short-text pools into narrative_config.
 
-    A scene is imported only when EVERY variant carries the default template's
-    full variable set (random.choice picks any entry, so partial coverage would
-    intermittently drop mechanical info like the breakthrough exp penalty).
+    Dual-slot scenes (``DUAL_SLOT_SCENES``) migrate to the panel + flavor-pool
+    shape via :func:`_migrate_dual_slot`. Other scenes import only when EVERY
+    variant carries the default template's full variable set (random.choice
+    picks any entry, so partial coverage would intermittently drop mechanical
+    info like the breakthrough exp penalty).
     Returns (scenes written, unknown scene keys, contract-skipped scenes).
     """
     written = 0
@@ -150,6 +233,19 @@ def _apply_short_text(
         section = ncfg.setdefault(domain, {})
         if scene not in section:
             unknown.append(f"{domain}.{scene}")
+            continue
+        if (domain, scene) in DUAL_SLOT_SCENES:
+            new_value = _migrate_dual_slot(
+                section[scene],
+                f"{domain}.{scene}",
+                buckets,
+                declared_vars.get((domain, scene)),
+            )
+            if new_value is None:
+                skipped.append(f"{domain}.{scene}")
+                continue
+            section[scene] = new_value
+            written += 1
             continue
         required = default_vars.get((domain, scene), set())
         ok = all(
@@ -224,7 +320,7 @@ def main() -> int:
     acfg = json.loads(acfg_path.read_text(encoding="utf-8"))
 
     n_written, n_unknown, n_skipped = _apply_short_text(
-        ncfg, pools, _default_scene_vars()
+        ncfg, pools, _default_scene_vars(), _declared_scene_vars()
     )
     e_written, e_unknown, _ = _apply_events(acfg, pools)
 
@@ -234,7 +330,7 @@ def main() -> int:
         print(f"  未知场景键（未写入）: {', '.join(n_unknown)}")
     if n_skipped:
         print(
-            f"  变量契约不满足（flavor 句缺机械变量，跳过待拼装设计）: "
+            f"  变量契约不满足（A 场景缺机械变量 / 双槽 flavor 越出声明集，跳过）: "
             f"{', '.join(n_skipped)}"
         )
     print(f"adventure_config.json: {e_written} 事件写入 desc_variants")
