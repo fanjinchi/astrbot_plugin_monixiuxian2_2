@@ -470,9 +470,7 @@ def _load_var_whitelist() -> dict[str, set[str]]:
     import importlib.util
 
     whitelist: dict[str, set[str]] = {}
-    init_path = (
-        DESIGN_DIR.parent.parent / "data" / "narrative_defaults" / "__init__.py"
-    )
+    init_path = DESIGN_DIR.parent.parent / "data" / "narrative_defaults" / "__init__.py"
     spec = importlib.util.spec_from_file_location("narrative_defaults_lint", init_path)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod

@@ -422,6 +422,8 @@ class PlayerHandler:
                     self._render_narrative(
                         "retreat_epiphany",
                         {"skill_name": learned.get("name", "未知")},
+                        route=player.cultivation_type,
+                        level_index=player.level_index,
                     )
                 )
 
