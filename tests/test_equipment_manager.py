@@ -68,9 +68,9 @@ def test_legacy_only_config_parses_to_zero(equipment_manager):
 
 
 def test_parse_armor_from_real_config(config_manager, equipment_manager):
-    """parse_item_from_name must build a valid Item from legacy items.json armor."""
+    """parse_item_from_name must build a valid Item from items.json armor."""
     item = equipment_manager.parse_item_from_name(
-        "玄铁甲", config_manager.items_data, config_manager.weapons_data
+        "铁叶甲", config_manager.items_data, config_manager.weapons_data
     )
     assert item is not None
     assert item.item_type == "armor"
@@ -88,13 +88,15 @@ def test_parse_legacy_weapon_from_items_json(config_manager, equipment_manager):
 
 
 def test_parse_legacy_armor_from_items_json(config_manager, equipment_manager):
-    """Legacy 法器/防具 entries in items.json must parse without TypeError."""
+    """items.json 法器/防具条目须正确解析，含 bonus_hp 入库的 hp 直读键。"""
     item = equipment_manager.parse_item_from_name(
-        "月华袍", config_manager.items_data, config_manager.weapons_data
+        "粗布法袍", config_manager.items_data, config_manager.weapons_data
     )
     assert item is not None
     assert item.item_type == "armor"
     assert item.armor_value > 0
+    # 法袍族的品级阶梯在 bonus_hp（入库为 hp 键，armor-content-design）
+    assert item.hp > 0
 
 
 def test_parse_heart_method_from_config(config_manager, equipment_manager):

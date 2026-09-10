@@ -456,8 +456,8 @@ def test_empty_import_aborts_without_writing(monkeypatch, tmp_path):
     config_dir = tmp_path / "config"
     design_dir.mkdir()
     config_dir.mkdir()
-    # heart/skills tables stay valid; weapons.csv carries only a legacy row.
-    for fname in ("heart_methods.csv", "skills.csv"):
+    # heart/skills/armors tables stay valid; weapons.csv carries only a legacy row.
+    for fname in ("heart_methods.csv", "skills.csv", "armors.csv"):
         shutil.copy(
             PLUGIN_ROOT / "design_docs" / "content-design" / fname, design_dir / fname
         )

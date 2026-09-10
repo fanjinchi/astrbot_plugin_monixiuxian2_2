@@ -1,7 +1,7 @@
 {
   "name": "pvp-effect-pierce",
   "description": "验证 pierce：破军诀「破军一击」穿透护甲。",
-  "scenario": "固定群聊双玩家，p2 装备泰坦之铠，p1 激活破军诀后决斗；引擎无穿透专用文本，结果依赖伤害数值与原始轨迹，声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。",
+  "scenario": "固定群聊双玩家，p2 装备铁叶甲，p1 激活破军诀后决斗；引擎无穿透专用文本，结果依赖伤害数值与原始轨迹，声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。（2026-09-10 armor-content-design：泰坦之铠随占位防具体系删除，改用门槛 0 的新标杆铁叶甲 armor 7——新建号只能装备凡品件）",
   "tags": [
     "pvp",
     "effect-matrix",
@@ -95,8 +95,8 @@
     {
       "type": "send",
       "player": "gm",
-      "text": "#修仙GM 给予装备 900000003 泰坦之铠 1",
-      "note": "p2 获得高护甲"
+      "text": "#修仙GM 给予装备 900000003 铁叶甲 1",
+      "note": "p2 获得护甲"
     },
     {
       "type": "expect",
@@ -107,7 +107,7 @@
     {
       "type": "send",
       "player": "p2",
-      "text": "#装备 泰坦之铠",
+      "text": "#装备 铁叶甲",
       "note": "p2 装备护甲"
     },
     {

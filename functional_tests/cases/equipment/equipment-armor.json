@@ -1,0 +1,115 @@
+{
+  "name": "equipment-armor",
+  "description": "验证新防具体系（armor-content-design 18 标杆件）：GM 给防具→装备→我的装备→卸下，两族各抽一件门槛 0 标杆。",
+  "scenario": "前置条件：群聊固定 GM 与玩家身份，GM_ADMINS 含 900000001，群已白名单。覆盖：防具装备/卸下/面板展示；铁叶甲（重甲凡品）与粗布法袍（法袍凡品）门槛均为 0，新建号可直接装备。",
+  "tags": [
+    "equipment",
+    "gm",
+    "core-smoke"
+  ],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pvp --yes",
+    "timeout": 60
+  },
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002",
+      "p2": "900000003"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 体修",
+      "note": "创建群聊测试玩家"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "玩家创建成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 给予装备 900000002 铁叶甲 1",
+      "note": "GM 给重甲"
+    },
+    {
+      "type": "expect",
+      "match": "已向",
+      "timeout": 30,
+      "note": "物品进入储物戒"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#装备 铁叶甲",
+      "note": "装备重甲"
+    },
+    {
+      "type": "expect",
+      "match": "已装备防具",
+      "timeout": 30,
+      "note": "重甲装备成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的装备",
+      "note": "查看装备面板"
+    },
+    {
+      "type": "expect",
+      "match": "铁叶甲",
+      "timeout": 30,
+      "note": "装备面板显示重甲"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#卸下 防具",
+      "note": "卸下重甲"
+    },
+    {
+      "type": "expect",
+      "match": "已卸下",
+      "timeout": 30,
+      "note": "重甲卸下成功"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 给予装备 900000002 粗布法袍 1",
+      "note": "GM 给法袍"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#装备 粗布法袍",
+      "note": "装备法袍"
+    },
+    {
+      "type": "expect",
+      "match": "已装备防具",
+      "timeout": 30,
+      "note": "法袍装备成功"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的装备",
+      "note": "查看装备面板"
+    },
+    {
+      "type": "expect",
+      "match": "粗布法袍",
+      "timeout": 30,
+      "note": "装备面板显示法袍"
+    }
+  ]
+}

@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """Sync content-design CSVs into runtime config JSONs (reconcile mode).
 
-Reads ``design_docs/content-design/weapons.csv``, ``heart_methods.csv`` and
-``skills.csv``, reconciles rows with status ``draft``/``final`` into
-``config/weapons.json``, ``config/heart_methods.json`` and
-``config/skills.json`` (keyed by item ``name``), and runs two gates before
-writing: the budget gate (``design_docs/content-design/validate_budget.py``)
-and the narrative lint gate (``design_docs/content-design/lint_narrative.py``,
-spec content-sync-pipeline — 初版仅 ``narrative_status=定稿`` 行 FAIL 阻塞).
+Reads ``design_docs/content-design/weapons.csv``, ``heart_methods.csv``,
+``skills.csv`` and ``armors.csv``, reconciles rows with status
+``draft``/``final`` into ``config/weapons.json``, ``config/heart_methods.json``,
+``config/skills.json`` and the 法器/防具 slice of ``config/items.json`` (keyed
+by item ``name``), and runs two gates before writing: the budget gate
+(``design_docs/content-design/validate_budget.py``) and the narrative lint
+gate (``design_docs/content-design/lint_narrative.py``, spec
+content-sync-pipeline — 初版仅 ``narrative_status=定稿`` 行 FAIL 阻塞).
+
+Armor notes: items.json is a mixed pool (丹药/材料/功法/法器), so reconcile
+deletion applies ONLY to entries with ``type=法器, subtype=防具`` — the armor
+CSV owns just that slice. ``bonus_hp`` imports as the new-framework direct key
+``hp`` (the engine aggregates ``item.hp``; the legacy ``equip_effects.max_hp``
+field is not mapped by the engine and is not used).
 
 Reconcile semantics: imported draft/final rows update same-name entries and
 append new names; config entries absent from the CSVs are deleted. Rows with
@@ -409,6 +416,92 @@ def _build_skill(row: dict, errors: list[str]) -> dict | None:
     return entry
 
 
+def _build_armor(row: dict, errors: list[str]) -> dict | None:
+    """Map an armors.csv row to a config/items.json armor entry (法器/防具)."""
+    name = (row.get("name") or "").strip()
+    ctx = f"armors.csv[{name or row.get('id', '?')}]"
+    if not name:
+        errors.append(f"{ctx}: name is required")
+        return None
+    entry = {
+        "name": name,
+        "type": "法器",
+        "subtype": "防具",
+        "rank": (row.get("rank") or "").strip(),
+        "required_level_index": _num(row.get("required_level_index", "")) or 0,
+        "description": (row.get("description") or "").strip(),
+        "price": _num(row.get("price", "")) or 0,
+        "shop_weight": _num(row.get("shop_weight", "")) or 0,
+        "armor_value": _num(row.get("armor_value", "")) or 0,
+        "route_multiplier": {
+            "灵修": _num(row.get("route_mult_ling", "")) or 1.0,
+            "体修": _num(row.get("route_mult_ti", "")) or 1.0,
+        },
+    }
+    # bonus_hp 入库为新框架直读键 hp（models.py 属性汇总读 item.hp）；
+    # 旧 equip_effects.max_hp 引擎并不映射（月华袍/泰坦之铠的 max_hp 实际无效），
+    # 故不沿用。0 值不写入（凡品重甲为纯甲件）。
+    bonus = _num(row.get("bonus_hp", ""))
+    if bonus:
+        entry["hp"] = bonus
+    return entry
+
+
+def _merge_armor(items_cfg: dict, payload: dict) -> tuple[str, list[str]]:
+    """Merge an armor payload into the items.json dict-of-dict by name.
+
+    Identity is the item name; an existing entry's numeric dict key is
+    preserved (keys are config-internal — player/storage references resolve
+    by name). New entries get a fresh key above the current numeric max.
+    """
+    for key, existing in items_cfg.items():
+        if isinstance(existing, dict) and existing.get("name") == payload["name"]:
+            diffs = []
+            for k, value in payload.items():
+                old = existing.get(k, "<absent>")
+                if old != value:
+                    diffs.append(
+                        f"    {k}: {json.dumps(old, ensure_ascii=False)} -> {json.dumps(value, ensure_ascii=False)}"
+                    )
+                existing[k] = value
+            # 清掉 payload 不再携带的键（如 bonus_hp=0 时不写 hp）
+            for k in list(existing.keys()):
+                if k not in payload and k not in ("id",):
+                    diffs.append(f"    {k}: removed (absent from design row)")
+                    del existing[k]
+            return ("UPDATE", diffs)
+    numeric_keys = [int(k) for k in items_cfg if str(k).isdigit()]
+    new_key = str(max(numeric_keys, default=3000) + 1)
+    items_cfg[new_key] = payload
+    return ("ADD", [f"    _key: {new_key}"])
+
+
+def _reconcile_armors(
+    items_cfg: dict,
+    imported_names: set[str],
+    protected_names: set[str] | None = None,
+) -> list[str]:
+    """Reconcile only the 法器/防具 slice of items.json; other types untouched.
+
+    items.json is a mixed pool (丹药/材料/功法/法器), so the whole-file
+    reconcile semantics of ``_reconcile_list`` cannot apply — the armor
+    design table only owns the armor slice.
+    """
+    keep = imported_names | (protected_names or set())
+    deleted = []
+    for key in list(items_cfg.keys()):
+        e = items_cfg[key]
+        if (
+            isinstance(e, dict)
+            and e.get("type") == "法器"
+            and e.get("subtype") == "防具"
+            and e.get("name") not in keep
+        ):
+            deleted.append(e["name"])
+            del items_cfg[key]
+    return deleted
+
+
 def _merge(entries: list[dict], payload: dict) -> tuple[str, list[str]]:
     """Merge payload into a config list by name. Returns (action, field diff lines)."""
     for existing in entries:
@@ -513,16 +606,19 @@ def main() -> int:
     weapon_rows, weapon_skipped = _load_rows("weapons.csv")
     heart_rows, heart_skipped = _load_rows("heart_methods.csv")
     skill_rows, skill_skipped = _load_rows("skills.csv")
+    armor_rows, armor_skipped = _load_rows("armors.csv")
 
     weapons = [w for r in weapon_rows if (w := _build_weapon(r, errors)) is not None]
     hearts = [h for r in heart_rows if (h := _build_heart(r, errors)) is not None]
     skills = [s for r in skill_rows if (s := _build_skill(r, errors)) is not None]
+    armors = [a for r in armor_rows if (a := _build_armor(r, errors)) is not None]
 
     # Names must be unique within each CSV (config is keyed by name).
     for label, items in (
         ("weapons", weapons),
         ("heart_methods", hearts),
         ("skills", skills),
+        ("armors", armors),
     ):
         seen: set[str] = set()
         for item in items:
@@ -545,6 +641,7 @@ def main() -> int:
             ("weapons", weapons),
             ("heart_methods", hearts),
             ("skills", skills),
+            ("armors", armors),
         ):
             if not items:
                 print(
@@ -557,10 +654,29 @@ def main() -> int:
     weapons_cfg_path = CONFIG_DIR / "weapons.json"
     hearts_cfg_path = CONFIG_DIR / "heart_methods.json"
     skills_cfg_path = CONFIG_DIR / "skills.json"
+    items_cfg_path = CONFIG_DIR / "items.json"
     weapons_cfg = json.loads(weapons_cfg_path.read_text(encoding="utf-8"))
     hearts_cfg = json.loads(hearts_cfg_path.read_text(encoding="utf-8"))
     skills_cfg = json.loads(skills_cfg_path.read_text(encoding="utf-8"))
+    items_cfg = json.loads(items_cfg_path.read_text(encoding="utf-8"))
     heart_list = hearts_cfg["心法列表"]
+
+    # Armor names must not collide with non-防具 items (runtime resolves by name
+    # across the whole items pool; a collision would shadow the other entry).
+    armor_names = {a["name"] for a in armors}
+    for key, existing in items_cfg.items():
+        if (
+            isinstance(existing, dict)
+            and existing.get("name") in armor_names
+            and not (
+                existing.get("type") == "法器" and existing.get("subtype") == "防具"
+            )
+        ):
+            print(
+                f"items.json[{key}]: name {existing['name']!r} collides with an "
+                "armors.csv row but is not 法器/防具; nothing was written."
+            )
+            return 1
 
     print(
         f"weapons.csv: {len(weapon_rows)} draft/final rows ({len(weapon_skipped)} legacy skipped)"
@@ -583,6 +699,13 @@ def main() -> int:
         action, diffs = _merge_skill(skills_cfg, s)
         print(f"  {action} {s['name']}")
         print("\n".join(diffs) if diffs else "    (no field changes)")
+    print(
+        f"armors.csv: {len(armor_rows)} draft/final rows ({len(armor_skipped)} legacy skipped)"
+    )
+    for a in armors:
+        action, diffs = _merge_armor(items_cfg, a)
+        print(f"  {action} {a['name']} [{a['rank']}]")
+        print("\n".join(diffs) if diffs else "    (no field changes)")
 
     # Reconcile: drop config entries absent from the CSVs entirely. legacy rows
     # are not imported but PROTECT their config counterparts from deletion
@@ -593,6 +716,7 @@ def main() -> int:
             ("weapons.json", weapon_skipped),
             ("heart_methods.json", heart_skipped),
             ("skills.json", skill_skipped),
+            ("items.json", armor_skipped),
         )
     }
     for label, entries, imported in (
@@ -609,6 +733,11 @@ def main() -> int:
     )
     for name in deleted:
         print(f"  DELETE {name} (skills.json, absent from CSV)")
+    deleted = _reconcile_armors(
+        items_cfg, {a["name"] for a in armors}, protected["items.json"]
+    )
+    for name in deleted:
+        print(f"  DELETE {name} (items.json 防具, absent from CSV)")
 
     # Budget gate: every draft/final design row must pass before any write.
     print("\nRunning budget gate (validate_budget.py)...")
@@ -645,13 +774,17 @@ def main() -> int:
         (weapons_cfg_path, weapons_cfg),
         (hearts_cfg_path, hearts_cfg),
         (skills_cfg_path, skills_cfg),
+        (items_cfg_path, items_cfg),
     ):
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(
             json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
         tmp.replace(path)
-    print(f"\nWrote {weapons_cfg_path}, {hearts_cfg_path} and {skills_cfg_path}.")
+    print(
+        f"\nWrote {weapons_cfg_path}, {hearts_cfg_path}, {skills_cfg_path} "
+        f"and {items_cfg_path}."
+    )
     return 0
 
 

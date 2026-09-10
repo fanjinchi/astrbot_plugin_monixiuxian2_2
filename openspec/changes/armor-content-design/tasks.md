@@ -27,7 +27,7 @@
 ## 5. 收口
 
 - [x] 5.1 更新 `design_docs/current-design-report.md` 防具节（占位 → 定稿框架，附供给曲线表与 M 序列推导；M 序列按验收结果定稿 v1 缓坡）
-- [ ] 5.2 **用户确认设计稿**（AGENTS.md §15：未经用户确认不导入 config）
-- [ ] 5.3 用户确认后经 `scripts/sync_content_to_config.py` 导入 config/items.json（导入前核对 bd bx8 宗门内容收编状态），复跑 `uv run python -m pytest tests/ -v` 与 ruff
-- [ ] 5.4 检查 `functional_tests/cases/` 是否有商店/装备域用例需补充或更新（AGENTS.md 功能测试套件规范）
-- [ ] 5.5 按 AGENTS.md §7 更新 `metadata.yaml` version 与 `README.md` 更新日志
+- [x] 5.2 **用户确认设计稿**（2026-09-10 用户确认，授权导入）
+- [x] 5.3 用户确认后经 `scripts/sync_content_to_config.py` 导入 config/items.json（导入前核对 bd bx8 宗门内容收编状态：已关闭，reconcile 有 legacy 保护；sync 管线新增 armors.csv → items.json 防具切片支持，bonus_hp 入库为直读键 `hp`，占位 3 件随 reconcile 删除），复跑 `uv run python -m pytest tests/ -v` 与 ruff
+- [x] 5.4 检查 `functional_tests/cases/` 是否有商店/装备域用例需补充或更新（pvp-effect-pierce 换装铁叶甲；新增 equipment-armor 用例；已 sync-cases）
+- [x] 5.5 按 AGENTS.md §7 更新 `metadata.yaml` version（v3.16.0）与 `README.md` 更新日志；无新指令，修仙帮助文本无需变更

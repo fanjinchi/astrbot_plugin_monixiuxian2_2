@@ -560,16 +560,6 @@
     },
     "shop_weight": 1000
   },
-  "3002": {
-    "name": "玄铁甲",
-    "type": "法器",
-    "subtype": "防具",
-    "rank": "凡品",
-    "description": "由玄铁编织的内甲，能提供基础的防护。",
-    "price": 800,
-    "shop_weight": 1000,
-    "armor_value": 1
-  },
   "3003": {
     "name": "烈阳刀",
     "type": "法器",
@@ -581,19 +571,6 @@
       "attack": 25
     },
     "shop_weight": 100
-  },
-  "3004": {
-    "name": "月华袍",
-    "type": "法器",
-    "subtype": "防具",
-    "rank": "珍品",
-    "description": "以月光精华织成，轻盈且防御力不俗。",
-    "price": 4000,
-    "equip_effects": {
-      "max_hp": 50
-    },
-    "shop_weight": 100,
-    "armor_value": 10
   },
   "3005": {
     "name": "弑神枪",
@@ -630,19 +607,6 @@
       "attack": 250
     },
     "shop_weight": 100
-  },
-  "3008": {
-    "name": "泰坦之铠",
-    "type": "法器",
-    "subtype": "防具",
-    "rank": "圣品",
-    "description": "以上古机关术打造的重甲，坚不可摧。",
-    "price": 750000,
-    "equip_effects": {
-      "max_hp": 200
-    },
-    "shop_weight": 100,
-    "armor_value": 25
   },
   "3009": {
     "name": "妖精之弓",
@@ -773,5 +737,292 @@
     "description": "强化肉身的防御功法秘籍。持有后可设为修习目标进行领悟。",
     "price": 2000,
     "shop_weight": 400
+  },
+  "4013": {
+    "name": "铁叶甲",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "凡品",
+    "required_level_index": 0,
+    "description": "铁叶缀成的护甲，入手沉实，散修防身常备",
+    "price": 159,
+    "shop_weight": 1000,
+    "armor_value": 7,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    }
+  },
+  "4014": {
+    "name": "灵岩甲",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "灵品",
+    "required_level_index": 11,
+    "description": "以灵岩薄片层层缀成，沉而不滞",
+    "price": 4800,
+    "shop_weight": 200,
+    "armor_value": 17,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 3
+  },
+  "4015": {
+    "name": "玄岳重铠",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "地品",
+    "required_level_index": 21,
+    "description": "玄岳石铁锻造的重铠，着之如负山而行",
+    "price": 14140,
+    "shop_weight": 80,
+    "armor_value": 27,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 9
+  },
+  "4016": {
+    "name": "镇岳神甲",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "天品",
+    "required_level_index": 31,
+    "description": "上古山神遗甲，镇岳之力凝于寸铁",
+    "price": 23280,
+    "shop_weight": 30,
+    "armor_value": 37,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 18
+  },
+  "4017": {
+    "name": "崩岳皇铠",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "皇品",
+    "required_level_index": 41,
+    "description": "皇室秘藏战铠，一震之间隐有崩岳之声",
+    "price": 67968,
+    "shop_weight": 10,
+    "armor_value": 47,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 27
+  },
+  "4018": {
+    "name": "镇狱帝铠",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "帝品",
+    "required_level_index": 51,
+    "description": "帝者征战之铠，自带镇压一方的沉雄之气",
+    "price": 180672,
+    "shop_weight": 3,
+    "armor_value": 57,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 33
+  },
+  "4019": {
+    "name": "太虚道甲",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "道品",
+    "required_level_index": 61,
+    "description": "太虚之气凝成的道甲，虚实相生，不着寸力",
+    "price": 417600,
+    "shop_weight": 1,
+    "armor_value": 67,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 39
+  },
+  "4020": {
+    "name": "不灭仙铠",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "仙品",
+    "required_level_index": 71,
+    "description": "仙家遗铠，历经万劫而寒光不蚀",
+    "price": 957440,
+    "shop_weight": 0.3,
+    "armor_value": 77,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 45
+  },
+  "4021": {
+    "name": "混元玄武甲",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "混元先天",
+    "required_level_index": 81,
+    "description": "混元初开时玄武遗蜕所化，负天而行，万劫不陷",
+    "price": 2447920,
+    "shop_weight": 0.1,
+    "armor_value": 87,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 51
+  },
+  "4022": {
+    "name": "粗布法袍",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "凡品",
+    "required_level_index": 0,
+    "description": "粗布缝制的法袍，散修入门的第一件护身家当",
+    "price": 159,
+    "shop_weight": 1000,
+    "armor_value": 3,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 8
+  },
+  "4023": {
+    "name": "流云袍",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "灵品",
+    "required_level_index": 11,
+    "description": "流云纹样的法袍，轻若无物，护体微光流转",
+    "price": 4800,
+    "shop_weight": 200,
+    "armor_value": 4,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 23
+  },
+  "4024": {
+    "name": "星纹法袍",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "地品",
+    "required_level_index": 21,
+    "description": "星纹缀夜的法袍，气血随星辉暗暗涌动",
+    "price": 14140,
+    "shop_weight": 80,
+    "armor_value": 5,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 41
+  },
+  "4025": {
+    "name": "九霄云袍",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "天品",
+    "required_level_index": 31,
+    "description": "九霄云气织就的法袍，罡风不侵",
+    "price": 23280,
+    "shop_weight": 30,
+    "armor_value": 7,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 63
+  },
+  "4026": {
+    "name": "织霞皇袍",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "皇品",
+    "required_level_index": 41,
+    "description": "以朝霞万缕织成，光华内蕴，邪风不近",
+    "price": 67968,
+    "shop_weight": 10,
+    "armor_value": 8,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 83
+  },
+  "4027": {
+    "name": "星河帝袍",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "帝品",
+    "required_level_index": 51,
+    "description": "星河垂野织就此袍，戴月披星，夜行千里",
+    "price": 180672,
+    "shop_weight": 3,
+    "armor_value": 9,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 101
+  },
+  "4028": {
+    "name": "上清道袍",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "道品",
+    "required_level_index": 61,
+    "description": "上清之气蕴养千年，淡泊中自生光华",
+    "price": 417600,
+    "shop_weight": 1,
+    "armor_value": 11,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 117
+  },
+  "4029": {
+    "name": "云锦仙袍",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "仙品",
+    "required_level_index": 71,
+    "description": "云锦天衣，仙家手笔，纤尘不染",
+    "price": 957440,
+    "shop_weight": 0.3,
+    "armor_value": 12,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 136
+  },
+  "4030": {
+    "name": "混元两仪袍",
+    "type": "法器",
+    "subtype": "防具",
+    "rank": "混元先天",
+    "required_level_index": 81,
+    "description": "两仪未分时的先天之气所凝，阴阳互护",
+    "price": 2447920,
+    "shop_weight": 0.1,
+    "armor_value": 13,
+    "route_multiplier": {
+      "灵修": 1.0,
+      "体修": 1.0
+    },
+    "hp": 154
   }
 }

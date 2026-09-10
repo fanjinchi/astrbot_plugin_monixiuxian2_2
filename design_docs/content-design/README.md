@@ -91,7 +91,7 @@
 
 - `armor_family`：**设计列**（不入库），重甲 / 法袍两族；入库后统一 `type=法器, subtype=防具`（对齐 items.json 现状）
 - `armor_value`：同名；防具护甲只参与百分比减伤、**不计格挡**（格挡来源分离，`separate-block-armor-source`）
-- `bonus_hp`：入库后对应 `equip_effects.max_hp`（对齐 items.json 月华袍/泰坦之铠现有字段）
+- `bonus_hp`：入库后对应新框架直读键 `hp`（models.py 属性汇总读 `item.hp`；旧 `equip_effects.max_hp` 引擎并不映射，月华袍/泰坦之铠的 max_hp 实为无效遗留字段，两件已随本体系删除）
 - 属性池纪律：防具**只有** armor_value / bonus_hp 两个数值列，永不挂身法/迅捷/伤害词条（armor-content-design spec「防具属性池纪律」）
 - 品级与门槛等级沿用武器同一套（凡0/灵11/…/混元81）；数值由供给曲线 + 对称 EHP 推导，见 `armors.md`
 - `status` / 叙事四列约定同 weapons.csv

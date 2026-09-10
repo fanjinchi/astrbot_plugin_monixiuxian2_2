@@ -317,6 +317,18 @@ astrbot_plugin_monixiuxian2_2/
 
 ---
 
+### v3.16.0 - 防具供给体系：重甲/法袍 18 标杆件
+
+**🎯 核心改动**
+
+- **防具内容体系上线**（openspec: armor-content-design）：重甲/法袍两族 × 9 品级（凡品 L1 ~ 混元先天 L81）共 18 件标杆防具进入商店与装备池，全部通用件（双路线 route_mult 1.0），品级门槛与武器同一套
+- **数值框架**：重甲门槛级总减伤 20%（护甲阶梯 7→87），法袍 14%（护甲 3→13、品级阶梯由气血加成承担 +8→+154）；同品级两族等效生命（EHP）倍率严格相等（对称 EHP 反解 bonus_hp，M 序列 1.25 起 +0.0125/品、皇品起封顶 1.30），族间差异仅为"护甲硬抗 vs 护体气血"的风味选择
+- 占位防具玄铁甲/月华袍/泰坦之铠删除（由新标杆体系重做）；`equip_effects.max_hp` 旧字段不再使用，气血加成走新框架直读键 `hp`
+- 内容管线：`design_docs/content-design/armors.csv` 为唯一设计源，`sync_content_to_config.py` 新增 items.json 防具切片 reconcile（其余物品类型不受影响），`validate_budget.py` 新增防具带/对称 EHP/属性池机器校验
+- 模拟器修复：`sim_route_matchup.py` 补上 `level_index`（减伤 K 随等级），带装验收（镜像 TTK + 满级跨路线胜率 50%±2）全绿留档 route-matchup-report.md
+
+---
+
 ### v3.15.0 - 格挡率来源分离（防具护甲退出格挡判定）
 
 **🎯 核心改动**
