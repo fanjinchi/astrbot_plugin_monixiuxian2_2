@@ -10,27 +10,27 @@
 ## 2. remaining_hp 阈值分档（bd -hcn 机制侧）
 
 - [ ] 2.1 `_resolve_attack` 分档判定（D4）：`ratio = hp / max(1, max_hp)`；`hp<=0` 或 `ratio>mid` 不输出；`(low,mid]` → `remaining_hp_mid`；`(0,low]` → `remaining_hp_low`；变量 `remaining_hp` 以 `f"{hp:,}"` 千分位传入
-- [ ] 2.2 阈值配置：`self._combat_cfg` 读 `remaining_hp_mid_threshold`（默认 0.6）/`remaining_hp_low_threshold`（默认 0.3），缺省走代码默认；`config/game_config.json` 战斗段补两键（工程性字段）
-- [ ] 2.3 `data/narrative_defaults/combat.py`：新增 `remaining_hp_mid`/`remaining_hp_low` 各一条中性最小默认句 + SCENE_VARS 登记 `{"defender_name","remaining_hp"}`；删除旧 `remaining_hp` 场景与其 SCENE_VARS 条目（D5）
-- [ ] 2.4 `scene_key_registry.md` 重生成（新场景登记、旧场景移除）
+- [ ] 2.2 阈值配置：`self._combat_cfg` 读 `remaining_hp_mid_threshold`（默认 0.6）/`remaining_hp_low_threshold`（默认 0.3），缺省走代码默认；读取处加合法域防御（clamp 到 (0,1) 且保证 low<mid，非法值回退默认并在注释写明合法域）；`config/game_config.json` 战斗段补两键（工程性字段）
+- [ ] 2.3 `data/narrative_defaults/combat.py`：新增 `remaining_hp_mid`/`remaining_hp_low` 各一条中性最小默认句 + SCENE_VARS 登记 `{"defender_name","remaining_hp"}`（**默认句必须带齐两个变量**——导入器契约要求 CSV 变体 ⊇ 默认模板变量集，默认句缺变量会连锁跳过 CSV 行）；删除旧 `remaining_hp` 场景与其 SCENE_VARS 条目（D5）
+- [ ] 2.4 `scene_key_registry.md` 同步更新（新场景登记、旧场景移除；该表为手工同步的登记表，无生成器）
 - [ ] 2.5 单测：分档四格边界（ratio 恰等 mid / 恰等 low / hp=0 / 高血量）、千分位断言、代码不再引用旧场景键（grep 钉）
 
 ## 3. 内容成稿与用户确认（design_docs 流程）
 
-- [ ] 3.1 `copy_variants.csv`：4 条 remaining_hp 变体改写（千分位变量织入成句、收紧濒死语义、不得描述死者）并改 scene 为 `remaining_hp_low`；`remaining_hp_mid` 残局档新稿（D6 规范：残局档不得出现濒死语义）
+- [ ] 3.1 `copy_variants.csv`：4 条 remaining_hp 变体改写（千分位变量织入成句、收紧濒死语义、不得描述死者）并改 scene 为 `remaining_hp_low`；`remaining_hp_mid` 残局档新稿（D6 规范：残局档不得出现濒死语义）；两档每条变体均带齐 `{defender_name}`/`{remaining_hp}`（与 2.3 默认句变量集对齐）
 - [ ] 3.2 框架场景 5 条内嵌默认句与 remaining_hp 两档默认句的内容终审（world-bible 正档）
 - [ ] 3.3 `lint_narrative.py` 0 FAIL；**等用户确认文案**后进入组 4
 
 ## 4. 导入与配置退役
 
-- [ ] 4.1 导入器改动（评审 C1）：`sync_copy_variants_to_config.py::_apply_short_text` 放行"config 缺失但已在 `NARRATIVE_SCENE_VARS` 声明且有内嵌默认"的新场景键（直接创建分桶池）；unknown 仅保留给完全未声明的键；脚本 docstring 同步
+- [ ] 4.1 导入器改动（评审 C1）：`sync_copy_variants_to_config.py::_apply_short_text` 放行"config 缺失但已在 `NARRATIVE_SCENE_VARS` 声明且有内嵌默认"的新场景键（直接创建分桶池）；unknown 仅保留给完全未声明的键；**新键放行后仍走同一变量契约检查（⊇ 默认模板变量集），不通过照旧归 skipped**；脚本 docstring 同步
 - [ ] 4.2 跑 `sync_copy_variants_to_config.py` 导入两档场景（dry-run 确认 `remaining_hp_mid/low` 落库、0 跳过）；显式移除 `config/narrative_config.json` 的旧 `remaining_hp` 键（一次性内容退役，commit 说明）
 - [ ] 4.3 ConfigManager 加载零告警；`uv run python -m pytest tests/ -v` 全绿
 
 ## 5. 功能测试同步
 
-- [ ] 5.1 pvp-basic-duel/spar 断言改回锚代码横幅（`☆━━━━ 战斗开始` / `☆━━━━ .* 胜利`），撤销 flavor-copy-assembly 7.5 的绕行锚；检查其余 pvp 用例无残留依赖
-- [ ] 5.2 濒死档覆盖：调整/新增一例使战斗必到低血（利用 pvp fixture 血量与武器伤害配置），断言 `remaining_hp_low` 池句出现且含千分位
+- [ ] 5.1 pvp-basic-duel/spar 断言改回锚代码横幅（`☆━━━━ 战斗开始` / `☆━━━━ .* 胜利`），替换当前为 -r0a 回滚兼容补的文学变体交替支（`收剑归鞘|抱拳一礼|…`，见用例 note）；检查其余 pvp 用例无残留依赖
+- [ ] 5.2 濒死档覆盖：调整/新增一例使战斗必到低血（利用 pvp fixture 血量与武器伤害配置）。断言锚**代码不变量**：防守方名 + 千分位数字（如 `re:测试玩家\d[^\n]{0,40}\d{1,3},\d{3}`），池句文本不进断言（防 -r0a/-xdl 同类文案锚静默翻红）
 - [ ] 5.3 webtest 回归由用户手动发起后归档结果
 
 ## 6. 收尾
