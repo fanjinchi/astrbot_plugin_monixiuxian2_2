@@ -1,0 +1,104 @@
+{
+  "name": "breakthrough-fail-pity",
+  "description": "验证 route B 双槽拼装（闭关/出关/突破失败面板）与连败保底提示文案：闭关面板、24h 内出关结算面板、0% 必败面板、pity_hint 与连败加成行。",
+  "scenario": "前置：pre_run_hook 跑 fixture --profile breakthrough，把 900000002 预置为练气九阶、修为 999,999、level_up_rate=-100（永久加成把最终成功率压到 0.0%，第一次「突破」必然失败且与随机数无关）、连败 0。流程：闭关 → 时间快进 12h → 出关（悟道窗口 1~24h 内，随机采样） → 突破（必败，走 survive 面板） → 再突破（连败 1 次，触发 5% 连败加成）。断言口径：route B 的结构契约用「面板首行前存在一行文案」（[^\n]\n🧘 …）验证，不锚任何文学句；数值行锚代码拼装的 rate_info 与面板模板。声明 deterministic: true + seed（走火入魔概率 0.5%~3%，需固定随机流才不会偶发翻进 death 面板）。收尾状态由 pre_run_hook 的 fixture 复位（用例内不重复发 GM 清除CD：非忙碌态下它会正常报「不在任何忙碌状态」，无断言价值）。已知抖动：失败后死亡率 uniform(0.005,0.03) 与境界无关，2 次必败约 3.5% 会翻进死亡面板使本用例红一次（评审 P2-7）——偶发红先查此项，勿改成 `突破失败|走火入魔` 并集来「绿」。cultivation.retreat_epiphany 是轮盘而非窗口保证，本用例只作为其抽样载体",
+  "tags": [
+    "player",
+    "cultivation",
+    "narrative",
+    "narrative-flavor"
+  ],
+  "deterministic": true,
+  "seed": 42,
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_flavor_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002"
+    }
+  },
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile breakthrough --yes",
+    "timeout": 90
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#闭关",
+      "note": "进入闭关（retreat_start 双槽）"
+    },
+    {
+      "type": "expect",
+      "match": "re:[^\\n]\\n🧘 道友已进入闭关状态",
+      "timeout": 60,
+      "note": "route B 结构契约：flavor 段在前、面板段在后（面板首行前必有一行文案），不锚文学句"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 时间快进 43200 确认",
+      "note": "前移闭关开始时间 12h（GM 为 900000001 发送；破坏性子命令必须带「确认」尾参），落入悟道窗口 [1h, 24h)"
+    },
+    {
+      "type": "expect",
+      "match": "re:✅ 时间已快进 43200 秒（共前移 \\d+ 条记录）：[\\s\\S]*闭关开始时间：[1-9]\\d* 条",
+      "combine": true,
+      "timeout": 60,
+      "note": "快进确实前移了闭关开始时间；计数是全球值，不断言等于 1（bd -777）"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#出关",
+      "note": "出关结算（retreat_settlement 双槽 + 12h 悟道判定）"
+    },
+    {
+      "type": "expect",
+      "match": "re:[^\\n]\\n🌟 道友出关成功！[\\s\\S]*⏱️ 闭关时长：[^\\n]+[\\s\\S]*(🏯 宗门洞天|📈 获得修为：[+\\d,]+)[\\s\\S]*💫 当前修为：[\\d,]+",
+      "combine": true,
+      "timeout": 60,
+      "note": "出关面板：双槽结构 + 闭关时长/获得修为/当前修为数值行插值成功；{fairyland_line} 空值不留字面量由末步占位符守护"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#突破",
+      "note": "第一次突破：level_up_rate=-100 → 最终成功率 0.0%，必然失败（与随机数无关）"
+    },
+    {
+      "type": "expect",
+      "match": "re:[^\\n]\\n❌ 突破失败 ❌[\\s\\S]*永久加成：-100\\.0%[\\s\\S]*最终成功率：0\\.0%[\\s\\S]*损失了 [\\d,]+ 点修为[\\s\\S]*当前修为：[\\d,]+[\\s\\S]*再败 \\d+ 回",
+      "combine": true,
+      "timeout": 60,
+      "note": "失败面板全链路：双槽结构 → rate_info 代码拼装行（永久加成/最终成功率）→ exp_penalty 数值行 → pity_hint 池两变体共有的「再败 N 回」（{remaining} 插值）。走火入魔概率 0.5%~3%，由 deterministic seed 固定随机流"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#突破",
+      "note": "第二次突破：连败 1 次 → +5%（成功/失败面板都输出该行，不断言结果）"
+    },
+    {
+      "type": "expect",
+      "match": "re:连败加成：\\+5\\.0%（连败1次）",
+      "combine": true,
+      "timeout": 60,
+      "note": "rate_info 连败加成行（skill_system.breakthrough_pity_step=0.05）"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的信息",
+      "note": "哨兵发送：给末步负向断言制造一条新回复"
+    },
+    {
+      "type": "expect_not",
+      "match": "re:(?m)^-{3,}\\s*$|\\{[a-z_]+(:[^}]*)?\\}",
+      "combine": true,
+      "timeout": 60,
+      "note": "回归守护：整轮回复不得残留未渲染占位符（{var} / {var:.1f}），也不得出现独占一行的「---」——后者是 copy_variants.csv 把剧情稿条目分隔线吞进 text 单元格造成的线上缺陷（narrative_config 5 条 + adventure desc_variants 15 条），命中即 bd astrbot_plugin_monixiuxian2_2-74n 未修"
+    }
+  ]
+}

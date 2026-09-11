@@ -1,12 +1,13 @@
 {
   "name": "pvp-effect-heal",
   "description": "验证 heal：回春诀「回春吐纳」恢复气血。",
-  "scenario": "固定群聊双玩家，p1 激活回春诀后决斗 p2；断言「恢复 N 气血！」，声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。",
+  "scenario": "固定群聊双玩家，p1 激活回春诀后决斗 p2；断言「恢复 N 气血！」，声明 deterministic: true + seed（确定性优先）；本用例走单场必中口径，不依赖 --repeat 采样。断言锚在代码插值值（【技能名】/对战面板/回合行）而非文案字面量，并统一追加占位符残留负向断言（flavor-copy-assembly route A 回归）。pre_run_hook 跑 fixture --profile pvp 复位双方属性/冷却/功法位。",
   "tags": [
     "pvp",
     "effect-matrix",
     "content-design",
-    "sampled"
+    "sampled",
+    "narrative-flavor"
   ],
   "deterministic": true,
   "seed": 42,
@@ -28,7 +29,7 @@
     },
     {
       "type": "expect",
-      "match": "re:恭喜道友|已踏入仙途",
+      "match": "re:恭喜道友|已踏入仙途，无需重复此举",
       "timeout": 60,
       "note": "p1 可用"
     },
@@ -40,7 +41,7 @@
     },
     {
       "type": "expect",
-      "match": "re:恭喜道友|已踏入仙途",
+      "match": "re:恭喜道友|已踏入仙途，无需重复此举",
       "timeout": 60,
       "note": "p2 可用"
     },
@@ -52,9 +53,9 @@
     },
     {
       "type": "expect",
-      "match": "re:攻击设置为|已踏入",
+      "match": "re:已将【[^】]*】的攻击设置为 200",
       "timeout": 60,
-      "note": "攻击方攻击设置成功"
+      "note": "GM 回执锚全串（攻击 200，去掉旧 `|已踏入` 假绿分支）"
     },
     {
       "type": "send",
@@ -64,33 +65,33 @@
     },
     {
       "type": "expect",
-      "match": "re:攻击设置为|已踏入",
+      "match": "re:已将【[^】]*】的攻击设置为 50",
       "timeout": 60,
-      "note": "防守方攻击设置成功"
+      "note": "GM 回执锚全串（攻击 50，去掉旧 `|已踏入` 假绿分支）"
     },
     {
       "type": "send",
       "player": "gm",
-      "text": "#修仙GM 设置气血 900000002 2000",
-      "note": "设置攻击方气血"
+      "text": "#修仙GM 设置气血 900000002 8000",
+      "note": "气血拉到 8000 以拉长战斗（实测本场 72 回合，全库战报中位 72、上限 100）；漏触发概率见下方断言 note 与 README「概率效果口径」"
     },
     {
       "type": "expect",
-      "match": "re:气血设置为|已踏入",
+      "match": "re:已将【[^】]*】的气血设置为 8,000",
       "timeout": 60,
-      "note": "攻击方气血设置成功"
+      "note": "GM 回执锚全串（气血 8,000，去掉旧 `|已踏入` 假绿分支）"
     },
     {
       "type": "send",
       "player": "gm",
-      "text": "#修仙GM 设置气血 900000003 5000",
-      "note": "设置防守方气血"
+      "text": "#修仙GM 设置气血 900000003 8000",
+      "note": "气血拉到 8000 以拉长战斗（实测本场 72 回合，全库战报中位 72、上限 100）；漏触发概率见下方断言 note 与 README「概率效果口径」"
     },
     {
       "type": "expect",
-      "match": "re:气血设置为|已踏入",
+      "match": "re:已将【[^】]*】的气血设置为 8,000",
       "timeout": 60,
-      "note": "防守方气血设置成功"
+      "note": "GM 回执锚全串（气血 8,000，去掉旧 `|已踏入` 假绿分支）"
     },
     {
       "type": "send",
@@ -100,9 +101,9 @@
     },
     {
       "type": "expect",
-      "match": "已激活",
+      "match": "re:已激活功法【回春诀】",
       "timeout": 60,
-      "note": "回春诀 激活成功"
+      "note": "激活回执锚全串（handlers/technique_handler.py:190），fixture 每轮重置 techniques 栏位，避免上轮激活残留"
     },
     {
       "type": "send",
@@ -112,9 +113,27 @@
     },
     {
       "type": "expect",
-      "match": "re:恢复 |战斗开始",
+      "match": "re:测试玩家1[^\\n]*【回春吐纳】",
+      "combine": true,
       "timeout": 60,
-      "note": "heal 触发文本（15% 概率，需 repeat）"
+      "note": "战报中出现「测试玩家1 …【回春吐纳】」行（触发率 15%；实测本场 72 回合；按 60 次出手保守估算 P(整场不触发)≈6e-5 ⇒ 单场必中。若日后把气血调低使战斗短于 ~45 回合，此断言需改回 --repeat 抽样）。锚点用代码插值的技能名，不锚文案——文案改写不影响本断言"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的信息",
+      "note": "哨兵发送：给负向断言制造一条新回复"
+    },
+    {
+      "type": "expect_not",
+      "match": "re:(?m)^-{3,}\\s*$|\\{[a-z_]+(:[^}]*)?\\}",
+      "combine": true,
+      "timeout": 60,
+      "note": "回归守护：整轮回复不得残留未渲染占位符（{var} / {var:.1f}），也不得出现独占一行的「---」——后者是 copy_variants.csv 把剧情稿条目分隔线吞进 text 单元格造成的线上缺陷（narrative_config 5 条 + adventure desc_variants 15 条），命中即 bd astrbot_plugin_monixiuxian2_2-74n 未修"
     }
-  ]
+  ],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pvp --yes",
+    "timeout": 90
+  }
 }

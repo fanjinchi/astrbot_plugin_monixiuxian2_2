@@ -1,12 +1,13 @@
 {
   "name": "pvp-weapon-trigger",
   "description": "验证武器触发技在真实战斗中触发：青云天剑「裂空斩」、混元至宝鼎「震魂槌」、弑龙帝枪「蓄锐式」。概率触发，需配合 --repeat 聚合。",
-  "scenario": "前置条件：固定群聊身份、GM_ADMINS/白名单已配、fixture 已准备或步骤内创建。覆盖：武器触发技、等级门槛、决斗。三个角色分别作为攻击方一次，规避 5 分钟决斗冷却。",
+  "scenario": "前置条件：固定群聊身份、GM_ADMINS/白名单已配、fixture 已准备或步骤内创建。覆盖：武器触发技、等级门槛、决斗。三个角色分别作为攻击方一次，规避 5 分钟决斗冷却。断言锚在代码插值值（【技能名】/对战面板/回合行）而非文案字面量，并统一追加占位符残留负向断言（flavor-copy-assembly route A 回归）。pre_run_hook 跑 fixture --profile pvp 复位双方属性/冷却/功法位。",
   "tags": [
     "pvp",
     "weapon-trigger",
     "content-design",
-    "sampled"
+    "sampled",
+    "narrative-flavor"
   ],
   "deterministic": true,
   "seed": 42,
@@ -28,7 +29,7 @@
     },
     {
       "type": "expect",
-      "match": "re:恭喜道友|已踏入仙途",
+      "match": "re:恭喜道友 测试玩家1 踏上仙途|已踏入仙途，无需重复此举",
       "timeout": 60,
       "note": "p1 可用"
     },
@@ -40,7 +41,7 @@
     },
     {
       "type": "expect",
-      "match": "re:恭喜道友|已踏入仙途",
+      "match": "re:恭喜道友 测试玩家2 踏上仙途|已踏入仙途，无需重复此举",
       "timeout": 60,
       "note": "p2 可用"
     },
@@ -52,7 +53,7 @@
     },
     {
       "type": "expect",
-      "match": "re:恭喜道友|已踏入仙途",
+      "match": "re:恭喜道友 测试GM 踏上仙途|已踏入仙途，无需重复此举",
       "timeout": 60,
       "note": "gm 可用"
     },
@@ -118,16 +119,42 @@
     },
     {
       "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置气血 900000002 999999999",
+      "note": "气血拉到 9.9 亿：三方境界差（31/81/51）导致伤害悬殊，8000 血一两回合就结束，8%~15% 的武器触发技采不到；拉满后由 combat.action_limit=200 封顶，回合数足够"
+    },
+    {
+      "type": "expect",
+      "match": "re:已将【测试玩家1】的气血设置为 999,999,999",
+      "combine": true,
+      "timeout": 60,
+      "note": "P2-2：按玩家名锚定（combine 窗口不清空，同串会被提前满足）"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置气血 900000003 999999999",
+      "note": "气血拉到 9.9 亿：三方境界差（31/81/51）导致伤害悬殊，8000 血一两回合就结束，8%~15% 的武器触发技采不到；拉满后由 combat.action_limit=200 封顶，回合数足够"
+    },
+    {
+      "type": "expect",
+      "match": "re:已将【测试玩家2】的气血设置为 999,999,999",
+      "combine": true,
+      "timeout": 60,
+      "note": "P2-2：按玩家名锚定（combine 窗口不清空，同串会被提前满足）"
+    },
+    {
+      "type": "send",
       "player": "p1",
       "text": "#决斗 900000003",
       "note": "p1 触发裂空斩（15%）"
     },
     {
       "type": "expect",
-      "match": "re:触发【裂空斩】|战斗开始",
+      "match": "re:测试玩家1[^\\n]*【裂空斩】",
+      "combine": true,
       "timeout": 60,
-      "note": "触发文本 裂空斩；combine 跨条拼接，deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底",
-      "combine": true
+      "note": "战报中出现「测试玩家1 …【裂空斩】」行（武器触发技亦按单场必中口径逐场验证）。锚点用代码插值的技能名，不锚文案——文案改写不影响本断言"
     },
     {
       "type": "send",
@@ -161,10 +188,10 @@
     },
     {
       "type": "expect",
-      "match": "re:触发【震魂槌】|战斗开始",
+      "match": "re:测试玩家2[^\\n]*【震魂槌】",
+      "combine": true,
       "timeout": 60,
-      "note": "触发文本 震魂槌；combine 跨条拼接，deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底",
-      "combine": true
+      "note": "战报中出现「测试玩家2 …【震魂槌】」行（武器触发技亦按单场必中口径逐场验证）。锚点用代码插值的技能名，不锚文案——文案改写不影响本断言"
     },
     {
       "type": "send",
@@ -193,20 +220,63 @@
     {
       "type": "send",
       "player": "gm",
+      "text": "#修仙GM 设置气血 900000001 999999999",
+      "note": "气血拉到 9.9 亿：三方境界差（31/81/51）导致伤害悬殊，8000 血一两回合就结束，8%~15% 的武器触发技采不到；拉满后由 combat.action_limit=200 封顶，回合数足够"
+    },
+    {
+      "type": "expect",
+      "match": "re:已将【测试GM】的气血设置为 999,999,999",
+      "combine": true,
+      "timeout": 60,
+      "note": "P2-2：按玩家名锚定（combine 窗口不清空，同串会被提前满足）"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置气血 900000002 999999999",
+      "note": "气血拉到 9.9 亿：三方境界差（31/81/51）导致伤害悬殊，8000 血一两回合就结束，8%~15% 的武器触发技采不到；拉满后由 combat.action_limit=200 封顶，回合数足够"
+    },
+    {
+      "type": "expect",
+      "match": "re:已将【测试玩家1】的气血设置为 999,999,999",
+      "combine": true,
+      "timeout": 60,
+      "note": "P2-2：按玩家名锚定（combine 窗口不清空，同串会被提前满足）"
+    },
+    {
+      "type": "send",
+      "player": "gm",
       "text": "#决斗 900000002",
       "note": "gm 触发蓄锐式（12%）"
     },
     {
       "type": "expect",
-      "match": "re:触发【蓄锐式】|战斗开始",
+      "match": "re:测试GM[^\\n]*【蓄锐式】",
+      "combine": true,
       "timeout": 60,
-      "note": "触发文本 蓄锐式；combine 跨条拼接，deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底",
-      "combine": true
+      "note": "战报中出现「测试GM …【蓄锐式】」行（武器触发技亦按单场必中口径逐场验证）。锚点用代码插值的技能名，不锚文案——文案改写不影响本断言"
     },
     {
       "type": "sleep",
       "seconds": 60,
       "note": "等待 AstrBot 事件队列冲刷，避免下一轮首条消息排队超时"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的信息",
+      "note": "哨兵发送：给负向断言制造一条新回复"
+    },
+    {
+      "type": "expect_not",
+      "match": "re:(?m)^-{3,}\\s*$|\\{[a-z_]+(:[^}]*)?\\}",
+      "combine": true,
+      "timeout": 60,
+      "note": "回归守护：整轮回复不得残留未渲染占位符（{var} / {var:.1f}），也不得出现独占一行的「---」——后者是 copy_variants.csv 把剧情稿条目分隔线吞进 text 单元格造成的线上缺陷（narrative_config 5 条 + adventure desc_variants 15 条），命中即 bd astrbot_plugin_monixiuxian2_2-74n 未修"
     }
-  ]
+  ],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pvp --yes",
+    "timeout": 90
+  }
 }

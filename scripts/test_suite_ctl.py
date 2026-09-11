@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import sqlite3
 import sys
@@ -52,6 +53,10 @@ DISCOVERED_JSON_PATTERN = "**/*.json"
 LAST_RUN_MANIFEST = FUNCTIONAL_TESTS_DIR / ".last-run.json"
 
 PVP_TEST_IDS = ("900000001", "900000002", "900000003")
+
+# breakthrough profile：突破/闭关文案用例。GM 沿用 900000001，被测玩家 900000002
+# 预置为练气九阶 + level_up_rate=-100（必败）+ 可调连败数（见 _apply_breakthrough_preset）。
+BREAKTHROUGH_TEST_IDS = ("900000001", "900000002")
 
 # sect profile：宗门功能用例。GM 沿用 900000001，业务玩家为 900000002
 # （青云门成员预置）与 900000003（无宗门，用于反例/对照组）。
@@ -342,30 +347,112 @@ def _select_cases(args: argparse.Namespace, base: str, token: str) -> list[dict]
     raise CtlError("请指定 --case 或 --tag")
 
 
+# Evidence markers counted across every reply of a run and reported in the
+# export summary (sampling signal for probabilistic trigger skills).
+#
+# Anchoring rule (flavor-copy-assembly review, 2026-09-11): count ONLY strings
+# that survive a copy rewrite, i.e. (a) values interpolated by code into the
+# narrative pool -- the 【技能/效果名】 brackets are code-supplied in every
+# variant of buff_applied/trigger_*/ultimate_cast/effect_* -- or (b) the
+# code-assembled (non-randomized) line shapes. Keys suffixed ``_prose`` (or the
+# 【name】-less ones above) are the unavoidable exceptions: either the scene's text
+# carries no name variable (reflect/dodge/lifesteal) or its name is ambiguous
+# across scenes (status_expired says 【金刚护体】, identical to the attach line, so
+# only the verb differs). They are coupled to the current variant text and must be
+# re-synced whenever content-design/文案变体 CSV changes.
+# The old ``pierce`` key ("攻击") was dropped: it matched every message and
+# reported noise (gm-basics showed "pierce": 6 without any battle).
 EFFECT_EVIDENCE_PATTERNS: dict[str, tuple[str, ...]] = {
-    "damage_bonus": ("攻势更盛！",),
-    "combo": ("攻势更盛！",),
-    "stun": ("被眩晕，下回合无法出手",),
-    "counter": ("触发【", "】反击，"),
-    "damage_reduction": ("受到的伤害降低",),
-    "heal": ("恢复 ", " 气血！"),
-    "vampire": ("吸取 ", " 气血！"),
-    "dot": ("侵蚀，损失 ", " 气血！"),
-    "buff": ("的【", "】作用于 "),
-    "debuff": ("的【", "】作用于 "),
-    "unavoidable": ("身形一闪，躲过了",),  # Absence hint is handled separately.
-    "pierce": (
-        "攻击",
-    ),  # Piercing has no dedicated log; it is inferred from damage vs armor.
-    "reflect": ("反弹 ", " 点伤害！"),
-    "survive": ("获得【", "】庇护！"),
-    "fatigue": ("的【", "】作用于 "),
-    "ultimate_damage": ("施展大招【", "】，天地变色！"),
-    "ultimate_heal": ("施展大招【", "】，天地变色！"),
-    "ultimate_dot": ("施展大招【", "】，天地变色！"),
-    "ultimate_survive": ("获得【", "】庇护！"),
-    "sect_event": ("🏯 宗门际遇",),
+    # --- trigger skills, keyed by the interpolated trigger-skill name ---
+    "tr_ningshen_xurui": ("【凝神蓄锐】",),  # buff (凝神诀)
+    "tr_lingshe_fu": ("【灵蛇缚】",),  # debuff (灵蛇缠身)
+    "tr_ran_xue": ("【燃血】",),  # fatigue (燃血诀)
+    "tr_jingfeng_lianji": ("【惊风连击】",),  # combo (狂风诀)
+    "tr_qixi_liuzhuan": ("【气息流转】",),  # damage_bonus (基础吐纳)
+    "tr_jingang_huti": ("【金刚护体】",),  # damage_reduction (铁布衫)
+    "tr_zhenshan_yiji": ("【震山一击】",),  # stun (震山锤)
+    "tr_yi_ya_huan_ya": ("【以牙还牙】",),  # counter (以牙还牙)
+    "tr_hui_chun_tuna": ("【回春吐纳】",),  # heal (回春诀)
+    # lifesteal（噬血剑意）触发技名为【噬血】，但日志行不插值技能名——真实战报只有
+    # 「…，N 点气血入体」（评审 P3：幽灵键 tr_shi_xue 永不计数），改锚共用词。
+    "lifesteal_prose": ("入体",),
+    "tr_shi_gu": ("【蚀骨】",),  # dot attach (蚀骨咒)
+    "tr_po_jun_yiji": ("【破军一击】",),  # pierce (破军诀)
+    "tr_po_feng": ("【破风】",),  # unavoidable (破风剑意)
+    "tr_niepan_zhongsheng": ("【涅槃重生】",),  # survive grant / ultimate
+    # --- weapon triggers (pvp-weapon-trigger) ---
+    "wp_liekong_zhan": ("【裂空斩】",),
+    "wp_zhenhun_chui": ("【震魂槌】",),
+    "wp_xurui_shi": ("【蓄锐式】",),
+    "ult_wanjian_guizong": ("【万剑归宗】",),
+    "ult_jiuyou_shihun": ("【九幽噬魂】",),
+    "ult_huitian_shengshou": ("【回天圣手】",),
+    # --- code-assembled line shapes (single-source str scenes) ---
+    "dot_tick": ("侵蚀，损失 ", " 气血！"),
+    "counter_line": ("反击，对",),
+    "heal_line": ("恢复 ", " 气血！"),
+    "survive_line": ("庇护！",),
+    "stack_cap": ("未生效：同类效果已达叠加上限",),
+    "round_header": ("第 ", " 回合"),
+    # --- prose-coupled fallbacks (see note above) ---
+    "reflect_prose": ("反震之力如数奉还", "的反噬让对方自己吃了个哑巴亏"),
+    "dodge_prose": (
+        "身形如风，于千钧一发之际侧身",
+        "已经不在原地",
+        "不闪不避，反倒迎着",
+        "堪堪避开",
+    ),
+    "expire_prose": ("】散去", "】无声褪尽"),
+    # --- breakthrough / retreat narrative coverage (flavor-copy-assembly) ---
+    "pity_guarantee": ("连败保底",),  # rate_info at streak >= guarantee
+    "pity_streak_bonus": ("连败加成",),  # rate_info below guarantee
+    "pity_hint_prose": ("再败 ",),  # breakthrough.pity_hint pool
+    "streak_reward_prose": ("败了这么多回", "比突破口诀入耳"),  # lose_streak_reward
+    "fortune_drop_prose": (  # fortune.{weapon,heart_method,pill}_drop pools
+        "废墟的石缝里",
+        "破庙香案下",
+        "涨水冲出一只石匣",
+        "山洞壁上",
+        "旧宅夹层",
+        "荒野古碑",
+        "废弃的丹房里",
+        "旧药袋",
+    ),
+    "comprehend_prose": (  # breakthrough.comprehend_* pools (量词+括号形式稳定)
+        "一部【",
+        "一卷【",
+    ),
+    "epiphany_prose": (  # cultivation.retreat_epiphany pool
+        "化成一部【",
+        "已在心中",
+        "就是这么悟了",
+    ),
+    # death / revive panels: only reachable by the 0.5%~3% 走火入魔 roll, so
+    # they are sampling evidence, never assertions (bd -b5h).
+    "death_panel": ("💀 突破失败，走火入魔！💀",),
+    "revive_panel": ("⚡ 回生丹效果触发！⚡",),
 }
+
+
+def _max_battle_rounds(run: dict) -> int:
+    """Return the highest 「第 N 回合」 seen in a run's message stream.
+
+    Used by the exported summary: trigger-rate assertions are only meaningful for
+    battles long enough that a miss is statistically negligible, so the round count
+    is the evidence that a green case actually exercised that premise.
+
+    Args:
+        run: A platform run record containing ``run_messages``.
+
+    Returns:
+        Maximum round number, or 0 when the case had no battle report.
+    """
+    highest = 0
+    for msg in run.get("run_messages") or []:
+        if isinstance(msg, dict) and msg.get("text"):
+            for num in re.findall(r"第 (\d+) 回合", msg["text"]):
+                highest = max(highest, int(num))
+    return highest
 
 
 def _count_evidence(run: dict) -> dict[str, int]:
@@ -617,11 +704,13 @@ def cmd_export(args: argparse.Namespace) -> int:
     evidence_agg: dict[str, dict] = {}
     for run in runs:
         evidence = _count_evidence(run)
-        if not evidence:
+        rounds = _max_battle_rounds(run)
+        if not evidence and not rounds:
             continue
         name = run.get("case_name", f"run_{run.get('id')}")
-        entry = evidence_agg.setdefault(name, {"total": 0, "evidence": {}})
+        entry = evidence_agg.setdefault(name, {"total": 0, "evidence": {}, "rounds": 0})
         entry["total"] += 1
+        entry["rounds"] = max(entry["rounds"], rounds)
         for key, count in evidence.items():
             entry["evidence"][key] = entry["evidence"].get(key, 0) + count
 
@@ -649,7 +738,12 @@ def cmd_export(args: argparse.Namespace) -> int:
     if evidence_agg:
         for name, entry in sorted(evidence_agg.items()):
             ev_str = ", ".join(f"{k}= {v}" for k, v in entry["evidence"].items())
-            lines.append(f"- {name}: {ev_str}（采样 {entry['total']} 次）")
+            rounds = f"，最长回合={entry['rounds']}" if entry["rounds"] else ""
+            lines.append(
+                f"- {name}: {ev_str}（采样 {entry['total']} 次{rounds}）"
+                if ev_str
+                else f"- {name}: 无命中（采样 {entry['total']} 次{rounds}）"
+            )
     else:
         lines.append("- 本次运行未捕获到效果证据片段。")
     lines += [
@@ -660,6 +754,10 @@ def cmd_export(args: argparse.Namespace) -> int:
         "- 消息轨迹：`messages/`",
         "",
         "> 随机/概率效果用例使用 `--repeat` 聚合并在 summary 中记录证据强度。",
+        "> 上面的人数/次数计数只证存在性：同一个 combine 窗口的 fullText 会出现在多个",
+        "> 步骤的 actual 与逐条消息里，计数因而被放大；判定请回看 `messages/` 原文。",
+        "> `最长回合` 是该用例单场战报的最大回合数，用于判断触发率断言的前提是否成立",
+        "> （见 README「概率效果口径」）。",
         "",
     ]
     (base_dir / "summary.md").write_text("\n".join(lines), encoding="utf-8")
@@ -673,19 +771,21 @@ def cmd_export(args: argparse.Namespace) -> int:
 
 
 def _default_plugin_db_path() -> Path:
-    """Return the most likely plugin database path under the local AstrBot install.
+    """Return the default plugin database path, preferring the dedicated test copy.
+
+    ``xiuxian_data_lite.db`` is the throwaway test instance this suite writes to;
+    the production ``xiuxian_data_v2.db`` must never be a silent default, because
+    every case ``pre_run_hook`` passes ``--yes`` (no interactive confirm).
 
     Returns:
-        A Path to the default ``xiuxian_data_v2.db`` file.
+        A Path to the first existing candidate, or the lite path as a last resort.
     """
     home = Path.home()
     candidates = [
         home
-        / "code/AstrBot/data/plugin_data/astrbot_plugin_monixiuxian2_2/xiuxian_data_v2.db",
-        home
         / "code/AstrBot/data/plugin_data/astrbot_plugin_monixiuxian2_2/xiuxian_data_lite.db",
         home
-        / ".astrbot/data/plugin_data/astrbot_plugin_monixiuxian2_2/xiuxian_data_v2.db",
+        / ".astrbot/data/plugin_data/astrbot_plugin_monixiuxian2_2/xiuxian_data_lite.db",
     ]
     for path in candidates:
         if path.exists():
@@ -694,11 +794,30 @@ def _default_plugin_db_path() -> Path:
 
 
 def _resolve_db_path(args: argparse.Namespace) -> Path:
-    """Resolve the plugin database path argument with a helpful error if absent."""
+    """Resolve the plugin database path, refusing anything that is not test-scoped.
+
+    Args:
+        args: Parsed CLI args; ``args.db`` may override the default.
+
+    Returns:
+        The validated database Path.
+
+    Raises:
+        CtlError: If the path is missing, or names a non-test database without an
+            explicit ``--db``/``WEBTEST_PLUGIN_DB`` opt-in (fixture writes use
+            ``--yes`` from every case hook, so a mis-resolved default would wipe
+            real player data).
+    """
+    explicit = bool(args.db)
     db = Path(args.db or _default_plugin_db_path()).expanduser()
     if not db.exists():
         raise CtlError(
             f"插件数据库不存在: {db}\n请用 --db 指定专用测试实例的数据库路径"
+        )
+    if not re.search(r"lite|test", db.name, re.I) and not explicit:
+        raise CtlError(
+            f"拒绝写入非测试库: {db}\n默认只允许名字含 lite/test 的专用测试实例；"
+            "确实要写该库请显式传 --db（破坏性操作，会覆盖玩家数据）"
         )
     return db
 
@@ -915,6 +1034,34 @@ def _reset_fresh_player(conn: sqlite3.Connection, user_id: str) -> None:
     _ensure_idle_cd(conn, user_id)
 
 
+def _apply_breakthrough_preset(
+    conn: sqlite3.Connection, user_id: str, fail_streak: int
+) -> None:
+    """Reset one player to the breakthrough-narrative baseline.
+
+    ``level_up_rate = -100`` (permanent breakthrough bonus, integer percentage
+    points) clamps the final rate to 0.0 before the pity stage runs, so the
+    first ``#突破`` is a *guaranteed* failure with no RNG involved -- the only
+    lever the suite has to reach the fail/保底 panels without adding gameplay GM
+    commands (see ``core/breakthrough_manager.py`` 计算成功率 → ``max(0.0, ...)``).
+    ``fail_streak`` seeds ``breakthrough_fail_streak`` directly: 0 for the
+    0%/pity-hint path, 19 (= ``skill_system.breakthrough_pity_guarantee``) for
+    the guaranteed-success 连败保底 path.
+
+    Args:
+        conn: Open sqlite connection.
+        user_id: Fixed test user id to reset.
+        fail_streak: Value for ``breakthrough_fail_streak``.
+    """
+    conn.execute(
+        "UPDATE players SET level_index = 9, experience = 999999, gold = 100000, "
+        "state = '空闲', cultivation_start_time = 0, cultivation_type = '灵修', "
+        "level_up_rate = -100, breakthrough_fail_streak = ?, sect_id = 0, "
+        "active_pill_effects = '[]', has_resurrection_pill = 0 WHERE user_id = ?",
+        (fail_streak, user_id),
+    )
+
+
 def _ensure_idle_cd(conn: sqlite3.Connection, user_id: str) -> None:
     """Insert an idle user_cd row so busy-state writes work for a fresh player.
 
@@ -1010,6 +1157,8 @@ def cmd_fixture(args: argparse.Namespace) -> int:
         ids = list(PVP_TEST_IDS)
     elif args.profile == "sect":
         ids = list(SECT_TEST_IDS)
+    elif args.profile == "breakthrough":
+        ids = list(BREAKTHROUGH_TEST_IDS)
     else:
         raise CtlError(f"不支持的 fixture profile: {args.profile}")
     if not args.yes:
@@ -1024,6 +1173,25 @@ def cmd_fixture(args: argparse.Namespace) -> int:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
+        # Purge webtest virtual players (`case_<case>_<n>_player<k>`, derived by
+        # the platform per conversation) that an earlier run left busy. GM
+        # 时间快进 counts 闭关/修炼 rows GLOBALLY (core/gm_manager.py
+        # _TIME_SKIP_RULES), so every ghost inflates 「闭关开始时间：N 条」 by 1 and
+        # breaks any assertion on that count (bd -777). Fixed numeric test ids
+        # are pinned identities reused across cases, hence reset per run; these
+        # ghosts are throwaway sender ids and are dropped outright.
+        ghosts = conn.execute(
+            # ESCAPE keeps `_` literal: without it `case_%` also matches a real
+            # player whose id happens to start with the letters "case".
+            "SELECT user_id FROM players WHERE user_id LIKE ? ESCAPE '\\'",
+            ("case\\_%",),
+        ).fetchall()
+        if ghosts:
+            ghost_ids = [row[0] for row in ghosts]
+            marks = ",".join("?" for _ in ghost_ids)
+            conn.execute(f"DELETE FROM players WHERE user_id IN ({marks})", ghost_ids)
+            conn.execute(f"DELETE FROM user_cd WHERE user_id IN ({marks})", ghost_ids)
+            print(f"已清理测试平台虚拟玩家 {len(ghost_ids)} 个（防污染全局冷却统计）")
         # Back up every id this run mutates (profile ids, fresh ids, GM) for restore.
         fresh_ids = list(SECT_FRESH_TEST_IDS) if args.profile == "sect" else []
         _backup_players(conn, ids + fresh_ids + ["900000001"], backup_path)
@@ -1038,6 +1206,20 @@ def cmd_fixture(args: argparse.Namespace) -> int:
                 _write_pvp_skills(conn, user_id)
                 _ensure_idle_cd(conn, user_id)
             conn.execute("DELETE FROM combat_cooldowns WHERE user_id IN (?,?,?)", ids)
+        elif args.profile == "breakthrough":
+            for user_id in ("900000001", "900000002"):
+                _upsert_player(conn, user_id, names[user_id])
+                # Same hygiene as the pvp profile: stale player_skills would leak
+                # combat effects into a breakthrough case's battle report.
+                conn.execute("DELETE FROM player_skills WHERE user_id = ?", (user_id,))
+                _ensure_idle_cd(conn, user_id)
+            _apply_breakthrough_preset(
+                conn, "900000002", int(getattr(args, "breakthrough_streak", 0) or 0)
+            )
+            conn.execute(
+                "DELETE FROM combat_cooldowns WHERE user_id IN (?,?)",
+                ("900000001", "900000002"),
+            )
         else:  # sect
             sect_row_id = _resolve_sect_row(conn)
             for user_id in ids:
@@ -1122,7 +1304,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument(
         "--fixture-profile",
-        choices=["pvp", "sect"],
+        choices=["pvp", "sect", "breakthrough"],
         default="pvp",
         help="--fixture 使用的 profile（默认 pvp）",
     )
@@ -1148,7 +1330,15 @@ def build_parser() -> argparse.ArgumentParser:
     export.set_defaults(func=cmd_export)
 
     fixture = sub.add_parser("fixture", help="准备测试基线数据")
-    fixture.add_argument("--profile", choices=["pvp", "sect"], default="pvp")
+    fixture.add_argument(
+        "--profile", choices=["pvp", "sect", "breakthrough"], default="pvp"
+    )
+    fixture.add_argument(
+        "--breakthrough-streak",
+        type=int,
+        default=0,
+        help="breakthrough profile 预置的连败次数（0=必败路径，19=保底必成路径）",
+    )
     fixture.add_argument("--db", default=None, help="插件数据库路径覆盖")
     fixture.add_argument("--yes", action="store_true", help="跳过确认提示")
     fixture.set_defaults(func=cmd_fixture)

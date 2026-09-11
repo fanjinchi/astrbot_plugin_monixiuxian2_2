@@ -1,8 +1,12 @@
 {
   "name": "gm-time-tools",
   "description": "GM 测试工具三命令回归（design D1/D3/D4）：时间快进使闭关到期可正常出关、清除全部冷却复位忙碌状态、随机种子设定/重置/非法参数。",
-  "scenario": "群聊：p1 闭关 → GM 时间快进 3600 确认（闭关开始时间前移）→ p1 出关成功（闭关时长 1 小时）；p1 再闭关 → GM 清除全部冷却 900000002 确认（忙碌状态 1 条）→ p1 开始历练成功；GM 随机种子 42 → 重置 → 非法参数报错。",
-  "tags": ["gm"],
+  "scenario": "群聊：p1 闭关 → GM 时间快进 3600 确认（闭关开始时间前移）→ p1 出关成功（闭关时长 1 小时）；p1 再闭关 → GM 清除全部冷却 900000002 确认（忙碌状态 1 条）→ p1 开始历练成功；GM 随机种子 42 → 重置 → 非法参数报错。文案回归口径：闭关/出关面板断「双槽结构 + 面板首行前存在 flavor 段」与占位符残留，不锚文学句。",
+  "tags": [
+    "gm",
+    "narrative",
+    "narrative-flavor"
+  ],
   "pre_run_hook": {
     "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile sect --yes",
     "timeout": 60
@@ -24,9 +28,9 @@
     },
     {
       "type": "expect",
-      "match": "已进入闭关状态",
+      "match": "re:[^\\n]\\n🧘 道友已进入闭关状态",
       "timeout": 30,
-      "note": "闭关开始"
+      "note": "闭关面板（route B：flavor 段在前，面板首行前必有一行文案）"
     },
     {
       "type": "send",
@@ -36,9 +40,9 @@
     },
     {
       "type": "expect",
-      "match": "re:✅ 时间已快进 3600 秒（共前移 \\d+ 条记录）：[\\s\\S]*闭关开始时间：1 条",
+      "match": "re:✅ 时间已快进 3600 秒（共前移 \\d+ 条记录）：[\\s\\S]*闭关开始时间：[1-9]\\d* 条",
       "timeout": 30,
-      "note": "闭关开始时间被前移"
+      "note": "闭关开始时间确实被前移（非 0 条）。计数是全球扫描值：库内任何 修炼中/闭关中 玩家都会被统计，故不断言等于 1——fixture 已改为每轮清理测试平台虚拟玩家 （case_% 派生 id），但别用例并发跑时该值仍可能 >1（bd -777）"
     },
     {
       "type": "send",
@@ -60,9 +64,9 @@
     },
     {
       "type": "expect",
-      "match": "已进入闭关状态",
+      "match": "re:[^\\n]\\n🧘 道友已进入闭关状态",
       "timeout": 30,
-      "note": "二次闭关开始"
+      "note": "二次闭关面板同样为双槽拼装"
     },
     {
       "type": "send",
@@ -123,6 +127,19 @@
       "match": "re:❌ 参数错误：/修仙GM 随机种子 <整数>",
       "timeout": 30,
       "note": "非法参数报错"
+    },
+    {
+      "type": "send",
+      "text": "#我的信息",
+      "player": "a",
+      "note": "哨兵 send：expect_not 需要新回复才会求值（评审 P1-3，README 断言锚点原则）"
+    },
+    {
+      "type": "expect_not",
+      "match": "re:(?m)^-{3,}\\s*$|\\{[a-z_]+(:[^}]*)?\\}",
+      "combine": true,
+      "timeout": 60,
+      "note": "回归守护：整轮回复不得残留未渲染占位符（{var} / {var:.1f}），也不得出现独占一行的「---」——后者是 copy_variants.csv 把剧情稿条目分隔线吞进 text 单元格造成的线上缺陷（narrative_config 5 条 + adventure desc_variants 15 条），命中即 bd astrbot_plugin_monixiuxian2_2-74n 未修"
     }
   ]
 }

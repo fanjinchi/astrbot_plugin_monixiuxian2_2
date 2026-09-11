@@ -1,12 +1,13 @@
 {
   "name": "pvp-effect-pierce",
   "description": "验证 pierce：破军诀「破军一击」穿透护甲。",
-  "scenario": "固定群聊双玩家，p2 装备铁叶甲，p1 激活破军诀后决斗；引擎无穿透专用文本，结果依赖伤害数值与原始轨迹，声明 deterministic: true + seed（确定性优先），必要时 --repeat 采样兜底。（2026-09-10 armor-content-design：泰坦之铠随占位防具体系删除，改用门槛 0 的新标杆铁叶甲 armor 7——新建号只能装备凡品件）",
+  "scenario": "固定群聊双玩家，p2 装备铁叶甲，p1 激活破军诀后决斗；引擎无穿透专用文本，结果依赖伤害数值与原始轨迹，声明 deterministic: true + seed（确定性优先）；本用例走单场必中口径，不依赖 --repeat 采样。（2026-09-10 armor-content-design：泰坦之铠随占位防具体系删除，改用门槛 0 的新标杆铁叶甲 armor 7——新建号只能装备凡品件）。断言锚在代码插值值（【技能名】/对战面板/回合行）而非文案字面量，并统一追加占位符残留负向断言（flavor-copy-assembly route A 回归）。pre_run_hook 跑 fixture --profile pvp 复位双方属性/冷却/功法位。",
   "tags": [
     "pvp",
     "effect-matrix",
     "content-design",
-    "sampled"
+    "sampled",
+    "narrative-flavor"
   ],
   "deterministic": true,
   "seed": 42,
@@ -28,7 +29,7 @@
     },
     {
       "type": "expect",
-      "match": "re:恭喜道友|已踏入仙途",
+      "match": "re:恭喜道友|已踏入仙途，无需重复此举",
       "timeout": 60,
       "note": "p1 可用"
     },
@@ -40,7 +41,7 @@
     },
     {
       "type": "expect",
-      "match": "re:恭喜道友|已踏入仙途",
+      "match": "re:恭喜道友|已踏入仙途，无需重复此举",
       "timeout": 60,
       "note": "p2 可用"
     },
@@ -52,9 +53,9 @@
     },
     {
       "type": "expect",
-      "match": "re:攻击设置为|已踏入",
+      "match": "re:已将【[^】]*】的攻击设置为 200",
       "timeout": 60,
-      "note": "攻击方攻击设置成功"
+      "note": "GM 回执锚全串（攻击 200，去掉旧 `|已踏入` 假绿分支）"
     },
     {
       "type": "send",
@@ -64,33 +65,33 @@
     },
     {
       "type": "expect",
-      "match": "re:攻击设置为|已踏入",
+      "match": "re:已将【[^】]*】的攻击设置为 50",
       "timeout": 60,
-      "note": "防守方攻击设置成功"
+      "note": "GM 回执锚全串（攻击 50，去掉旧 `|已踏入` 假绿分支）"
     },
     {
       "type": "send",
       "player": "gm",
-      "text": "#修仙GM 设置气血 900000002 2000",
-      "note": "设置攻击方气血"
+      "text": "#修仙GM 设置气血 900000002 8000",
+      "note": "气血拉到 8000：战斗拉长到约 40 回合，触发率再低也必然命中"
     },
     {
       "type": "expect",
-      "match": "re:气血设置为|已踏入",
+      "match": "re:已将【[^】]*】的气血设置为 8,000",
       "timeout": 60,
-      "note": "攻击方气血设置成功"
+      "note": "GM 回执锚全串（气血 8,000，去掉旧 `|已踏入` 假绿分支）"
     },
     {
       "type": "send",
       "player": "gm",
-      "text": "#修仙GM 设置气血 900000003 5000",
-      "note": "设置防守方气血"
+      "text": "#修仙GM 设置气血 900000003 8000",
+      "note": "气血拉到 8000：战斗拉长到约 40 回合，触发率再低也必然命中"
     },
     {
       "type": "expect",
-      "match": "re:气血设置为|已踏入",
+      "match": "re:已将【[^】]*】的气血设置为 8,000",
       "timeout": 60,
-      "note": "防守方气血设置成功"
+      "note": "GM 回执锚全串（气血 8,000，去掉旧 `|已踏入` 假绿分支）"
     },
     {
       "type": "send",
@@ -100,9 +101,9 @@
     },
     {
       "type": "expect",
-      "match": "re:已向|已踏入",
+      "match": "re:已向【[^】]*】的储物戒放入",
       "timeout": 60,
-      "note": "p2 护甲发放"
+      "note": "GM 给予装备回执（core/gm_manager.py:828 代码拼装 「已向【{name}】的储物戒放入 {item} x{count}」，只锚代码侧固定词，不锚文案）"
     },
     {
       "type": "send",
@@ -124,9 +125,9 @@
     },
     {
       "type": "expect",
-      "match": "已激活",
+      "match": "re:已激活功法【破军诀】",
       "timeout": 60,
-      "note": "破军诀 激活成功"
+      "note": "激活回执锚全串（handlers/technique_handler.py:190），fixture 每轮重置 techniques 栏位，避免上轮激活残留"
     },
     {
       "type": "send",
@@ -136,9 +137,27 @@
     },
     {
       "type": "expect",
-      "match": "re:发起攻击|暴击|战斗开始",
+      "match": "re:气血 \\d+/\\d+，伤害 \\d+，身法 \\d+，迅捷 \\d+",
+      "combine": true,
       "timeout": 60,
-      "note": "pierce 无专用日志；通过高护甲下伤害表现与 --repeat 原始轨迹人工/脚本核对"
+      "note": "该效果在战报中无任何痕迹（handlers 不落叙事行，bd 已登记），webtest 只保证战斗跑通并输出代码拼装的对战面板；效果语义由 tests/ 单测覆盖"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的信息",
+      "note": "哨兵发送：给负向断言制造一条新回复"
+    },
+    {
+      "type": "expect_not",
+      "match": "re:(?m)^-{3,}\\s*$|\\{[a-z_]+(:[^}]*)?\\}",
+      "combine": true,
+      "timeout": 60,
+      "note": "回归守护：整轮回复不得残留未渲染占位符（{var} / {var:.1f}），也不得出现独占一行的「---」——后者是 copy_variants.csv 把剧情稿条目分隔线吞进 text 单元格造成的线上缺陷（narrative_config 5 条 + adventure desc_variants 15 条），命中即 bd astrbot_plugin_monixiuxian2_2-74n 未修"
     }
-  ]
+  ],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pvp --yes",
+    "timeout": 90
+  }
 }

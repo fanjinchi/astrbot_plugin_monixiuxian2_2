@@ -1,11 +1,12 @@
 {
   "name": "pvp-basic-spar",
   "description": "覆盖切磋路径；当前预期记录 handlers/combat_handlers.py handle_spar 疑似缺 result 赋值的 Bug（待修复用例，预期失败）。",
-  "scenario": "前置条件：固定群聊身份，GM_ADMINS/白名单已配，fixture 已准备或步骤内创建。覆盖：切磋、战斗冷却、战报。若此用例失败且运行轨迹出现 UnboundLocalError/服务端错误，即为已知 Bug 证据。",
+  "scenario": "前置条件：固定群聊身份，GM_ADMINS/白名单已配，fixture 已准备或步骤内创建。覆盖：切磋、战斗冷却、战报。若此用例失败且运行轨迹出现 UnboundLocalError/服务端错误，即为已知 Bug 证据。断言锚在代码插值值（【技能名】/对战面板/回合行）而非文案字面量，并统一追加占位符残留负向断言（flavor-copy-assembly route A 回归）。pre_run_hook 跑 fixture --profile pvp 复位双方属性/冷却/功法位。",
   "tags": [
     "pvp",
     "core-smoke",
-    "known-bug"
+    "known-bug",
+    "narrative-flavor"
   ],
   "conversation": {
     "kind": "group",
@@ -25,7 +26,7 @@
     },
     {
       "type": "expect",
-      "match": "re:恭喜道友|已踏入仙途",
+      "match": "re:恭喜道友|已踏入仙途，无需重复此举",
       "timeout": 30,
       "note": "p1 可用"
     },
@@ -37,7 +38,7 @@
     },
     {
       "type": "expect",
-      "match": "re:恭喜道友|已踏入仙途",
+      "match": "re:恭喜道友|已踏入仙途，无需重复此举",
       "timeout": 30,
       "note": "p2 可用"
     },
@@ -49,9 +50,9 @@
     },
     {
       "type": "expect",
-      "match": "re:攻击设置为[^\\n]*1,?000",
+      "match": "re:已将【[^】]*】的攻击设置为 1,000",
       "timeout": 30,
-      "note": "p1 属性设置成功"
+      "note": "GM 回执锚全串（攻击 1,000，去掉旧 `|已踏入` 假绿分支）"
     },
     {
       "type": "send",
@@ -61,9 +62,9 @@
     },
     {
       "type": "expect",
-      "match": "re:攻击设置为[^\\n]*500",
+      "match": "re:已将【[^】]*】的攻击设置为 500",
       "timeout": 30,
-      "note": "p2 属性设置成功"
+      "note": "GM 回执锚全串（攻击 500，去掉旧 `|已踏入` 假绿分支）"
     },
     {
       "type": "send",
@@ -73,9 +74,27 @@
     },
     {
       "type": "expect",
-      "match": "re:战斗开始[\\s\\S]*胜利",
+      "match": "re:气血 \\d+/\\d+，伤害 \\d+[\\s\\S]*第 \\d+ 回合[\\s\\S]*[\\d,]+ 点伤害[\\s\\S]*(收剑归鞘|抱拳一礼|尘土慢慢落回|脚步不停|战斗开始|胜利！)",
+      "combine": true,
       "timeout": 60,
-      "note": "已知 Bug：handle_spar 在第 211 行前未调用 player_vs_player 给 result 赋值，疑似 UnboundLocalError，此步预期失败"
+      "note": "战报结构契约：代码拼装面板行 + 回合行 + 至少一条伤害行 + 收束语成组（评审 P2-1：打平的 | 会让 round_header 被改坏也绿）。「N 点伤害」只出现在 combat.damage_normal/damage_crit 与代码拼装行，故本断言同时正向覆盖这两个 route A 场景（评审 P1-4①）；收束语支取自 combat.battle_victory 全部变体 + 旧版横幅（bd -r0a 回滚兼容），文案再改需同步此处。实测本场 4 回合（气血 2000 速胜局，不断言触发技）"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的信息",
+      "note": "哨兵发送：给负向断言制造一条新回复"
+    },
+    {
+      "type": "expect_not",
+      "match": "re:(?m)^-{3,}\\s*$|\\{[a-z_]+(:[^}]*)?\\}",
+      "combine": true,
+      "timeout": 60,
+      "note": "回归守护：整轮回复不得残留未渲染占位符（{var} / {var:.1f}），也不得出现独占一行的「---」——后者是 copy_variants.csv 把剧情稿条目分隔线吞进 text 单元格造成的线上缺陷（narrative_config 5 条 + adventure desc_variants 15 条），命中即 bd astrbot_plugin_monixiuxian2_2-74n 未修"
     }
-  ]
+  ],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pvp --yes",
+    "timeout": 90
+  }
 }

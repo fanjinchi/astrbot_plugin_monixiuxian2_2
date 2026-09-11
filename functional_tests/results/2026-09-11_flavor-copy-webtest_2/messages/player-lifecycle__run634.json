@@ -1,0 +1,128 @@
+[
+  {
+    "id": 8594,
+    "conversation_id": 645,
+    "direction": "in",
+    "sender": "case_player-lifecycle_10_player1",
+    "text": "我要修仙",
+    "rich": null,
+    "created_at": 1789129101.8277576
+  },
+  {
+    "id": 8595,
+    "conversation_id": 645,
+    "direction": "out",
+    "sender": "bot",
+    "text": "欢迎踏入修仙之路！灵修体修，各有一番天地。请选择你的修炼方式：【灵修】以灵气为主，法术攻击\n• 寿命：100\n• 灵气：100-1000\n• 法伤：5-100\n• 物伤：5\n• 法防：0\n• 物防：5\n• 精神力：100-500\n\n【体修】以气血为主，肉身强横\n• 寿命：50-100\n• 气血：100-500\n• 法伤：0\n• 物伤：100-500\n• 法防：50-200\n• 物防：100-500\n• 精神力：100-500\n━━━━━━━━━━━━━━━\n⚠️ 修仙风险警告 ⚠️\n• 突破失败有概率走火入魔身死道消\n• 生命值归零也会导致死亡\n• 死亡后所有数据清除，需重新入仙途\n━━━━━━━━━━━━━━━\n💡 使用方法：\n  我要修仙 灵修\n  我要修仙 体修",
+    "rich": [],
+    "created_at": 1789129101.842911
+  },
+  {
+    "id": 8596,
+    "conversation_id": 645,
+    "direction": "in",
+    "sender": "case_player-lifecycle_10_player1",
+    "text": "我要修仙 灵修",
+    "rich": null,
+    "created_at": 1789129102.1422498
+  },
+  {
+    "id": 8597,
+    "conversation_id": 645,
+    "direction": "out",
+    "sender": "bot",
+    "text": "恭喜道友 player1 踏上仙途！━━━━━━━━━━━━━━━\n修炼方式：【灵修】\n灵根：【土灵根】\n评价：【上品】土之厚重，稳如磐石\n启动资金：100 灵石\n━━━━━━━━━━━━━━━\n修仙路上多凶险：突破失败或生命值归零，会身死道消，一切归于尘土。修行之前，先把这条路看清。━━━━━━━━━━━━━━━\n💡 发送「我的信息」查看状态",
+    "rich": [],
+    "created_at": 1789129102.1700752
+  },
+  {
+    "id": 8598,
+    "conversation_id": 645,
+    "direction": "in",
+    "sender": "case_player-lifecycle_10_player1",
+    "text": "我的信息",
+    "rich": null,
+    "created_at": 1789129102.4589071
+  },
+  {
+    "id": 8599,
+    "conversation_id": 645,
+    "direction": "out",
+    "sender": "bot",
+    "text": "📋 道友 player1 的信息\n━━━━━━━━━━━━━━━\n\n【基本信息】\n  道号：player1\n  境界：练气一阶\n  修为：0/1,800\n  灵石：100\n  战力：140\n  灵根：土灵根\n\n【四主属性】\n  伤害：13\n  身法：13\n  迅捷：18\n  气血：96\n  护甲：0\n\n【装备信息】\n  主修功法：无\n  法器：无\n  防具：无\n\n【功法修习】\n  已领悟功法：0\n  修习目标：无\n  战报合并条数：10\n\n【宗门信息】\n  所在宗门：无宗门\n  宗门职位：散修\n━━━━━━━━━━━━━━━",
+    "rich": [],
+    "created_at": 1789129102.479738
+  },
+  {
+    "id": 8600,
+    "conversation_id": 645,
+    "direction": "in",
+    "sender": "case_player-lifecycle_10_player1",
+    "text": "闭关",
+    "rich": null,
+    "created_at": 1789129102.7775395
+  },
+  {
+    "id": 8601,
+    "conversation_id": 645,
+    "direction": "out",
+    "sender": "bot",
+    "text": "一炷香燃在案头，烟直直地升，无风无扰。你看着那缕烟出了神，等回过神，烟已去了半炷——修炼先修定，定下来了，才算是开了头。\n🧘 道友已进入闭关状态\n━━━━━━━━━━━━━━━\n闭关期间，你将与世隔绝，潜心修炼。\n💡 发送「出关」结束闭关\n⏱️ 每分钟将获得修为，受灵根资质影响。",
+    "rich": [],
+    "created_at": 1789129102.81416
+  },
+  {
+    "id": 8602,
+    "conversation_id": 645,
+    "direction": "in",
+    "sender": "case_player-lifecycle_10_player1",
+    "text": "闭关",
+    "rich": null,
+    "created_at": 1789129103.0950174
+  },
+  {
+    "id": 8603,
+    "conversation_id": 645,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友当前正在「闭关中」，无法分心他顾。\n💡 可使用「我的信息」「签到」「银行」等基础指令。",
+    "rich": [],
+    "created_at": 1789129103.1136694
+  },
+  {
+    "id": 8604,
+    "conversation_id": 645,
+    "direction": "in",
+    "sender": "case_player-lifecycle_10_player1",
+    "text": "出关",
+    "rich": null,
+    "created_at": 1789129103.4116263
+  },
+  {
+    "id": 8605,
+    "conversation_id": 645,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友闭关时间不足1分钟，未获得修为。请继续闭关修炼。",
+    "rich": [],
+    "created_at": 1789129103.4249296
+  },
+  {
+    "id": 8606,
+    "conversation_id": 645,
+    "direction": "in",
+    "sender": "case_player-lifecycle_10_a",
+    "text": "#我的信息",
+    "rich": null,
+    "created_at": 1789129103.7231815
+  },
+  {
+    "id": 8607,
+    "conversation_id": 645,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友尚未踏入仙途，请发送「我要修仙」开启你的旅程。",
+    "rich": [],
+    "created_at": 1789129103.7361104
+  }
+]

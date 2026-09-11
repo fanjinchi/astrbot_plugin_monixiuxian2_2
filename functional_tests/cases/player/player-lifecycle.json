@@ -1,11 +1,13 @@
 {
   "name": "player-lifecycle",
   "description": "验证新玩家主循环：创建角色→查看信息→闭关→重复闭关拦截→出关（不足1分钟不结算）。",
-  "scenario": "前置条件：无（运行器使用全新私聊玩家）。覆盖：玩家创建/选择灵修/信息查看/闭关状态机/忙碌拦截/出关结算。",
+  "scenario": "前置条件：无（运行器使用全新私聊玩家）。覆盖：玩家创建/选择灵修/信息查看/闭关状态机/忙碌拦截/出关结算。断言不锚文学句，闭关面板按 route B 双槽结构断言（面板首行前存在 flavor 段）+ 占位符残留负向断言。",
   "tags": [
     "player",
     "cultivation",
-    "core-smoke"
+    "core-smoke",
+    "narrative",
+    "narrative-flavor"
   ],
   "conversation": {
     "kind": "private",
@@ -44,9 +46,9 @@
     },
     {
       "type": "expect",
-      "match": "道友",
+      "match": "re:📋 道友 [^\\n]*的信息",
       "timeout": 30,
-      "note": "信息面板可访问"
+      "note": "信息面板可访问（旧断言只锚裸词「道友」，任何回复都命中，等于无断言）"
     },
     {
       "type": "send",
@@ -56,9 +58,9 @@
     },
     {
       "type": "expect",
-      "match": "已进入闭关状态",
+      "match": "re:[^\\n]\\n🧘 道友已进入闭关状态",
       "timeout": 30,
-      "note": "状态切换为修炼中"
+      "note": "route B 结构契约：flavor 段在前、面板段在后"
     },
     {
       "type": "send",
@@ -83,6 +85,19 @@
       "match": "不足1分钟",
       "timeout": 30,
       "note": "未满足时长不结算修为"
+    },
+    {
+      "type": "send",
+      "text": "#我的信息",
+      "player": "a",
+      "note": "哨兵 send：expect_not 需要新回复才会求值（评审 P1-3，README 断言锚点原则）"
+    },
+    {
+      "type": "expect_not",
+      "match": "re:(?m)^-{3,}\\s*$|\\{[a-z_]+(:[^}]*)?\\}",
+      "combine": true,
+      "timeout": 60,
+      "note": "回归守护：整轮回复不得残留未渲染占位符（{var} / {var:.1f}），也不得出现独占一行的「---」——后者是 copy_variants.csv 把剧情稿条目分隔线吞进 text 单元格造成的线上缺陷（narrative_config 5 条 + adventure desc_variants 15 条），命中即 bd astrbot_plugin_monixiuxian2_2-74n 未修"
     }
   ]
 }

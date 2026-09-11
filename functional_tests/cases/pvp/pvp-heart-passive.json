@@ -1,11 +1,12 @@
 {
   "name": "pvp-heart-passive",
   "description": "验证心法被动在战斗首行属性中生效：长春功气血+10%、疾风迅雷功迅捷+12%/身法+10%。",
-  "scenario": "前置条件：固定群聊身份、GM 可用、fixture 已准备或步骤内创建。覆盖：主修心法被动、战斗首行属性、决斗。",
+  "scenario": "前置条件：固定群聊身份、GM 可用、fixture 已准备或步骤内创建。覆盖：主修心法被动、战斗首行属性、决斗。断言锚在代码插值值（【技能名】/对战面板/回合行）而非文案字面量，并统一追加占位符残留负向断言（flavor-copy-assembly route A 回归）。pre_run_hook 跑 fixture --profile pvp 复位双方属性/冷却/功法位。",
   "tags": [
     "pvp",
     "heart-method",
-    "content-design"
+    "content-design",
+    "narrative-flavor"
   ],
   "conversation": {
     "kind": "group",
@@ -25,7 +26,7 @@
     },
     {
       "type": "expect",
-      "match": "re:恭喜道友|已踏入仙途",
+      "match": "re:恭喜道友|已踏入仙途，无需重复此举",
       "timeout": 30,
       "note": "p1 可用"
     },
@@ -37,21 +38,21 @@
     },
     {
       "type": "expect",
-      "match": "re:恭喜道友|已踏入仙途",
+      "match": "re:恭喜道友|已踏入仙途，无需重复此举",
       "timeout": 30,
       "note": "p2 可用"
     },
     {
       "type": "send",
       "player": "gm",
-      "text": "#修仙GM 设置气血 900000002 1000",
-      "note": "p1 基础气血"
+      "text": "#修仙GM 设置气血 900000002 8000",
+      "note": "气血拉到 8000：战斗拉长到约 40 回合，触发率再低也必然命中"
     },
     {
       "type": "expect",
-      "match": "re:气血设置为[^\\n]*1,?000",
+      "match": "re:已将【[^】]*】的气血设置为 8,000",
       "timeout": 30,
-      "note": "p1 基数确定"
+      "note": "GM 回执锚全串（气血 8,000，去掉旧 `|已踏入` 假绿分支）"
     },
     {
       "type": "send",
@@ -73,9 +74,9 @@
     },
     {
       "type": "expect",
-      "match": "re:气血 1100/1100",
+      "match": "re:气血 8800/8800",
       "timeout": 60,
-      "note": "气血+10% 被动在战斗首行生效（1000→1100）"
+      "note": "长春功气血+10% 被动在战斗首行生效（基线 8000→8,800，代码拼装的对战面板）"
     },
     {
       "type": "send",
@@ -136,6 +137,23 @@
       "match": "re:身法 55[\\s\\S]*迅捷 56",
       "timeout": 60,
       "note": "迅捷+12%/身法+10% 在战斗首行生效（50→56/55）"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的信息",
+      "note": "哨兵发送：给负向断言制造一条新回复"
+    },
+    {
+      "type": "expect_not",
+      "match": "re:(?m)^-{3,}\\s*$|\\{[a-z_]+(:[^}]*)?\\}",
+      "combine": true,
+      "timeout": 60,
+      "note": "回归守护：整轮回复不得残留未渲染占位符（{var} / {var:.1f}），也不得出现独占一行的「---」——后者是 copy_variants.csv 把剧情稿条目分隔线吞进 text 单元格造成的线上缺陷（narrative_config 5 条 + adventure desc_variants 15 条），命中即 bd astrbot_plugin_monixiuxian2_2-74n 未修"
     }
-  ]
+  ],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pvp --yes",
+    "timeout": 90
+  }
 }
