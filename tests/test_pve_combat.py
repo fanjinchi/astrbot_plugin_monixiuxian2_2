@@ -2,6 +2,7 @@
 reward calculation, and the full trigger_pve_combat flow.
 """
 
+import random
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -158,6 +159,10 @@ class TestEncounterProbability:
     )
     def test_encounter_rate(self, pve_manager, scene, difficulty, expected):
         """Observed encounter rate is within ±5% of the configured rate."""
+        # Statistical assertions must own their seed: this test samples the global
+        # ``random`` stream, so any other case that consumes RNG (e.g. breakthrough
+        # panels) shifts it and turns a rare 3.4σ draw into an order-dependent red.
+        random.seed(f"encounter:{scene}:{difficulty}")
         hits = sum(
             pve_manager._should_trigger_combat(scene, difficulty)
             for _ in range(self.TRIALS)
@@ -199,6 +204,8 @@ class TestEnemyCategoryDistribution:
     )
     def test_category_distribution(self, pve_manager, scene, difficulty, expected):
         """Observed category proportions are within ±5% of configured rates."""
+        # Same order-dependence guard as test_encounter_rate (global RNG stream).
+        random.seed(f"category:{scene}:{difficulty}")
         counts = {"normal": 0, "elite": 0, "boss": 0}
         for _ in range(self.TRIALS):
             cat = pve_manager._select_enemy_category(scene, difficulty)
