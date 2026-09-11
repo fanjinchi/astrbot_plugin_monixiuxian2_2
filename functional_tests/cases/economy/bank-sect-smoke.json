@@ -1,7 +1,7 @@
 {
   "name": "bank-sect-smoke",
   "description": "银行存取 + 宗门子命令冒烟（统一入口「宗门」，子命令 信息/列表）",
-  "scenario": "前置条件：新玩家已创建（步骤内完成）。覆盖：银行信息/存取、宗门信息/列表。。注意：宗门无「我的宗门/宗门列表」独立指令，只有 @filter.command(CMD_SECT=宗门) 统一入口 + 子命令路由（handlers/sect_handlers.py:73-92）。",
+  "scenario": "前置条件：新玩家已创建（步骤内完成）。覆盖：银行信息/存取、宗门信息/列表。注意：宗门无「我的宗门/宗门列表」独立指令，只有 @filter.command(CMD_SECT=宗门) 统一入口 + 子命令路由（handlers/sect_handlers.py:73-92）。",
   "tags": [
     "economy",
     "social",
@@ -20,9 +20,9 @@
     },
     {
       "type": "expect",
-      "match": "re:踏上仙途",
+      "match": "re:启动资金：\\d+ 灵石",
       "timeout": 30,
-      "note": "新玩家注册回执（cultivation 代码拼装「恭喜道友 {name} 踏上仙途！」）（旧断言含裸「宗门/灵石」宽词，LLM 兜底回复即可满足=假绿，评审 P1-3 同类）"
+      "note": "新玩家创建回执里的代码拼装行（handlers/player_handler.py:152 `启动资金：{gold} 灵石`），不锚文案。原断言 `re:踏上仙途` 锚的是 cultivation.creation_welcome 文案池（当前只有 1 个变体所以能过），内容侧补变体即静默翻红——正是 bd -r0a 的死法，与本用例立意（修假绿）冲突。（评审 H2）"
     },
     {
       "type": "send",
@@ -46,7 +46,7 @@
       "type": "expect",
       "match": "re:✅ 成功存入 \\d+ 灵石",
       "timeout": 30,
-      "note": "存入回执代码字面量（旧断言含裸「宗门/灵石」宽词，LLM 兜底回复即可满足=假绿，评审 P1-3 同类）"
+      "note": "存入回执代码字面量（handlers/bank_handlers.py:88 + managers/bank_manager.py:143）。注意金额走 `{amount:,}` 带千分位：存款额改到 ≥1000 时 `\\d+` 会失配，需改成 `[\\d,]+`。"
     },
     {
       "type": "send",

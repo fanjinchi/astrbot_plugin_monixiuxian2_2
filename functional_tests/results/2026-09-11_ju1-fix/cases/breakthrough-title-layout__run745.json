@@ -1,0 +1,114 @@
+{
+  "id": 745,
+  "case_name": "breakthrough-title-layout",
+  "run_index": 8,
+  "status": "passed",
+  "conversation_id": 756,
+  "steps_result": [
+    {
+      "index": -1,
+      "type": "pre_run_hook",
+      "note": "",
+      "ok": true,
+      "detail": "hook 退出码 0：已清理测试平台虚拟玩家 1 个（防污染全局冷却统计）\n已备份现有固定 ID 数据 -> /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/functional_tests/.fixture-backup.json\nfixture breakthrough 完成：2 个固定测试玩家已重置",
+      "actual": [],
+      "duration": 0.05
+    },
+    {
+      "index": 0,
+      "type": "send",
+      "note": "保底必成突破（复现同一条成功面板）",
+      "ok": true,
+      "detail": "已注入（消息 #10273）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "标题行以 ✨ 结尾且其后另起一行非分隔符内容 ⇒ 连败彩蛋确实独占一行。（fixture 预置 level_index=9 练气九阶，突破后 level_index=10 → 筑基初期，success 双槽的 flavor 取筑基段，故标题前必有一行引子；pity 参数见 game_config.skill_system.breakthrough_pity_step / _pity_guarantee，不在 level_config。）bd -ju1 修复的验收锚点：只断 `✨\\n` 证不了 bug 是否复现，故要求后随非 ━ 字符。",
+      "ok": true,
+      "detail": "合并窗口匹配（消息 #10274-#10275）",
+      "actual": [
+        "开始尝试突破...",
+        "丹田里第一滴灵液落下，如春水破冰。河开的那一刻，整条灵脉都活了，汩汩地往丹田里汇。你守着这一泓春水，知道根基落成了——往后的路，是奔流，不再是漫流。\n✨ 突破成功！✨\n下山散心，师门塞给你一道平安符：不突破，也得平安。你捏着那枚歪歪扭扭缝的符，鼻子有点酸——符上绣的是一只胖乎乎的乌龟。你把它挂在腰间，觉得这句话，比突破口诀入耳。\n━━━━━━━━━━━━━━━\n基础成功率：80.0%\n永久加成：-100.0%\n连败保底：19次失败，天道酬勤，本次必成！\n最终成功率：100.0%\n━━━━━━━━━━━━━━━\n恭喜你从【练气九阶】突破至【筑基初期】！\n\n【属性增长】\n气血 +15\n伤害 +5\n身法 +0\n迅捷 +0\n\n【当前属性】\n伤害：105\n身法：50\n迅捷：50\n气血：1015\n护甲：0"
+      ],
+      "expected": "re:✨ 突破成功！✨\n[^━\n]",
+      "matched": {
+        "combined": true,
+        "first_id": 10274,
+        "last_id": 10275,
+        "text": "开始尝试突破...\n丹田里第一滴灵液落下，如春水破冰。河开的那一刻，整条灵脉都活了，汩汩地往丹田里汇。你守着这一泓春水，知道根基落成了——往后的路，是奔流，不再是漫流。\n✨ 突破成功！✨\n下山散心，师门塞给你一道平安符：不突破，也得平安。你"
+      },
+      "duration": 0.3
+    }
+  ],
+  "case_snapshot": {
+    "name": "breakthrough-title-layout",
+    "description": "换行契约：高连败突破成功时，lose_streak_reward 彩蛋必须与「✨ 突破成功！✨」标题分行（bd -ju1 的防回归钉，修复后转常规用例）。",
+    "scenario": "前置与 breakthrough-guarantee 完全相同（fixture --profile breakthrough --breakthrough-streak 19 → 突破必然成功且必然带彩蛋段）。唯一断言要求标题行以换行收尾、彩蛋另起一行。换行责任在代码调用侧（core/breakthrough_manager.py 渲染 streak_bonus_msg 时补 \\n 并 strip 变体首尾空白，导入器同样 strip），因为文案自带的前导换行穿不过内容导入。空彩蛋分支（连败 <3 不插换行、不留空行）由 tests/test_breakthrough_manager.py::TestSuccessPanelStreakBonusLineBreak 覆盖。",
+    "tags": [
+      "player",
+      "narrative",
+      "narrative-flavor"
+    ],
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_flavor_002",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000002"
+      }
+    },
+    "pre_run_hook": {
+      "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile breakthrough --breakthrough-streak 19 --yes",
+      "timeout": 90
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#突破",
+        "note": "保底必成突破（复现同一条成功面板）"
+      },
+      {
+        "type": "expect",
+        "match": "re:✨ 突破成功！✨\n[^━\n]",
+        "combine": true,
+        "timeout": 60,
+        "note": "标题行以 ✨ 结尾且其后另起一行非分隔符内容 ⇒ 连败彩蛋确实独占一行。（fixture 预置 level_index=9 练气九阶，突破后 level_index=10 → 筑基初期，success 双槽的 flavor 取筑基段，故标题前必有一行引子；pity 参数见 game_config.skill_system.breakthrough_pity_step / _pity_guarantee，不在 level_config。）bd -ju1 修复的验收锚点：只断 `✨\\n` 证不了 bug 是否复现，故要求后随非 ━ 字符。"
+      }
+    ]
+  },
+  "run_messages": [
+    {
+      "id": 10273,
+      "conversation_id": 756,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#突破",
+      "rich": null,
+      "created_at": 1789147831.5886471
+    },
+    {
+      "id": 10274,
+      "conversation_id": 756,
+      "direction": "out",
+      "sender": "bot",
+      "text": "开始尝试突破...",
+      "rich": [],
+      "created_at": 1789147831.6037657
+    },
+    {
+      "id": 10275,
+      "conversation_id": 756,
+      "direction": "out",
+      "sender": "bot",
+      "text": "丹田里第一滴灵液落下，如春水破冰。河开的那一刻，整条灵脉都活了，汩汩地往丹田里汇。你守着这一泓春水，知道根基落成了——往后的路，是奔流，不再是漫流。\n✨ 突破成功！✨\n下山散心，师门塞给你一道平安符：不突破，也得平安。你捏着那枚歪歪扭扭缝的符，鼻子有点酸——符上绣的是一只胖乎乎的乌龟。你把它挂在腰间，觉得这句话，比突破口诀入耳。\n━━━━━━━━━━━━━━━\n基础成功率：80.0%\n永久加成：-100.0%\n连败保底：19次失败，天道酬勤，本次必成！\n最终成功率：100.0%\n━━━━━━━━━━━━━━━\n恭喜你从【练气九阶】突破至【筑基初期】！\n\n【属性增长】\n气血 +15\n伤害 +5\n身法 +0\n迅捷 +0\n\n【当前属性】\n伤害：105\n身法：50\n迅捷：50\n气血：1015\n护甲：0",
+      "rich": [],
+      "created_at": 1789147831.627053
+    }
+  ],
+  "started_at": 1789147831.4871132,
+  "finished_at": 1789147831.9005802
+}

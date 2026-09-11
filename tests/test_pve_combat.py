@@ -36,6 +36,20 @@ RiftManager = _rift_mod.RiftManager
 # ──────────────────────────────────────────────────────────────────────
 
 
+@pytest.fixture(autouse=True)
+def _restore_global_rng_state():
+    """Restore the global RNG stream after each test in this module.
+
+    The statistical cases below seed ``random`` to make their own draw reproducible and
+    order-independent. Without restoring the stream afterwards that seeding would leak
+    into every later test that consumes the global RNG (attribute-growth roulette, loot
+    rolls, other breakthrough panels), just moving the coupling instead of removing it.
+    """
+    state = random.getstate()
+    yield
+    random.setstate(state)
+
+
 @pytest.fixture
 def mock_combat_engine():
     """A fake combat engine returning deterministic results."""
@@ -139,10 +153,10 @@ def pve_manager_with_config(
 
 
 class TestEncounterProbability:
-    """_should_trigger_combat statistical verification (±5% tolerance, 1000 trials)."""
+    """_should_trigger_combat statistical verification (seeded draw, z < 4, 1000 trials)."""
 
     TRIALS = 1000
-    TOLERANCE = 0.05
+    Z_LIMIT = 4.0
 
     @pytest.mark.parametrize(
         "scene,difficulty,expected",
@@ -158,7 +172,7 @@ class TestEncounterProbability:
         ],
     )
     def test_encounter_rate(self, pve_manager, scene, difficulty, expected):
-        """Observed encounter rate is within ±5% of the configured rate."""
+        """Observed encounter rate matches the configured rate within 4 standard errors."""
         # Statistical assertions must own their seed: this test samples the global
         # ``random`` stream, so any other case that consumes RNG (e.g. breakthrough
         # panels) shifts it and turns a rare 3.4σ draw into an order-dependent red.
@@ -168,9 +182,16 @@ class TestEncounterProbability:
             for _ in range(self.TRIALS)
         )
         observed = hits / self.TRIALS
-        assert abs(observed - expected) <= self.TOLERANCE, (
+        # Per-cell tolerance rather than a flat band: ±5% is 3.16σ at p=0.50 but 7.2σ at
+        # p=0.95, so one constant proves different things per row. The seed freezes the
+        # draw (regression tripwire, not a live statistical test), so the threshold must
+        # be the one justified by that row's own variance.
+        sigma = (expected * (1.0 - expected) / self.TRIALS) ** 0.5
+        assert sigma > 0.0, f"[{scene}/{difficulty}] degenerate probability {expected}"
+        z = abs(observed - expected) / sigma
+        assert z < self.Z_LIMIT, (
             f"[{scene}/{difficulty}] expected {expected:.2f}, "
-            f"observed {observed:.2f} ({hits}/{self.TRIALS})"
+            f"observed {observed:.2f} ({hits}/{self.TRIALS}), z={z:.2f}"
         )
 
     def test_unknown_scene_returns_false(self, pve_manager):
@@ -185,10 +206,10 @@ class TestEncounterProbability:
 
 
 class TestEnemyCategoryDistribution:
-    """_select_enemy_category statistical verification (±5% tolerance, 1000 trials)."""
+    """_select_enemy_category statistical verification (seeded draw, z < 4, 1000 trials)."""
 
     TRIALS = 1000
-    TOLERANCE = 0.05
+    Z_LIMIT = 4.0
 
     @pytest.mark.parametrize(
         "scene,difficulty,expected",
@@ -203,7 +224,7 @@ class TestEnemyCategoryDistribution:
         ],
     )
     def test_category_distribution(self, pve_manager, scene, difficulty, expected):
-        """Observed category proportions are within ±5% of configured rates."""
+        """Observed category proportions match the configured rates within 4 errors."""
         # Same order-dependence guard as test_encounter_rate (global RNG stream).
         random.seed(f"category:{scene}:{difficulty}")
         counts = {"normal": 0, "elite": 0, "boss": 0}
@@ -211,23 +232,22 @@ class TestEnemyCategoryDistribution:
             cat = pve_manager._select_enemy_category(scene, difficulty)
             counts[cat] += 1
 
-        exp_norm, exp_elite, exp_boss = expected
-        obs_norm = counts["normal"] / self.TRIALS
-        obs_elite = counts["elite"] / self.TRIALS
-        obs_boss = counts["boss"] / self.TRIALS
-
-        assert abs(obs_norm - exp_norm) <= self.TOLERANCE, (
-            f"[{scene}/{difficulty}/normal] expected {exp_norm:.2f}, "
-            f"observed {obs_norm:.2f} ({counts['normal']}/{self.TRIALS})"
-        )
-        assert abs(obs_elite - exp_elite) <= self.TOLERANCE, (
-            f"[{scene}/{difficulty}/elite] expected {exp_elite:.2f}, "
-            f"observed {obs_elite:.2f} ({counts['elite']}/{self.TRIALS})"
-        )
-        assert abs(obs_boss - exp_boss) <= self.TOLERANCE, (
-            f"[{scene}/{difficulty}/boss] expected {exp_boss:.2f}, "
-            f"observed {obs_boss:.2f} ({counts['boss']}/{self.TRIALS})"
-        )
+        # One loop instead of three near-identical asserts; a configured 0.0 probability
+        # has no sampling variance, so any hit there is a defect rather than a tail event.
+        for label, exp in zip(("normal", "elite", "boss"), expected, strict=True):
+            observed = counts[label] / self.TRIALS
+            if exp == 0.0:
+                assert counts[label] == 0, (
+                    f"[{scene}/{difficulty}/{label}] configured 0.0 but hit "
+                    f"{counts[label]}/{self.TRIALS}"
+                )
+                continue
+            sigma = (exp * (1.0 - exp) / self.TRIALS) ** 0.5
+            z = abs(observed - exp) / sigma
+            assert z < self.Z_LIMIT, (
+                f"[{scene}/{difficulty}/{label}] expected {exp:.2f}, "
+                f"observed {observed:.2f} ({counts[label]}/{self.TRIALS}), z={z:.2f}"
+            )
 
     def test_adventure_low_always_normal(self, pve_manager):
         """Adventure low difficulty always returns 'normal'."""

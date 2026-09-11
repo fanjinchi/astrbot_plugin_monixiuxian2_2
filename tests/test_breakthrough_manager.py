@@ -2,6 +2,7 @@
 
 import json
 import random
+import re
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -422,15 +423,22 @@ class TestSuccessPanelStreakBonusLineBreak:
         Returns:
             The panel text produced by a forced-successful breakthrough.
         """
-        config_manager.narrative_config["breakthrough"]["lose_streak_reward"][
-            "通用"
-        ] = [bonus]
+        # Inject the whole scene, not one bucket of the live pool: the scene may legally
+        # be flat (list) or bucketed (dict), and rebuilding it keeps the layout guard from
+        # failing on container shape instead of on layout.
+        config_manager.narrative_config["breakthrough"]["lose_streak_reward"] = {
+            "通用": [bonus]
+        }
         db_mock.ext.get_active_loan = AsyncMock(return_value=None)
         manager.storage_ring_manager.get_available_slots = MagicMock(return_value=1)
         manager.pill_manager.add_pill_to_inventory = AsyncMock()
         # The test owns the outcome: pin the rate instead of relying on the shipped
         # early-realm table being 100% (a future nerf would make this test randomly red).
-        manager.calculate_breakthrough_success_rate = lambda *a, **k: (1.0, "")
+        # Keep a non-empty rate_info so the lines under the title stay realistic.
+        manager.calculate_breakthrough_success_rate = lambda *a, **k: (
+            1.0,
+            "基础成功率：100.0%",
+        )
         success, msg, died = await manager.execute_breakthrough(self._player(streak))
         assert success and not died
         return msg
@@ -453,7 +461,12 @@ class TestSuccessPanelStreakBonusLineBreak:
             breakthrough_manager, db_mock, config_manager, streak, "苦尽甘来"
         )
         if expected_line:
-            assert f"{self.TITLE}\n{expected_line}\n" in msg, msg[:160]
+            # One whole block instead of a two-line prefix: pins the bonus as its own
+            # line with no blank line above *or* below it (lstrip-only would survive a
+            # `TITLE\nbonus\n` substring check).
+            assert f"{self.TITLE}\n{expected_line}\n━" in msg, msg[:160]
+            assert f"{expected_line}\n\n" not in msg, msg[:160]
+            assert "基础成功率：100.0%" in msg, msg[:160]
         else:
             # Title is followed directly by the rule, with no blank line in between.
             assert f"{self.TITLE}\n━" in msg, msg[:160]
@@ -466,27 +479,37 @@ class TestSuccessPanelStreakBonusLineBreak:
         msg = await self._success_panel(
             breakthrough_manager, db_mock, config_manager, 5, "\n  苦尽甘来  \n"
         )
-        assert f"{self.TITLE}\n苦尽甘来\n" in msg, msg[:160]
+        assert f"{self.TITLE}\n苦尽甘来\n━" in msg, msg[:160]
         assert f"{self.TITLE}\n\n" not in msg, msg[:160]
 
     def test_panel_template_does_not_precede_the_slot_with_a_break(self):
         """Both the embedded default and the live config keep the slot inline."""
         # Defaults store the scene as a plain string; the imported config stores the
-        # dual-slot shape (panel template + bucketed flavor pool).
+        # dual-slot shape (panel template + bucketed flavor pool). Only the newline
+        # *before* the slot is forbidden (it would double the break the caller inserts);
+        # what follows the slot is the template's own business, so it stays unconstrained.
         default_panel = _breakthrough_scenes.SCENES["success"]
-        live_panel = json.loads(
+        live = json.loads(
             (PLUGIN_ROOT / "config" / "narrative_config.json").read_text("utf-8")
-        )["breakthrough"]["success"]["panel"]
+        )
+        live_panel = live["breakthrough"]["success"]["panel"]
         for panel in (default_panel, live_panel):
-            assert f"{self.TITLE}{{streak_bonus_msg}}\n" in panel
-            assert f"\n{{streak_bonus_msg}}" not in panel
+            assert f"{self.TITLE}{{streak_bonus_msg}}" in panel
+            assert re.search(r"\n\s*\{streak_bonus_msg\}", panel) is None, panel[:80]
 
     def test_shipped_bonus_copy_carries_no_edge_whitespace(self, config_manager):
-        """Shipped variants match the ``.strip()`` the panel applies to them."""
-        pool = config_manager.narrative_config["breakthrough"]["lose_streak_reward"]
+        """Warn if imported variants smuggle the whitespace the caller strips away."""
+        scene = config_manager.narrative_config.get("breakthrough", {}).get(
+            "lose_streak_reward"
+        )
+        if scene is None:
+            # Absent scene falls back to the embedded default, whose layout the tests
+            # above already pin; there is no imported copy to police here.
+            pytest.skip("lose_streak_reward 未导入，契约由内嵌默认保证")
+        buckets = scene.values() if isinstance(scene, dict) else [scene]
         texts = [
             entry["text"] if isinstance(entry, dict) else str(entry)
-            for bucket in pool.values()
+            for bucket in buckets
             for entry in (bucket if isinstance(bucket, list) else [bucket])
         ]
         assert texts
