@@ -241,7 +241,7 @@ armor-content-design 预算复核须以含此 nerf 的新基线为准。
 ### 7.4 UX 与配置
 
 - 失败消息追加：`连败 N 次，天道酬勤：下次成功率 +X%（再败 M 次必成）`；
-- 高连败（≥3）成功后追加`苦尽甘来`彩蛋文案；
+- 高连败（≥3）成功后追加久败补偿彩蛋（`breakthrough.lose_streak_reward`，当前变体见 `design_docs/content-design/copy_variants.csv` 的 breakthrough/lose_streak_reward 段）：彩蛋**独占一行**跟在标题后，换行由面板调用侧代码负责（`core/breakthrough_manager.py` 插入 `\n` 并对渲染结果做 strip），文案变体不得自带首尾空白——`copy_variants.csv` 导入不保留单元格前导空白，靠文案带换行会退化成标题与彩蛋粘连（bd -ju1，已修）；连败 <3 时不插该行也不留空行；
 - 配置（`game_config.json` → `skill_system`）：
   `breakthrough_pity_step: 0.05`、`breakthrough_pity_guarantee: 19`；
 - 实装位置：`execute_breakthrough`（与成长方案 A 同一代码路径，随 §5 第 1 步一起做），

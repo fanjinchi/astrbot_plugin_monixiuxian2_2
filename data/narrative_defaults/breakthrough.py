@@ -13,7 +13,9 @@ test assertions on the exact wording keep passing.
 SCENES: dict[str, object] = {
     # Breakthrough success panel (core/breakthrough_manager.py execute_breakthrough).
     # {streak_bonus_msg} carries the optional lose-streak reward line (already
-    # rendered from the ``lose_streak_reward`` scene, empty when streak < 3).
+    # rendered from the ``lose_streak_reward`` scene, empty when streak < 3). The
+    # separator newline is owned by the caller (core/breakthrough_manager.py), so
+    # variants must NOT start with ``\n`` (bd -ju1).
     "success": (
         "✨ 突破成功！✨{streak_bonus_msg}\n"
         "━━━━━━━━━━━━━━━\n"
@@ -33,8 +35,9 @@ SCENES: dict[str, object] = {
         "护甲：{armor_value}"
     ),
     # Lose-streak reward line appended to the success header when the player
-    # had >= 3 consecutive failures before this success.
-    "lose_streak_reward": "\n💪 苦尽甘来，天道不负有心人！",
+    # had >= 3 consecutive failures before this success. No leading newline: the
+    # panel inserts exactly one before this line (bd -ju1).
+    "lose_streak_reward": "💪 苦尽甘来，天道不负有心人！",
     # Skill-comprehension flavor lines (success roll / fail soft-pity roll /
     # universal-pool fallback shared by both outcomes).
     "comprehend_success": "🎁 福至心灵，领悟功法【{name}】！",

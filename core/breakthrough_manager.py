@@ -276,16 +276,25 @@ class BreakthroughManager:
             # 检查并处理突破贷款自动还款
             loan_msg = await self._handle_breakthrough_loan_repay(player)
 
-            # 高连败彩蛋文案（叙事文案外移：默认文本见 narrative_defaults/breakthrough.py）
+            # Lose-streak reward line (defaults: narrative_defaults/breakthrough.py).
+            # The separator newline is owned by this call site: the reward is optional, so
+            # a template-side "\n{streak_bonus_msg}" (the shape openspec
+            # flavor-copy-assembly D6 picked for the mandatory {pity_msg}) would leave a
+            # blank line whenever streak < 3, and a copy-side leading "\n" vanishes on
+            # content import because CSV cells keep no leading whitespace -- which is what
+            # glued this line onto the title (bd -ju1). Stripping both ends also neutralises
+            # legacy variants that still carry their own break.
             streak_bonus_msg = ""
             if prev_fail_streak >= 3:
-                streak_bonus_msg = render_narrative(
+                bonus_text = render_narrative(
                     self.config_manager,
                     "breakthrough",
                     "lose_streak_reward",
                     route=player.cultivation_type,
                     level_index=player.level_index,
-                )
+                ).strip()
+                if bonus_text:
+                    streak_bonus_msg = f"\n{bonus_text}"
 
             # 领悟判定（成功 20%）
             learn_msgs = []

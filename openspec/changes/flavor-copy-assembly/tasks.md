@@ -50,7 +50,11 @@
 
 - [x] 7.5 用例侧同步（2026-09-11，修 -khh）：pvp 20 例断言全部改锚**代码不变量**（`re:<actor>[^\n]*【效果名】`、代码拼装对战面板、`-- 第 N 回合 --`、GM 回执全串含千分位），删除所有 `|战斗开始` 恒真兼底；双方气血 8000（武器用例 999999999）把战斗拉长到 action_limit 附近，使 8%~25% 触发率单场必中而不再依赖 `--repeat`；每例末尾新增哨兵 send + `expect_not`（扫未渲染占位符与独占一行的 `---`）；全部加 `pre_run_hook` 跑 `fixture --profile pvp` 复位属性/功法位/冷却，tag 补 `narrative-flavor`。`scripts/test_suite_ctl.py` 的 `EFFECT_EVIDENCE_PATTERNS` 重写为按插值名计数（弃 `攻击`=噪声的 pierce 键），新增 pity/彩蛋/机缘/领悟/悟道/death/revive 证据键
 - [x] 7.6 route B 真实环境覆盖补齐（修 -b5h）：新增 `player/breakthrough-fail-pity`（闭关双槽 + 时间快进 12h + 出关结算面板数值行 + 0.0% 必败面板 + pity_hint「再败 N 回」+ 连败加成 +5.0%）、`player/breakthrough-guarantee`（streak=19 强制成功：双槽结构 + 保底行 + 彩蛋段 + 境界变更 + 方案 A 成长/当前属性行）、`player/breakthrough-title-layout`（tag `known-bug`，盯 -ju1 换行缺陷）；`fixture` 新增 `breakthrough` profile（`level_up_rate=-100` 把最终成功率压到 0.0% → 必败与随机数无关；`--breakthrough-streak` 预置连败数），三个 profile 均先清理 `case_%` 虚拟玩家（修 -777）；`gm-time-tools` 的 `闭关开始时间：1 条` 改为 `[1-9]\d* 条`（全局计数不断言具体值），`player-lifecycle` 裸词 `道友` 改为 `📋 道友 … 的信息`
-- [ ] 7.7 本轮发现、需产品/内容决策的遗留（不自行修游戏代码）：-ju1 成功面板标题与彩蛋粘连（D6 漏了 `streak_bonus_msg` 同族插值点）、-74n copy_variants.csv 20 行吞进 `---` 条目分隔线（narrative 5 条 + adventure desc_variants 15 条，玩家可见）、-hcn `remaining_hp` 无阈值恒定追加与血量自相矛盾、-os6 pierce/unavoidable 触发零痕迹、-r0a 横幅文案被导入替换（用例已改锚代码行，横幅是否恢复属内容决策）
+- [x] 7.7 本轮发现的遗留处置记录：
+  - `-ju1` 成功面板标题与彩蛋粘连（`streak_bonus_msg` 是 D6 漏掉的同族插值点）——**已修**，换行责任落在 `core/breakthrough_manager.py` 插值侧（彩蛋可选 ⇒ 模板侧插 `\n` 会在连败 <3 时留空行，与 D6 对必然存在的 `{pity_msg}` 取模板侧的口径有意偏离），防回归钉为 `tests/test_breakthrough_manager.py::TestSuccessPanelStreakBonusLineBreak` 与 `functional_tests/cases/player/breakthrough-title-layout.json`
+  - `-74n` copy_variants.csv 20 行吞进 `---` 条目分隔线——**已修**（design_docs 去分隔线 + 导入器 `_strip_separator` 兜底，commit `a288bba`）
+  - `-os6` pierce/unavoidable 触发零痕迹——**定为不做**：新增痕迹需 `combat.*` 新句子，而该域渲染实时战报行（见 `-r0a`），AGENTS.md #15 又禁止直改 `config/*.json`；理由写进 `managers/combat_manager.py` 注释，两个用例退化为路径 smoke
+  - 仍 open 需产品/内容决策：`-hcn` `remaining_hp` 无阈值恒定追加与血量自相矛盾、`-r0a` 横幅文案被导入替换（用例已改锚代码行）
 
 ## 8. 收尾
 

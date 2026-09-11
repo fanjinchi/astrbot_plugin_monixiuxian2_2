@@ -325,6 +325,8 @@ astrbot_plugin_monixiuxian2_2/
 - **bd 3bt① 闭环**：此前滞留的 19 个场景全部入库——6 个面板场景走双槽，其余 13 个轻信息场景（战斗伤害/闪避/机缘掉落等）变体补写机械变量后按原契约导入，共 43 场景写入 `narrative_config.json`
 - **降级纪律**：flavor 渲染异常只出面板、面板渲染异常输出原始模板（均不 raise）；加载校验豁免 `panel` 桶键，非字符串 panel 或 text+panel 混写整场景回退内嵌默认
 - **文案细节**：连败提示换行责任移入 survive 面板（`{pity_msg}` 前补 `\n`），pity_hint 变体不再携带前导换行
+- **修复**：高连败（≥3）突破成功时久败彩蛋与「✨ 突破成功！✨」标题粘连——换行改由 `core/breakthrough_manager.py` 插值侧负责（彩蛋可选，模板侧补 `\n` 会在无彩蛋时留空行），并对渲染结果 strip（bd -ju1）
+- **修复**：剧情稿 `copy_variants.csv` 的 `---` 条目分隔线不再被当成文案内容导入（narrative 5 条 + adventure desc_variants 15 条玩家可见的尾部 `---` 消失，bd -74n）
 
 ---
 

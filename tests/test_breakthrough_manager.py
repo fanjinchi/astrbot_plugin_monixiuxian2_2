@@ -1,5 +1,6 @@
 """Tests for the formula-driven breakthrough system."""
 
+import json
 import random
 from unittest.mock import AsyncMock, MagicMock
 
@@ -26,6 +27,12 @@ _bm_mod = load_package_module(
     "astrbot_plugin_monixiuxian2_2.core.breakthrough_manager",
 )
 BreakthroughManager = _bm_mod.BreakthroughManager
+
+_scenes_mod = load_package_module(
+    "data/narrative_defaults/breakthrough.py",
+    "astrbot_plugin_monixiuxian2_2.data.narrative_defaults.breakthrough",
+)
+_breakthrough_scenes = _scenes_mod
 
 PLUGIN_ROOT = _config_mod.Path(__file__).resolve().parent.parent
 
@@ -368,3 +375,120 @@ class TestGrowthByRoute:
         assert msg == "🎁 机缘天降，获得【木剑】，但储物戒已满无法存入。"
         # The drop is lost: nothing persisted on this branch.
         db_mock.update_player.assert_not_called()
+
+
+class TestSuccessPanelStreakBonusLineBreak:
+    """The success panel owns the line break before the lose-streak bonus (bd -ju1).
+
+    ``breakthrough.lose_streak_reward`` copy must not carry its own leading newline
+    (the CSV import drops leading whitespace in cells, so the bonus used to be glued to
+    the ``✨ 突破成功！✨`` title), and the panel template must not pre-newline the slot
+    either — the bonus is optional, so an unconditional newline would leave a blank line
+    whenever the streak is below 3.
+    """
+
+    TITLE = "✨ 突破成功！✨"
+
+    @staticmethod
+    def _player(streak: int) -> Player:
+        player = Player(
+            user_id="u1",
+            level_index=5,
+            cultivation_type="灵修",
+            experience=10**9,
+            hp=100,
+            damage=10,
+            agility=5,
+            speed=5,
+            armor_value=0,
+        )
+        player.breakthrough_fail_streak = streak
+        return player
+
+    async def _success_panel(
+        self, manager, db_mock, config_manager, streak: int, bonus: str
+    ) -> str:
+        """Render one success panel with ``bonus`` as the only bonus variant.
+
+        Args:
+            manager: BreakthroughManager under test.
+            db_mock: Stubbed database (``get_player`` stays None, so the caller's
+                in-memory player is the only state).
+            config_manager: Provides the loaded narrative pool, overwritten here so the
+                assertion does not depend on which copy variant the pool draws.
+            streak: Prior breakthrough failures recorded on the player.
+            bonus: Content of the ``lose_streak_reward`` scene.
+
+        Returns:
+            The panel text produced by a forced-successful breakthrough.
+        """
+        config_manager.narrative_config["breakthrough"]["lose_streak_reward"][
+            "通用"
+        ] = [bonus]
+        db_mock.ext.get_active_loan = AsyncMock(return_value=None)
+        manager.storage_ring_manager.get_available_slots = MagicMock(return_value=1)
+        manager.pill_manager.add_pill_to_inventory = AsyncMock()
+        # The test owns the outcome: pin the rate instead of relying on the shipped
+        # early-realm table being 100% (a future nerf would make this test randomly red).
+        manager.calculate_breakthrough_success_rate = lambda *a, **k: (1.0, "")
+        success, msg, died = await manager.execute_breakthrough(self._player(streak))
+        assert success and not died
+        return msg
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "streak,expected_line",
+        [
+            (0, ""),
+            (2, ""),
+            (3, "苦尽甘来"),
+            (19, "苦尽甘来"),
+        ],
+    )
+    async def test_bonus_line_follows_the_streak_threshold(
+        self, breakthrough_manager, db_mock, config_manager, streak, expected_line
+    ):
+        """Streaks below 3 add no line; from 3 on the bonus gets its own line."""
+        msg = await self._success_panel(
+            breakthrough_manager, db_mock, config_manager, streak, "苦尽甘来"
+        )
+        if expected_line:
+            assert f"{self.TITLE}\n{expected_line}\n" in msg, msg[:160]
+        else:
+            # Title is followed directly by the rule, with no blank line in between.
+            assert f"{self.TITLE}\n━" in msg, msg[:160]
+
+    @pytest.mark.asyncio
+    async def test_legacy_leading_newline_is_neutralized(
+        self, breakthrough_manager, db_mock, config_manager
+    ):
+        """A copy variant that still starts with ``\n`` must not double the break."""
+        msg = await self._success_panel(
+            breakthrough_manager, db_mock, config_manager, 5, "\n  苦尽甘来  \n"
+        )
+        assert f"{self.TITLE}\n苦尽甘来\n" in msg, msg[:160]
+        assert f"{self.TITLE}\n\n" not in msg, msg[:160]
+
+    def test_panel_template_does_not_precede_the_slot_with_a_break(self):
+        """Both the embedded default and the live config keep the slot inline."""
+        # Defaults store the scene as a plain string; the imported config stores the
+        # dual-slot shape (panel template + bucketed flavor pool).
+        default_panel = _breakthrough_scenes.SCENES["success"]
+        live_panel = json.loads(
+            (PLUGIN_ROOT / "config" / "narrative_config.json").read_text("utf-8")
+        )["breakthrough"]["success"]["panel"]
+        for panel in (default_panel, live_panel):
+            assert f"{self.TITLE}{{streak_bonus_msg}}\n" in panel
+            assert f"\n{{streak_bonus_msg}}" not in panel
+
+    def test_shipped_bonus_copy_carries_no_edge_whitespace(self, config_manager):
+        """Shipped variants match the ``.strip()`` the panel applies to them."""
+        pool = config_manager.narrative_config["breakthrough"]["lose_streak_reward"]
+        texts = [
+            entry["text"] if isinstance(entry, dict) else str(entry)
+            for bucket in pool.values()
+            for entry in (bucket if isinstance(bucket, list) else [bucket])
+        ]
+        assert texts
+        for text in texts:
+            assert text == text.strip(), f"leading/trailing whitespace in {text!r}"
