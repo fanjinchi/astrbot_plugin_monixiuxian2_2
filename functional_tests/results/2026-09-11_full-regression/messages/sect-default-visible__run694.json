@@ -1,0 +1,110 @@
+[
+  {
+    "id": 9698,
+    "conversation_id": 705,
+    "direction": "in",
+    "sender": "900000004",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1789140948.197531
+  },
+  {
+    "id": 9699,
+    "conversation_id": 705,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1789140948.21159
+  },
+  {
+    "id": 9700,
+    "conversation_id": 705,
+    "direction": "in",
+    "sender": "900000004",
+    "text": "#宗门 列表",
+    "rich": null,
+    "created_at": 1789140948.5092714
+  },
+  {
+    "id": 9701,
+    "conversation_id": 705,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏛️ 宗门列表\n━━━━━━━━━━━━━━━\n1. 【青云门】\n   宗主：未知\n   建设度：100 | 成员：1人\n\n2. 【合欢宗】\n   宗主：未知\n   建设度：100 | 成员：0人\n\n",
+    "rich": [],
+    "created_at": 1789140948.52445
+  },
+  {
+    "id": 9702,
+    "conversation_id": 705,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000004 练气三阶",
+    "rich": null,
+    "created_at": 1789140948.8230689
+  },
+  {
+    "id": 9703,
+    "conversation_id": 705,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家4】的境界设置为「练气三阶」",
+    "rich": [],
+    "created_at": 1789140948.8522196
+  },
+  {
+    "id": 9704,
+    "conversation_id": 705,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置灵石 900000004 50000",
+    "rich": null,
+    "created_at": 1789140949.1405892
+  },
+  {
+    "id": 9705,
+    "conversation_id": 705,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家4】的灵石设置为 50,000",
+    "rich": [],
+    "created_at": 1789140949.1683636
+  },
+  {
+    "id": 9706,
+    "conversation_id": 705,
+    "direction": "in",
+    "sender": "900000004",
+    "text": "#宗门 创建 青云门",
+    "rich": null,
+    "created_at": 1789140949.457619
+  },
+  {
+    "id": 9707,
+    "conversation_id": 705,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 『青云门』乃天下名门，不可用作宗门名称！",
+    "rich": [],
+    "created_at": 1789140949.4768004
+  },
+  {
+    "id": 9708,
+    "conversation_id": 705,
+    "direction": "in",
+    "sender": "900000004",
+    "text": "#宗门 创建 合欢宗",
+    "rich": null,
+    "created_at": 1789140949.7747674
+  },
+  {
+    "id": 9709,
+    "conversation_id": 705,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 『合欢宗』乃天下名门，不可用作宗门名称！",
+    "rich": [],
+    "created_at": 1789140949.7889562
+  }
+]

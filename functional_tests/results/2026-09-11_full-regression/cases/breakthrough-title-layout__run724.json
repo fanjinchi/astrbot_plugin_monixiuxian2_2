@@ -1,0 +1,120 @@
+{
+  "id": 724,
+  "case_name": "breakthrough-title-layout",
+  "run_index": 3,
+  "status": "failed",
+  "conversation_id": 735,
+  "steps_result": [
+    {
+      "index": -1,
+      "type": "pre_run_hook",
+      "note": "",
+      "ok": true,
+      "detail": "hook 退出码 0：已备份现有固定 ID 数据 -> /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/functional_tests/.fixture-backup.json\nfixture breakthrough 完成：2 个固定测试玩家已重置",
+      "actual": [],
+      "duration": 0.05
+    },
+    {
+      "index": 0,
+      "type": "send",
+      "note": "保底必成突破（复现同一条成功面板）",
+      "ok": true,
+      "detail": "已注入（消息 #10113）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "标题行以 ✨ 结尾、其后另起一行非分隔符内容 ⇒ 强制成功时必定渲染的连败彩蛋（面板 level=10 恒为「练气一层→练气二层」，见 level_config.pity_config）确实独占一行；只断 `✨\\n` 在彩蛋缺失时同样通过，证不了 bug 是否复现（评审 P2-6）",
+      "ok": false,
+      "detail": "超时未匹配 're:✨ 突破成功！✨\\n[^━\\n]'；窗口内实际回复 2 条，最接近 #10114（相似度 0.174）",
+      "actual": [
+        "开始尝试突破...",
+        "灵气在丹田凝成一方基台，白石砌的，不花俏，稳当。你盘坐其上，像农夫坐进自己的田里——地是自家的了，种什么，秋天见分晓。\n✨ 突破成功！✨闭关处的墙角，你踢到一枚石子——不是普通石子，是温养石，摸着暖融融的，不知是哪位前辈随手落的。你揣进怀里，心想：败了这么多回，总该捡点什么。这石头后来一直跟着你，比许多法宝都贴心。\n━━━━━━━━━━━━━━━\n基础成功率：80.0%\n永久加成：-100.0%\n连败保底：19次失败，天道酬勤，本次必成！\n最终成功率：100.0%\n━━━━━━━━━━━━━━━\n恭喜你从【练气九阶】突破至【筑基初期】！\n\n【属性增长】\n气血 +15\n伤害 +3\n身法 +1\n迅捷 +1\n\n【当前属性】\n伤害：103\n身法：51\n迅捷：51\n气血：1015\n护甲：0\n\n废弃的丹房里，炉灰深处还埋着几粒滚圆丹药，尚有余温——【灵气容量丹】x1、【小法盾丹】x1。你托在掌心，想了想，没有急着服——来路不明的丹，来路不明的机缘。你收进玉瓶，想着等哪天请个识丹的老前辈，掌掌眼。"
+      ],
+      "expected": "re:✨ 突破成功！✨\n[^━\n]",
+      "candidates": [
+        {
+          "id": 10114,
+          "text": "开始尝试突破...",
+          "score": 0.174
+        },
+        {
+          "id": 10115,
+          "text": "灵气在丹田凝成一方基台，白石砌的，不花俏，稳当。你盘坐其上，像农夫坐进自己的田里——地是自家的了，种什么，秋天见分晓。\n✨ 突破成功！✨闭关处的墙角，你踢到一枚石子——不是普通石子，是温养石，摸着暖融融的，不知是哪位前辈随手落的。你揣进怀里",
+          "score": 0.035
+        }
+      ],
+      "duration": 60.23
+    }
+  ],
+  "case_snapshot": {
+    "name": "breakthrough-title-layout",
+    "description": "盯住已知排版 Bug：高连败突破成功时，lose_streak_reward 彩蛋必须另起一行，不得与「✨ 突破成功！✨」标题粘连。",
+    "scenario": "前置与 breakthrough-guarantee 完全相同（fixture --profile breakthrough --breakthrough-streak 19 → 突破必然成功且必然带彩蛋段）。唯一断言要求标题行以换行收尾。当前 core/breakthrough_manager.py 的面板模板为 `✨ 突破成功！✨{streak_bonus_msg}`，彩蛋段无前导换行 → 本用例预期失败，作为 bd -ju1 的验收标准；修复后自动转绿。",
+    "tags": [
+      "player",
+      "narrative",
+      "known-bug"
+    ],
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_flavor_002",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000002"
+      }
+    },
+    "pre_run_hook": {
+      "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile breakthrough --breakthrough-streak 19 --yes",
+      "timeout": 90
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#突破",
+        "note": "保底必成突破（复现同一条成功面板）"
+      },
+      {
+        "type": "expect",
+        "match": "re:✨ 突破成功！✨\n[^━\n]",
+        "combine": true,
+        "timeout": 60,
+        "note": "标题行以 ✨ 结尾、其后另起一行非分隔符内容 ⇒ 强制成功时必定渲染的连败彩蛋（面板 level=10 恒为「练气一层→练气二层」，见 level_config.pity_config）确实独占一行；只断 `✨\\n` 在彩蛋缺失时同样通过，证不了 bug 是否复现（评审 P2-6）"
+      }
+    ]
+  },
+  "run_messages": [
+    {
+      "id": 10113,
+      "conversation_id": 735,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#突破",
+      "rich": null,
+      "created_at": 1789141413.64571
+    },
+    {
+      "id": 10114,
+      "conversation_id": 735,
+      "direction": "out",
+      "sender": "bot",
+      "text": "开始尝试突破...",
+      "rich": [],
+      "created_at": 1789141413.6609392
+    },
+    {
+      "id": 10115,
+      "conversation_id": 735,
+      "direction": "out",
+      "sender": "bot",
+      "text": "灵气在丹田凝成一方基台，白石砌的，不花俏，稳当。你盘坐其上，像农夫坐进自己的田里——地是自家的了，种什么，秋天见分晓。\n✨ 突破成功！✨闭关处的墙角，你踢到一枚石子——不是普通石子，是温养石，摸着暖融融的，不知是哪位前辈随手落的。你揣进怀里，心想：败了这么多回，总该捡点什么。这石头后来一直跟着你，比许多法宝都贴心。\n━━━━━━━━━━━━━━━\n基础成功率：80.0%\n永久加成：-100.0%\n连败保底：19次失败，天道酬勤，本次必成！\n最终成功率：100.0%\n━━━━━━━━━━━━━━━\n恭喜你从【练气九阶】突破至【筑基初期】！\n\n【属性增长】\n气血 +15\n伤害 +3\n身法 +1\n迅捷 +1\n\n【当前属性】\n伤害：103\n身法：51\n迅捷：51\n气血：1015\n护甲：0\n\n废弃的丹房里，炉灰深处还埋着几粒滚圆丹药，尚有余温——【灵气容量丹】x1、【小法盾丹】x1。你托在掌心，想了想，没有急着服——来路不明的丹，来路不明的机缘。你收进玉瓶，想着等哪天请个识丹的老前辈，掌掌眼。",
+      "rich": [],
+      "created_at": 1789141413.7086165
+    }
+  ],
+  "started_at": 1789141413.542156,
+  "finished_at": 1789141473.884932
+}

@@ -1,0 +1,170 @@
+{
+  "id": 723,
+  "case_name": "breakthrough-guarantee",
+  "run_index": 9,
+  "status": "passed",
+  "conversation_id": 734,
+  "steps_result": [
+    {
+      "index": -1,
+      "type": "pre_run_hook",
+      "note": "",
+      "ok": true,
+      "detail": "hook 退出码 0：已备份现有固定 ID 数据 -> /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/functional_tests/.fixture-backup.json\nfixture breakthrough 完成：2 个固定测试玩家已重置",
+      "actual": [],
+      "duration": 0.05
+    },
+    {
+      "index": 0,
+      "type": "send",
+      "note": "保底必成突破（success 双槽）",
+      "ok": true,
+      "detail": "已注入（消息 #10108）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "一条断言覆盖成功面板全链路（平台语义：每个 send 只有一个断言会被新回复触发）：双槽结构 → lose_streak_reward 彩蛋段（紧跟标题，两变体各取稳定子串）→ rate_info 保底行（pity_guarantee=19 强制 100%）→ 境界变更行 → 方案 A 成长/当前属性数值行。标题与彩蛋粘连的排版缺陷由 breakthrough-title-layout 盯住（bd astrbot_plugin_monixiuxian2_2-ju1）",
+      "ok": true,
+      "detail": "合并窗口匹配（消息 #10109-#10110）",
+      "actual": [
+        "开始尝试突破...",
+        "丹田里第一滴灵液落下，如春水破冰。河开的那一刻，整条灵脉都活了，汩汩地往丹田里汇。你守着这一泓春水，知道根基落成了——往后的路，是奔流，不再是漫流。\n✨ 突破成功！✨下山散心，师门塞给你一道平安符：不突破，也得平安。你捏着那枚歪歪扭扭缝的符，鼻子有点酸——符上绣的是一只胖乎乎的乌龟。你把它挂在腰间，觉得这句话，比突破口诀入耳。\n━━━━━━━━━━━━━━━\n基础成功率：80.0%\n永久加成：-100.0%\n连败保底：19次失败，天道酬勤，本次必成！\n最终成功率：100.0%\n━━━━━━━━━━━━━━━\n恭喜你从【练气九阶】突破至【筑基初期】！\n\n【属性增长】\n气血 +15\n伤害 +5\n身法 +0\n迅捷 +0\n\n【当前属性】\n伤害：105\n身法：50\n迅捷：50\n气血：1015\n护甲：0"
+      ],
+      "expected": "re:[^\\n]\\n✨ 突破成功！✨[\\s\\S]*(败了这么多回|比突破口诀入耳)[\\s\\S]*连败保底：19次失败，天道酬勤，本次必成！[\\s\\S]*恭喜你从【[^】]*】突破至【[^】]*】！[\\s\\S]*【属性增长】[\\s\\S]*气血 \\+[\\d,]+[\\s\\S]*【当前属性】[\\s\\S]*护甲：[\\d,]+",
+      "matched": {
+        "combined": true,
+        "first_id": 10109,
+        "last_id": 10110,
+        "text": "开始尝试突破...\n丹田里第一滴灵液落下，如春水破冰。河开的那一刻，整条灵脉都活了，汩汩地往丹田里汇。你守着这一泓春水，知道根基落成了——往后的路，是奔流，不再是漫流。\n✨ 突破成功！✨下山散心，师门塞给你一道平安符：不突破，也得平安。你捏"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "哨兵发送：给末步负向断言制造一条新回复",
+      "ok": true,
+      "detail": "已注入（消息 #10111）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 3,
+      "type": "expect_not",
+      "note": "回归守护：整轮回复不得残留未渲染占位符（{var} / {var:.1f}），也不得出现独占一行的「---」——后者是 copy_variants.csv 把剧情稿条目分隔线吞进 text 单元格造成的线上缺陷（narrative_config 5 条 + adventure desc_variants 15 条），命中即 bd astrbot_plugin_monixiuxian2_2-74n 未修",
+      "ok": true,
+      "detail": "60s 窗口内 3 条回复均未命中 're:(?m)^-{3,}\\\\s*$|\\\\{[a-z_]+(:[^}]*)?\\\\}'",
+      "actual": [
+        "开始尝试突破...",
+        "丹田里第一滴灵液落下，如春水破冰。河开的那一刻，整条灵脉都活了，汩汩地往丹田里汇。你守着这一泓春水，知道根基落成了——往后的路，是奔流，不再是漫流。\n✨ 突破成功！✨下山散心，师门塞给你一道平安符：不突破，也得平安。你捏着那枚歪歪扭扭缝的符，鼻子有点酸——符上绣的是一只胖乎乎的乌龟。你把它挂在腰间，觉得这句话，比突破口诀入耳。\n━━━━━━━━━━━━━━━\n基础成功率：80.0%\n永久加成：-100.0%\n连败保底：19次失败，天道酬勤，本次必成！\n最终成功率：100.0%\n━━━━━━━━━━━━━━━\n恭喜你从【练气九阶】突破至【筑基初期】！\n\n【属性增长】\n气血 +15\n伤害 +5\n身法 +0\n迅捷 +0\n\n【当前属性】\n伤害：105\n身法：50\n迅捷：50\n气血：1015\n护甲：0",
+        "📋 道友 测试玩家1 的信息\n━━━━━━━━━━━━━━━\n\n【基本信息】\n  道号：测试玩家1\n  境界：筑基初期\n  修为：999,999/56,920\n  灵石：100,000\n  战力：1,220\n  灵根：天灵根\n\n【四主属性】\n  伤害：105\n  身法：50\n  迅捷：50\n  气血：1015\n  护甲：0\n\n【装备信息】\n  主修功法：无\n  法器：无\n  防具：无\n\n【功法修习】\n  已领悟功法：0\n  修习目标：无\n  战报合并条数：10\n\n【宗门信息】\n  所在宗门：无宗门\n  宗门职位：散修\n━━━━━━━━━━━━━━━"
+      ],
+      "expected": "re:(?m)^-{3,}\\s*$|\\{[a-z_]+(:[^}]*)?\\}",
+      "duration": 60.22
+    }
+  ],
+  "case_snapshot": {
+    "name": "breakthrough-guarantee",
+    "description": "验证连败保底路径下的突破成功面板：route B 双槽拼装（flavor+panel）、保底说明行、高连败彩蛋、属性增长/当前属性数值行。",
+    "scenario": "前置：pre_run_hook 跑 fixture --profile breakthrough --breakthrough-streak 19，把 900000002 预置为练气九阶、修为 999,999、level_up_rate=-100、breakthrough_fail_streak=19（= game_config.skill_system.breakthrough_pity_guarantee）。此时 core/breakthrough_manager.py 在丹药 cap 之后把成功率强制为 1.0，`random() < 1.0` 恒真 → 突破必然成功，且 prev_fail_streak=19 ≥3 会追加 lose_streak_reward 彩蛋段。断言口径：结构契约用「面板首行前存在一行文案」验证，不锚文学句；保底说明/属性增长行锚代码拼装模板。成功路径同时 roll 突破领悟（20%）与突破机缘掉落（武器/心法/丹药合计约 40%），二者文案随变体随机，不进断言，改由 test_suite_ctl 的 comprehend_prose / fortune_drop_prose 证据计数——需覆盖请以 --repeat ≥10 抽样后看结果归档的「效果证据聚合」。本用例是 route A 的 fortune.weapon_drop / pill_drop / heart_method_drop 与 breakthrough.comprehend_success / comprehend_universal 在 webtest 侧的唯一渲染入口（core/breakthrough_manager.py:325 突破成功后掷机缘轮盘、:303/:317 领悟判定），这些轮盘无 GM 杠杆、不可强制 ⇒ 需 --repeat >=10 抽样并在归档 summary.md 记录命中率；本用例刻意不设 deterministic，让每次 repeat 抽到不同文学变体。death/revive 面板不在本套件覆盖：fixture 预设 has_resurrection_pill=0 使 revive 不可达，且失败死亡率 uniform(0.005,0.03) 与境界无关（评审 P1-4④，改由 tests/ 打分支）",
+    "tags": [
+      "player",
+      "cultivation",
+      "narrative",
+      "narrative-flavor",
+      "sampled"
+    ],
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_flavor_002",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000002"
+      }
+    },
+    "pre_run_hook": {
+      "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile breakthrough --breakthrough-streak 19 --yes",
+      "timeout": 90
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#突破",
+        "note": "保底必成突破（success 双槽）"
+      },
+      {
+        "type": "expect",
+        "match": "re:[^\\n]\\n✨ 突破成功！✨[\\s\\S]*(败了这么多回|比突破口诀入耳)[\\s\\S]*连败保底：19次失败，天道酬勤，本次必成！[\\s\\S]*恭喜你从【[^】]*】突破至【[^】]*】！[\\s\\S]*【属性增长】[\\s\\S]*气血 \\+[\\d,]+[\\s\\S]*【当前属性】[\\s\\S]*护甲：[\\d,]+",
+        "combine": true,
+        "timeout": 60,
+        "note": "一条断言覆盖成功面板全链路（平台语义：每个 send 只有一个断言会被新回复触发）：双槽结构 → lose_streak_reward 彩蛋段（紧跟标题，两变体各取稳定子串）→ rate_info 保底行（pity_guarantee=19 强制 100%）→ 境界变更行 → 方案 A 成长/当前属性数值行。标题与彩蛋粘连的排版缺陷由 breakthrough-title-layout 盯住（bd astrbot_plugin_monixiuxian2_2-ju1）"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#我的信息",
+        "note": "哨兵发送：给末步负向断言制造一条新回复"
+      },
+      {
+        "type": "expect_not",
+        "match": "re:(?m)^-{3,}\\s*$|\\{[a-z_]+(:[^}]*)?\\}",
+        "combine": true,
+        "timeout": 60,
+        "note": "回归守护：整轮回复不得残留未渲染占位符（{var} / {var:.1f}），也不得出现独占一行的「---」——后者是 copy_variants.csv 把剧情稿条目分隔线吞进 text 单元格造成的线上缺陷（narrative_config 5 条 + adventure desc_variants 15 条），命中即 bd astrbot_plugin_monixiuxian2_2-74n 未修"
+      }
+    ]
+  },
+  "run_messages": [
+    {
+      "id": 10108,
+      "conversation_id": 734,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#突破",
+      "rich": null,
+      "created_at": 1789141352.953881
+    },
+    {
+      "id": 10109,
+      "conversation_id": 734,
+      "direction": "out",
+      "sender": "bot",
+      "text": "开始尝试突破...",
+      "rich": [],
+      "created_at": 1789141352.9670973
+    },
+    {
+      "id": 10110,
+      "conversation_id": 734,
+      "direction": "out",
+      "sender": "bot",
+      "text": "丹田里第一滴灵液落下，如春水破冰。河开的那一刻，整条灵脉都活了，汩汩地往丹田里汇。你守着这一泓春水，知道根基落成了——往后的路，是奔流，不再是漫流。\n✨ 突破成功！✨下山散心，师门塞给你一道平安符：不突破，也得平安。你捏着那枚歪歪扭扭缝的符，鼻子有点酸——符上绣的是一只胖乎乎的乌龟。你把它挂在腰间，觉得这句话，比突破口诀入耳。\n━━━━━━━━━━━━━━━\n基础成功率：80.0%\n永久加成：-100.0%\n连败保底：19次失败，天道酬勤，本次必成！\n最终成功率：100.0%\n━━━━━━━━━━━━━━━\n恭喜你从【练气九阶】突破至【筑基初期】！\n\n【属性增长】\n气血 +15\n伤害 +5\n身法 +0\n迅捷 +0\n\n【当前属性】\n伤害：105\n身法：50\n迅捷：50\n气血：1015\n护甲：0",
+      "rich": [],
+      "created_at": 1789141352.9915526
+    },
+    {
+      "id": 10111,
+      "conversation_id": 734,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#我的信息",
+      "rich": null,
+      "created_at": 1789141353.2653356
+    },
+    {
+      "id": 10112,
+      "conversation_id": 734,
+      "direction": "out",
+      "sender": "bot",
+      "text": "📋 道友 测试玩家1 的信息\n━━━━━━━━━━━━━━━\n\n【基本信息】\n  道号：测试玩家1\n  境界：筑基初期\n  修为：999,999/56,920\n  灵石：100,000\n  战力：1,220\n  灵根：天灵根\n\n【四主属性】\n  伤害：105\n  身法：50\n  迅捷：50\n  气血：1015\n  护甲：0\n\n【装备信息】\n  主修功法：无\n  法器：无\n  防具：无\n\n【功法修习】\n  已领悟功法：0\n  修习目标：无\n  战报合并条数：10\n\n【宗门信息】\n  所在宗门：无宗门\n  宗门职位：散修\n━━━━━━━━━━━━━━━",
+      "rich": [],
+      "created_at": 1789141353.2790227
+    }
+  ],
+  "started_at": 1789141352.8471296,
+  "finished_at": 1789141413.4978268
+}

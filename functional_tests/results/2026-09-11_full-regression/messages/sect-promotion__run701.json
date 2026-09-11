@@ -1,0 +1,92 @@
+[
+  {
+    "id": 9802,
+    "conversation_id": 712,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除CD 900000002 确认",
+    "rich": null,
+    "created_at": 1789140966.370819
+  },
+  {
+    "id": 9803,
+    "conversation_id": 712,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 目标玩家当前不在任何忙碌状态！",
+    "rich": [],
+    "created_at": 1789140966.3826232
+  },
+  {
+    "id": 9804,
+    "conversation_id": 712,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000002 练气五阶",
+    "rich": null,
+    "created_at": 1789140966.680966
+  },
+  {
+    "id": 9805,
+    "conversation_id": 712,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的境界设置为「练气五阶」",
+    "rich": [],
+    "created_at": 1789140966.7045531
+  },
+  {
+    "id": 9806,
+    "conversation_id": 712,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 晋升",
+    "rich": null,
+    "created_at": 1789140966.9955826
+  },
+  {
+    "id": 9807,
+    "conversation_id": 712,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎖️ 晋升成功！你已成为【内门弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+100 灵石\n商店折扣：9.5折\n传承解锁：heart_qy_001",
+    "rich": [],
+    "created_at": 1789140967.0188165
+  },
+  {
+    "id": 9808,
+    "conversation_id": 712,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 晋升",
+    "rich": null,
+    "created_at": 1789140967.3104343
+  },
+  {
+    "id": 9809,
+    "conversation_id": 712,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 晋升【亲传弟子】未达门槛：\n贡献不足（2500/8000）\n境界不足（需达到练气六阶）",
+    "rich": [],
+    "created_at": 1789140967.3264675
+  },
+  {
+    "id": 9810,
+    "conversation_id": 712,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#签到",
+    "rich": null,
+    "created_at": 1789140967.624161
+  },
+  {
+    "id": 9811,
+    "conversation_id": 712,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 签到成功！\n━━━━━━━━━━━━━━━\n💰 获得灵石：90\n🏛️ 宗门俸禄（内门弟子）：+100 灵石\n💎 当前灵石：100190\n━━━━━━━━━━━━━━━\n明日再来，莫要忘记哦~",
+    "rich": [],
+    "created_at": 1789140967.6578245
+  }
+]

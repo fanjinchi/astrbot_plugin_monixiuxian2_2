@@ -1,0 +1,495 @@
+{
+  "id": 706,
+  "case_name": "equipment-armor",
+  "run_index": 3,
+  "status": "passed",
+  "conversation_id": 717,
+  "steps_result": [
+    {
+      "index": -1,
+      "type": "pre_run_hook",
+      "note": "",
+      "ok": true,
+      "detail": "hook 退出码 0：已清理测试平台虚拟玩家 1 个（防污染全局冷却统计）\n已备份现有固定 ID 数据 -> /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/functional_tests/.fixture-backup.json\nfixture pvp 完成：3 个固定测试玩家已重置",
+      "actual": [],
+      "duration": 0.05
+    },
+    {
+      "index": 0,
+      "type": "send",
+      "note": "创建群聊测试玩家",
+      "ok": true,
+      "detail": "已注入（消息 #9856）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "玩家创建成功",
+      "ok": true,
+      "detail": "匹配（消息 #9857：道友，你已踏入仙途，无需重复此举。）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。"
+      ],
+      "expected": "re:恭喜道友|已踏入仙途",
+      "matched": {
+        "id": 9857,
+        "window_index": 0,
+        "text": "道友，你已踏入仙途，无需重复此举。"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "GM 给重甲",
+      "ok": true,
+      "detail": "已注入（消息 #9858）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 3,
+      "type": "expect",
+      "note": "物品进入储物戒",
+      "ok": true,
+      "detail": "匹配（消息 #9859：✅ 已向【测试玩家1】的储物戒放入 铁叶甲 x1）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已向【测试玩家1】的储物戒放入 铁叶甲 x1"
+      ],
+      "expected": "已向",
+      "matched": {
+        "id": 9859,
+        "window_index": 1,
+        "text": "✅ 已向【测试玩家1】的储物戒放入 铁叶甲 x1"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 4,
+      "type": "send",
+      "note": "装备重甲",
+      "ok": true,
+      "detail": "已注入（消息 #9860）",
+      "actual": [],
+      "duration": 0.04
+    },
+    {
+      "index": 5,
+      "type": "expect",
+      "note": "重甲装备成功",
+      "ok": true,
+      "detail": "匹配（消息 #9861：✅ 已装备防具【铁叶甲】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：护甲+7）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已向【测试玩家1】的储物戒放入 铁叶甲 x1",
+        "✅ 已装备防具【铁叶甲】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：护甲+7"
+      ],
+      "expected": "已装备防具",
+      "matched": {
+        "id": 9861,
+        "window_index": 2,
+        "text": "✅ 已装备防具【铁叶甲】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：护甲+7"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 6,
+      "type": "send",
+      "note": "查看装备面板",
+      "ok": true,
+      "detail": "已注入（消息 #9862）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 7,
+      "type": "expect",
+      "note": "装备面板显示重甲",
+      "ok": true,
+      "detail": "匹配（消息 #9863：=== p1 的装备 ===\n【武器】未装备\n【防具】铁叶甲\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已向【测试玩家1】的储物戒放入 铁叶甲 x1",
+        "✅ 已装备防具【铁叶甲】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：护甲+7",
+        "=== p1 的装备 ===\n【武器】未装备\n【防具】铁叶甲\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--- 装备属性加成 ---\n🛡️ 护甲 +7\n============================"
+      ],
+      "expected": "铁叶甲",
+      "matched": {
+        "id": 9863,
+        "window_index": 3,
+        "text": "=== p1 的装备 ===\n【武器】未装备\n【防具】铁叶甲\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--- 装备属性加成 ---\n🛡️ 护甲 +7\n============================"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 8,
+      "type": "send",
+      "note": "卸下重甲",
+      "ok": true,
+      "detail": "已注入（消息 #9864）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 9,
+      "type": "expect",
+      "note": "重甲卸下成功",
+      "ok": true,
+      "detail": "匹配（消息 #9865：✅ 已卸下防具【铁叶甲】\n已存入储物戒）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已向【测试玩家1】的储物戒放入 铁叶甲 x1",
+        "✅ 已装备防具【铁叶甲】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：护甲+7",
+        "=== p1 的装备 ===\n【武器】未装备\n【防具】铁叶甲\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--- 装备属性加成 ---\n🛡️ 护甲 +7\n============================",
+        "✅ 已卸下防具【铁叶甲】\n已存入储物戒"
+      ],
+      "expected": "已卸下",
+      "matched": {
+        "id": 9865,
+        "window_index": 4,
+        "text": "✅ 已卸下防具【铁叶甲】\n已存入储物戒"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 10,
+      "type": "send",
+      "note": "GM 给法袍",
+      "ok": true,
+      "detail": "已注入（消息 #9866）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 11,
+      "type": "send",
+      "note": "装备法袍",
+      "ok": true,
+      "detail": "已注入（消息 #9867）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 12,
+      "type": "expect",
+      "note": "法袍装备成功",
+      "ok": true,
+      "detail": "匹配（消息 #9869：✅ 已装备防具【粗布法袍】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：气血+8、护甲+3）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已向【测试玩家1】的储物戒放入 铁叶甲 x1",
+        "✅ 已装备防具【铁叶甲】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：护甲+7",
+        "=== p1 的装备 ===\n【武器】未装备\n【防具】铁叶甲\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--- 装备属性加成 ---\n🛡️ 护甲 +7\n============================",
+        "✅ 已卸下防具【铁叶甲】\n已存入储物戒",
+        "✅ 已向【测试玩家1】的储物戒放入 粗布法袍 x1",
+        "✅ 已装备防具【粗布法袍】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：气血+8、护甲+3"
+      ],
+      "expected": "已装备防具",
+      "matched": {
+        "id": 9869,
+        "window_index": 6,
+        "text": "✅ 已装备防具【粗布法袍】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：气血+8、护甲+3"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 13,
+      "type": "send",
+      "note": "查看装备面板",
+      "ok": true,
+      "detail": "已注入（消息 #9870）",
+      "actual": [],
+      "duration": 0.03
+    },
+    {
+      "index": 14,
+      "type": "expect",
+      "note": "装备面板显示法袍",
+      "ok": true,
+      "detail": "匹配（消息 #9871：=== p1 的装备 ===\n【武器】未装备\n【防具】粗布法袍\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n-）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "✅ 已向【测试玩家1】的储物戒放入 铁叶甲 x1",
+        "✅ 已装备防具【铁叶甲】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：护甲+7",
+        "=== p1 的装备 ===\n【武器】未装备\n【防具】铁叶甲\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--- 装备属性加成 ---\n🛡️ 护甲 +7\n============================",
+        "✅ 已卸下防具【铁叶甲】\n已存入储物戒",
+        "✅ 已向【测试玩家1】的储物戒放入 粗布法袍 x1",
+        "✅ 已装备防具【粗布法袍】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：气血+8、护甲+3",
+        "=== p1 的装备 ===\n【武器】未装备\n【防具】粗布法袍\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--- 装备属性加成 ---\n❤️ 气血 +8\n🛡️ 护甲 +3\n============================"
+      ],
+      "expected": "粗布法袍",
+      "matched": {
+        "id": 9871,
+        "window_index": 7,
+        "text": "=== p1 的装备 ===\n【武器】未装备\n【防具】粗布法袍\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--- 装备属性加成 ---\n❤️ 气血 +8\n🛡️ 护甲 +3\n============================"
+      },
+      "duration": 0.3
+    }
+  ],
+  "case_snapshot": {
+    "name": "equipment-armor",
+    "description": "验证新防具体系（armor-content-design 18 标杆件）：GM 给防具→装备→我的装备→卸下，两族各抽一件门槛 0 标杆。",
+    "scenario": "前置条件：群聊固定 GM 与玩家身份，GM_ADMINS 含 900000001，群已白名单。覆盖：防具装备/卸下/面板展示；铁叶甲（重甲凡品）与粗布法袍（法袍凡品）门槛均为 0，新建号可直接装备。",
+    "tags": [
+      "equipment",
+      "gm",
+      "core-smoke"
+    ],
+    "pre_run_hook": {
+      "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pvp --yes",
+      "timeout": 60
+    },
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_pvp_001",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000002",
+        "p2": "900000003"
+      }
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#我要修仙 体修",
+        "note": "创建群聊测试玩家"
+      },
+      {
+        "type": "expect",
+        "match": "re:恭喜道友|已踏入仙途",
+        "timeout": 30,
+        "note": "玩家创建成功"
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 给予装备 900000002 铁叶甲 1",
+        "note": "GM 给重甲"
+      },
+      {
+        "type": "expect",
+        "match": "已向",
+        "timeout": 30,
+        "note": "物品进入储物戒"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#装备 铁叶甲",
+        "note": "装备重甲"
+      },
+      {
+        "type": "expect",
+        "match": "已装备防具",
+        "timeout": 30,
+        "note": "重甲装备成功"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#我的装备",
+        "note": "查看装备面板"
+      },
+      {
+        "type": "expect",
+        "match": "铁叶甲",
+        "timeout": 30,
+        "note": "装备面板显示重甲"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#卸下 防具",
+        "note": "卸下重甲"
+      },
+      {
+        "type": "expect",
+        "match": "已卸下",
+        "timeout": 30,
+        "note": "重甲卸下成功"
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 给予装备 900000002 粗布法袍 1",
+        "note": "GM 给法袍"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#装备 粗布法袍",
+        "note": "装备法袍"
+      },
+      {
+        "type": "expect",
+        "match": "已装备防具",
+        "timeout": 30,
+        "note": "法袍装备成功"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#我的装备",
+        "note": "查看装备面板"
+      },
+      {
+        "type": "expect",
+        "match": "粗布法袍",
+        "timeout": 30,
+        "note": "装备面板显示法袍"
+      }
+    ]
+  },
+  "run_messages": [
+    {
+      "id": 9856,
+      "conversation_id": 717,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#我要修仙 体修",
+      "rich": null,
+      "created_at": 1789141008.6632204
+    },
+    {
+      "id": 9857,
+      "conversation_id": 717,
+      "direction": "out",
+      "sender": "bot",
+      "text": "道友，你已踏入仙途，无需重复此举。",
+      "rich": [],
+      "created_at": 1789141008.6770108
+    },
+    {
+      "id": 9858,
+      "conversation_id": 717,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 给予装备 900000002 铁叶甲 1",
+      "rich": null,
+      "created_at": 1789141008.9762342
+    },
+    {
+      "id": 9859,
+      "conversation_id": 717,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已向【测试玩家1】的储物戒放入 铁叶甲 x1",
+      "rich": [],
+      "created_at": 1789141009.0051904
+    },
+    {
+      "id": 9860,
+      "conversation_id": 717,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#装备 铁叶甲",
+      "rich": null,
+      "created_at": 1789141009.2936163
+    },
+    {
+      "id": 9861,
+      "conversation_id": 717,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已装备防具【铁叶甲】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：护甲+7",
+      "rich": [],
+      "created_at": 1789141009.351516
+    },
+    {
+      "id": 9862,
+      "conversation_id": 717,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#我的装备",
+      "rich": null,
+      "created_at": 1789141009.631803
+    },
+    {
+      "id": 9863,
+      "conversation_id": 717,
+      "direction": "out",
+      "sender": "bot",
+      "text": "=== p1 的装备 ===\n【武器】未装备\n【防具】铁叶甲\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--- 装备属性加成 ---\n🛡️ 护甲 +7\n============================",
+      "rich": [],
+      "created_at": 1789141009.6457744
+    },
+    {
+      "id": 9864,
+      "conversation_id": 717,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#卸下 防具",
+      "rich": null,
+      "created_at": 1789141009.9432344
+    },
+    {
+      "id": 9865,
+      "conversation_id": 717,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已卸下防具【铁叶甲】\n已存入储物戒",
+      "rich": [],
+      "created_at": 1789141009.9744422
+    },
+    {
+      "id": 9866,
+      "conversation_id": 717,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 给予装备 900000002 粗布法袍 1",
+      "rich": null,
+      "created_at": 1789141010.2542698
+    },
+    {
+      "id": 9867,
+      "conversation_id": 717,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#装备 粗布法袍",
+      "rich": null,
+      "created_at": 1789141010.265226
+    },
+    {
+      "id": 9868,
+      "conversation_id": 717,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已向【测试玩家1】的储物戒放入 粗布法袍 x1",
+      "rich": [],
+      "created_at": 1789141010.2820227
+    },
+    {
+      "id": 9869,
+      "conversation_id": 717,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已装备防具【粗布法袍】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：气血+8、护甲+3",
+      "rich": [],
+      "created_at": 1789141010.3145328
+    },
+    {
+      "id": 9870,
+      "conversation_id": 717,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#我的装备",
+      "rich": null,
+      "created_at": 1789141010.5791283
+    },
+    {
+      "id": 9871,
+      "conversation_id": 717,
+      "direction": "out",
+      "sender": "bot",
+      "text": "=== p1 的装备 ===\n【武器】未装备\n【防具】粗布法袍\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--- 装备属性加成 ---\n❤️ 气血 +8\n🛡️ 护甲 +3\n============================",
+      "rich": [],
+      "created_at": 1789141010.6168108
+    }
+  ],
+  "started_at": 1789141008.5471392,
+  "finished_at": 1789141010.9161189
+}

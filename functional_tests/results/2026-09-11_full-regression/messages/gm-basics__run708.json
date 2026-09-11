@@ -1,0 +1,110 @@
+[
+  {
+    "id": 9886,
+    "conversation_id": 719,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1789141013.8252926
+  },
+  {
+    "id": 9887,
+    "conversation_id": 719,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1789141013.8340936
+  },
+  {
+    "id": 9888,
+    "conversation_id": 719,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000002 练气一阶",
+    "rich": null,
+    "created_at": 1789141014.1327195
+  },
+  {
+    "id": 9889,
+    "conversation_id": 719,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的境界设置为「练气一阶」",
+    "rich": [],
+    "created_at": 1789141014.1941082
+  },
+  {
+    "id": 9890,
+    "conversation_id": 719,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置攻击 900000002 200",
+    "rich": null,
+    "created_at": 1789141014.4880552
+  },
+  {
+    "id": 9891,
+    "conversation_id": 719,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的攻击设置为 200",
+    "rich": [],
+    "created_at": 1789141014.5418558
+  },
+  {
+    "id": 9892,
+    "conversation_id": 719,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 给予装备 900000002 青铜剑 1",
+    "rich": null,
+    "created_at": 1789141014.8368566
+  },
+  {
+    "id": 9893,
+    "conversation_id": 719,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已向【测试玩家1】的储物戒放入 青铜剑 x1",
+    "rich": [],
+    "created_at": 1789141014.8590019
+  },
+  {
+    "id": 9894,
+    "conversation_id": 719,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#闭关",
+    "rich": null,
+    "created_at": 1789141015.1510842
+  },
+  {
+    "id": 9895,
+    "conversation_id": 719,
+    "direction": "out",
+    "sender": "bot",
+    "text": "你在门内插上门闩，外头的声响便远了。旧蒲团，半炷香，你先把心放稳——闭关如守夜，最要紧的是坐得住。\n🧘 道友已进入闭关状态\n━━━━━━━━━━━━━━━\n闭关期间，你将与世隔绝，潜心修炼。\n💡 发送「出关」结束闭关\n⏱️ 每分钟将获得修为，受灵根资质影响。",
+    "rich": [],
+    "created_at": 1789141015.204459
+  },
+  {
+    "id": 9896,
+    "conversation_id": 719,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除CD 900000002 确认",
+    "rich": null,
+    "created_at": 1789141015.4918306
+  },
+  {
+    "id": 9897,
+    "conversation_id": 719,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已清除【测试玩家1】的忙碌状态",
+    "rich": [],
+    "created_at": 1789141015.516133
+  }
+]

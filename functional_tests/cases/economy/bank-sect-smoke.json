@@ -1,19 +1,76 @@
 {
   "name": "bank-sect-smoke",
-  "description": "冒烟验证银行与宗门基础入口可触达。",
-  "scenario": "前置条件：新玩家已创建（步骤内完成）。覆盖：银行信息/存取、宗门信息/列表。",
-  "tags": ["economy", "social", "core-smoke"],
-  "conversation": { "kind": "private", "pin_players": {} },
+  "description": "银行存取 + 宗门子命令冒烟（统一入口「宗门」，子命令 信息/列表）",
+  "scenario": "前置条件：新玩家已创建（步骤内完成）。覆盖：银行信息/存取、宗门信息/列表。。注意：宗门无「我的宗门/宗门列表」独立指令，只有 @filter.command(CMD_SECT=宗门) 统一入口 + 子命令路由（handlers/sect_handlers.py:73-92）。",
+  "tags": [
+    "economy",
+    "social",
+    "core-smoke"
+  ],
+  "conversation": {
+    "kind": "private",
+    "pin_players": {}
+  },
   "steps": [
-    { "type": "send", "player": "player1", "text": "我要修仙 灵修", "note": "创建玩家" },
-    { "type": "expect", "match": "恭喜道友", "timeout": 30, "note": "创建成功" },
-    { "type": "send", "player": "player1", "text": "银行", "note": "进入银行面板" },
-    { "type": "expect", "match": "re:银行|灵石|存款|利息", "timeout": 30, "note": "银行入口可访问" },
-    { "type": "send", "player": "player1", "text": "存灵石 100", "note": "尝试存款" },
-    { "type": "expect", "match": "re:存入|余额|灵石|成功", "timeout": 30, "note": "存款路径有响应" },
-    { "type": "send", "player": "player1", "text": "我的宗门", "note": "查看宗门" },
-    { "type": "expect", "match": "re:宗门|无宗门|未加入|散修", "timeout": 30, "note": "宗门信息可访问" },
-    { "type": "send", "player": "player1", "text": "宗门列表", "note": "查看宗门列表" },
-    { "type": "expect", "match": "re:宗门|暂无|列表", "timeout": 30, "note": "宗门列表可访问" }
+    {
+      "type": "send",
+      "player": "player1",
+      "text": "我要修仙 灵修",
+      "note": "创建玩家"
+    },
+    {
+      "type": "expect",
+      "match": "re:踏上仙途",
+      "timeout": 30,
+      "note": "新玩家注册回执（cultivation 代码拼装「恭喜道友 {name} 踏上仙途！」）（旧断言含裸「宗门/灵石」宽词，LLM 兜底回复即可满足=假绿，评审 P1-3 同类）"
+    },
+    {
+      "type": "send",
+      "player": "player1",
+      "text": "银行",
+      "note": "进入银行面板"
+    },
+    {
+      "type": "expect",
+      "match": "re:🏦 灵石银行",
+      "timeout": 30,
+      "note": "银行面板首行是代码拼装字面量，不锚文案（旧断言含裸「宗门/灵石」宽词，LLM 兜底回复即可满足=假绿，评审 P1-3 同类）"
+    },
+    {
+      "type": "send",
+      "player": "player1",
+      "text": "存灵石 100",
+      "note": "尝试存款"
+    },
+    {
+      "type": "expect",
+      "match": "re:✅ 成功存入 \\d+ 灵石",
+      "timeout": 30,
+      "note": "存入回执代码字面量（旧断言含裸「宗门/灵石」宽词，LLM 兜底回复即可满足=假绿，评审 P1-3 同类）"
+    },
+    {
+      "type": "send",
+      "player": "player1",
+      "text": "宗门 信息",
+      "note": "查看宗门"
+    },
+    {
+      "type": "expect",
+      "match": "re:你还未加入宗门",
+      "timeout": 30,
+      "note": "managers/sect_manager.py:521 未入宗回执，代码字面量（旧断言含裸「宗门/灵石」宽词，LLM 兜底回复即可满足=假绿，评审 P1-3 同类）"
+    },
+    {
+      "type": "send",
+      "player": "player1",
+      "text": "宗门 列表",
+      "note": "查看宗门列表"
+    },
+    {
+      "type": "expect",
+      "match": "re:🏛️ 宗门列表",
+      "timeout": 30,
+      "note": "managers/sect_manager.py:631 列表表头，代码字面量（旧断言含裸「宗门/灵石」宽词，LLM 兜底回复即可满足=假绿，评审 P1-3 同类）"
+    }
   ]
 }
