@@ -276,9 +276,7 @@ class TestRiftExploreBeastBranch:
         )
 
         event = FakeEvent("探索秘境 迎战")
-        results = [
-            r async for r in plugin.handle_rift_explore(event, "迎战", "")
-        ]
+        results = [r async for r in plugin.handle_rift_explore(event, "迎战", "")]
 
         assert len(results) == 1
         assert "战报：胜利" in results[0].text
@@ -298,9 +296,7 @@ class TestRiftExploreBeastBranch:
         plugin.sect_mgr.advance_master_progress = AsyncMock()
 
         event = FakeEvent("探索秘境 迎战")
-        results = [
-            r async for r in plugin.handle_rift_explore(event, "迎战", "")
-        ]
+        results = [r async for r in plugin.handle_rift_explore(event, "迎战", "")]
 
         assert len(results) == 1
         assert "战报：战败" in results[0].text
@@ -317,9 +313,7 @@ class TestRiftExploreBeastBranch:
         )
 
         event = FakeEvent("探索秘境 迎战")
-        results = [
-            r async for r in plugin.handle_rift_explore(event, "迎战", "")
-        ]
+        results = [r async for r in plugin.handle_rift_explore(event, "迎战", "")]
 
         assert len(results) == 1
         assert results[0].text == "战报：胜利"
@@ -333,9 +327,7 @@ class TestRiftExploreBeastBranch:
         plugin.sect_mgr.advance_master_progress = AsyncMock()
 
         event = FakeEvent("探索秘境 迎战")
-        results = [
-            r async for r in plugin.handle_rift_explore(event, "迎战", "")
-        ]
+        results = [r async for r in plugin.handle_rift_explore(event, "迎战", "")]
 
         assert len(results) == 1
         assert "机缘已消散" in results[0].text
@@ -347,9 +339,7 @@ class TestRiftExploreBeastBranch:
         plugin.rift_mgr.accept_beast_challenge = AsyncMock()
 
         event = FakeEvent("探索秘境 迎战")
-        results = [
-            r async for r in plugin.handle_rift_explore(event, "迎战", "")
-        ]
+        results = [r async for r in plugin.handle_rift_explore(event, "迎战", "")]
 
         assert len(results) == 1
         assert "维护" in results[0].text
@@ -366,9 +356,7 @@ class TestRiftExploreDelegation:
         )
 
         event = FakeEvent("探索秘境 3")
-        results = [
-            r async for r in plugin.handle_rift_explore(event, "3", "")
-        ]
+        results = [r async for r in plugin.handle_rift_explore(event, "3", "")]
 
         assert len(results) == 1
         assert results[0].text == "已进入秘境"
@@ -386,9 +374,7 @@ class TestRiftExploreDelegation:
         )
 
         event = FakeEvent("探索秘境 破阵 土")
-        results = [
-            r async for r in plugin.handle_rift_explore(event, "破阵", "土")
-        ]
+        results = [r async for r in plugin.handle_rift_explore(event, "破阵", "土")]
 
         assert len(results) == 1
         call_args = plugin.rift_handlers.handle_rift_explore.call_args.args

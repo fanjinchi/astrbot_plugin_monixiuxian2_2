@@ -1336,9 +1336,9 @@ class TestForceRiftEncounters:
 
         assert success is True
         assert "题面内容" in msg
-        mock_managers[
-            "rift_manager"
-        ].force_puzzle_encounter.assert_awaited_once_with("gm_001")
+        mock_managers["rift_manager"].force_puzzle_encounter.assert_awaited_once_with(
+            "gm_001"
+        )
 
     @pytest.mark.asyncio
     async def test_force_beast_single_numeric_token_targets_that_player(
@@ -1355,9 +1355,9 @@ class TestForceRiftEncounters:
         success, _ = await gm_manager.cmd_force_rift_beast(event, "900000002")
 
         assert success is True
-        mock_managers[
-            "rift_manager"
-        ].force_beast_encounter.assert_awaited_once_with("900000002")
+        mock_managers["rift_manager"].force_beast_encounter.assert_awaited_once_with(
+            "900000002"
+        )
 
     @pytest.mark.asyncio
     async def test_force_legacy_at_mention_takes_priority(
@@ -1374,9 +1374,9 @@ class TestForceRiftEncounters:
         success, _ = await gm_manager.cmd_force_rift_legacy(event, "@玩家")
 
         assert success is True
-        mock_managers[
-            "rift_manager"
-        ].force_legacy_encounter.assert_awaited_once_with("88888")
+        mock_managers["rift_manager"].force_legacy_encounter.assert_awaited_once_with(
+            "88888"
+        )
 
     @pytest.mark.asyncio
     async def test_dispatch_full_path_with_numeric_target(
@@ -1394,9 +1394,9 @@ class TestForceRiftEncounters:
 
         assert success is True
         assert "已触发" in msg
-        mock_managers[
-            "rift_manager"
-        ].force_beast_encounter.assert_awaited_once_with("900000002")
+        mock_managers["rift_manager"].force_beast_encounter.assert_awaited_once_with(
+            "900000002"
+        )
 
     @pytest.mark.asyncio
     async def test_rift_manager_not_ready(self, gm_manager):

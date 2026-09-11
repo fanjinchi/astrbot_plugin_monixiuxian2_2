@@ -77,7 +77,12 @@ def make_fighter(
 
 class TestInitiative:
     def test_speed_double_gets_twice_as_many_actions(self):
-        """When fighter A has 2x speed of B, A should act ~2x as often."""
+        """When fighter A has 2x speed of B, A should act ~2x as often.
+
+        Seeded and pinned to the exact hit count (bd -o41 同口径）：旧版本用
+        1000 次未播种抽样 + 1.6~2.4 宽容差，sd=14.9 下每次执行天然漂 ±3σ，
+        套件里其它用例消耗全局 RNG 就会把它推过边界（实测偶发翻红）。
+        """
         engine = make_engine()
         f1 = make_fighter("Fast", 100, 10, 5, 20)
         f2 = make_fighter("Slow", 100, 10, 5, 10)
@@ -86,25 +91,35 @@ class TestInitiative:
         f2_actions = 0
         trials = 1000
 
+        # 播种在自己拥有：`_roll_initiative` 每 trial 消 1 个 random()，不受执行顺序影响
+        random.seed("initiative-fast2x")
         for _ in range(trials):
             if engine._roll_initiative(f1, f2):
                 f1_actions += 1
             else:
                 f2_actions += 1
 
+        assert f1_actions == 671, (
+            f"_roll_initiative 在 trials={trials} 下应恰命中 671，实得 {f1_actions}"
+        )
+        assert f1_actions + f2_actions == trials
         ratio = f1_actions / f2_actions if f2_actions > 0 else float("inf")
-        # With 2:1 speed ratio, expect ~2:1 action ratio (tolerate 20% variance, ~3σ)
-        assert 1.6 < ratio < 2.4, f"Expected ratio ~2.0, got {ratio:.2f}"
+        assert abs(ratio - 2.0) <= 0.15, f"Expected ratio ~2.0, got {ratio:.2f}"
 
     def test_equal_speed_fifty_fifty(self):
-        """When speeds are equal, initiative should be roughly 50/50."""
+        """When speeds are equal, initiative should be roughly 50/50.
+
+        同上：播种 + 钉死命中数（原先同样是无种子抽样，sd=15.8 对 ±0.05 容差）。
+        """
         engine = make_engine()
         f1 = make_fighter("A", 100, 10, 5, 10)
         f2 = make_fighter("B", 100, 10, 5, 10)
 
+        random.seed("initiative-even")
         f1_actions = sum(1 for _ in range(1000) if engine._roll_initiative(f1, f2))
-        ratio = f1_actions / 1000
-        assert 0.45 < ratio < 0.55, f"Expected ~0.5, got {ratio:.3f}"
+        assert f1_actions == 480, f"`_roll_initiative` 应恰命中 480，实得 {f1_actions}"
+        # 公平性判据一并明写（只钉数字会丢掉「50/50」这个意图）。
+        assert 0.45 < f1_actions / 1000 < 0.55
 
 
 class TestCombatActionDistribution:

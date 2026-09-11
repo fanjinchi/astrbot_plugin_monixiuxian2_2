@@ -64,7 +64,10 @@ def _stub_with(value):
 
 def test_dual_slot_composes_flavor_and_panel(dual_slot_scene):
     out = render_narrative(
-        _stub_with(dual_slot_scene), "_test", "panel_scene", {"name": "张三", "level_name": "筑基"}
+        _stub_with(dual_slot_scene),
+        "_test",
+        "panel_scene",
+        {"name": "张三", "level_name": "筑基"},
     )
     assert out.endswith("\n面板：张三 升至 筑基")
     assert out.split("\n")[0] in ("通用引子", "练气引子")
@@ -77,7 +80,10 @@ def test_dual_slot_empty_flavor_pool_renders_panel_only(dual_slot_scene):
     out = render_narrative(_stub_with(value), "_test", "panel_scene", {"name": "张三"})
     assert out == "面板：张三"
     # route 过滤清空 flavor 池：同样只出 panel，不冒默认文案
-    filtered = {"panel": "面板：{name}", "通用": [{"text": "灵修专属", "route": "灵修"}]}
+    filtered = {
+        "panel": "面板：{name}",
+        "通用": [{"text": "灵修专属", "route": "灵修"}],
+    }
     out = render_narrative(
         _stub_with(filtered), "_test", "panel_scene", {"name": "张三"}, route="体修"
     )
@@ -130,7 +136,10 @@ def test_dual_slot_bucket_and_route_selection(dual_slot_scene):
 def test_dual_slot_flavor_may_reference_declared_vars():
     value = {"panel": "面板", "通用": ["冲击{level_name}的引子"]}
     out = render_narrative(
-        _stub_with(value), "_test", "panel_scene", {"name": "张三", "level_name": "金丹"}
+        _stub_with(value),
+        "_test",
+        "panel_scene",
+        {"name": "张三", "level_name": "金丹"},
     )
     assert out == "冲击金丹的引子\n面板"
 
@@ -139,7 +148,10 @@ def test_dual_slot_flavor_render_failure_skips_flavor():
     """A flavor entry failing at render time is skipped; panel still renders."""
     value = {"panel": "面板{name}", "通用": ["坏引子{unknown}"]}
     out = render_narrative(
-        _stub_with(value), "_test", "panel_scene", {"name": "张三", "level_name": "筑基"}
+        _stub_with(value),
+        "_test",
+        "panel_scene",
+        {"name": "张三", "level_name": "筑基"},
     )
     assert out == "面板张三"
 
@@ -148,7 +160,10 @@ def test_dual_slot_panel_render_failure_degrades_to_raw():
     value = {"panel": "面板{name}{oops}", "通用": ["引子"]}
     # panel 引用未声明变量无法过加载校验；此处直接测运行时防御路径
     out = render_narrative(
-        _stub_with(value), "_test", "panel_scene", {"name": "张三", "level_name": "筑基"}
+        _stub_with(value),
+        "_test",
+        "panel_scene",
+        {"name": "张三", "level_name": "筑基"},
     )
     assert out == "引子\n面板{name}{oops}"
 
@@ -156,7 +171,9 @@ def test_dual_slot_panel_render_failure_degrades_to_raw():
 def test_dict_without_panel_key_stays_bucketed_pool():
     """Bucketed dict lacking ``panel`` keeps plain bucket semantics."""
     value = {"通用": ["通1"], "练气": ["气1"]}
-    out = render_narrative(_stub_with(value), "_test", "panel_scene", {"name": "张三"}, level_index=5)
+    out = render_narrative(
+        _stub_with(value), "_test", "panel_scene", {"name": "张三"}, level_index=5
+    )
     assert out in ("通1", "气1")
 
 
@@ -175,22 +192,16 @@ def test_dual_slot_panel_violation_falls_back(config_manager, dual_slot_scene):
         "_test": {"panel_scene": {"panel": "面板{bad_var}", "通用": ["引子"]}}
     }
     config_manager._validate_narrative_config()
-    assert (
-        config_manager.narrative_config["_test"]["panel_scene"] == "默认面板{name}"
-    )
+    assert config_manager.narrative_config["_test"]["panel_scene"] == "默认面板{name}"
 
 
 def test_dual_slot_flavor_violation_falls_back(config_manager, dual_slot_scene):
     """flavor 条目引用未声明变量 → 整场景回退默认。"""
     config_manager.narrative_config = {
-        "_test": {
-            "panel_scene": {"panel": "面板{name}", "练气": ["引子{bad_var}"]}
-        }
+        "_test": {"panel_scene": {"panel": "面板{name}", "练气": ["引子{bad_var}"]}}
     }
     config_manager._validate_narrative_config()
-    assert (
-        config_manager.narrative_config["_test"]["panel_scene"] == "默认面板{name}"
-    )
+    assert config_manager.narrative_config["_test"]["panel_scene"] == "默认面板{name}"
 
 
 def test_dual_slot_non_string_panel_falls_back(config_manager, dual_slot_scene):
@@ -198,9 +209,7 @@ def test_dual_slot_non_string_panel_falls_back(config_manager, dual_slot_scene):
         "_test": {"panel_scene": {"panel": ["面板{name}"], "通用": ["引子"]}}
     }
     config_manager._validate_narrative_config()
-    assert (
-        config_manager.narrative_config["_test"]["panel_scene"] == "默认面板{name}"
-    )
+    assert config_manager.narrative_config["_test"]["panel_scene"] == "默认面板{name}"
 
 
 def test_dual_slot_text_and_panel_dict_falls_back(config_manager, dual_slot_scene):
@@ -215,9 +224,7 @@ def test_dual_slot_text_and_panel_dict_falls_back(config_manager, dual_slot_scen
         }
     }
     config_manager._validate_narrative_config()
-    assert (
-        config_manager.narrative_config["_test"]["panel_scene"] == "默认面板{name}"
-    )
+    assert config_manager.narrative_config["_test"]["panel_scene"] == "默认面板{name}"
 
 
 # --- 5.3 select_narrative_pool 回归（保护 adventure desc_variants 复用路径） ---
