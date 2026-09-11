@@ -136,9 +136,33 @@ def _template_vars(text: str) -> set[str]:
     return set(re.findall(r"\{(\w+)", text))
 
 
+def _strip_separator(text: str) -> str:
+    """Drop trailing "entry separator" lines swallowed from the 剧情 draft.
+
+    The copy drafts in ``design_docs/narrative-drafts/**`` use ``---`` to split
+    multiple variants inside one cell. When such a cell is imported as a single
+    variant the separator survives as a trailing ``\n---`` line and reaches
+    players as a stray horizontal rule (bd -74n). Only trailing/leading
+    separator-only lines are removed; ``---`` used as an in-sentence pause mark
+    (破折号连写) stays untouched.
+
+    Args:
+        text: Raw cell text from the variants CSV.
+
+    Returns:
+        The same text without separator-only border lines.
+    """
+    lines = text.split("\n")
+    while lines and re.fullmatch(r"-+", lines[-1].strip()):
+        lines.pop()
+    while lines and re.fullmatch(r"-+", lines[0].strip()):
+        lines.pop(0)
+    return "\n".join(lines).strip()
+
+
 def _to_entry(row: dict):
     """Convert one CSV row to a pool entry (str, or route-tagged dict)."""
-    text = (row.get("text") or "").strip()
+    text = _strip_separator((row.get("text") or "").strip())
     route = (row.get("route") or "").strip()
     if route in ROUTE_TAGS:
         return {"text": text, "route": route}
