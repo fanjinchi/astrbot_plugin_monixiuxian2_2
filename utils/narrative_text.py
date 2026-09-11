@@ -189,8 +189,11 @@ def select_narrative_pool(
 
     Every entry is normalized by :func:`_sanitize_entry_text` -- stray edge
     whitespace is removed here so no scene can render a blank line (bd -ju1).
-    Pass ``scene_label`` (``section.scene``) to get a one-shot warning naming the
-    offending scene. Panel templates are *not* pool entries and stay untouched.
+    Entries that sanitize to an empty string are dropped, so a whitespace-only
+    entry can neither render a blank message nor block the caller's
+    empty-pool fallback. Pass ``scene_label`` (``section.scene``) to get a
+    one-shot warning naming the offending scene. Panel templates are *not*
+    pool entries and stay untouched.
     """
     if isinstance(value, dict) and not isinstance(value.get("text"), str):
         # Bucketed pool: merge current segment bucket with the 通用 bucket.
@@ -204,14 +207,19 @@ def select_narrative_pool(
     pool: list[str] = []
     for entry in entries:
         if isinstance(entry, str):
-            pool.append(_sanitize_entry_text(entry, scene_label))
-            continue
-        tagged_route = entry.get("route")
-        if tagged_route and tagged_route != route:
-            continue
-        text = entry.get("text")
-        if isinstance(text, str):
-            pool.append(_sanitize_entry_text(text, scene_label))
+            cleaned = _sanitize_entry_text(entry, scene_label)
+        else:
+            tagged_route = entry.get("route")
+            if tagged_route and tagged_route != route:
+                continue
+            text = entry.get("text")
+            if not isinstance(text, str):
+                continue
+            cleaned = _sanitize_entry_text(text, scene_label)
+        # A whitespace-only entry sanitizes to "" -- keeping it would render a
+        # blank message and defeat the empty-pool fallback in render_narrative.
+        if cleaned:
+            pool.append(cleaned)
     return pool
 
 

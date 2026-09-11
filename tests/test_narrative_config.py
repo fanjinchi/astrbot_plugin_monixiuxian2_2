@@ -456,6 +456,43 @@ def test_dirty_copy_cannot_split_a_panel_line(monkeypatch):
     )
 
 
+def test_whitespace_only_entries_are_dropped_from_pool():
+    """A whitespace-only entry sanitizes away instead of rendering blank.
+
+    ``[""]`` is not an empty pool: keeping the husk would let random.choice
+    render a blank message and block render_narrative's default-pool fallback.
+    """
+    assert select_narrative_pool(["\n\n", " 甲 "]) == ["甲"]
+    assert select_narrative_pool(["\n\n"]) == []
+
+    class _BlankOnly:
+        narrative_config = {"breakthrough": {"pity_hint": ["\n \n"]}}
+
+    out = render_narrative(
+        _BlankOnly(),
+        "breakthrough",
+        "pity_hint",
+        {"streak": 2, "next_bonus": 0.05, "remaining": 1},
+    )
+    # 整池空白 → 空池 → 回退内嵌默认，而不是渲染出空串。
+    assert out.startswith("连败 2 次")
+
+    class _BlankFlavor:
+        narrative_config = {
+            "breakthrough": {
+                "revive": {"panel": "面板：{next_level_name}", "通用": ["\n"]}
+            }
+        }
+
+    # 双槽 flavor 空白 → 只出 panel，且不得混入默认池文案（D1）。
+    assert (
+        render_narrative(
+            _BlankFlavor(), "breakthrough", "revive", {"next_level_name": "筑基"}
+        )
+        == "面板：筑基"
+    )
+
+
 def test_embedded_defaults_obey_the_line_break_contract():
     """Every embedded default pool entry is free of edge whitespace.
 
