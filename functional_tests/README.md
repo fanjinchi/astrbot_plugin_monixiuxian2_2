@@ -8,6 +8,7 @@
 functional_tests/
 ├── README.md                     # 本文档：目录规范、命名、使用流程
 ├── platform-gap-report.md        # 测试平台能力差距报告（Supported / Partially / Unsupported）
+├── external_cases.md           # 归其它插件的用例登记（平台用例目录是跨插件共享的，勿回填进 cases/）
 ├── cases/                        # 用例源文件（source-of-truth，可按功能域分子目录）
 │   ├── player/                   # 玩家创建、修炼、突破
 │   ├── equipment/                # 装备、武器、心法
@@ -15,8 +16,7 @@ functional_tests/
 │   ├── pve/                      # Boss、历练、秘境
 │   ├── sect/                     # 宗门（默认宗门/建设/师承/晋升/出师回收/指令统一/悬赏分流/商店/事件标记）
 │   ├── pvp/                      # 切磋、决斗、传承PK、效果验证
-│   ├── gm/                       # GM 工具
-│   └── misc/                     # 不属以上功能域的入库拍平件：平台模板用例、其他插件的冒烟用例
+│   └── gm/                       # GM 工具
 └── results/
     └── <YYYY-MM-DD>_<target>/    # 每次测试目标一个目录
         ├── summary.md            # 运行概览：通过/失败/跳过/遗留问题

@@ -323,28 +323,44 @@ def cmd_sync_cases(args: argparse.Namespace) -> int:
     # left there without a source file is a case that exists on this machine only, is
     # never reviewed or re-run by the suite, and vanishes on a fresh install (bd -ju1
     # review round 3, P3-3). Warn only -- deleting someone else's case is the operator's
-    # call, so backfill it to functional_tests/cases/<domain>/ or remove it by hand.
+    # call. The dir is shared across plugins, so a case owned by another plugin is legit
+    # but must be registered in functional_tests/external_cases.md instead of being
+    # backfilled into this repo (that mistake moved astrbot_plugin_tarot's regression
+    # case and the platform's blank template into our suite once already).
     synced = {name for name, _, _ in found}
-    orphans = sorted(
-        p.name[: -len(".json")]
-        for p in platform_dir.glob("*.json")
-        if not p.name.endswith(".meta.json") and p.name[: -len(".json")] not in synced
-    )
-    if orphans:
+    external_text = ""
+    external_file = cases_root.parent / "external_cases.md"
+    if external_file.is_file():
+        external_text = external_file.read_text(encoding="utf-8")
+    pending, registered = [], []
+    for path in platform_dir.glob("*.json"):
+        if path.name.endswith(".meta.json"):
+            continue
+        name = path.name[: -len(".json")]
+        if name in synced:
+            continue
+        (registered if name in external_text else pending).append(name)
+    pending, registered = sorted(pending), sorted(registered)
+    if pending:
         print(
-            f"警告：平台目录存在 {len(orphans)} 个仓库外未纳管用例（无 functional_tests/cases 源文件）：",
+            f"警告：平台目录存在 {len(pending)} 个仓库外未纳管用例（无 functional_tests/cases 源文件）：",
             file=sys.stderr,
         )
-        for name in orphans:
+        for name in pending:
             print(f"  - {name}", file=sys.stderr)
         print(
-            "请回填到 functional_tests/cases/<domain>/<name>.json 后重新 sync；"
+            "属本插件的请回填到 functional_tests/cases/<domain>/<name>.json 后重新 sync；"
+            "属其它插件的请挪进其仓库并登记到 functional_tests/external_cases.md；"
             "确认废弃再手工删平台副本。",
             file=sys.stderr,
         )
+    if registered:
+        print(
+            f"（{len(registered)} 个平台用例属其它插件，已登记于 functional_tests/external_cases.md："
+            f"{'、'.join(registered)}）",
+            file=sys.stderr,
+        )
     print(f"同步完成：{len(found)} 个用例已拍平到 {platform_dir}")
-    if orphans:
-        print(f"（另有 {len(orphans)} 个未纳管用例被告警，未同步）", file=sys.stderr)
     return 0
 
 
