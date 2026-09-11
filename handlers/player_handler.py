@@ -93,33 +93,38 @@ class PlayerHandler:
         # 如果没有提供职业选择，显示选择提示
         if not cultivation_type or cultivation_type.strip() == "":
             # 欢迎头部为叙事文案（配置化）；属性数值与规则列表属数值说明类，
-            # 留在代码原位（externalize-narrative-texts design D6）
-            help_msg = self._render_narrative("creation_help_welcome") + (
-                "【灵修】以灵气为主，法术攻击\n"
-                "• 寿命：100\n"
-                "• 灵气：100-1000\n"
-                "• 法伤：5-100\n"
-                "• 物伤：5\n"
-                "• 法防：0\n"
-                "• 物防：5\n"
-                "• 精神力：100-500\n\n"
-                "【体修】以气血为主，肉身强横\n"
-                "• 寿命：50-100\n"
-                "• 气血：100-500\n"
-                "• 法伤：0\n"
-                "• 物伤：100-500\n"
-                "• 法防：50-200\n"
-                "• 物防：100-500\n"
-                "• 精神力：100-500\n"
-                "━━━━━━━━━━━━━━━\n"
-                "⚠️ 修仙风险警告 ⚠️\n"
-                "• 突破失败有概率走火入魔身死道消\n"
-                "• 生命值归零也会导致死亡\n"
-                "• 死亡后所有数据清除，需重新入仙途\n"
-                "━━━━━━━━━━━━━━━\n"
-                f"💡 使用方法：\n"
-                f"  {CMD_START_XIUXIAN} 灵修\n"
-                f"  {CMD_START_XIUXIAN} 体修"
+            # 留在代码原位（externalize-narrative-texts design D6）。文案不得自带
+            # 首尾空白，因此分隔用的空行由调用侧补（换行契约）。
+            help_msg = (
+                self._render_narrative("creation_help_welcome")
+                + "\n\n"
+                + (
+                    "【灵修】以灵气为主，法术攻击\n"
+                    "• 寿命：100\n"
+                    "• 灵气：100-1000\n"
+                    "• 法伤：5-100\n"
+                    "• 物伤：5\n"
+                    "• 法防：0\n"
+                    "• 物防：5\n"
+                    "• 精神力：100-500\n\n"
+                    "【体修】以气血为主，肉身强横\n"
+                    "• 寿命：50-100\n"
+                    "• 气血：100-500\n"
+                    "• 法伤：0\n"
+                    "• 物伤：100-500\n"
+                    "• 法防：50-200\n"
+                    "• 物防：100-500\n"
+                    "• 精神力：100-500\n"
+                    "━━━━━━━━━━━━━━━\n"
+                    "⚠️ 修仙风险警告 ⚠️\n"
+                    "• 突破失败有概率走火入魔身死道消\n"
+                    "• 生命值归零也会导致死亡\n"
+                    "• 死亡后所有数据清除，需重新入仙途\n"
+                    "━━━━━━━━━━━━━━━\n"
+                    f"💡 使用方法：\n"
+                    f"  {CMD_START_XIUXIAN} 灵修\n"
+                    f"  {CMD_START_XIUXIAN} 体修"
+                )
             )
             yield event.plain_result(help_msg)
             return
@@ -145,6 +150,8 @@ class PlayerHandler:
                 "creation_welcome",
                 {"name": event.get_sender_name()},
             )
+            # 换行由代码拥有（文案不得自带首尾空白）：欢迎词后接分隔线。
+            + "\n"
             + f"━━━━━━━━━━━━━━━\n"
             f"修炼方式：【{new_player.cultivation_type}】\n"
             f"灵根：【{new_player.spiritual_root}】\n"
@@ -152,6 +159,7 @@ class PlayerHandler:
             f"启动资金：{new_player.gold} 灵石\n"
             f"━━━━━━━━━━━━━━━\n"
             + self._render_narrative("creation_warning")
+            + "\n"
             + f"━━━━━━━━━━━━━━━\n"
             f"💡 发送「{CMD_PLAYER_INFO}」查看状态"
         )
@@ -471,7 +479,8 @@ class PlayerHandler:
                         player.user_id
                     )
                     if owned:
-                        legacy_line = self._render_narrative(
+                        # 分隔用的空行由代码拥有（与上一分支 "\n\n" + legacy_msg 同口径）。
+                        legacy_line = "\n\n" + self._render_narrative(
                             "impart_value_inactive_hint"
                         )
             except Exception as exc:
@@ -662,6 +671,7 @@ class PlayerHandler:
         # 属数值说明类，与宗门之宝回收行一起留在代码原位（design D6）
         yield event.plain_result(
             self._render_narrative("rebirth_farewell")
+            + "\n"  # 换行归调用侧：告别词后接规则行
             + "（7天内不可再次重修）"
             + f"{reclaim_msg}"
         )

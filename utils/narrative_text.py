@@ -12,6 +12,27 @@ fragment files, so the content is always identical.
 Call sites render copy through :func:`render_narrative`; adventure event
 ``desc_variants`` bucket selection reuses :func:`select_narrative_pool` and
 :func:`level_to_narrative_bucket` so bucket semantics stay single-sourced.
+
+Line-break ownership contract (bd -ju1 / -tnr)
+----------------------------------------------
+**Copy never owns line breaks at its edges; code and panel templates do.** A
+narrative pool entry may contain internal newlines (multi-line flavor text is
+fine), but it must not start or end with whitespace: whoever concatenates the
+result (a panel template's ``\n``, or a call site appending a block) owns the
+separator. Two independent enforcements implement this:
+
+1. :func:`select_narrative_pool` strips stray edge whitespace off every entry
+   at render time (the safety net -- it also fixes the mixed case where a
+   template already supplies the newline), warning once per scene.
+2. ``scripts/sync_copy_variants_to_config.py`` warns on the same condition
+   while importing ``design_docs`` copy, so the offending draft gets fixed at
+   the source instead of relying on the net.
+
+Slots that may legitimately render empty (``{streak_bonus_msg}``) additionally
+need their newline *inside* the conditional at the call site -- see
+``core/breakthrough_manager.py`` -- otherwise an absent line leaves a blank row.
+Panel templates (the dual-slot ``panel`` key) are excluded from stripping: they
+*are* the newline owner.
 """
 
 import random
@@ -19,6 +40,9 @@ import string
 from typing import Any
 
 from astrbot.api import logger
+
+# Scenes whose stray edge whitespace has already been reported this process.
+_EDGE_WS_WARNED: set[str] = set()
 
 try:
     from ..data.narrative_defaults import (
@@ -111,8 +135,37 @@ def _iter_pool_entries(value: Any) -> list:
     return []
 
 
+def _sanitize_entry_text(text: str, scene_label: str) -> str:
+    """Drop stray edge whitespace from one pool entry (line-break ownership contract).
+
+    Args:
+        text: Raw pool entry as configured (may carry leading/trailing blanks).
+        scene_label: Human-readable scene key used in the warning, e.g.
+            ``breakthrough.pity_hint`` or ``adventure.desc_variants``.
+
+    Returns:
+        The entry with leading/trailing whitespace removed; interior newlines are
+        untouched because multi-line flavor copy is legitimate.
+    """
+    cleaned = text.strip()
+    if cleaned != text and scene_label not in _EDGE_WS_WARNED:
+        # Warn once per scene per process: copy is rendered on hot paths (every
+        # combat round), so an unconditional warning would flood the log.
+        _EDGE_WS_WARNED.add(scene_label)
+        logger.warning(
+            f"叙事文案 {scene_label} 自带首尾空白/换行，已在渲染时剔除。"
+            "换行归代码或面板模板所有（utils/narrative_text.py 模块文档）；"
+            "design_docs 稿子请去掉多余换行后重新导入。"
+        )
+    return cleaned
+
+
 def select_narrative_pool(
-    value: Any, *, route: str | None = None, level_index: int | None = None
+    value: Any,
+    *,
+    route: str | None = None,
+    level_index: int | None = None,
+    scene_label: str = "",
 ) -> list[str]:
     """Normalize a narrative scene value into a flat list of template strings.
 
@@ -133,6 +186,11 @@ def select_narrative_pool(
 
     This is the single shared implementation used both by narrative scenes and
     by adventure event ``desc_variants`` bucket selection.
+
+    Every entry is normalized by :func:`_sanitize_entry_text` -- stray edge
+    whitespace is removed here so no scene can render a blank line (bd -ju1).
+    Pass ``scene_label`` (``section.scene``) to get a one-shot warning naming the
+    offending scene. Panel templates are *not* pool entries and stay untouched.
     """
     if isinstance(value, dict) and not isinstance(value.get("text"), str):
         # Bucketed pool: merge current segment bucket with the 通用 bucket.
@@ -146,14 +204,14 @@ def select_narrative_pool(
     pool: list[str] = []
     for entry in entries:
         if isinstance(entry, str):
-            pool.append(entry)
+            pool.append(_sanitize_entry_text(entry, scene_label))
             continue
         tagged_route = entry.get("route")
         if tagged_route and tagged_route != route:
             continue
         text = entry.get("text")
         if isinstance(text, str):
-            pool.append(text)
+            pool.append(_sanitize_entry_text(text, scene_label))
     return pool
 
 
@@ -191,7 +249,7 @@ def _render_dual_slot(
     """
     flavor_source = {k: v for k, v in value.items() if k != "panel"}
     flavor_pool = select_narrative_pool(
-        flavor_source, route=route, level_index=level_index
+        flavor_source, route=route, level_index=level_index, scene_label=scene_label
     )
     flavor = ""
     if flavor_pool:
@@ -253,12 +311,15 @@ def render_narrative(
         )
 
     default_value = DEFAULT_NARRATIVE_CONFIG.get(section, {}).get(scene)
-    pool = select_narrative_pool(value, route=route, level_index=level_index)
+    scene_label = f"{section}.{scene}"
+    pool = select_narrative_pool(
+        value, route=route, level_index=level_index, scene_label=scene_label
+    )
     if not pool:
         # Missing scene or a pool emptied by route filtering: fall back to the
         # embedded default copy (same fallback path as contract violations).
         pool = select_narrative_pool(
-            default_value, route=route, level_index=level_index
+            default_value, route=route, level_index=level_index, scene_label=scene_label
         )
     if not pool:
         logger.error(f"叙事文案场景未配置且无可用默认: {section}.{scene}")

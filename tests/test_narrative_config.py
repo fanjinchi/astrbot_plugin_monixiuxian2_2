@@ -391,3 +391,108 @@ def test_repo_narrative_config_carries_leftover_scenes():
         assert cfg[section][scene] == template, (
             f"config/narrative_config.json {section}.{scene} 与内嵌默认不一致"
         )
+
+
+# --- 换行所有权契约（bd -ju1 / -tnr） ----------------------------------------
+
+
+def test_pool_entries_lose_stray_edge_whitespace():
+    """Copy may not own edge blanks: the pool normalizer removes them.
+
+    Interior newlines survive -- multi-line flavor copy is legitimate; only the
+    edges belong to code / panel templates.
+    """
+    assert select_narrative_pool(
+        ["\n\n甲\n", {"text": "  乙  ", "route": "灵修"}], route="灵修"
+    ) == ["甲", "乙"]
+    bucketed = {"通用": ["\n🗿 丙\n"], "练气": [{"text": "\t丁\t"}]}
+    assert select_narrative_pool(bucketed, level_index=5) == ["🗿 丙", "丁"]
+    assert select_narrative_pool(["第一段\n\n第二段"]) == ["第一段\n\n第二段"]
+
+
+def test_edge_whitespace_warning_fires_once_per_scene(monkeypatch):
+    """A dirty scene is reported once per process: copy renders on hot paths."""
+    seen: list[str] = []
+    monkeypatch.setattr(_nt_mod.logger, "warning", lambda msg: seen.append(str(msg)))
+    _nt_mod._EDGE_WS_WARNED.discard("unit.edge")
+    for _ in range(3):
+        assert select_narrative_pool(["\n脏稿\n"], scene_label="unit.edge") == ["脏稿"]
+    assert len(seen) == 1
+    assert "unit.edge" in seen[0]
+    assert "换行归代码或面板模板" in seen[0]
+
+
+def test_clean_scene_warns_nothing(monkeypatch):
+    """Contract-abiding copy stays silent (the guard must not become noise)."""
+    seen: list[str] = []
+    monkeypatch.setattr(_nt_mod.logger, "warning", lambda msg: seen.append(str(msg)))
+    assert select_narrative_pool(["干净稿"], scene_label="unit.clean") == ["干净稿"]
+    assert seen == []
+
+
+def test_dirty_copy_cannot_split_a_panel_line(monkeypatch):
+    """End to end: a variant carrying a leading blank line still renders inline.
+
+    This is the -ju1 failure mode (bonus copy glued to / doubled under the panel
+    title), re-checked through render_narrative rather than by reading shipped
+    content -- copy may change freely without turning this test red.
+    """
+
+    class _Dirty:
+        narrative_config = {
+            "breakthrough": {
+                "lose_streak_reward": {"通用": ["\n  苦尽甘来  \n"]},
+                "pity_hint": ["\n再败 1 次即触发保底。\n"],
+            }
+        }
+
+    assert (
+        render_narrative(_Dirty(), "breakthrough", "lose_streak_reward", {})
+        == "苦尽甘来"
+    )
+    assert (
+        render_narrative(_Dirty(), "breakthrough", "pity_hint", {})
+        == "再败 1 次即触发保底。"
+    )
+
+
+def test_embedded_defaults_obey_the_line_break_contract():
+    """Every embedded default pool entry is free of edge whitespace.
+
+    The defaults are code-owned resources (``data/narrative_defaults/``), so this
+    pins our own side of the contract. Where a blank line is needed for spacing,
+    the call site adds it -- see ``handlers/player_handler.py`` and
+    ``managers/rift_manager.py``.
+    """
+
+    def _entries(value):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, list):
+            for item in value:
+                yield from _entries(item)
+        elif isinstance(value, dict):
+            for key, sub in value.items():
+                if key == "panel" and isinstance(sub, str):
+                    continue  # panels are the newline owners, not the copy
+                if key.endswith("_SCENE_VARS"):
+                    continue
+                yield from _entries(sub)
+        elif isinstance(value, tuple):
+            for item in value:
+                yield from _entries(item)
+
+    checked = 0
+    for section, scenes in DEFAULT_NARRATIVE_CONFIG.items():
+        if not isinstance(scenes, dict) or section.endswith("_SCENE_VARS"):
+            continue
+        for scene, value in scenes.items():
+            for text in _entries(value):
+                if not isinstance(text, str):
+                    continue
+                checked += 1
+                assert text == text.strip(), (
+                    f"{section}.{scene} 自带首尾空白: {text[:20]!r}"
+                )
+    # 内嵌默认是「每场景一条」的兜底文案（多 variant 池只存在于导入后的 config）。
+    assert checked >= 50, f"扫描条目过少（{checked}），契约测试可能已失效"

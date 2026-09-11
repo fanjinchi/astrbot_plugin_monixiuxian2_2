@@ -161,8 +161,25 @@ def _strip_separator(text: str) -> str:
 
 
 def _to_entry(row: dict):
-    """Convert one CSV row to a pool entry (str, or route-tagged dict)."""
-    text = _strip_separator((row.get("text") or "").strip())
+    """Convert one CSV row to a pool entry (str, or route-tagged dict).
+
+    Edge whitespace is dropped on import and reported: line breaks belong to the
+    code or the panel template, never to the copy (a variant starting with
+    ``\\n`` renders a blank line inside the panel -- bd -ju1). Interior newlines
+    are kept, so multi-line copy is unaffected.
+    """
+    raw = row.get("text") or ""
+    label = f"{row.get('domain')}.{row.get('scene')}#{row.get('variant_no')}"
+    if raw != raw.strip():
+        edge = repr(raw[: len(raw) - len(raw.lstrip())]) + repr(
+            raw[len(raw.rstrip()) :]
+        )
+        print(
+            f"  WARN 稿子首尾带空白/换行，导入时已剔除（换行归代码或面板模板所有，"
+            f"见 utils/narrative_text.py 「Line-break ownership contract」）: "
+            f"{label} 边缘={edge}"
+        )
+    text = _strip_separator(raw.strip())
     route = (row.get("route") or "").strip()
     if route in ROUTE_TAGS:
         return {"text": text, "route": route}

@@ -476,6 +476,7 @@ class AdventureManager:
             event.get("desc_variants"),
             route=getattr(player, "cultivation_type", None),
             level_index=getattr(player, "level_index", None),
+            scene_label="adventure.desc_variants",
         )
         if pool:
             return random.choice(pool)

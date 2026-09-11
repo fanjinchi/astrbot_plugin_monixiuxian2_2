@@ -496,22 +496,3 @@ class TestSuccessPanelStreakBonusLineBreak:
         for panel in (default_panel, live_panel):
             assert f"{self.TITLE}{{streak_bonus_msg}}" in panel
             assert re.search(r"\n\s*\{streak_bonus_msg\}", panel) is None, panel[:80]
-
-    def test_shipped_bonus_copy_carries_no_edge_whitespace(self, config_manager):
-        """Warn if imported variants smuggle the whitespace the caller strips away."""
-        scene = config_manager.narrative_config.get("breakthrough", {}).get(
-            "lose_streak_reward"
-        )
-        if scene is None:
-            # Absent scene falls back to the embedded default, whose layout the tests
-            # above already pin; there is no imported copy to police here.
-            pytest.skip("lose_streak_reward 未导入，契约由内嵌默认保证")
-        buckets = scene.values() if isinstance(scene, dict) else [scene]
-        texts = [
-            entry["text"] if isinstance(entry, dict) else str(entry)
-            for bucket in buckets
-            for entry in (bucket if isinstance(bucket, list) else [bucket])
-        ]
-        assert texts
-        for text in texts:
-            assert text == text.strip(), f"leading/trailing whitespace in {text!r}"

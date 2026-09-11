@@ -784,9 +784,9 @@ class RiftManager:
                 "encounter_lose",
                 {"battle_msg": battle_msg},
             )
-            # 模板的 \n\n 前缀为结算消息内联追加设计（见 narrative 模块注释），
-            # 独立回复场景去掉前导空行
-            return False, msg.lstrip("\n")
+            # 文案不得自带边缘空白（换行契约），旧版本这里需要 `lstrip("\n")` 去
+            # 掉模板来带的两个前导空行；现在由渲染层统一剔除，无需再脱。
+            return False, msg
 
         legacy_type = entry.payload.get("legacy_type", "rift")
         instance = await self.impart_mgr.create_legacy(
@@ -802,7 +802,7 @@ class RiftManager:
             "encounter_win",
             {"battle_msg": battle_msg, "name": name, "instance_id": instance.id},
         )
-        return True, msg.lstrip("\n")
+        return True, msg
 
     # -------- GM 强制触发（design D4：与判定路径共用挂起逻辑，仅跳过概率） --------
 

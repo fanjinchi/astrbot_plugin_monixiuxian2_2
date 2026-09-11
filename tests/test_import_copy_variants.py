@@ -125,3 +125,31 @@ def test_imported_csv_zero_fail() -> None:
     ) as f:
         header = csv.DictReader(f).fieldnames
     assert "group" in header
+
+
+def test_import_drops_edge_whitespace_with_warning(capsys) -> None:
+    """导入器剔稿子首尾空白并打 WARN（换行归代码/面板模板，bd -tnr）。
+
+    内部换行属正文，必须原样保留；干净稿子不应产生告警。
+    """
+    sync_mod = load_module(
+        "sync_copy_variants_to_config", "scripts/sync_copy_variants_to_config.py"
+    )
+    row = {
+        "domain": "breakthrough",
+        "scene": "lose_streak_reward",
+        "variant_no": "01",
+        "text": "\n\n✨ 苦尽甘来，+3.0%。\n",
+        "route": "",
+    }
+    assert sync_mod._to_entry(row) == "✨ 苦尽甘来，+3.0%。"
+    out = capsys.readouterr().out
+    assert "WARN" in out and "首尾带空白" in out
+    assert "breakthrough.lose_streak_reward#01" in out
+    assert "narrative_text.py" in out
+
+    capsys.readouterr()
+    clean = dict(row, text="✨ 苦尽甘来，\n+3.0%。")
+    # 内部换行是正文的一部分，不参与剔除。
+    assert sync_mod._to_entry(clean) == "✨ 苦尽甘来，\n+3.0%。"
+    assert "WARN" not in capsys.readouterr().out

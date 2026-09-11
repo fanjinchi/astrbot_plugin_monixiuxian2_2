@@ -56,6 +56,13 @@
   - `-os6` pierce/unavoidable 触发零痕迹——**定为不做**：新增痕迹需 `combat.*` 新句子，而该域渲染实时战报行（见 `-r0a`），AGENTS.md #15 又禁止直改 `config/*.json`；理由写进 `managers/combat_manager.py` 注释，两个用例退化为路径 smoke
   - 仍 open 需产品/内容决策：`-hcn` `remaining_hp` 无阈值恒定追加与血量自相矛盾、`-r0a` 横幅文案被导入替换（用例已改锚代码行）
 
+- [x] 7.8 `-tnr` 换行所有权契约从「单测钉」升级为「代码拥有 + 代码兜底 + 导入告警」：
+  - 渲染层 `utils/narrative_text.py` 取用时剔除条目首尾空白（真 trim，不是回退内嵌默认），剔除实际发生时每场景打一次 WARN；`select_narrative_pool` / `_render_dual_slot` / `render_narrative` 透传 `scene_label`
+  - 内嵌默认 6 处收齐契约（`cultivation.py` 5 处 + `legacy_encounter.py` 2 处去前导 `\n\n`），分隔换行改由调用侧补：`handlers/player_handler.py` 4 处（与相邻已在线条同口径）、`managers/rift_manager.py` 两处失效 `lstrip("\n")` 删除、`managers/adventure_manager.py` 双槽调用点补 `scene_label`
+  - 上游两道判断：导入器 `scripts/sync_copy_variants_to_config.py` 剔边缘空白时逐条 WARN；`lint_narrative.py` 新增“首尾空白”检查项（必须在未脱 `{var}`、未 strip 的原稿上查，否则 `{name}` 开头的稿子会误报 36 条）
+  - 契约入档：`utils/narrative_text.py` 模块 docstring、spec delta（`narrative-text-config` 新增 Requirement、`content-sync-pipeline` 修订 lint 闸门）
+  - 测试：`tests/test_narrative_config.py` 新增 5 钉（trim / 单次 WARN / 干净不警 / 脏稿拆不坏面板 / 内嵌默认全量扫描），`tests/test_rift_adventure_narrative.py::test_legacy_encounter_fragment_defaults_are_verbatim` 随默认值同步，删除读线上 config 内容的 `test_shipped_bonus_copy_carries_no_edge_whitespace`（契约已有三层保证，不靠内容测钉）
+
 ## 8. 收尾
 
 - [x] 8.1 `bd update 3bt` 标记 ① 部分完成（州条部分保持 open）

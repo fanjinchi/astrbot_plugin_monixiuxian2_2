@@ -18,14 +18,14 @@ values, so the render points pass the id directly).
 """
 
 SCENES: dict[str, object] = {
-    # 偶遇制胜利（managers/adventure_manager.py / managers/rift_manager.py）。
-    # 前缀 \n\n 属于原文案（结算消息内联追加），逐字保留。
+    # 偶遇制胜利（managers/rift_manager.py）。前导空行已剔除：两个调用点本来
+    # 就 `lstrip("\n")` 把它去掉（独立回复场景），换行契约要求文案不自带边缘空白。
     "encounter_win": (
-        "\n\n🗿 你偶遇上古传承之地，战胜了守护者！\n{battle_msg}\n"
+        "🗿 你偶遇上古传承之地，战胜了守护者！\n{battle_msg}\n"
         "🌟 获得【{name}】#{instance_id}，发送「激活传承」可开始修炼解锁。"
     ),
     # 偶遇制失败。
-    "encounter_lose": "\n\n🗿 你偶遇上古传承之地，但未能战胜守护者。\n{battle_msg}",
+    "encounter_lose": "🗿 你偶遇上古传承之地，但未能战胜守护者。\n{battle_msg}",
     # 领取制胜利（managers/sect_manager.py），含宗门专属机制行（不可夺取/离宗归还）。
     "claim_win": (
         "🗿 你战胜了守护者！\n{battle_msg}\n"

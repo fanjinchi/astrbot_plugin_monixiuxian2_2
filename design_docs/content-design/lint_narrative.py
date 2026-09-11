@@ -206,6 +206,8 @@ def _text_violations(text: str, max_len: int) -> list[str]:
     if not text:
         return []
     problems = []
+    # 首尾空白检查不在这里做：调用方传的是脱 {var} 后的文本（「{name} 起手」会
+    # 被脉成前导空白）或已 strip 的存量文案，只有 copy_variants 处能拿到原稿。
     sanitized = text
     for phrase in BANNED_WHITELIST:
         sanitized = sanitized.replace(phrase, "")
@@ -216,8 +218,8 @@ def _text_violations(text: str, max_len: int) -> list[str]:
         problems.append("含百分号（数值承诺）")
     if DIGIT_RE.search(text):
         problems.append("含阿拉伯数字（数值承诺）")
-    if len(text) > max_len:
-        problems.append(f"长度 {len(text)} 字超上限 {max_len}")
+    if len(text.strip()) > max_len:
+        problems.append(f"长度 {len(text.strip())} 字超上限 {max_len}")
     m = GRADE_RANK_RE.search(text)
     if m:
         problems.append(f"品级冠词「{m.group(0)}」进正文")
@@ -511,7 +513,8 @@ def _check_copy_variants(rows: list[dict], results: list[str], strict: bool) -> 
     for i, r in enumerate(rows, start=2):
         domain = (r.get("domain") or "").strip()
         scene = (r.get("scene") or "").strip()
-        text = (r.get("text") or "").strip()
+        raw_text = r.get("text") or ""
+        text = raw_text.strip()
         status = (r.get("narrative_status") or "").strip()
         where = f"copy_variants.csv:{i} [{domain}.{scene}]"
         # 严重度定档：定稿行违例必 FAIL；占位/待写仅 --strict 时 FAIL
@@ -569,8 +572,15 @@ def _check_copy_variants(rows: list[dict], results: list[str], strict: bool) -> 
         if not text:
             results.append(f"{verdict} {where} text 为空")
             continue
+        # 换行所有权契约：必须查未脱槽、未 strip 的原稿——脱槽会把「{name} 起手」
+        # 这类正常稿子变成前导空白（误报），strip 那么永远看不出违规（漏报）。
+        if raw_text != raw_text.strip():
+            results.append(
+                f"{verdict} {where} text 首尾带空白/换行（分隔用的换行归代码或面板模板，"
+                "见 utils/narrative_text.py 「Line-break ownership contract」）"
+            )
         # 脱 {var} 槽再跑文本检查：变量名含数字（{name1} 等）不应触发数字违例
-        plain = _WHITELIST_VAR_RE.sub("", text)
+        plain = _WHITELIST_VAR_RE.sub("", raw_text)
         for problem in _text_violations(
             plain, DOMAIN_MAX_LEN.get(domain, DEFAULT_MAX_LEN)
         ):

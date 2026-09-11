@@ -265,14 +265,21 @@ def test_repo_rift_config_explore_events_match_original_pool():
 
 
 def test_legacy_encounter_fragment_defaults_are_verbatim():
-    """The embedded cluster matches the original strings (rift wording chosen)."""
+    """The embedded cluster matches the original strings (rift wording chosen).
+
+    The cluster used to open with ``\n\n`` because the copy owned the blank line
+    that separated it from an inline settlement message; both call sites then
+    undid it with ``lstrip("\n")``. Under the line-break contract
+    (utils/narrative_text.py) copy carries no edge whitespace, so the prefix is
+    gone and the call sites no longer need to strip.
+    """
     scenes = DEFAULT_NARRATIVE_CONFIG["legacy_encounter"]
     assert scenes["encounter_win"] == (
-        "\n\n🗿 你偶遇上古传承之地，战胜了守护者！\n{battle_msg}\n"
+        "🗿 你偶遇上古传承之地，战胜了守护者！\n{battle_msg}\n"
         "🌟 获得【{name}】#{instance_id}，发送「激活传承」可开始修炼解锁。"
     )
     assert scenes["encounter_lose"] == (
-        "\n\n🗿 你偶遇上古传承之地，但未能战胜守护者。\n{battle_msg}"
+        "🗿 你偶遇上古传承之地，但未能战胜守护者。\n{battle_msg}"
     )
     assert scenes["claim_win"] == (
         "🗿 你战胜了守护者！\n{battle_msg}\n"

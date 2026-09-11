@@ -37,31 +37,35 @@ SCENES: dict[str, object] = {
     # code before rendering.
     "retreat_epiphany": "🎁 闭关悟道，领悟功法【{skill_name}】！",
     # 传承值结算 flavor: hint shown when the player owns a legacy but none is
-    # active. Leading "\n\n" preserved verbatim (it is appended to the
-    # settlement message).
+    # active. The blank line that separates it from the settlement message is
+    # owned by the call site (handlers/player_handler.py); copy must not carry
+    # edge whitespace (line-break contract, utils/narrative_text.py).
     "impart_value_inactive_hint": (
-        "\n\n💡 你持有传承但未激活，本次闭关未累积传承值。\n"
+        "💡 你持有传承但未激活，本次闭关未累积传承值。\n"
         "使用「激活传承 <编号>」激活后再闭关。"
     ),
     # 角色创建-选择提示头部: the stat/rule blocks that follow are numeric
-    # explanation text and stay in code (design D6).
+    # explanation text and stay in code (design D6). The blank line before them
+    # is added by the call site.
     "creation_help_welcome": (
-        "🌟 欢迎踏入修仙之路！\n━━━━━━━━━━━━━━━\n请选择你的修炼方式：\n\n"
+        "🌟 欢迎踏入修仙之路！\n━━━━━━━━━━━━━━━\n请选择你的修炼方式："
     ),
-    # 角色创建-欢迎词: {name} is the sender display name.
-    "creation_welcome": "🎉 恭喜道友 {name} 踏上仙途！\n",
-    # 角色创建-风险 flavor 句（结束于换行，后接代码内的分隔线）。
+    # 角色创建-欢迎词: {name} is the sender display name. Trailing newline is
+    # owned by the call site (it appends the separator rule).
+    "creation_welcome": "🎉 恭喜道友 {name} 踏上仙途！",
+    # 角色创建-风险 flavor 句：后接代码内的分隔线，换行归调用侧。
     "creation_warning": (
         "⚠️ 修仙有风险，突破需谨慎！\n"
         "突破失败或生命值归零会导致\n"
-        "身死道消，所有数据清除！\n"
+        "身死道消，所有数据清除！"
     ),
     # 弃道重修-告别词: the trailing numeric rule line "（7天内不可再次重修）"
-    # and the sect-treasure reclaim line stay in code (design D6).
+    # and the sect-treasure reclaim line stay in code (design D6); the newline
+    # before them is owned by the call site.
     "rebirth_farewell": (
         "💀 你选择了弃道重修，旧生一切化为尘埃。\n"
         "━━━━━━━━━━━━━━━\n"
-        "可立即使用「我要修仙」重新踏上仙途。\n"
+        "可立即使用「我要修仙」重新踏上仙途。"
     ),
 }
 
