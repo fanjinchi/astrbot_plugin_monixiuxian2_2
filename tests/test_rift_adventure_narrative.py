@@ -294,6 +294,30 @@ def test_legacy_encounter_fragment_defaults_are_verbatim():
     )
 
 
+def test_repo_config_legacy_encounter_mirrors_defaults_and_line_break_contract():
+    """Ship-check for the one domain the import pipeline does NOT manage.
+
+    ``legacy_encounter`` 不在 ``sync_copy_variants_to_config.py`` 的
+    ``SHORT_TEXT_DOMAINS`` 里（当年外部化时是直接 dump 进 config 的），所以
+    ``config/narrative_config.json`` 与内嵌默认是两份手写副本：漂移时既没有
+    导入器剔边、也没有 lint 可查。-53w 就是这里带着 ``\n\n`` 前缀：渲染层现在
+    会剔掉，但面板行结构靠的是兜底而不是数据本身对。本钉把「非管线域 config 必须
+    逐字等于内嵌默认」写成不变量（-ju1 那类换行漂移的结构性拦截）。
+    """
+    cfg = json.loads(
+        (PLUGIN_ROOT / "config" / "narrative_config.json").read_text(encoding="utf-8")
+    )
+    scenes = cfg["legacy_encounter"]
+    defaults = DEFAULT_NARRATIVE_CONFIG["legacy_encounter"]
+    assert set(scenes) == set(defaults), "config 与内嵌默认的场景集不一致"
+    for scene, value in scenes.items():
+        assert isinstance(value, str), f"{scene} 应为单串文案"
+        assert value == defaults[scene], (
+            f"config 与内嵌默认漂移: legacy_encounter.{scene}"
+        )
+        assert value == value.strip(), f"文案自带首尾空白: legacy_encounter.{scene}"
+
+
 @pytest.mark.asyncio
 async def test_adventure_legacy_pends_encounter_with_invite_hint():
     """Adventure 命中 legacy_chance → 挂起来源 adventure 的传承遭遇并提示应邀方式

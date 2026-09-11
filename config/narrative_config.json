@@ -489,8 +489,8 @@
     "storage_full_drop": "🎁 机缘天降，获得【{name}】，但储物戒已满无法存入。"
   },
   "legacy_encounter": {
-    "encounter_win": "\n\n🗿 你偶遇上古传承之地，战胜了守护者！\n{battle_msg}\n🌟 获得【{name}】#{instance_id}，发送「激活传承」可开始修炼解锁。",
-    "encounter_lose": "\n\n🗿 你偶遇上古传承之地，但未能战胜守护者。\n{battle_msg}",
+    "encounter_win": "🗿 你偶遇上古传承之地，战胜了守护者！\n{battle_msg}\n🌟 获得【{name}】#{instance_id}，发送「激活传承」可开始修炼解锁。",
+    "encounter_lose": "🗿 你偶遇上古传承之地，但未能战胜守护者。\n{battle_msg}",
     "claim_win": "🗿 你战胜了守护者！\n{battle_msg}\n🌟 获得宗门传承【{name}】#{instance_id}！\n⚠️ 宗门传承不可被夺取，但离宗时将自动归还宗门。\n💡 发送「激活传承 {instance_id}」开始修炼解锁等阶奖励。",
     "claim_lose": "🗿 领取【{name}】需先战胜传承之地守护者。\n{battle_msg}\n此次未领取成功，不占用领取名额，可择日再试。"
   }
