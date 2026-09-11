@@ -148,50 +148,66 @@ def pve_manager_with_config(
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Encounter probability (statistical)
+# Encounter probability (frozen seed, exact hit-count pins)
 # ──────────────────────────────────────────────────────────────────────
 
 
 class TestEncounterProbability:
-    """_should_trigger_combat statistical verification (seeded draw, z < 4, 1000 trials)."""
+    """_should_trigger_combat exact-draw verification (frozen seed, pinned hit count).
+
+    Each cell owns its seed, so the 1000 draws are one *fixed* sample rather than a
+    fresh statistical experiment. The contract is therefore the exact number of hits
+    that sample produces under the current encounter table -- a tripwire on the table
+    and on the RNG call sequence, not a confidence band.
+
+    Why not a z-test (bd -ju1 review round 3, H1): with n=1000 the smallest detectable
+    shift is 4 sigma = 4*sqrt(p(1-p)/1000) = 5.48~6.32pp for every cell between
+    p=0.30 and p=0.75 (only p=0.90 -> 3.79pp and p=0.95 -> 2.76pp are tighter), i.e.
+    wider than the ±5% band it replaced. Measured on this frozen sample: shifting the
+    whole encounter table by +1pp or +2pp lights up 0 of 8 cells under either retired
+    band but 8 of 8 under these pins (+3pp still only catches 1 of 8 there), which is
+    why the band was dropped instead of re-tuned.
+    """
 
     TRIALS = 1000
-    Z_LIMIT = 4.0
 
+    # (scene, difficulty, configured rate, hits under the frozen seed below).
+    # Re-pin by reading the count from the assertion message after an intentional table
+    # change; the rate column is kept only so the message can quote the design value.
     @pytest.mark.parametrize(
-        "scene,difficulty,expected",
+        "scene,difficulty,rate,expected_hits",
         [
-            ("adventure", "low", 0.30),
-            ("adventure", "mid", 0.45),
-            ("adventure", "high", 0.65),
-            ("adventure", "extreme", 0.75),
-            ("rift", "low", 0.50),
-            ("rift", "mid", 0.70),
-            ("rift", "high", 0.90),
-            ("rift", "extreme", 0.95),
+            ("adventure", "low", 0.30, 291),
+            ("adventure", "mid", 0.45, 431),
+            ("adventure", "high", 0.65, 638),
+            ("adventure", "extreme", 0.75, 747),
+            ("rift", "low", 0.50, 505),
+            ("rift", "mid", 0.70, 717),
+            ("rift", "high", 0.90, 902),
+            ("rift", "extreme", 0.95, 952),
         ],
     )
-    def test_encounter_rate(self, pve_manager, scene, difficulty, expected):
-        """Observed encounter rate matches the configured rate within 4 standard errors."""
+    def test_encounter_rate(self, pve_manager, scene, difficulty, rate, expected_hits):
+        """The frozen seed must reproduce the pinned hit count exactly."""
         # Statistical assertions must own their seed: this test samples the global
         # ``random`` stream, so any other case that consumes RNG (e.g. breakthrough
-        # panels) shifts it and turns a rare 3.4σ draw into an order-dependent red.
+        # panels) would shift it. The retired ±5% band made that coupling visible -- a
+        # 5pp miss is only 3.45σ at p=0.70, so a perturbed draw could fall outside the
+        # band and turn an unrelated ordering change into a red test. Exact pins remove
+        # the band: the seed *is* the contract, so nothing drifts with execution order.
         random.seed(f"encounter:{scene}:{difficulty}")
         hits = sum(
             pve_manager._should_trigger_combat(scene, difficulty)
             for _ in range(self.TRIALS)
         )
-        observed = hits / self.TRIALS
-        # Per-cell tolerance rather than a flat band: ±5% is 3.16σ at p=0.50 but 7.2σ at
-        # p=0.95, so one constant proves different things per row. The seed freezes the
-        # draw (regression tripwire, not a live statistical test), so the threshold must
-        # be the one justified by that row's own variance.
-        sigma = (expected * (1.0 - expected) / self.TRIALS) ** 0.5
-        assert sigma > 0.0, f"[{scene}/{difficulty}] degenerate probability {expected}"
-        z = abs(observed - expected) / sigma
-        assert z < self.Z_LIMIT, (
-            f"[{scene}/{difficulty}] expected {expected:.2f}, "
-            f"observed {observed:.2f} ({hits}/{self.TRIALS}), z={z:.2f}"
+        assert hits == expected_hits, (
+            f"[{scene}/{difficulty}] pinned draw changed: seed "
+            f"'encounter:{scene}:{difficulty}' hit {hits}/{self.TRIALS} "
+            f"(= {hits / self.TRIALS:.2%}), the pin says {expected_hits} "
+            f"(configured rate {rate:.2%}). This is the exact sample of a frozen seed, "
+            "not a tolerance band: any intentional change to the encounter table, or to "
+            "how often _should_trigger_combat draws from `random`, must be re-pinned "
+            "here with the new count."
         )
 
     def test_unknown_scene_returns_false(self, pve_manager):
@@ -201,52 +217,67 @@ class TestEncounterProbability:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Enemy category distribution (statistical)
+# Enemy category distribution (frozen seed, exact hit-count pins)
 # ──────────────────────────────────────────────────────────────────────
 
 
 class TestEnemyCategoryDistribution:
-    """_select_enemy_category statistical verification (seeded draw, z < 4, 1000 trials)."""
+    """_select_enemy_category exact-draw verification (frozen seed, pinned counts).
+
+    Same contract as :class:`TestEncounterProbability`: one owned seed per cell, and the
+    assertion is the exact per-category hit vector of that frozen sample. See that class
+    docstring for why the z-test band was dropped (a 4σ band detects ≥5.5pp shifts, so
+    a 1~2pp drift of the category table stayed green).
+    """
 
     TRIALS = 1000
-    Z_LIMIT = 4.0
 
+    # (scene, difficulty, configured (normal, elite, boss) rates, exact hits per label
+    # under random.seed(f"category:{scene}:{difficulty}")). Re-pin by reading the counts
+    # from the assertion message after an intentional table change.
     @pytest.mark.parametrize(
-        "scene,difficulty,expected",
+        "scene,difficulty,rates,expected_counts",
         [
-            ("adventure", "mid", (0.70, 0.25, 0.05)),
-            ("adventure", "high", (0.40, 0.40, 0.20)),
-            ("adventure", "extreme", (0.30, 0.35, 0.35)),
-            ("rift", "low", (0.80, 0.20, 0.00)),
-            ("rift", "mid", (0.50, 0.35, 0.15)),
-            ("rift", "high", (0.30, 0.40, 0.30)),
-            ("rift", "extreme", (0.20, 0.40, 0.40)),
+            ("adventure", "mid", (0.70, 0.25, 0.05), (709, 249, 42)),
+            ("adventure", "high", (0.40, 0.40, 0.20), (370, 431, 199)),
+            ("adventure", "extreme", (0.30, 0.35, 0.35), (298, 351, 351)),
+            ("rift", "low", (0.80, 0.20, 0.00), (789, 211, 0)),
+            ("rift", "mid", (0.50, 0.35, 0.15), (513, 331, 156)),
+            ("rift", "high", (0.30, 0.40, 0.30), (295, 394, 311)),
+            ("rift", "extreme", (0.20, 0.40, 0.40), (177, 430, 393)),
         ],
     )
-    def test_category_distribution(self, pve_manager, scene, difficulty, expected):
-        """Observed category proportions match the configured rates within 4 errors."""
-        # Same order-dependence guard as test_encounter_rate (global RNG stream).
+    def test_category_distribution(
+        self, pve_manager, scene, difficulty, rates, expected_counts
+    ):
+        """The frozen seed must reproduce the pinned per-category counts exactly."""
+        # Seed ownership: see test_encounter_rate (global ``random`` stream).
         random.seed(f"category:{scene}:{difficulty}")
         counts = {"normal": 0, "elite": 0, "boss": 0}
         for _ in range(self.TRIALS):
             cat = pve_manager._select_enemy_category(scene, difficulty)
             counts[cat] += 1
 
-        # One loop instead of three near-identical asserts; a configured 0.0 probability
-        # has no sampling variance, so any hit there is a defect rather than a tail event.
-        for label, exp in zip(("normal", "elite", "boss"), expected, strict=True):
-            observed = counts[label] / self.TRIALS
-            if exp == 0.0:
-                assert counts[label] == 0, (
-                    f"[{scene}/{difficulty}/{label}] configured 0.0 but hit "
-                    f"{counts[label]}/{self.TRIALS}"
+        # One loop instead of three near-identical asserts, so the table stays the single
+        # source of truth for the (normal, elite, boss) order.
+        for label, rate, pinned in zip(
+            ("normal", "elite", "boss"), rates, expected_counts, strict=True
+        ):
+            if rate == 0.0:
+                # A configured 0.0 has no sampling variance, so its pin must be exactly 0
+                # -- the retired ±5% band allowed 50 hits on such a cell.
+                assert pinned == 0, (
+                    f"table error: [{scene}/{difficulty}/{label}] is configured 0.0 "
+                    f"but pinned to {pinned} hits"
                 )
-                continue
-            sigma = (exp * (1.0 - exp) / self.TRIALS) ** 0.5
-            z = abs(observed - exp) / sigma
-            assert z < self.Z_LIMIT, (
-                f"[{scene}/{difficulty}/{label}] expected {exp:.2f}, "
-                f"observed {observed:.2f} ({counts[label]}/{self.TRIALS}), z={z:.2f}"
+            assert counts[label] == pinned, (
+                f"[{scene}/{difficulty}/{label}] pinned draw changed: seed "
+                f"'category:{scene}:{difficulty}' hit {counts[label]}/{self.TRIALS} "
+                f"(= {counts[label] / self.TRIALS:.2%}), the pin says {pinned} "
+                f"(configured rate {rate:.2%}). This is the exact sample of a frozen "
+                "seed, not a tolerance band: any intentional change to the category "
+                "table, or to how often _select_enemy_category draws from `random`, "
+                "must be re-pinned here with the new counts."
             )
 
     def test_adventure_low_always_normal(self, pve_manager):
