@@ -1,0 +1,23 @@
+{
+  "name": "smoke-test",
+  "description": "（必填）本用例测试的目的与覆盖场景，一句话说明。",
+  "scenario": "（必填）前置条件与涉及功能。",
+  "tags": [],
+  "conversation": {
+    "kind": "private"
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "player_a",
+      "text": "我要修仙",
+      "note": "（可选）这一步做什么、期望什么。"
+    },
+    {
+      "type": "expect",
+      "match": "修仙",
+      "timeout": 30,
+      "note": "（可选）期望收到的回复内容（子串；前缀 re: 为正则）。"
+    }
+  ]
+}

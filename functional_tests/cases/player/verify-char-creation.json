@@ -1,0 +1,38 @@
+{
+  "name": "verify-char-creation",
+  "description": "验证建角流程：新玩家发送「我要修仙 灵修」，断言回复同时包含「恭喜道友」与「修炼方式：【灵修】」；再发「我的信息」断言面板包含境界字段。",
+  "scenario": "运行器自动生成全新玩家身份（从零状态），私聊会话。覆盖：创建角色（灵修）→ 创建成功回复 → 我的信息面板。",
+  "tags": [
+    "smoke",
+    "player"
+  ],
+  "conversation": {
+    "kind": "private"
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "我要修仙 灵修",
+      "note": "新玩家直接带参数建角（灵修）"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友[\\s\\S]*修炼方式：【灵修】",
+      "timeout": 30,
+      "note": "建角成功回复为单条消息，两处关键信息须合并为一个跨行正则断言（expect 游标语义下不可连写两个 expect）"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "我的信息",
+      "note": "查看角色面板"
+    },
+    {
+      "type": "expect",
+      "match": "境界",
+      "timeout": 10,
+      "note": "面板包含「境界：」字段"
+    }
+  ]
+}

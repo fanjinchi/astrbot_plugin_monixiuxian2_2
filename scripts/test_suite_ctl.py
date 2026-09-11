@@ -4,7 +4,14 @@
 Commands:
   sync-cases          Deploy functional_tests/cases/**/*.json to the platform flat cases dir.
   run                 Run cases by --case or --tag, with optional --repeat N.
+                      Caveat: --repeat is not a resampling mechanism -- a case marked
+                      ``deterministic`` is reseeded with the same seed every round (see
+                      astrbot_plugin_testplatform/cases/runner.py), so repeats replay the
+                      same draw; unmarked cases advance the shared stream and are not
+                      reproducible.
   export              Export recent runs into functional_tests/results/<date>_<target>/.
+                      On the .last-run.json manifest branch <date> is taken from the runs'
+                      actual day (``--date`` only names the folder there, it never filters).
   fixture --profile pvp|sect  Write fixed test player baseline rows into the plugin test DB.
                             (Legacy: platform v0.3.0 supports case-level pre_run_hook —
                             sect cases declare it calling fixture --profile sect --yes;
@@ -312,7 +319,32 @@ def cmd_sync_cases(args: argparse.Namespace) -> int:
     # 这里清理历史残留，后续 sync 不再生成。
     for meta in platform_dir.glob("*.meta.json"):
         meta.unlink(missing_ok=True)
+    # The platform dir is only a flattened mirror of functional_tests/cases/**: a JSON
+    # left there without a source file is a case that exists on this machine only, is
+    # never reviewed or re-run by the suite, and vanishes on a fresh install (bd -ju1
+    # review round 3, P3-3). Warn only -- deleting someone else's case is the operator's
+    # call, so backfill it to functional_tests/cases/<domain>/ or remove it by hand.
+    synced = {name for name, _, _ in found}
+    orphans = sorted(
+        p.name[: -len(".json")]
+        for p in platform_dir.glob("*.json")
+        if not p.name.endswith(".meta.json") and p.name[: -len(".json")] not in synced
+    )
+    if orphans:
+        print(
+            f"警告：平台目录存在 {len(orphans)} 个仓库外未纳管用例（无 functional_tests/cases 源文件）：",
+            file=sys.stderr,
+        )
+        for name in orphans:
+            print(f"  - {name}", file=sys.stderr)
+        print(
+            "请回填到 functional_tests/cases/<domain>/<name>.json 后重新 sync；"
+            "确认废弃再手工删平台副本。",
+            file=sys.stderr,
+        )
     print(f"同步完成：{len(found)} 个用例已拍平到 {platform_dir}")
+    if orphans:
+        print(f"（另有 {len(orphans)} 个未纳管用例被告警，未同步）", file=sys.stderr)
     return 0
 
 
@@ -640,19 +672,6 @@ def cmd_export(args: argparse.Namespace) -> int:
     """Implement ``export``: write a dated result folder with summary/cases/messages."""
     target = args.target or datetime.now().strftime("%H%M%S")
     run_date = args.date or date.today().isoformat()
-    base_dir = FUNCTIONAL_TESTS_DIR / "results" / f"{run_date}_{target}"
-    if base_dir.exists():
-        base_dir = FUNCTIONAL_TESTS_DIR / "results" / f"{run_date}_{target}_2"
-        suffix = 3
-        while base_dir.exists():
-            base_dir = (
-                FUNCTIONAL_TESTS_DIR / "results" / f"{run_date}_{target}_{suffix}"
-            )
-            suffix += 1
-    cases_dir = base_dir / "cases"
-    messages_dir = base_dir / "messages"
-    cases_dir.mkdir(parents=True, exist_ok=True)
-    messages_dir.mkdir(parents=True, exist_ok=True)
 
     if LAST_RUN_MANIFEST.exists():
         manifest = json.loads(LAST_RUN_MANIFEST.read_text(encoding="utf-8"))
@@ -660,6 +679,27 @@ def cmd_export(args: argparse.Namespace) -> int:
         runs = [
             _request(args.url, args.token, "GET", f"/api/runs/{rid}") for rid in run_ids
         ]
+        # The manifest decides WHICH runs get exported, so ``--date`` is only a folder
+        # name on this branch -- nothing filters the runs by day. A batch exported after
+        # midnight therefore lands under the wrong date and breaks the README contract
+        # "<YYYY-MM-DD>_<target> = run date" (bd -ju1 review round 3, P3-1: the run named
+        # 2026-09-11_ju1-fix actually started 2026-09-12 01:28). The runs win over the
+        # requested name; multi-day manifests are reported, not silently renamed.
+        stamps = [r.get("started_at") for r in runs if r.get("started_at")]
+        actual_dates = sorted({date.fromtimestamp(ts).isoformat() for ts in stamps})
+        if len(actual_dates) == 1 and actual_dates[0] != run_date:
+            print(
+                f"提示：manifest 内 run 的实际日期是 {actual_dates[0]}，与目录日期 "
+                f"{run_date} 不一致（--date 不参与 manifest 筛选），已按实际日期归档。",
+                file=sys.stderr,
+            )
+            run_date = actual_dates[0]
+        elif len(actual_dates) > 1 and not args.date:
+            print(
+                f"提示：manifest 的 run 跨 {len(actual_dates)} 个日期（{', '.join(actual_dates)}），"
+                f"目录日期 {run_date} 无法代表整批，建议分批导出。",
+                file=sys.stderr,
+            )
     else:
         all_cases = (
             _request(args.url, args.token, "GET", "/api/cases").get("cases") or []
@@ -676,6 +716,20 @@ def cmd_export(args: argparse.Namespace) -> int:
                 if (r.get("started_at") or 0) >= day_start
                 and (r.get("started_at") or 0) < day_end
             ]
+
+    base_dir = FUNCTIONAL_TESTS_DIR / "results" / f"{run_date}_{target}"
+    if base_dir.exists():
+        base_dir = FUNCTIONAL_TESTS_DIR / "results" / f"{run_date}_{target}_2"
+        suffix = 3
+        while base_dir.exists():
+            base_dir = (
+                FUNCTIONAL_TESTS_DIR / "results" / f"{run_date}_{target}_{suffix}"
+            )
+            suffix += 1
+    cases_dir = base_dir / "cases"
+    messages_dir = base_dir / "messages"
+    cases_dir.mkdir(parents=True, exist_ok=True)
+    messages_dir.mkdir(parents=True, exist_ok=True)
 
     passed, failed, unstable, skipped = [], [], [], []
     for run in runs:
@@ -753,7 +807,10 @@ def cmd_export(args: argparse.Namespace) -> int:
         "- 逐用例结果：`cases/`",
         "- 消息轨迹：`messages/`",
         "",
-        "> 随机/概率效果用例使用 `--repeat` 聚合并在 summary 中记录证据强度。",
+        "> 随机/概率效果不靠 `--repeat` 换抽样：标了 `deterministic` 的用例每轮被平台用同一个",
+        "> seed 重置（`astrbot_plugin_testplatform/cases/runner.py`），重跑 N 遍得到的是同一随机序列；没标的用例每轮继续",
+        "> 消费全局流，换得了抽样但不可复现。要拿真实样本请换种子/换用例，或在 `tests/` 补",
+        "> 单测（见 README「概率效果口径」）。",
         "> 上面的人数/次数计数只证存在性：同一个 combine 窗口的 fullText 会出现在多个",
         "> 步骤的 actual 与逐条消息里，计数因而被放大；判定请回看 `messages/` 原文。",
         "> `最长回合` 是该用例单场战报的最大回合数，用于判断触发率断言的前提是否成立",
@@ -1326,7 +1383,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     export = sub.add_parser("export", help="导出最近运行结果")
     export.add_argument("--target", required=True, help="测试目标名（短横线小写英文）")
-    export.add_argument("--date", default=None, help="运行日期 YYYY-MM-DD（默认今天）")
+    export.add_argument(
+        "--date",
+        default=None,
+        help="归档目录日期 YYYY-MM-DD（默认取 run 实际日期；走 manifest 时不再简单用今天）",
+    )
     export.set_defaults(func=cmd_export)
 
     fixture = sub.add_parser("fixture", help="准备测试基线数据")

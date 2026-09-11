@@ -1,0 +1,63 @@
+{
+  "name": "daily-checkin-basic",
+  "description": "验证每日签到全流程：未建角被拒 → 建角 → 首次签到成功 → 当日重复签到被拒",
+  "scenario": "新玩家（唯一身份，从零状态）在私聊中依次发送 签到（未建角应被拒）→ 我要修仙 灵修（建角）→ 签到（首次成功，获得灵石）→ 签到（当日重复应被拒）",
+  "tags": [
+    "daily",
+    "player"
+  ],
+  "conversation": {
+    "kind": "private",
+    "pin_players": {}
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "签到",
+      "note": "未建角直接签到应被拒"
+    },
+    {
+      "type": "expect",
+      "match": "尚未踏入仙途",
+      "timeout": 30,
+      "note": "提示先创建角色"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "我要修仙 灵修",
+      "note": "创建灵修角色"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友[\\s\\S]*修炼方式：【灵修】",
+      "timeout": 30,
+      "note": "建角成功且职业为灵修"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "签到",
+      "note": "首次签到"
+    },
+    {
+      "type": "expect",
+      "match": "re:签到成功[\\s\\S]*获得灵石：[0-9]+",
+      "timeout": 30,
+      "note": "签到成功且发放灵石"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "签到",
+      "note": "当日重复签到"
+    },
+    {
+      "type": "expect",
+      "match": "今日已经签到过了",
+      "timeout": 30,
+      "note": "重复签到被拒"
+    }
+  ]
+}

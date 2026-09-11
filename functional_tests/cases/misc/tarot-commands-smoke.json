@@ -1,0 +1,42 @@
+{
+  "name": "tarot-commands-smoke",
+  "description": "验证 astrbot_plugin_tarot 合并 tarot_reading 之后宿主侧命令路径：/tarot 多牌阵与 /占卜 随机多方式仍正常出牌",
+  "scenario": "变更 merge-tarot-reading-into-divination 只动了 LLM 工具面（main.py divination_tool/docstring 与删除 tarot_reading_tool），命令路径须保持回归通过。插件先经 reload 热重载加载。注意：webtest 平台命令前缀为 #（非 /），否则消息落入 LLM 会话。覆盖：#tarot 三张牌阵（含问题回显）、#tarot single、#占卜 随机（多方式任意一种，输出带 占卜方式： 前缀）。",
+  "tags": ["smoke", "tarot"],
+  "conversation": { "kind": "private", "pin_players": {} },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#tarot 三张 这个周末适合出门走走吗",
+      "note": "三张牌阵 + 问题"
+    },
+    {
+      "type": "expect",
+      "match": "re:🔮 塔罗占卜 · .*三张",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#tarot 一张 明天运势如何",
+      "note": "单张指引 + 问题"
+    },
+    {
+      "type": "expect",
+      "match": "re:🔮 塔罗占卜 · ",
+      "timeout": 10
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#占卜 帮我看看最近状态",
+      "note": "随机多方式"
+    },
+    {
+      "type": "expect",
+      "match": "re:占卜 · ",
+      "timeout": 10
+    }
+  ]
+}

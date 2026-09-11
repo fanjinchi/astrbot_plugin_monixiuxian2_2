@@ -33,7 +33,7 @@
       "match": "re:[^\\n]\\n✨ 突破成功！✨[\\s\\S]*(败了这么多回|比突破口诀入耳)[\\s\\S]*连败保底：19次失败，天道酬勤，本次必成！[\\s\\S]*恭喜你从【[^】]*】突破至【[^】]*】！[\\s\\S]*【属性增长】[\\s\\S]*气血 \\+[\\d,]+[\\s\\S]*【当前属性】[\\s\\S]*护甲：[\\d,]+",
       "combine": true,
       "timeout": 60,
-      "note": "一条断言覆盖成功面板全链路（平台语义：每个 send 只有一个断言会被新回复触发）：双槽结构 → lose_streak_reward 彩蛋段（紧跟标题，两变体各取稳定子串）→ rate_info 保底行（pity_guarantee=19 强制 100%）→ 境界变更行 → 方案 A 成长/当前属性数值行。标题与彩蛋粘连的排版缺陷由 breakthrough-title-layout 盯住（bd astrbot_plugin_monixiuxian2_2-ju1）"
+      "note": "一条断言覆盖成功面板全链路（平台语义：每个 send 只有一个断言会被新回复触发）：双槽结构 → lose_streak_reward 彩蛋段（紧跟标题，两变体各取稳定子串）→ rate_info 保底行（pity_guarantee=19 强制 100%）→ 境界变更行 → 方案 A 成长/当前属性数值行。标题与彩蛋粘连的排版缺陷由 breakthrough-title-layout 盯住（bd astrbot_plugin_monixiuxian2_2-ju1）；本步锚了 breakthrough.lose_streak_reward 的变体 prose（败了这么多回 / 比突破口诀入耳），文案再改需同步此处（breakthrough.lose_streak_reward）（functional_tests/README.md 锚点原则）"
     },
     {
       "type": "send",
