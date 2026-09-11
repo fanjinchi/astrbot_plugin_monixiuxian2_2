@@ -73,5 +73,6 @@
       "match": "re:签到成功！[\\s\\S]*宗门俸禄（内门弟子）：\\+100 灵石",
       "timeout": 10
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

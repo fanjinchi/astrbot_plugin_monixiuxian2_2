@@ -129,5 +129,6 @@
       "match": "re:✅ 【投名状】已完成[\\s\\S]*【见血】[\\s\\S]*历练/秘境战斗胜利：0/5[\\s\\S]*厉无欢",
       "timeout": 10
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

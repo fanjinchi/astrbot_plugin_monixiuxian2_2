@@ -72,5 +72,6 @@
       "timeout": 30,
       "note": "managers/sect_manager.py:631 列表表头，代码字面量（旧断言含裸「宗门/灵石」宽词，LLM 兜底回复即可满足=假绿，评审 P1-3 同类）"
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

@@ -73,5 +73,6 @@
       "match": "re:【青云镇山剑】乃宗门之物，不可外传",
       "timeout": 10
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

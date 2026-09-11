@@ -105,5 +105,6 @@
       "timeout": 30,
       "note": "装备面板显示主修心法"
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

@@ -27,7 +27,9 @@ functional_tests/
 ### 目录命名规则
 
 - `cases/` 下按功能域分子目录，文件名即用例名，例如 `pvp/pvp-effect-stun.json`。
-- 平台 `data/plugin_data/astrbot_plugin_testplatform/cases/` **只是同步后的拍平副本**：里面任何
+- 平台 `data/plugin_data/astrbot_plugin_testplatform/cases/` 是**跨插件共享目录，按归属插件
+  分子目录**（`cases/<插件目录名>/`）；本插件的副本同步到 `cases/astrbot_plugin_monixiuxian2_2/`，
+  用例 JSON 带 `owner` 自描述字段（平台校验其与子目录一致）。本插件子目录里任何
   没有 `functional_tests/cases/**` 源文件的 JSON 都是未纳管用例（只活在本机，不会进评审，
   换新环境就丢）。`sync-cases` 会逐个告警（不删除），看到告警就把源文件回填进仓库。
 - 归档目录日期以 **run 的实际日期** 为准：`export` 走 `.last-run.json` manifest 分支时，
@@ -89,9 +91,10 @@ functional_tests/
 export WEBTEST_URL=http://127.0.0.1:8765
 export WEBTEST_TOKEN=<token>
 
-# 1. 同步用例：扫描 functional_tests/cases/**/*.json → 校验 → 拍平复制到平台 cases 顶层
-#    sync-cases 只写用例 JSON，不向平台 cases 目录写入 *.meta.json（历史残留会自动清理）
-#    平台目录里多余的未纳管用例会进告警名单（只告警，不删除）
+# 1. 同步用例：扫描 functional_tests/cases/**/*.json → 校验 → 同步到平台 cases/astrbot_plugin_monixiuxian2_2/ 子目录
+#    （平台目录按归属插件分子目录；源文件须带 "owner": "astrbot_plugin_monixiuxian2_2"，缺失时 sync 注入）
+#    sync-cases 只写用例 JSON，不向平台目录写入 *.meta.json（历史残留会自动清理）
+#    本插件子目录里多余的未纳管用例会进告警名单（只告警，不删除；其他插件的子目录不归本套件管）
 uv run python scripts/test_suite_ctl.py sync-cases
 
 # 2. 按标签运行（例如所有 PvP 用例）——不要拿 --repeat 当“多抽几次样”：
@@ -129,10 +132,11 @@ uv run python scripts/test_suite_ctl.py export --target pvp-effects
 CLI=~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/scripts/test_platform_cli.py
 uv run python $CLI case run <case>
 uv run python $CLI case run-all --tag <tag> --sync-from <dir> --reload <plugin> --export <dir>
-uv run python $CLI case check --source <flat_dir>   # 源与平台副本语义比对（注意：非递归 *.json，源须为拍平目录）
+uv run python $CLI case check --source <flat_dir>   # 源与平台副本语义比对（注意：非递归 *.json，源须为拍平目录；「仅平台存在」条目附注 owner）
+uv run python $CLI case run-all --owner astrbot_plugin_monixiuxian2_2 [--tag <tag>]   # 按归属限定范围
 ```
 
-> 平台 CLI 的 `--sync-from`/`check --source` 使用**非递归** `*.json` glob，只能处理拍平目录；`functional_tests/cases/` 下的源用例是分域子目录，因此**同步必须走 `scripts/test_suite_ctl.py sync-cases`**（递归扫描+拍平），`--reload` 的插件名为平台注册名 `astrbot_plugin_monixiuxian2_2`。
+> 平台 CLI 的 `--sync-from`/`check --source` 使用**非递归** `*.json` glob，只能处理拍平目录；`functional_tests/cases/` 下的源用例是分域子目录，因此**同步必须走 `scripts/test_suite_ctl.py sync-cases`**（递归扫描+写入本插件 owner 子目录），`--reload` 的插件名为平台注册名 `astrbot_plugin_monixiuxian2_2`。
 
 ## 结果归档约定
 

@@ -73,5 +73,6 @@
       "match": "re:我的功法[\\s\\S]*青云剑诀",
       "timeout": 10
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

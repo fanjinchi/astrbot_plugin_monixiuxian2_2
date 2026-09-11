@@ -177,5 +177,6 @@
       "match": "re:✅ 悬赏完成（F级）！[\\s\\S]*任务：后山巡视[\\s\\S]*获得灵石：\\+\\d+[\\s\\S]*获得修为：\\+[\\d,]+",
       "timeout": 10
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

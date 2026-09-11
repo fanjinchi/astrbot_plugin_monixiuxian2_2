@@ -96,5 +96,6 @@
       "match": "re:职位设置为「外门弟子」",
       "timeout": 10
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

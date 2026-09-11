@@ -59,5 +59,6 @@
       "timeout": 30,
       "note": "重复签到被拒"
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

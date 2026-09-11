@@ -85,5 +85,6 @@
       "match": "re:晋升成功！你已成为【长老】！[\\s\\S]*每日签到俸禄：\\+800 灵石[\\s\\S]*商店折扣：8.5折",
       "timeout": 10
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

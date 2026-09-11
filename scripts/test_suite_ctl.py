@@ -57,6 +57,8 @@ DEFAULT_URL = "http://127.0.0.1:8765"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FUNCTIONAL_TESTS_DIR = PROJECT_ROOT / "functional_tests"
 DISCOVERED_JSON_PATTERN = "**/*.json"
+# 平台用例目录按归属插件分子目录（cases/<owner>/<name>.json），本插件的归属名
+OWNER = "astrbot_plugin_monixiuxian2_2"
 LAST_RUN_MANIFEST = FUNCTIONAL_TESTS_DIR / ".last-run.json"
 
 PVP_TEST_IDS = ("900000001", "900000002", "900000003")
@@ -306,61 +308,62 @@ def _load_source_cases(cases_root: Path) -> list[tuple[str, dict, Path]]:
 
 
 def cmd_sync_cases(args: argparse.Namespace) -> int:
-    """Implement ``sync-cases``: flatten canonical cases into the platform dir."""
+    """Implement ``sync-cases``: copy canonical cases into our platform subdir.
+
+    The platform cases dir is shared across plugins and organised as
+    ``cases/<owner-plugin>/<name>.json`` (one subdirectory per plugin, the
+    directory name IS the ownership marker enforced by the platform loader).
+    This plugin only ever writes into its own ``OWNER`` subdirectory; other
+    plugins' subdirectories are never scanned, warned about, or deleted.
+    """
     cases_root = Path(args.cases_root)
-    platform_dir = Path(args.platform_cases_dir)
+    # 平台目录共享：本插件只维护自己的 owner 子目录
+    platform_dir = Path(args.platform_cases_dir) / OWNER
     platform_dir.mkdir(parents=True, exist_ok=True)
     found = _load_source_cases(cases_root)
     for name, case, src in found:
         dst = platform_dir / f"{name}.json"
-        shutil.copyfile(src, dst)
+        # 源文件缺 owner 时同步期注入（自描述字段，平台保存接口要求它与子目录一致）
+        if case.get("owner") != OWNER:
+            case = {**case, "owner": OWNER}
+            dst.write_text(
+                json.dumps(case, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+        else:
+            shutil.copyfile(src, dst)
         print(f"已同步 {name} -> {dst}")
     # metadata 文件此前用于同步追踪，平台 loader 已过滤但仍建议不写入平台目录；
     # 这里清理历史残留，后续 sync 不再生成。
     for meta in platform_dir.glob("*.meta.json"):
         meta.unlink(missing_ok=True)
-    # The platform dir is only a flattened mirror of functional_tests/cases/**: a JSON
-    # left there without a source file is a case that exists on this machine only, is
-    # never reviewed or re-run by the suite, and vanishes on a fresh install (bd -ju1
-    # review round 3, P3-3). Warn only -- deleting someone else's case is the operator's
-    # call. The dir is shared across plugins, so a case owned by another plugin is legit
-    # but must be registered in functional_tests/external_cases.md instead of being
-    # backfilled into this repo (that mistake moved astrbot_plugin_tarot's regression
-    # case and the platform's blank template into our suite once already).
+    # Cases in our own subdirectory without a source file are un-managed (never
+    # reviewed or re-run by the suite, vanish on a fresh install). Warn only --
+    # deleting is the operator's call. Cases under OTHER plugins' subdirectories
+    # are out of scope by construction (ownership is the subdirectory name), so
+    # the external_cases.md registry for platform copies is no longer consulted.
     synced = {name for name, _, _ in found}
-    external_text = ""
-    external_file = cases_root.parent / "external_cases.md"
-    if external_file.is_file():
-        external_text = external_file.read_text(encoding="utf-8")
-    pending, registered = [], []
-    for path in platform_dir.glob("*.json"):
-        if path.name.endswith(".meta.json"):
-            continue
-        name = path.name[: -len(".json")]
-        if name in synced:
-            continue
-        (registered if name in external_text else pending).append(name)
-    pending, registered = sorted(pending), sorted(registered)
+    pending = sorted(
+        path.name[: -len(".json")]
+        for path in platform_dir.glob("*.json")
+        if not path.name.endswith(".meta.json")
+        and path.name[: -len(".json")] not in synced
+    )
     if pending:
         print(
-            f"警告：平台目录存在 {len(pending)} 个仓库外未纳管用例（无 functional_tests/cases 源文件）：",
+            f"警告：平台 {OWNER}/ 子目录存在 {len(pending)} 个仓库外未纳管用例"
+            "（无 functional_tests/cases 源文件）：",
             file=sys.stderr,
         )
         for name in pending:
             print(f"  - {name}", file=sys.stderr)
         print(
             "属本插件的请回填到 functional_tests/cases/<domain>/<name>.json 后重新 sync；"
-            "属其它插件的请挪进其仓库并登记到 functional_tests/external_cases.md；"
+            "不属本插件的用例不应出现在本子目录——挪到其归属插件的子目录；"
             "确认废弃再手工删平台副本。",
             file=sys.stderr,
         )
-    if registered:
-        print(
-            f"（{len(registered)} 个平台用例属其它插件，已登记于 functional_tests/external_cases.md："
-            f"{'、'.join(registered)}）",
-            file=sys.stderr,
-        )
-    print(f"同步完成：{len(found)} 个用例已拍平到 {platform_dir}")
+    print(f"同步完成：{len(found)} 个用例已同步到 {platform_dir}")
     return 0
 
 

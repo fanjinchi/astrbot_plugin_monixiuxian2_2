@@ -155,5 +155,6 @@
   "pre_run_hook": {
     "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pvp --yes",
     "timeout": 90
-  }
+  },
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

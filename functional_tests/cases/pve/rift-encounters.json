@@ -2,7 +2,10 @@
   "name": "rift-encounters",
   "description": "秘境遭遇系统全链路：GM 强制触发谜题/妖兽/传承三类遭遇，验证探索秘境子命令响应与零惩罚负路径。",
   "scenario": "前置条件：群 webtest_pvp_001 已白名单，900000001 在 GM_ADMINS，pre_run_hook 复位基线。覆盖：GM 强触三类遭遇（缺省上下文，不依赖特定秘境）、破阵（无答案→用法提示/非法形式不耗次/作答判定）、迎战（战报三分支）、传承应邀（胜负双分支）、无 pending 的机缘消散提示。谜题族与答案、战斗胜负均为随机：作答与迎战断言用多分支正则判定『系统给出判定响应』，属抽样验证，必要时 --repeat 采样；分支级正确性由 pytest 单测兜底。",
-  "tags": ["pve", "gm"],
+  "tags": [
+    "pve",
+    "gm"
+  ],
   "pre_run_hook": {
     "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile sect --yes",
     "timeout": 60
@@ -161,5 +164,6 @@
       "timeout": 30,
       "note": "无 pending 提示"
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

@@ -210,21 +210,20 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 
 ## 功能测试套件（项目内用例与结果归档）
 
-> 统一存放本项目功能测试用例源文件与测试结果：`functional_tests/`。用例源文件在 `functional_tests/cases/`，按功能域分子目录；测试平台数据目录 `data/plugin_data/astrbot_plugin_testplatform/cases/` 只保留同步后的拍平副本。流程说明见 `functional_tests/README.md`。
+> 统一存放本项目功能测试用例源文件与测试结果：`functional_tests/`。用例源文件在 `functional_tests/cases/`，按功能域分子目录；测试平台数据目录 `data/plugin_data/astrbot_plugin_testplatform/cases/` 只保留同步副本（按归属插件分子目录，本插件在 `cases/astrbot_plugin_monixiuxian2_2/`）。流程说明见 `functional_tests/README.md`。
 
-- **用例存放**：`functional_tests/cases/<domain>/<name>.json`；用例 `name` 必须等于文件名且全局唯一，JSON 兼容测试平台 `loader.validate_case`（必填 `description`/`scenario`/`steps`；顶层可声明 `pre_run_hook`，平台 v0.3.0 起每轮首步前由服务端执行复位命令——宗门用例已内嵌 fixture 复位）。
+- **用例存放**：`functional_tests/cases/<domain>/<name>.json`；用例 `name` 必须等于文件名且全局唯一，JSON 兼容测试平台 `loader.validate_case`（必填 `description`/`scenario`/`steps` 与 `owner`——值为 `astrbot_plugin_monixiuxian2_2`，平台校验其与子目录一致；顶层可声明 `pre_run_hook`，平台 v0.3.0 起每轮首步前由服务端执行复位命令——宗门用例已内嵌 fixture 复位）。
 - **同步到平台**：`uv run python scripts/test_suite_ctl.py sync-cases`
-  - 扫描 `functional_tests/cases/**/*.json` → 校验合法性 + 名称全局唯一 → 拍平复制到平台 `cases/` 顶层。
-  - 平台 `cases/` 目录里没有任何源文件的 JSON（仓库外未纳管用例会）会被逐个告警（只告警不
-    删除），需回填成 `functional_tests/cases/<domain>/<name>.json` 后重新 sync。
+  - 扫描 `functional_tests/cases/**/*.json` → 校验合法性 + 名称全局唯一 → 复制到平台 `cases/astrbot_plugin_monixiuxian2_2/` 子目录（源缺 `owner` 时同步期注入）。
+  - 本插件子目录里没有源文件的 JSON（仓库外未纳管用例）会被逐个告警（只告警不删除），需回填成 `functional_tests/cases/<domain>/<name>.json` 后重新 sync；其他插件的子目录不归本套件扫描。
 - **运行用例**：支持脚本或平台 CLI：
   - `uv run python scripts/test_suite_ctl.py run --tag <tag> [--repeat N]`（`--repeat` 不是抽样手段：`deterministic` 用例每轮同种子→同一随机序列，未标用例换的是不可复现的抽样；见 `functional_tests/README.md`「概率效果口径」）
   - `uv run python scripts/test_suite_ctl.py run --case <name> [--repeat N]`（同上：`--repeat` 得不到可复现的新样本，要换种子或补 `tests/` 单测）
   - one-shot 编排（推荐）：`run --sync --reload <plugin> --export <dir> [--quiet]`——跑前同步用例 + 热重载被测插件 + 结果落盘 `summary.json`（插件名用平台注册名 `astrbot_plugin_monixiuxian2_2`）。
   - 宗门域：用例已内嵌 `pre_run_hook`（command 调 `fixture --profile sect --yes`）自动复位基线，`run --tag sect` 无需 `--fixture`（该参数保留兼容，PvP 抽样仍可用）。
-  - 或平台 CLI（详细用法见 SKILL.md）：`uv run python data/plugins/astrbot_plugin_testplatform/scripts/test_platform_cli.py case run <case>` / `case run-all --tag <tag> --sync-from <dir> --reload <plugin> --export <dir>`。
+  - 或平台 CLI（详细用法见 SKILL.md）：`uv run python data/plugins/astrbot_plugin_testplatform/scripts/test_platform_cli.py case run <case>` / `case run-all --owner astrbot_plugin_monixiuxian2_2 [--tag <tag>] --sync-from <dir> --reload <plugin> --export <dir>`。
   - 依赖环境变量 `WEBTEST_URL` / `WEBTEST_TOKEN`（同平台 CLI）。
-  - 注意：平台 CLI 的 `--sync-from`/`check --source` 为非递归 `*.json` glob，只能处理拍平目录；分域子目录源必须用 `test_suite_ctl.py sync-cases` 同步。
+  - 注意：平台 CLI 的 `--sync-from`/`check --source` 为非递归 `*.json` glob，只能处理拍平目录；分域子目录源必须用 `test_suite_ctl.py sync-cases` 同步。平台用例目录按归属插件分子目录，`run-all` 建议带 `--owner astrbot_plugin_monixiuxian2_2` 限定范围。
 - **结果归档**：`uv run python scripts/test_suite_ctl.py export --target <target> [--date <YYYY-MM-DD>]`
   - 写入 `functional_tests/results/<YYYY-MM-DD>_<target>/summary.md` + `cases/` + `messages/`；
   - **结果目录命名固定** `<YYYY-MM-DD>_<target>`（如 `2026-08-17_pvp-effects`）；已存在时自动加后缀，不覆盖历史。

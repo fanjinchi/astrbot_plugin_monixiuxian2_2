@@ -97,5 +97,6 @@
       "match": "re:🏪 购买成功！【青云天剑】已存入储物戒。[\\s\\S]*消耗贡献：-1500",
       "timeout": 10
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }

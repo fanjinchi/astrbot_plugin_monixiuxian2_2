@@ -140,5 +140,6 @@
       "match": "re:师承任务【破境之礼】完成！[\\s\\S]*奖励：宗门贡献 \\+150、修为 \\+1000[\\s\\S]*师承任务已全部完成！",
       "timeout": 10
     }
-  ]
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
 }
