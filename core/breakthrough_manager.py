@@ -277,15 +277,21 @@ class BreakthroughManager:
             loan_msg = await self._handle_breakthrough_loan_repay(player)
 
             # Lose-streak reward line (defaults: narrative_defaults/breakthrough.py).
-            # The separator newline is owned by this call site: the reward is optional, so
-            # a template-side "\n{streak_bonus_msg}" (the shape openspec
-            # flavor-copy-assembly D6 picked for the mandatory {pity_msg}) would leave a
-            # blank line whenever streak < 3, and a copy-side leading "\n" vanishes on
-            # content import because CSV cells keep no leading whitespace -- which is what
-            # glued this line onto the title (bd -ju1). Stripping both ends also neutralises
-            # legacy variants that still carry their own break.
+            # The separator newline is owned by this call site. The embedded default used to
+            # carry it ("\n💪 苦尽甘来…"), so once route B imported copy without a leading
+            # break -- the importer strips variant edges, see
+            # scripts/sync_copy_variants_to_config.py _to_entry() -- the bonus glued itself
+            # onto the title (bd -ju1). A template-side "\n{streak_bonus_msg}" (the shape
+            # openspec flavor-copy-assembly D6 picked for the mandatory {pity_msg}) is not
+            # an option here: this slot is optional, so it would leave a blank line whenever
+            # streak < 3. Stripping both ends also neutralises copy that still carries its
+            # own break.
             streak_bonus_msg = ""
             if prev_fail_streak >= 3:
+                # Bucket by the post-breakthrough realm (design D3, same 口径 as the
+                # success flavor at :362) — it reads player.level_index after the +1, so
+                # a realm-bucketed reward would describe the new realm, not the one whose
+                # losses it celebrates. Only 通用 exists today, hence no behavioural gap.
                 bonus_text = render_narrative(
                     self.config_manager,
                     "breakthrough",

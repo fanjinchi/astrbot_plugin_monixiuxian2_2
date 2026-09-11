@@ -36,7 +36,8 @@ SCENES: dict[str, object] = {
     ),
     # Lose-streak reward line appended to the success header when the player
     # had >= 3 consecutive failures before this success. No leading newline: the
-    # panel inserts exactly one before this line (bd -ju1).
+    # call site (core/breakthrough_manager.py) inserts exactly one before this line,
+    # and the importer strips variant edges, so a copy-side break cannot survive (bd -ju1).
     "lose_streak_reward": "💪 苦尽甘来，天道不负有心人！",
     # Skill-comprehension flavor lines (success roll / fail soft-pity roll /
     # universal-pool fallback shared by both outcomes).
