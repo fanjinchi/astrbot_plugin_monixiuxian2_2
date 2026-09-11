@@ -277,21 +277,37 @@ class BreakthroughManager:
             loan_msg = await self._handle_breakthrough_loan_repay(player)
 
             # Lose-streak reward line (defaults: narrative_defaults/breakthrough.py).
-            # The separator newline is owned by this call site. The embedded default used to
-            # carry it ("\n💪 苦尽甘来…"), so once route B imported copy without a leading
-            # break -- the importer strips variant edges, see
-            # scripts/sync_copy_variants_to_config.py _to_entry() -- the bonus glued itself
-            # onto the title (bd -ju1). A template-side "\n{streak_bonus_msg}" (the shape
-            # openspec flavor-copy-assembly D6 picked for the mandatory {pity_msg}) is not
-            # an option here: this slot is optional, so it would leave a blank line whenever
-            # streak < 3. Stripping both ends also neutralises copy that still carries its
-            # own break.
+            # The separator newline is owned by this call site, not by the copy.
+            #
+            # How the glue happened (bd -ju1). Both shapes of this scene used to carry
+            # the break themselves -- the embedded default and the value in
+            # config/narrative_config.json were both:
+            #     "\n💪 苦尽甘来，天道不负有心人！"
+            # render_narrative() only falls back to the embedded default when the
+            # configured pool is empty (utils/narrative_text.render_narrative), so the
+            # player always saw the config copy. The route A short-sentence pool import
+            # (b1ff0c8) replaced that value with two 通用 (universal) variants carrying no
+            # leading break, which glued the bonus onto the title. This scene is not one
+            # of the six dual-slot scenes in
+            # scripts/sync_copy_variants_to_config.py DUAL_SLOT_SCENES, so route B never
+            # wrote it. The CSV cells never had a leading break either; the importer
+            # strips variant edges on purpose (_to_entry() in that same script), which
+            # explains why copy cannot own the separator -- it is not what caused this
+            # bug.
+            #
+            # Why the break is not moved to the template as "\n{streak_bonus_msg}" (the
+            # shape openspec flavor-copy-assembly D6 picked for the mandatory {pity_msg}):
+            # this slot is optional, so a template-side break would leave a blank line
+            # whenever streak < 3. Stripping both ends also neutralises copy that still
+            # carries its own break.
             streak_bonus_msg = ""
             if prev_fail_streak >= 3:
-                # Bucket by the post-breakthrough realm (design D3, same 口径 as the
-                # success flavor at :362) — it reads player.level_index after the +1, so
-                # a realm-bucketed reward would describe the new realm, not the one whose
-                # losses it celebrates. Only 通用 exists today, hence no behavioural gap.
+                # Deliberately bucketed by the post-breakthrough realm, i.e. the same D3
+                # rule as the success flavor below (that render_narrative() call passes
+                # level_index=player.level_index after the +1). The cost is that a
+                # realm-bucketed reward would describe the new realm instead of the one
+                # whose losses it celebrates; only the 通用 (universal) bucket exists
+                # today, so there is no behavioural gap yet.
                 bonus_text = render_narrative(
                     self.config_manager,
                     "breakthrough",

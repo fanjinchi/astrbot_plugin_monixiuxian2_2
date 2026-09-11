@@ -215,9 +215,11 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 - **用例存放**：`functional_tests/cases/<domain>/<name>.json`；用例 `name` 必须等于文件名且全局唯一，JSON 兼容测试平台 `loader.validate_case`（必填 `description`/`scenario`/`steps`；顶层可声明 `pre_run_hook`，平台 v0.3.0 起每轮首步前由服务端执行复位命令——宗门用例已内嵌 fixture 复位）。
 - **同步到平台**：`uv run python scripts/test_suite_ctl.py sync-cases`
   - 扫描 `functional_tests/cases/**/*.json` → 校验合法性 + 名称全局唯一 → 拍平复制到平台 `cases/` 顶层。
+  - 平台 `cases/` 目录里没有任何源文件的 JSON（仓库外未纳管用例会）会被逐个告警（只告警不
+    删除），需回填成 `functional_tests/cases/<domain>/<name>.json` 后重新 sync。
 - **运行用例**：支持脚本或平台 CLI：
-  - `uv run python scripts/test_suite_ctl.py run --tag <tag> [--repeat N]`
-  - `uv run python scripts/test_suite_ctl.py run --case <name> [--repeat N]`
+  - `uv run python scripts/test_suite_ctl.py run --tag <tag> [--repeat N]`（`--repeat` 不是抽样手段：`deterministic` 用例每轮同种子→同一随机序列，未标用例换的是不可复现的抽样；见 `functional_tests/README.md`「概率效果口径」）
+  - `uv run python scripts/test_suite_ctl.py run --case <name> [--repeat N]`（同上：`--repeat` 得不到可复现的新样本，要换种子或补 `tests/` 单测）
   - one-shot 编排（推荐）：`run --sync --reload <plugin> --export <dir> [--quiet]`——跑前同步用例 + 热重载被测插件 + 结果落盘 `summary.json`（插件名用平台注册名 `astrbot_plugin_monixiuxian2_2`）。
   - 宗门域：用例已内嵌 `pre_run_hook`（command 调 `fixture --profile sect --yes`）自动复位基线，`run --tag sect` 无需 `--fixture`（该参数保留兼容，PvP 抽样仍可用）。
   - 或平台 CLI（详细用法见 SKILL.md）：`uv run python data/plugins/astrbot_plugin_testplatform/scripts/test_platform_cli.py case run <case>` / `case run-all --tag <tag> --sync-from <dir> --reload <plugin> --export <dir>`。
@@ -226,6 +228,8 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 - **结果归档**：`uv run python scripts/test_suite_ctl.py export --target <target> [--date <YYYY-MM-DD>]`
   - 写入 `functional_tests/results/<YYYY-MM-DD>_<target>/summary.md` + `cases/` + `messages/`；
   - **结果目录命名固定** `<YYYY-MM-DD>_<target>`（如 `2026-08-17_pvp-effects`）；已存在时自动加后缀，不覆盖历史。
+  - 走 `.last-run.json` manifest 分支时，目录日期与 manifest 内 run 的实际日期不一致（典型：跨午夜才导出）
+    会自动改按实际日期并打提示；`--date` 在该分支只影响命名，不做时间筛选。
 - **fixture 基线数据**（兼容保留；平台 v0.3.0 起宗门用例已在用例内声明 `pre_run_hook` 调用它，无需外部编排）：`uv run python scripts/test_suite_ctl.py fixture --profile pvp|sect`
   - 向专用测试实例的插件数据库写入固定测试 ID（`900000001`/`900000002`/`900000003`，sect 另含新建型 `900000004`/`900000005`/`900000006`/`900000008`）的玩家属性、储物戒、`player_skills`、清除冷却/忙碌状态，并复位宗门行与商店种子（丹阁筑基丹、器阁狼牙棒）；
   - ⚠ 仅用于独立测试实例，禁止对正式数据执行；操作前脚本会确认。

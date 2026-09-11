@@ -14,9 +14,9 @@ functional_tests/
 │   ├── economy/                  # 丹药、商店、储物戒、银行、悬赏
 │   ├── pve/                      # Boss、历练、秘境
 │   ├── sect/                     # 宗门（默认宗门/建设/师承/晋升/出师回收/指令统一/悬赏分流/商店/事件标记）
-│   ├── social/                   # 双修、洞天、灵田、灵眼（宗门已独立到 sect/）
 │   ├── pvp/                      # 切磋、决斗、传承PK、效果验证
-│   └── gm/                       # GM 工具
+│   ├── gm/                       # GM 工具
+│   └── misc/                     # 不属以上功能域的入库拍平件：平台模板用例、其他插件的冒烟用例
 └── results/
     └── <YYYY-MM-DD>_<target>/    # 每次测试目标一个目录
         ├── summary.md            # 运行概览：通过/失败/跳过/遗留问题
@@ -27,6 +27,12 @@ functional_tests/
 ### 目录命名规则
 
 - `cases/` 下按功能域分子目录，文件名即用例名，例如 `pvp/pvp-effect-stun.json`。
+- 平台 `data/plugin_data/astrbot_plugin_testplatform/cases/` **只是同步后的拍平副本**：里面任何
+  没有 `functional_tests/cases/**` 源文件的 JSON 都是未纳管用例（只活在本机，不会进评审，
+  换新环境就丢）。`sync-cases` 会逐个告警（不删除），看到告警就把源文件回填进仓库。
+- 归档目录日期以 **run 的实际日期** 为准：`export` 走 `.last-run.json` manifest 分支时，
+  manifest 内 run 全部落在同一天而与目录日期不同（典型：跨过午夜才导出）时会自动改按实际
+  日期命名并打提示；`--date` 在该分支只影响命名，不做时间筛选。
 - `results/` 子目录固定为 `<YYYY-MM-DD>_<target>`：
   - `<YYYY-MM-DD>`：本地运行日期，例如 `2026-08-17`；
   - `<target>`：短横线小写英文的测试目标名，例如 `core-smoke`、`pvp-effects`；
@@ -64,11 +70,11 @@ functional_tests/
   - 禁止 `re:<目标>|战斗开始` 这类恒真兼底分支：它把断言变成摆设（历史教训：bd -khh）；
   - 确实无名字变量的场景（`lifesteal`/`reflect`/`dodge`/`battle_victory` 等）只能锚文案时，取该场景**全部变体**的稳定子串并集，并在 `note` 注明“文案再改需同步此处”；
   - GM 破坏性子命令（`时间快进`/`清除CD`/`清除全部冷却`）必须带 `确认` 尾参，且该 `send` 的 `player` 必须是 `gm`（900000001），否则只会收到 `❌ 你没有权限使用修仙GM命令！`。
-- **概率效果口径**：不再靠 `--repeat` 兜底——把战斗拉长（双方 `气血 8000`；境界悬殊的武器用例用 `999999999`，由 `combat.action_limit=200` 封顶）使 8%~25% 触发率单场必中，断言直接锚效果行（效果类实测 67~76 回合）。真抽样型覆盖（突破领悟、机缘掉落、闭关悟道、走火入魔/回生丹）不写进断言，由 `scripts/test_suite_ctl.py` 的 `EFFECT_EVIDENCE_PATTERNS` 证据计数，在归档 summary 的「效果证据聚合」里体现；但 `--repeat` 不能换抽样（平台每轮同种子），要拿到真实样本得换种子或补 `tests/` 单测断言渲染后的变体集合。
+- **概率效果口径**：不再靠 `--repeat` 兜底——把战斗拉长（双方 `气血 8000`；境界悬殊的武器用例用 `999999999`，由 `combat.action_limit=200` 封顶）使 8%~25% 触发率单场必中，断言直接锚效果行（效果类实测 67~76 回合）。真抽样型覆盖（突破领悟、机缘掉落、闭关悟道、走火入魔/回生丹）不写进断言，由 `scripts/test_suite_ctl.py` 的 `EFFECT_EVIDENCE_PATTERNS` 证据计数，在归档 summary 的「效果证据聚合」里体现；但 `--repeat` 不是抽样手段：标了 `deterministic` 的用例每轮被平台用同一个 seed 重置（`../astrbot_plugin_testplatform/cases/runner.py:277-280`），重跑 N 遍得到的是同一随机序列；未标的用例每轮只是继续消费全局流，换得了抽样但不可复现。要拿到真实样本得换种子或补 `tests/` 单测断言渲染后的变体集合。
 - **fixture profile 清单**（`fixture --profile <p> --yes`，均由用例 `pre_run_hook` 自带）：`pvp`（3 个固定 ID 的属性/技能位/冷却）、`sect`（宗门基线 + 商店种子）、`breakthrough`（练气九阶 + 修为 999,999 + `level_up_rate=-100` → 最终成功率 0.0% 必败；加 `--breakthrough-streak 19` 则触发连败保底强制成功）。三个 profile 每次都会先清理测试平台派生的 `case_%` 虚拟玩家，避免污染 `时间快进` 的全局计数（bd -777）；因此任何用例都不得断言该计数等于具体值，应用 `[1-9]\d* 条` 断“确实被前移”。
 - 域 tag `narrative-flavor` = 叙事文案（route A/B）回归集，一条命令跑全：`run --tag narrative-flavor`。
 - 每个用例至少有一个功能域 `tag`（如 `player`、`equipment`、`pvp`、`pve`、`gm`、`economy`、`sect`、`social`），便于 `run-all --tag <tag>` 定向回归。
-- 随机/概率效果用例在 `description` 或 `scenario` 中写明证据口径（单场拉长 / 结构性断言 / 交 `tests/`）；需要聚合「效果证据」时得用**不同种子或不同用例**的多次跑批，`--repeat` 本身不换抽样（见上文确定性段落）。
+- 随机/概率效果用例在 `description` 或 `scenario` 中写明证据口径（单场拉长 / 结构性断言 / 交 `tests/`）；需要聚合「效果证据」时得用**不同种子或不同用例**的多次跑批——`--repeat` 对 `deterministic` 用例不换抽样，对未标的用例换的是不可复现的抽样（见上文确定性段落）。
 - 触发率断言必须附带实测依据：战报长度取 `第 N 回合` 最大值，归档 summary 的「效果证据聚合」行会输出 `最长回合=N`。实测参考（2026-09-11，气血 8000）：被动/触发类效果单场 67~76 回合，大招类 33~90，`action_limit=200` 封顶时 100；按 60 次出手保守估算，10% 触发率整场不触发的概率约 2e-3，所以单场断言可代替抽样。若日后把气血调低使战斗短于 ~45 回合，这些断言必须改回抽样口径。
 - 锚定文案变体（prose）的断言必须在 `note` 里写明 `文案再改需同步此处（<domain.scene>）`，且同步面 = 用例断言 + `EFFECT_EVIDENCE_PATTERNS` 两处，缺一不可。
 - 同库禁止并发跑批：多个 `run`/`--repeat` 进程共享同一组固定测试 ID 与 `.fixture-backup.json`，并发会互相覆盖基线、使“单场必中”类断言失真。需要并行请各起一份独立 `xiuxian_data_lite.db` 副本与独立平台会话。
@@ -85,15 +91,17 @@ export WEBTEST_TOKEN=<token>
 
 # 1. 同步用例：扫描 functional_tests/cases/**/*.json → 校验 → 拍平复制到平台 cases 顶层
 #    sync-cases 只写用例 JSON，不向平台 cases 目录写入 *.meta.json（历史残留会自动清理）
+#    平台目录里多余的未纳管用例会进告警名单（只告警，不删除）
 uv run python scripts/test_suite_ctl.py sync-cases
 
-# 2. 按标签运行（例如所有 PvP 用例；重复 3 次用于随机效果聚合）
+# 2. 按标签运行（例如所有 PvP 用例）——不要拿 --repeat 当“多抽几次样”：
+#    deterministic 用例每轮同种子→同一随机序列，未标用例换的是不可复现的抽样（见上「概率效果口径」）
 #    随机效果用例可加 --fixture --db <测试库>：每轮前重置固定测试玩家/冷却
 #    （平台 v0.3.0 起宗门用例已内嵌 pre_run_hook 自动复位：run --tag sect 无需 --fixture，该参数保留兼容）
 uv run python scripts/test_suite_ctl.py run --tag pvp --fixture --db /path/to/xiuxian_data_lite.db
 uv run python scripts/test_suite_ctl.py run --tag player
 
-# 3. 导出最近运行结果到 results/<日期>_<目标>/
+# 3. 导出最近运行结果到 results/<日期>_<目标>/（日期默认取 run 实际日期，跨午夜不会归错天）
 uv run python scripts/test_suite_ctl.py export --target pvp-effects
 uv run python scripts/test_suite_ctl.py export --target core-smoke --date 2026-08-17
 
