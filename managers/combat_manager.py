@@ -697,20 +697,14 @@ class CombatEngine:
                 )
             )
 
-    # Intentionally silent: pierce only arms `next_attack_pierce_rate`, and the panel
-    # renders the resulting damage line, never the armor bypass itself. Adding narration
-    # would need `combat.*` copy (AGENTS.md #15 forbids editing `config/*.json` directly,
-    # and bd -r0a shows re-importing that domain rewrites live battle lines), so the
-    # observable contract stays the damage gap alone. Webtest cases
-    # `functional_tests/cases/pvp/effect-pierce.json` / `effect-unavoidable.json`
-    # therefore assert path smoke only (see their notes). Tracked as bd -os6.
     # Intentionally silent (bd -os6): pierce only arms next_attack_pierce_rate and the
     # panel renders the resulting damage line, never the bypass itself; unavoidable is the
     # same for dodge/block/counter exemption. Adding narration would need combat.* copy, but
     # that domain renders live battle lines (see bd -r0a: a content re-import rewrote them)
     # and AGENTS.md #15 forbids hand-editing config/*.json. The observable contract is
-    # therefore the damage/dodge gap alone, so functional_tests/cases/pvp/effect-pierce.json
-    # and effect-unavoidable.json assert path smoke only (see their notes).
+    # therefore the damage/dodge gap alone, so the webtest cases
+    # functional_tests/cases/pvp/pvp-effect-pierce.json and pvp-effect-unavoidable.json
+    # assert path smoke only (see their notes).
     @staticmethod
     def _handler_pierce(
         actor: FighterState,
