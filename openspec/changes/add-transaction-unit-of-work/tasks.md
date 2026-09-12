@@ -9,8 +9,8 @@
 
 ## 1. 核心基建（DataBase.transaction() + helper 先行切换）
 
-- [ ] 1.1 `data/data_manager.py` 的 `DataBase` 新增 `transaction()` 异步上下文管理器：entry 时 `in_transaction` 为 False 则 `BEGIN IMMEDIATE`，否则 no-op join（记深度）；干净退出且无 abort → commit，异常 → rollback 后 re-raise；`txn.abort()` 按 design D1 契约（标记；clean exit 走 rollback 不 re-raise）；docstring 写明"内层块异常 = 整体回滚"与 abort 语义；英文 Google 风格 docstring
-- [ ] 1.2 32 个纯提交门控 helper 的提交判定改为 `if commit and not self.conn.in_transaction`（`data_manager.py` 2、`database_extended.py` 25、`core/pill_manager.py` 1、`bank_manager.py:465` 1、`impart_manager.py` 4、`shop_handler.py:346` 1）；**`set_active_legacy_instance` / `learn_or_star_up` 例外**（commit 门控 BEGIN），本阶段不动、随 4.2 收编
+- [ ] 1.1 `data/data_manager.py` 的 `DataBase` 新增 `transaction()` 异步上下文管理器：entry 时 `in_transaction` 为 False 则 `BEGIN IMMEDIATE`，否则 no-op join（记深度）；干净退出且无 abort → commit，异常 → rollback 后 re-raise；**`__aexit__` 按 `exc_type is not None` 分支（BaseException 安全，不得 `except Exception`）**；**嵌套 abort 传播**（任一层 abort 标记传至最外层）；`txn.abort()` 按 design D1 契约（幂等标记；clean exit 走 rollback 不 re-raise）；docstring 写明"内层块异常 = 整体回滚"与 abort 语义；英文 Google 风格 docstring
+- [ ] 1.2 **25 个叶子 helper**（`data_manager.py` 2、`database_extended.py` 23）的提交判定改为 `if commit and not self.conn.in_transaction`；**7 个纯透传 wrapper**（`core/pill_manager.py:654`、`bank_manager.py:458`、`shop_handler.py:345`、`impart_manager.py` ×4）零改动；**`set_active_legacy_instance` / `learn_or_star_up` 例外**（commit 门控 BEGIN），本阶段不动、随 4.2 收编
 - [ ] 1.3 新增 CM 级单测：嵌套 no-op join、仅最外层提交、abort 走 rollback；`uv run python -m pytest tests/test_transaction_atomicity.py -v` 现有 **28 个测试函数**保持全绿
 
 ## 2. 试点迁移（bank_manager 6 块）
@@ -18,7 +18,7 @@
 - [ ] 2.1 `managers/bank_manager.py` 6 个手工块（:109、:153、:195、:281、:346、:414，含 bd 9jt 的 claim_interest / 逾期追杀——逾期追杀循环保持**顺序兄弟事务**语义：逐条独立事务、单条失败不影响其他）改为 `async with self.db.transaction() as txn:`；能前置的复查前置，锁内复查用 `txn.abort()`；调用点 `commit=False` 可暂留（第二阶段清理）
 - [ ] 2.2 验证：bank 相关测试全绿 + 注入回归（§7.2/7.5 对应场景）通过
 
-## 3. 其余块迁移（~21 块）
+## 3. 其余块迁移（20 块）
 
 - [ ] 3.1 `managers/sect_manager.py` 8 块（:839、:1049、:1198、:1369、:1588、:1708、:1831、:2129，含 `complete_construction_task` 锁内复查复杂场景，abort 的主要用武之地）
 - [ ] 3.2 `core/storage_ring_manager.py` 3 块（:123、:169、:206）+ `managers/bounty_manager.py` 3 块（:331、:445、:599）
@@ -28,7 +28,7 @@
 ## 4. 第二阶段：flag 退役
 
 - [ ] 4.1 确认 50 处穿参点（sect 15、bank 18、shop 3+4、utils 3、storage_ring 3、player_handler 2、impart 2）清零后，从 34 个定义移除 `commit`/`external_transaction` 参数（含 manager 层重导出）
-- [ ] 4.2 4 个自事务 helper 收编为 CM：`decrement_shop_item_stock`、`increment_shop_item_stock`（**收编时须加 `in_transaction` 门控**，其当前无条件 BEGIN 在 CM 内会撞 "cannot start a transaction"）、`set_active_legacy_instance`、`learn_or_star_up`（后两者 BEGIN 条件一并改为 `in_transaction` 判定）
+- [ ] 4.2 5 个自事务 helper 收编为 CM：`decrement_shop_item_stock`、`increment_shop_item_stock`（**收编时须加 `in_transaction` 门控**，其当前无条件 BEGIN 在 CM 内会撞 "cannot start a transaction"）、`set_active_legacy_instance`、`learn_or_star_up`（后两者 BEGIN 条件一并改为 `in_transaction` 判定）、**`StorageRingManager.store_item`**（`core/storage_ring_manager.py:101`，第二个 `external_transaction` 持有者；~11 个独立调用方在事务外依赖其自 BEGIN 路径——equipment/storage_ring handlers、boss/adventure/spirit_farm/bounty/rift managers、gm_manager ×2、equipment_manager，收编后这些独立调用保持原语义）
 - [ ] 4.3 `tests/test_transaction_atomicity.py`：§7.1 kwarg 相关断言随 flag 退役移除/改写；**6 个 spy 测试**（§7.3 ×4 + §7.5 ×2）改写为 CM 级断言——只断 `conn.in_transaction` 状态，不依赖 `kwargs.get("commit", True)` 默认值回读；合并进 1.3 的测试组去重
 - [ ] 4.4 全量质量门：`uv run python -m pytest tests/ -v` 全绿；`uv run ruff format . && uv run ruff check .` 通过
 

@@ -7,8 +7,8 @@
 ## What Changes
 
 - `data/data_manager.py` 的 `DataBase` 新增 `async with db.transaction():` 单元工作上下文管理器：entry 时若 `conn.in_transaction` 为 False 则 `BEGIN IMMEDIATE`，否则 no-op join（内层放行，最外层全权 commit/rollback）；提供显式 `txn.abort()` 供锁内复查后放弃的场景。
-- 写 helper（~33 个定义）改为依据 `conn.in_transaction` 决定是否提交（连接自身已知道的事，替代 flag）；`commit`/`external_transaction` 参数标记为过渡兼容，第二阶段移除。
-- 绞杀者迁移 ~27 个手工 `BEGIN IMMEDIATE` 块 / 50 处穿参点（sect 15、bank 18、shop 3+4、utils 3、storage_ring 3、player_handler 2、impart 2），按块推进（bank_manager 6 块试点 → 其余模块）；early-exit 模式按"能前置的复查前置，必须锁内复查的用 `txn.abort()`"收编。
+- 写 helper（34 个定义：25 个叶子 helper 改提交判定，7 个纯透传 wrapper 无需改动随叶子继承行为，2 个 BEGIN 门控 helper 随收编处理）改为依据 `conn.in_transaction` 决定是否提交（连接自身已知道的事，替代 flag）；`commit`/`external_transaction` 参数标记为过渡兼容，第二阶段移除。
+- 绞杀者迁移 26 个手工 `BEGIN IMMEDIATE` 块 / 50 处穿参点（sect 15、bank 18、shop 3+4、utils 3、storage_ring 3、player_handler 2、impart 2），按块推进（bank_manager 6 块试点 → 其余 20 块）；early-exit 模式按"能前置的复查前置，必须锁内复查的用 `txn.abort()`"收编。
 - `tests/test_transaction_atomicity.py`：§7.2/7.4/7.5（与设计无关的原子性核心）全程守护；§7.1 kwarg 相关断言与 6 个 spy 测试（§7.3 ×4 + §7.5 ×2，spy `commit=False` kwarg）随 flag 移除改写为 CM 级测试（嵌套 no-op join / 仅最外层提交 / abort 走 rollback；改写时只断言 `in_transaction` 状态，不再依赖 kwarg 默认值回读）。
 - 同步创建 `CONTEXT.md` 并登记新概念 `unit-of-work`。
 
@@ -26,7 +26,7 @@
 
 ## Impact
 
-- **代码**：`data/data_manager.py`（+CM）、`data/database_extended.py`（~21 个 helper）、`managers/`（sect、bank、bounty、impart、spirit_eye…）、`handlers/`（shop、utils、player_handler…）、`core/storage_ring_manager.py` —— ~12 文件，纯机械替换为主。
+- **代码**：`data/data_manager.py`（+CM）、`data/database_extended.py`（25 个 helper）、`managers/`（sect、bank、bounty、impart、spirit_eye…）、`handlers/`（shop、utils、player_handler…）、`core/storage_ring_manager.py` —— ~12 文件，纯机械替换为主。
 - **测试**：`tests/test_transaction_atomicity.py` 改写部分断言；新增 CM 级测试。
 - **文档**：`CONTEXT.md` 新建；AGENTS.md §3 数据库操作规范补一句 CM 用法（指针式）。
 - **依赖**：aiosqlite 0.22.1 已验证提供 `Connection.in_transaction`（跨线程读正确性列入 spike）。

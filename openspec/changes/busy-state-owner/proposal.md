@@ -13,7 +13,7 @@
   - `set_cooldown(user_id, status, scheduled_time)`：纯时间戳冷却（宗门任务 SECT_TASK 场景），不配镜像，只能等过期；
   - `clear(player)`：`set_user_free` + 镜像复位，单事务；
   - `assert_idle(user_id) -> str | None`：`BusyState` 读侧方法（单点守卫，返回报错文案或 None），收编 12 处手抄块。
-- **R1**：条件 upsert（`BEGIN IMMEDIATE` + `WHERE type = 0` 语义）关闭并发 start-race；**R2**：闭关/出关双写并入单事务（依赖先行 change `add-transaction-unit-of-work` 的 `db.transaction()`）。
+- **R1**：owner 侧锁内复查（`BEGIN IMMEDIATE` 内重读 `type`，竞争 loser 走 `txn.abort()`；`set_user_busy` SQL 不改）关闭并发 start-race；**R2**：闭关/出关双写并入单事务（依赖先行 change `add-transaction-unit-of-work` 的 `db.transaction()`）。
 - **R3 走保守方案 (ii)**：装饰器 `player_required` 删第二层冗余检查（`utils.py:116-123`，该层本就极少命中）——删除后用户几乎无感；12 处守卫**保留各自原文案**只换实现（文案统一留给内容管线，另立任务，不在本 change）。
 - GM 两处手动双重置、宗门任务写点、历练/秘境写点全部改道 owner；`_TIME_SKIP_RULES` 无需改动（镜像由 owner 维护后 `:77` 的 WHERE 选择器语义保持）。
 - `CONTEXT.md` 登记 `BusyState` 条目（若 `add-transaction-unit-of-work` 已建文件则在其上追加）。
@@ -28,7 +28,7 @@
 
 ### Modified Capabilities
 
-（无 — 忙碌检查/冷却的行为契约无 spec 需求条目；本 change 的行为变化是 bug 修复型（R1/R2）与冗余删除（R3-ii），不修改需求级定义。故 `skip_specs: true`。）
+（无 — `openspec/specs` 中与忙碌状态相关的唯一需求条目是 gm-commands 的 "Clear busy cooldown"（`spec.md:109-116`，要求同时复位 user_cd 与 player.state），本 change 的 `clear()` 保持其可观察行为不变；其余忙碌/冷却行为无 spec 需求条目。本 change 的行为变化是 bug 修复型（R1/R2）与冗余删除（R3-ii），不修改需求级定义。故 `skip_specs: true`。）
 
 ## Impact
 
