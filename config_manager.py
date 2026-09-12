@@ -8,6 +8,7 @@ from .data.default_configs import (
     ALCHEMY_CONFIG,
     BOSS_CONFIG,
     DEFAULT_NARRATIVE_CONFIG,
+    GAME_CONFIG,
     IMPART_CONFIG,
     NARRATIVE_SCENE_VARS,
     RIFT_CONFIG,
@@ -448,9 +449,10 @@ class ConfigManager:
             config_dir / "spirit_root_descriptions.json"
         )
 
-        # 加载游戏配置（包含各系统的硬编码参数）
+        # 加载游戏配置（包含各系统的硬编码参数）；文件缺失时物化 data/default_configs
+        # 的 GAME_CONFIG（曾传 {}，导致全新部署落成空文件、只能隐式走各调用点兜底值）
         self.game_config = self._load_config_with_default(
-            config_dir / "game_config.json", {}
+            config_dir / "game_config.json", GAME_CONFIG
         )
 
         self._pill_names_cache = None

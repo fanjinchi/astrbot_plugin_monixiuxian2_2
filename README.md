@@ -317,6 +317,14 @@ astrbot_plugin_monixiuxian2_2/
 
 ---
 
+### v3.17.2 - 游戏配置默认值补齐
+
+**🔧 修复**
+
+- **全新部署的 `game_config.json` 不再落成空文件**：`data/default_configs.py` 新增 `GAME_CONFIG`（完整镜像装机文件，含 `combat.remaining_hp_mid_threshold` / `combat.remaining_hp_low_threshold` 等全部可调项），`config_manager.py` 在配置文件缺失时用它物化默认（此前传 `{}`）——缺失时那些可调项只能隐式落到各调用点的硬编码兜底值，既不可见也无从调整；两份取值漂移由 `tests/test_game_config_defaults.py` 守卫（解析后必须深度相等，并在临时目录模拟缺失物化）
+
+---
+
 ### v3.17.1 - 战报结构行代码化与剩余气血分档
 
 **🎯 核心改动**
