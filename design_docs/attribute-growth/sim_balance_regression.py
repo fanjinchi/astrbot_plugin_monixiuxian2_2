@@ -101,6 +101,10 @@ ENGINE = CombatEngine(CONFIG_MANAGER, skill_manager=None)
 #   - base_damage = max(1, 每击预算 - 期望属性伤害 × weapon_k)（卡牌化固定面板）
 #   - 轻型 +25% 迅捷 +3 身法；重型 -20% 迅捷（§4.1 低频高伤定位）
 #   - armor_value = 同级典型护甲的 30%/50%/80%，典型护甲 = level × 2
+#   - 格挡来源（spec combat-core「格挡率来源分离」）：仅 天生+武器槽 护甲计入
+#     格挡，防具槽护甲只进百分比减伤。本 sim 无防具槽、armor 全部来自武器槽，
+#     故 armor==block 当前成立且代表现网规则；未来引入防具槽时只加 armor_value、
+#     显式传 block_armor_value=天生+武器槽部分（带装口径见 sim_route_matchup）。
 #
 # 注: 以上拆分为 §4.1 的一种合理解释；若后续武器设计采用不同拆分，
 # 只需调整 _make_weapon() 并重新跑回归。
@@ -225,11 +229,23 @@ def _make_fighter(
     agility: int,
     speed: int,
     armor_value: int = 0,
+    block_armor_value: int | None = None,
     weapon_k: float = 1.0,
     base_damage: int = 0,
     level_index: int = 1,
     name: str = "修士A",
 ) -> FighterState:
+    """Build one side of a mirror battle from synthesized panel + weapon stats.
+
+    ``block_armor_value`` falls back to ``armor_value`` when omitted: this sim
+    has no armor slot, all armor here comes from the weapon slot, and the
+    weapon slot counts toward block under the block-source split (spec
+    combat-core 「格挡率来源分离」), so the fallback matches live semantics.
+    If an armor slot is ever modeled here, its armor may only be added to
+    ``armor_value``; ``block_armor_value`` must then be passed explicitly as
+    the innate + weapon-slot part (loadout reference: sim_route_matchup).
+    """
+    block_armor = armor_value if block_armor_value is None else block_armor_value
     return FighterState(
         user_id=name,
         name=name,
@@ -239,8 +255,7 @@ def _make_fighter(
         agility=agility,
         speed=speed,
         armor_value=armor_value,
-        # 模拟器护甲语义 = 天生+武器槽，格挡来源同步（design D1/D2 校准不变）
-        block_armor_value=armor_value,
+        block_armor_value=block_armor,
         weapon_k=weapon_k,
         base_damage=base_damage,
         level_index=level_index,

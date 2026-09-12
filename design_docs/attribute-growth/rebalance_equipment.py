@@ -451,7 +451,18 @@ def _make_fighter(
     level_index: int,
     weapon: _SampleWeapon | None,
     FighterState: Any,
+    block_armor_value: int | None = None,
 ) -> Any:
+    """Build one side of a mirror battle mirroring the sample weapon's stats.
+
+    ``block_armor_value`` falls back to ``armor_value`` when omitted: armor
+    here comes from the weapon slot only, and the weapon slot counts toward
+    block under the block-source split (spec combat-core 「格挡率来源分离」),
+    so the fallback matches live semantics. If armor-slot armor is ever added
+    to this sim, it may only raise ``armor_value``; pass ``block_armor_value``
+    explicitly as the innate + weapon-slot part then (loadout reference:
+    sim_route_matchup).
+    """
     hp = int(round(_expected_hp(level_index)))
     damage = int(round(_expected_damage(level_index)))
     agility = int(round(5 + 1.25 * level_index))
@@ -466,6 +477,7 @@ def _make_fighter(
         weapon_k = weapon.weapon_k
         base_damage = weapon.base_damage
 
+    block_armor = armor_value if block_armor_value is None else block_armor_value
     return FighterState(
         user_id=name,
         name=name,
@@ -475,8 +487,7 @@ def _make_fighter(
         agility=agility,
         speed=speed,
         armor_value=armor_value,
-        # 模拟器护甲语义 = 天生+武器槽，格挡来源同步（design D1/D2 校准不变）
-        block_armor_value=armor_value,
+        block_armor_value=block_armor,
         level_index=level_index,
         weapon_k=weapon_k,
         base_damage=base_damage,
