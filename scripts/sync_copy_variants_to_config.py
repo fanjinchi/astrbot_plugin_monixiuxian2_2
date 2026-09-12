@@ -18,6 +18,13 @@ Deliberate exclusions (reported, not silently dropped):
 - ``state != 通用`` rows（州条，~186 行）：运行时没有州/世界状态选择轴，
   导入会让州专属文案混进通用池——待运行时出现 state 选择器后再入库。
 - config 中不存在的事件 key（sect_duel/sect_trial，随 bd n6o 五宗落地）。
+- **config 暂缺但已在 ``NARRATIVE_SCENE_VARS`` 声明且有内嵌默认的短句场景键**
+  （change combat-report-structure D5）：直接建分桶池——ConfigManager 只在配置
+  文件不存在时物化默认，已有文件不会合并新键，否则新场景永远停在 unknown。
+  这是导入器的**永久性全局新语义**（不限本变更两档）；已知副作用并接受：
+  故意从 config 移除的已声明键会被下一次导入写回，要让场景回到内嵌默认必须先
+  把它从 ``SCENE_VARS`` 退役（``battle_vs`` / ``remaining_hp`` 即走此路径）。
+  放行后仍走同一变量契约检查（⊇ 默认模板变量集），不通过照旧归 skipped。
 - **双槽场景**（``DUAL_SLOT_SCENES``，breakthrough.success/survive/death/
   revive、cultivation.retreat_start/retreat_settlement）：机械面板与 flavor
   引子分离（change flavor-copy-assembly D1/D7）。导入时旧字符串值整体搬入
@@ -263,6 +270,14 @@ def _apply_short_text(
     variant carries the default template's full variable set (random.choice
     picks any entry, so partial coverage would intermittently drop mechanical
     info like the breakthrough exp penalty).
+
+    A scene key missing from config is admitted (pool created from the CSV)
+    when the render point declares it (``NARRATIVE_SCENE_VARS``) AND it has an
+    embedded default — the two conditions that make a CSV pool a legal
+    replacement for that default. Everything else stays ``unknown``. See the
+    module docstring for the permanent global semantics and its accepted side
+    effect.
+
     Returns (scenes written, unknown scene keys, contract-skipped scenes).
     """
     written = 0
@@ -273,8 +288,18 @@ def _apply_short_text(
             continue
         section = ncfg.setdefault(domain, {})
         if scene not in section:
-            unknown.append(f"{domain}.{scene}")
-            continue
+            # 放行规则（change combat-report-structure D5）：config 暂缺的场景键，
+            # 只要渲染点已声明（SCENE_VARS）且有内嵌默认，就从 CSV 直接建池；
+            # unknown 仅保留给完全未声明的键。双槽场景排除在外：其 config 值是
+            # panel 载体，没有可从 CSV 新建的形态（仍需先手工补 panel）。
+            admitted = (
+                (domain, scene) in declared_vars
+                and (domain, scene) in default_vars
+                and (domain, scene) not in DUAL_SLOT_SCENES
+            )
+            if not admitted:
+                unknown.append(f"{domain}.{scene}")
+                continue
         if (domain, scene) in DUAL_SLOT_SCENES:
             new_value = _migrate_dual_slot(
                 section[scene],

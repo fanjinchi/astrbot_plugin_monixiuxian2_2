@@ -55,6 +55,21 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# --- Battle-report structural lines (change combat-report-structure D1/D2) -----
+# Banners and the versus line are code-owned: a battle report must keep its
+# start/end markers and matchup info no matter how the narrative copy rotates,
+# how the config is emptied, or which embedded default is in effect (bd -r0a).
+# Text is verbatim from the pre-rotating defaults that used to live in
+# data/narrative_defaults/combat.py — full-width punctuation and spaces are part
+# of the original format, do not "normalize" them.
+_BANNER_OPENING = "☆━━━━ 战斗开始 ━━━━☆"
+_BANNER_VICTORY = "☆━━━━ {name} 胜利！━━━━☆"
+_BANNER_DRAW = "☆━━━━ 平局！━━━━☆"
+_BANNER_DRAW_STALEMATE = "☆━━━━ 战斗胶着，双方罢手，平局！━━━━☆"
+_BANNER_MUTUAL_DESTRUCTION = "☆━━━━ 同归于尽！平局！━━━━☆"
+# Versus line (half-width ``VS`` with one space on each side, verbatim).
+_VERSUS_LINE = "{name1} VS {name2}"
+
 
 @dataclass
 class CombatStats:
@@ -185,6 +200,35 @@ class CombatEngine:
         self._armor_k_level_coeff = self._combat_cfg.get("armor_k_level_coeff", 10)
         self._base_crit_rate = self._combat_cfg.get("base_crit_rate", 0.15)
 
+        # Remaining-HP tier thresholds (change combat-report-structure D4).
+        # Tuning keys: combat.remaining_hp_mid_threshold / _low_threshold in
+        # config/game_config.json. Legal domain is 0 < low < mid < 1 (compared
+        # against `hp / max(1, max_hp)`); config_manager.py has no combat-section
+        # validator, so a non-numeric / out-of-range / inverted pair is caught
+        # here and falls back to the code defaults 0.6 / 0.3 — a malformed pair
+        # must never silence one tier or merge both into one.
+        mid_default, low_default = 0.6, 0.3
+        mid = self._combat_cfg.get("remaining_hp_mid_threshold", mid_default)
+        low = self._combat_cfg.get("remaining_hp_low_threshold", low_default)
+        if (
+            not all(
+                isinstance(value, (int, float)) and 0 < value < 1
+                for value in (mid, low)
+            )
+            or low >= mid
+        ):
+            logger.warning(
+                "Invalid remaining-HP thresholds (mid=%r, low=%r); "
+                "falling back to %s / %s.",
+                mid,
+                low,
+                mid_default,
+                low_default,
+            )
+            mid, low = mid_default, low_default
+        self._hp_mid_threshold = float(mid)
+        self._hp_low_threshold = float(low)
+
     def _narrative(self, scene: str, variables: dict | None = None) -> str:
         """Render one combat log line from the narrative config.
 
@@ -238,12 +282,16 @@ class CombatEngine:
         crit_multiplier = self._combat_cfg.get("crit_damage_multiplier", 1.5)
 
         log: list[str] = []
-        log.append(self._narrative("battle_opening"))
-        log.append(
-            self._narrative(
-                "battle_vs", {"name1": fighter1.name, "name2": fighter2.name}
-            )
-        )
+        # Opening block (change D2): banner -> structural versus line -> optional
+        # literary description line -> both stat panels. `battle_vs` is retired;
+        # the matchup is structural and never depends on the copy pool.
+        log.append(_BANNER_OPENING)
+        log.append(_VERSUS_LINE.format(name1=fighter1.name, name2=fighter2.name))
+        opening_flavor = self._narrative("battle_opening")
+        if opening_flavor:
+            # `""` only when config AND embedded default are both missing that
+            # scene (render_narrative contract); the banner stays regardless.
+            log.append(opening_flavor)
         log.append(
             f"{fighter1.name}：气血 {fighter1.hp}/{fighter1.max_hp}，"
             f"伤害 {fighter1.damage}，身法 {fighter1.agility}，迅捷 {fighter1.speed}"
@@ -290,22 +338,31 @@ class CombatEngine:
             if total_actions % 2 == 0:
                 log.append("")
 
-        # Determine winner
+        # Determine winner. Every closing branch emits its code-owned banner and
+        # the matching scene's optional literary description line right after it
+        # (change D2: banner -> description, adjacent).
         if fighter1.hp <= 0 and fighter2.hp <= 0:
             winner = "draw"
-            log.append(self._narrative("battle_mutual_destruction"))
+            log.append(_BANNER_MUTUAL_DESTRUCTION)
+            flavor = self._narrative("battle_mutual_destruction")
         elif fighter1.hp <= 0:
             winner = fighter2.user_id
-            log.append(self._narrative("battle_victory", {"name": fighter2.name}))
+            log.append(_BANNER_VICTORY.format(name=fighter2.name))
+            flavor = self._narrative("battle_victory", {"name": fighter2.name})
         elif fighter2.hp <= 0:
             winner = fighter1.user_id
-            log.append(self._narrative("battle_victory", {"name": fighter1.name}))
+            log.append(_BANNER_VICTORY.format(name=fighter1.name))
+            flavor = self._narrative("battle_victory", {"name": fighter1.name})
         elif total_actions >= action_limit:
             winner = "draw"
-            log.append(self._narrative("battle_draw_stalemate"))
+            log.append(_BANNER_DRAW_STALEMATE)
+            flavor = self._narrative("battle_draw_stalemate")
         else:
             winner = "draw"
-            log.append(self._narrative("battle_draw"))
+            log.append(_BANNER_DRAW)
+            flavor = self._narrative("battle_draw")
+        if flavor:
+            log.append(flavor)
 
         # Merge log into chunks
         merged_log = self._merge_log(log, merge_count)
@@ -1217,15 +1274,28 @@ class CombatEngine:
         # Survive (免死): lethal damage keeps the fighter at 1 HP once per charge
         self._try_survive(defender, log)
 
-        log.append(
-            self._narrative(
-                "remaining_hp",
-                {
-                    "defender_name": defender.name,
-                    "remaining_hp": max(0, defender.hp),
-                },
+        # Tiered remaining-HP line (change D4): above the mid threshold the data
+        # line is noise and is dropped; (low, mid] reads as 残局, (0, low] as
+        # 濒死. A defender at 0 HP gets no line either — the death is carried by
+        # the ending banner, and the 濒死 copy must not describe a corpse.
+        ratio = defender.hp / max(1, defender.max_hp)
+        if defender.hp > 0 and ratio <= self._hp_mid_threshold:
+            scene = (
+                "remaining_hp_mid"
+                if ratio > self._hp_low_threshold
+                else "remaining_hp_low"
             )
-        )
+            log.append(
+                self._narrative(
+                    scene,
+                    {
+                        "defender_name": defender.name,
+                        # Thousands separator is done here: the copy must never
+                        # receive a bare number (spec 剩余气血行阈值分档).
+                        "remaining_hp": f"{max(0, defender.hp):,}",
+                    },
+                )
+            )
 
         # 8. Trigger skills - on_defense (counter / stun / damage reduction)
         if defender.hp > 0:

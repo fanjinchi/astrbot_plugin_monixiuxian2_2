@@ -317,6 +317,17 @@ astrbot_plugin_monixiuxian2_2/
 
 ---
 
+### v3.17.1 - 战报结构行代码化与剩余气血分档
+
+**🎯 核心改动**
+
+- **战报结构行改由代码拼装**（openspec: combat-report-structure）：开战横幅「☆━━━━ 战斗开始 ━━━━☆」、对阵行「甲 VS 乙」、胜利/平局/互灭收束横幅共 5 条结构行从文案池改为 `managers/combat_manager.py` 代码常量（`_BANNER_*` / `_VERSUS_LINE`），版式不再受文案池随机性影响；原 `battle_vs` 场景退役（玩家可见效果：对战行不再随战斗随手抽出不同说法）
+- **剩余气血行按气血比例分档**：原单一 `remaining_hp` 场景拆为两档——气血比例 `(0.3, 0.6]` 出「残局」句、`≤ 0.3` 出「濒死」句，比例高于 0.6 不再输出这行（血多时报数字是噪声）；档位阈值可在 `config/game_config.json` 调（`combat.remaining_hp_mid_threshold` 默认 0.6 / `combat.remaining_hp_low_threshold` 默认 0.3，非法或倒置时回退默认），旧 `remaining_hp` 键退役
+- **千分位由代码注入**：剩余气血四位以上统一显示为 `4,800`；文案池模板不再自行处理数字，避免同场景不同变体数字格式不一
+- **文案同步**（用户 2026-09-12 终审确认）：`copy_variants.csv` 新增 `remaining_hp_mid` 3 条、`remaining_hp_low` 4 条（改写）并删除 `battle_vs` 2 条，已导入 `config/narrative_config.json`
+
+---
+
 ### v3.17.0 - 叙事双槽形态：突破/闭关面板 flavor 引子上线
 
 **🎯 核心改动**
