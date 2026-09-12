@@ -32,17 +32,21 @@ def _parse_all() -> list[dict]:
 
 
 def test_parse_total_rows() -> None:
-    """12 册应产出 477 行（事件 341 + 突破 55 + 修炼 18 + 战斗 55 + 机缘 8）。"""
-    assert len(_parse_all()) == 477
+    """12 册应产出 478 行（事件 341 + 突破 55 + 修炼 18 + 战斗 56 + 机缘 8）。
+
+    战斗册 56 = change combat-report-structure 拆两档后 +1：battle_vs 退役 2 条，
+    remaining_hp 4 条归入 remaining_hp_low 并新增 remaining_hp_mid 3 条。
+    """
+    assert len(_parse_all()) == 478
 
 
 def test_domain_split() -> None:
-    """分域行数：adventure_event 341 / breakthrough 55 / combat 55 / cultivation 18 / fortune 8。"""
+    """分域行数：adventure_event 341 / breakthrough 55 / combat 56 / cultivation 18 / fortune 8。"""
     counts = Counter(r["domain"] for r in _parse_all())
     assert counts == {
         "adventure_event": 341,
         "breakthrough": 55,
-        "combat": 55,
+        "combat": 56,
         "cultivation": 18,
         "fortune": 8,
     }
