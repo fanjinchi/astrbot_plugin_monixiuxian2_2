@@ -2,7 +2,7 @@
 
 ## Context
 
-写侧盘点（全部运行时代码）：`player.state` 仅 4 处写入——`handlers/player_handler.py:335-338`（闭关，"修炼中"）、`:455-459`（出关，"空闲"）、`core/gm_manager.py:908-910` / `:1236-1239`（GM 双清）。全部非原子：先 `update_player` commit、再 `set_user_busy/free` 独立 commit。`user_cd` 写点另见于 adventure（:222-224/:313-314）、rift（:325-327/:418-421/:485）、sect（:917-920，唯一已在事务内的）、GM force-settle（:986,:1060）。读侧：所有 `player.state` 读取都是忙碌检查（`utils.py:116,121`、`player_handler.py:323,353,618`、`gm_manager.py:77,1236`），无任何展示/序列化用途。
+写侧盘点（全部运行时代码）：`player.state` 仅 4 处写入——`handlers/player_handler.py:335-338`（闭关，"修炼中"）、`:455-459`（出关，"空闲"）、`core/gm_manager.py:908-910` / `:1236-1239`（GM 双清）。全部非原子：先 `update_player` commit、再 `set_user_busy/free` 独立 commit。`user_cd` 写点另见于 adventure（:222-224/:313-314）、rift（:325-327/:418-421/:485）、sect（:917-920，唯一已在事务内的）、GM force-settle（:986,:1060）。读侧：所有 `player.state` 读取都是忙碌检查——6 处 Python 读取（`utils.py:116,121`、`player_handler.py:323,353,618`、`gm_manager.py:1236`）+ 1 处 SQL WHERE（`gm_manager.py:77`），无任何展示/序列化用途。
 
 `UserStatus` 枚举五值（`models_extended.py:12-31`）：IDLE/CULTIVATING/ADVENTURING/EXPLORING/SECT_TASK。镜像只覆盖 CULTIVATING；SECT_TASK 实为时间戳冷却（`scheduled_time` 到期由 sect_manager:857 判定），不是活动状态。`set_user_busy` 已是带回归测试的 upsert（`database_extended.py:705-738`，`test_user_busy_upsert.py`）。
 
@@ -29,11 +29,13 @@ db 层保持模型无关（`database_extended` 只依赖 `UserStatus` 枚举）�
 **D2 · 双语义 API（Q4 决策 = a）：`set_busy` 与 `set_cooldown` 分设。**
 `set_busy` = 活动状态（闭关/历练/秘境），写 user_cd + 维护 state 镜像（CULTIVATING → "修炼中"，其余活动 → 镜像"空闲"——镜像只认 CULTIVATING 是现状语义，忠实保留）；配对 `clear`。`set_cooldown` = 时间戳冷却（SECT_TASK），只写 user_cd 不配镜像，无 clear 入口（只能过期）——杜绝误清任务冷却。sect_manager:857 的到期判定逻辑不动，写点改道。
 
-**D3 · R1/R2 实现：条件 upsert + `db.transaction()`。**
-`set_busy`/`clear` 内部 `async with self.db.transaction():`（前置 change 提供）：锁内复查 `type == IDLE`（或目标活动态），条件不满足则 `txn.abort()` 返回失败文案；满足则 `set_user_busy` + 镜像赋值 + 单次提交。race loser 得到"正在X中"报错而非静默覆盖。**行为说明**：R1 改变了并发竞争的结果（修复向），需在更新日志按 bug 修复记录。
+**D3 · R1/R2 实现：锁内复查 + `db.transaction()`。**
+`set_busy`/`clear` 内部 `async with self.db.transaction():`（前置 change 提供，其 design D1 已钉死 abort 契约：abort 只置标记；标记后 clean exit = rollback 不 re-raise）：锁内复查当前 `type == IDLE`（或目标活动态），不满足则 `txn.abort()` 返回失败文案；满足则 `set_user_busy` + 镜像赋值 + 单次提交。race loser 得到"正在X中"报错而非静默覆盖。**注意**：`set_user_busy` 的 SQL upsert 本身不改（`test_user_busy_upsert.py` 保持有效），竞争控制在 owner 侧事务内完成。**行为说明**：R1 改变了并发竞争的结果（修复向），需在更新日志按 bug 修复记录。
+
+**D3.1 · `player_handler.py:323/:353` 两处残留读取的处置**：`:323`（闭关前的 state 复查）装饰器 user_cd 层已等价拦截，属死代码——删除；`:353`（出关时"并未闭关"的 idle 用户应答）是合法流程分支——保留（注意它仍是镜像读取，user_cd 语义可等价改写，实施时顺手改为查 user_cd 更彻底）。`:438-441` 出关"先 commit state、后结算传承"的时序注释在 R2 单事务化后须更新（clear 与传承结算的先后关系不变，但"两次 commit 窗口"的说法失效）。
 
 **D4 · R3-(ii) 读侧：装饰器删第二层，守卫保留文案。**
-`player_required`（`utils.py:102-123`）删除 `player.state == "修炼中"` 分支——镜像由 owner 单写后，user_cd 是唯一真相，第二层是纯冗余（它存在的历史意义就是糊漂移）。12 处守卫换成 `assert_idle(db, user_id)`（返回 `str | None`），各站点传入自己的原文案模板或接受默认——**文案逐字不变**，平台用例锚点不受影响。manager 层 6 处重复守卫同法收编。
+`player_required`（`utils.py:102-123`）删除 `player.state == "修炼中"` 分支——镜像由 owner 单写后，user_cd 是唯一真相，第二层是纯冗余（它存在的历史意义就是糊漂移）。12 处守卫换成 `BusyState.assert_idle(user_id)`（返回 `str | None`），各站点传入自己的原文案模板或接受默认——**文案逐字不变**，平台用例锚点不受影响。注意 sect 的 5 个入口（`:433,448,459,469,481`）共享一个 `_get_busy_message`（:421-427），收编一处即覆盖 5 点。manager 层 6 处重复守卫同法收编。弃道重修（`:612-622`）有两条守卫消息：user_cd 基（:615）与 state 基（:620）——收编时保留 :615 的专属文案，state 基冗余检查随 D3.1 同法删除。
 
 **D5 · GM 与 `_TIME_SKIP_RULES` 改道不改语义。**
 `cmd_clear_cd` / `cmd_clear_all_cooldowns` 的手动双重置改为单次 `clear(player)`；`:77` 的 `WHERE state = '修炼中'` 选择器保持（镜像由 owner 维护，语义不变）。
@@ -44,7 +46,7 @@ db 层保持模型无关（`database_extended` 只依赖 `UserStatus` 枚举）�
 - [SECT_TASK 误清] → `set_cooldown` 无 clear 入口从构造上杜绝；sect 完成任务的既有到期路径不动。
 - [R1 的报错时机变化：race loser 从"静默进入活动"变"收到忙碌报错"] → 修复向行为，更新日志记录；functional_tests 相关用例重跑确认。
 - [`update_player` 与 owner 写镜像同块时的字段覆盖] → R2 后双写在同一事务同一内存对象上，无跨对象竞争。
-- [decorator 删第二层的残留假设：某 handler 依赖 state 字符串判断] → 已全量 grep（探索报告 §1），仅 4 处读取且全为忙碌检查；tasks 中逐项核对。
+- [decorator 删第二层的残留假设：某 handler 依赖 state 字符串判断] → 已全量 grep（探索报告 §1），6 处 Python 读取 + 1 处 SQL WHERE，全为忙碌检查，且 :323/:353/弃道重修的处置已在 D3.1/D4 明确；tasks 中逐项核对。
 
 ## Migration Plan
 
