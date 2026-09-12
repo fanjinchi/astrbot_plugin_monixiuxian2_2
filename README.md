@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.17.2
+> **版本:** v3.17.3
 > **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -314,6 +314,15 @@ astrbot_plugin_monixiuxian2_2/
 ---
 
 ## 📝 更新日志
+
+---
+
+### v3.17.3 - 银行多步写补事务（bd 9jt）
+
+**🔧 修复**
+
+- **领取利息全程事务化**：`claim_interest` 此前「利息入账」与「记流水」是两步独立提交，中途失败留下半成品账户，且并发领取可对同一余额重复结息；现按存取款同款模式套 `BEGIN IMMEDIATE`，读账户→算息→入账→流水一步提交（bd 9jt）
+- **逾期追杀每笔贷款一个事务**：`check_and_process_overdue_loans` 此前「级联删除→标记逾期→记流水」三次独立提交，中途崩溃会留下「人已删但贷款仍 active」的半成品；现每笔贷款独立事务三步同生共死，并在拿到写锁后复核贷款仍为 active——快照后已还款的玩家不会被误杀（bd 9jt）
 
 ---
 

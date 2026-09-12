@@ -14,6 +14,9 @@ Covers design D6:
 4. Shop purchase success path — buying equipment/material items must persist
    both the item in the storage ring and the gold deduction (D5 stale-player
    overwrite regression), and pill purchases must credit the pill inventory.
+5. bd 9jt — claim_interest and the overdue-loan kill loop, previously
+   multi-write-without-transaction, now join the rollback/nesting contracts
+   above (plus a repaid-after-snapshot guard so a closed loan never kills).
 """
 
 import sys
@@ -608,3 +611,169 @@ async def test_store_item_standalone_still_refetches(db):
     assert ok, msg
     fresh = await db.get_player_by_id("u1")
     assert fresh.get_storage_ring_items() == {"青铜剑": 1, "玄铁": 1}
+
+
+# ===== 7.5 bd 9jt：claim_interest / check_and_process_overdue_loans 补事务后的守约测试 =====
+
+
+@pytest_asyncio.fixture
+async def bank_mgr(db):
+    """BankManager on default config (daily rate 0.1%)."""
+    return BankManager(db)
+
+
+async def _seed_claimable_account(db: DataBase, user_id: str = "u1") -> int:
+    """Create a player and an account whose last settlement was 1 day ago.
+
+    Returns:
+        The seeded balance (200_000), whose 1-day compound interest is 200.
+    """
+    await _make_player(db, user_id=user_id)
+    now = int(time.time())
+    await db.ext.update_bank_account(user_id, 200_000, now - 86400)
+    return 200_000
+
+
+@pytest.mark.asyncio
+async def test_claim_interest_success_credits_and_records(db, bank_mgr):
+    """Success path: interest compounds into balance and an interest row lands."""
+    balance = await _seed_claimable_account(db)
+
+    ok, msg = await bank_mgr.claim_interest(await db.get_player_by_id("u1"))
+    assert ok, msg
+    assert not db.conn.in_transaction
+
+    account = await db.ext.get_bank_account("u1")
+    assert account["balance"] == balance + 200
+    assert account["last_interest_time"] > 0
+    txs = await db.ext.get_bank_transactions("u1")
+    assert len(txs) == 1
+    assert txs[0]["trans_type"] == "interest" and txs[0]["amount"] == 200
+
+
+@pytest.mark.asyncio
+async def test_claim_interest_rolls_back_when_transaction_fails(
+    db, bank_mgr, monkeypatch
+):
+    """claim_interest block: a failing transaction write must roll back the credit."""
+
+    async def boom(*args, **kwargs):
+        raise RuntimeError("injected failure")
+
+    monkeypatch.setattr(bank_mgr, "_add_transaction", boom)
+    await _seed_claimable_account(db)
+
+    with pytest.raises(RuntimeError):
+        await bank_mgr.claim_interest(await db.get_player_by_id("u1"))
+
+    account = await db.ext.get_bank_account("u1")
+    assert account["balance"] == 200_000  # 利息未入账
+    assert await db.ext.get_bank_transactions("u1") == []  # 无流水残留
+
+
+@pytest.mark.asyncio
+async def test_claim_interest_block_never_leaves_transaction(db, bank_mgr, monkeypatch):
+    """claim_interest: both writes are commit=False and stay inside the tx."""
+    await _seed_claimable_account(db)
+
+    states = []
+    for obj, name in [
+        (db.ext, "update_bank_account"),
+        (db.ext, "add_bank_transaction"),
+    ]:
+        _spy_in_transaction(db, monkeypatch, obj, name, states)
+
+    ok, msg = await bank_mgr.claim_interest(await db.get_player_by_id("u1"))
+    assert ok, msg
+
+    assert [s[0] for s in states] == ["update_bank_account", "add_bank_transaction"]
+    assert all(commit is False and in_tx for _, commit, in_tx in states), states
+
+
+async def _seed_overdue_loan(db: DataBase, user_id: str = "u1") -> None:
+    """Create a player carrying a loan whose due_at is already past."""
+    await _make_player(db, user_id=user_id)
+    now = int(time.time())
+    await db.ext.create_loan(user_id, 1000, 0.005, now - 10 * 86400, now - 1)
+
+
+@pytest.mark.asyncio
+async def test_overdue_loans_kill_success_is_atomic(db, bank_mgr):
+    """Kill path: player deleted, loan overdue and bank_kill row land together."""
+    await _seed_overdue_loan(db)
+
+    processed = await bank_mgr.check_and_process_overdue_loans()
+    assert not db.conn.in_transaction
+
+    assert len(processed) == 1 and processed[0]["death"] is True
+    assert await db.get_player_by_id("u1") is None
+    row = await _fetchone(db, "SELECT status FROM bank_loans WHERE user_id = 'u1'")
+    assert row[0] == "overdue"
+    txs = await db.ext.get_bank_transactions("u1")
+    assert len(txs) == 1 and txs[0]["trans_type"] == "bank_kill"
+
+
+@pytest.mark.asyncio
+async def test_overdue_loans_skips_repaid_loan(db, bank_mgr):
+    """Snapshot staleness guard: a loan closed after the snapshot must not kill."""
+    await _seed_overdue_loan(db)
+    active = await db.ext.get_active_loan("u1")
+    await db.ext.close_loan(active["id"])  # 模拟快照后、处理前已还款
+
+    processed = await bank_mgr.check_and_process_overdue_loans()
+
+    assert processed == []
+    assert await db.get_player_by_id("u1") is not None  # 玩家未被误杀
+    row = await _fetchone(db, "SELECT status FROM bank_loans WHERE user_id = 'u1'")
+    assert row[0] == "closed"  # 还款状态不被追杀覆写
+    assert await db.ext.get_bank_transactions("u1") == []
+
+
+@pytest.mark.asyncio
+async def test_overdue_loans_rolls_back_when_transaction_fails(
+    db, bank_mgr, monkeypatch
+):
+    """Kill loop: a failing bank_kill write must resurrect the cascade delete."""
+
+    original = db.ext.add_bank_transaction
+
+    async def add_then_boom(*args, **kwargs):
+        await original(*args, **kwargs)
+        raise RuntimeError("injected failure")
+
+    monkeypatch.setattr(db.ext, "add_bank_transaction", add_then_boom)
+    await _seed_overdue_loan(db)
+
+    with pytest.raises(RuntimeError):
+        await bank_mgr.check_and_process_overdue_loans()
+
+    assert await db.get_player_by_id("u1") is not None  # 级联删除已回滚
+    loan = await db.ext.get_active_loan("u1")
+    assert loan is not None and loan["status"] == "active"  # 逾期标记已回滚
+    assert await db.ext.get_bank_transactions("u1") == []  # 流水已回滚
+
+
+@pytest.mark.asyncio
+async def test_overdue_loans_loop_block_never_leaves_transaction(
+    db, bank_mgr, monkeypatch
+):
+    """Kill loop: cascade/mark_overdue/transaction are commit=False in one tx."""
+    await _seed_overdue_loan(db)
+
+    states = []
+    for obj, name in [
+        (db, "delete_player_cascade"),
+        (db.ext, "mark_loan_overdue"),
+        (db.ext, "add_bank_transaction"),
+    ]:
+        _spy_in_transaction(db, monkeypatch, obj, name, states)
+
+    processed = await bank_mgr.check_and_process_overdue_loans()
+    assert len(processed) == 1
+
+    assert [s[0] for s in states] == [
+        "delete_player_cascade",
+        "mark_loan_overdue",
+        "add_bank_transaction",
+    ]
+    assert all(commit is False and in_tx for _, commit, in_tx in states), states

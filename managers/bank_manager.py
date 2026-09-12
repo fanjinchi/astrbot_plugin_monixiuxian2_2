@@ -190,28 +190,48 @@ class BankManager:
 
     async def claim_interest(self, player: Player) -> tuple[bool, str]:
         """领取利息"""
-        bank_data = await self.db.ext.get_bank_account(player.user_id)
-        if not bank_data or bank_data["balance"] <= 0:
-            return False, "你还没有存款，无法领取利息。"
+        # BEGIN IMMEDIATE 保证「读余额→结算入账→记流水」三步原子：
+        # 并发领取或中途失败都不会双结利息或留下无流水的入账
+        await self.db.conn.execute("BEGIN IMMEDIATE")
+        try:
+            bank_data = await self.db.ext.get_bank_account(player.user_id)
+            if not bank_data or bank_data["balance"] <= 0:
+                await self.db.conn.rollback()
+                return False, "你还没有存款，无法领取利息。"
 
-        interest = self._calculate_interest(
-            bank_data["balance"], bank_data["last_interest_time"]
-        )
+            interest = self._calculate_interest(
+                bank_data["balance"], bank_data["last_interest_time"]
+            )
 
-        if interest <= 0:
-            return False, "利息不足1灵石，请明日再来。"
+            if interest <= 0:
+                await self.db.conn.rollback()
+                return False, "利息不足1灵石，请明日再来。"
 
-        # 利息转入本金
-        new_balance = bank_data["balance"] + interest
-        now = int(time.time())
-        await self.db.ext.update_bank_account(player.user_id, new_balance, now)
+            # 利息转入本金
+            new_balance = bank_data["balance"] + interest
+            now = int(time.time())
+            await self.db.ext.update_bank_account(
+                player.user_id, new_balance, now, commit=False
+            )
 
-        # 记录流水
-        await self._add_transaction(
-            player.user_id, "interest", interest, new_balance, "领取利息"
-        )
+            # 记录流水
+            await self._add_transaction(
+                player.user_id,
+                "interest",
+                interest,
+                new_balance,
+                "领取利息",
+                commit=False,
+            )
 
-        return True, f"成功领取利息 {interest:,} 灵石！\n当前余额：{new_balance:,} 灵石"
+            await self.db.conn.commit()
+            return (
+                True,
+                f"成功领取利息 {interest:,} 灵石！\n当前余额：{new_balance:,} 灵石",
+            )
+        except Exception:
+            await self.db.conn.rollback()
+            raise
 
     # ===== 贷款相关 =====
 
@@ -389,26 +409,47 @@ class BankManager:
         processed = []
 
         for loan in overdue_loans:
-            player = await self.db.get_player_by_id(loan["user_id"])
-            if not player:
-                # 玩家已不存在，直接关闭贷款
-                await self.db.ext.mark_loan_overdue(loan["id"])
-                continue
+            # 每笔贷款独立事务：级联删除 + 标记逾期 + 流水要么全部生效要么全部回滚，
+            # 避免中途崩溃留下「人已删但贷款仍 active」的半成品状态
+            await self.db.conn.execute("BEGIN IMMEDIATE")
+            try:
+                # get_overdue_loans 是无锁快照，拿到写锁后须复核贷款仍未被偿还
+                # （repay 会先取写锁置 closed，已还的贷款绝不能触发追杀）
+                active = await self.db.ext.get_active_loan(loan["user_id"])
+                if not active or active["id"] != loan["id"]:
+                    await self.db.conn.rollback()
+                    continue
 
-            player_name = player.user_name or f"道友{player.user_id[:6]}"
+                player = await self.db.get_player_by_id(loan["user_id"])
+                if not player:
+                    # 玩家已不存在，直接关闭贷款
+                    await self.db.ext.mark_loan_overdue(loan["id"], commit=False)
+                    await self.db.conn.commit()
+                    continue
 
-            # 删除玩家数据（银行追杀致死）- 级联删除所有关联数据
-            await self.db.delete_player_cascade(player.user_id)
+                player_name = player.user_name or f"道友{loan['user_id'][:6]}"
 
-            # 标记贷款逾期
-            await self.db.ext.mark_loan_overdue(loan["id"])
+                # 删除玩家数据（银行追杀致死）- 级联删除所有关联数据
+                await self.db.delete_player_cascade(loan["user_id"], commit=False)
 
-            # 记录流水
-            await self._add_transaction(
-                loan["user_id"], "bank_kill", 0, 0, "逾期未还款，被银行追杀致死"
-            )
+                # 标记贷款逾期
+                await self.db.ext.mark_loan_overdue(loan["id"], commit=False)
 
-            processed.append({**loan, "player_name": player_name, "death": True})
+                # 记录流水
+                await self._add_transaction(
+                    loan["user_id"],
+                    "bank_kill",
+                    0,
+                    0,
+                    "逾期未还款，被银行追杀致死",
+                    commit=False,
+                )
+
+                await self.db.conn.commit()
+                processed.append({**loan, "player_name": player_name, "death": True})
+            except Exception:
+                await self.db.conn.rollback()
+                raise
 
         return processed
 
