@@ -22,6 +22,7 @@ Usage:
 from __future__ import annotations
 
 import csv
+import random
 import statistics
 import sys
 from pathlib import Path
@@ -44,6 +45,18 @@ from sim_xiuxian_turns import (  # noqa: E402
 
 MILESTONES = [10, 20, 30, 40]
 BATTLES_DEFAULT = 2000
+
+# 逐局播种（bd 9j1）：引擎战斗走全局 random，不播种则每次运行胜率漂移
+# ±2pp（3000 场口径），留档 diff 无法区分噪声与真回归。参照
+# rebalance_equipment.py 的写法——cell 级种子经 rng 逐局派生，各局随机流
+# 独立；cell 种子只由格标识（等级/装备/路线）决定，增删格不重排既有格。
+_BATTLE_SEED_BASE = 2026
+
+
+def _seed_battle(rng: random.Random) -> None:
+    """Reseed the engine-global RNG for one battle from the cell-local stream."""
+    random.seed(rng.randint(0, 2**31 - 1))
+
 
 # 创角初始期望值（core/cultivation_manager.py:282-311 按路线随机区间的均值，
 # 含体修专属护甲 3-10 与灵修迅捷 10-18（C1 决策）；创角差异本身就是
@@ -131,9 +144,13 @@ def run_matchup_cells(battles: int) -> list[dict[str, Any]]:
             tixiu_wins = 0
             draws = 0
             rounds_list: list[int] = []
+            rng = random.Random(
+                _BATTLE_SEED_BASE + level * 1000 + (100 if armed else 0)
+            )
             for _ in range(battles):
                 f_ti = build_route_fighter("体修", level, armed)
                 f_ling = build_route_fighter("灵修", level, armed)
+                _seed_battle(rng)
                 result = ENGINE.resolve_combat(
                     f_ti, f_ling, combat_type="spar", merge_count=10
                 )
@@ -172,6 +189,7 @@ def run_matchup_cells(battles: int) -> list[dict[str, Any]]:
                     "li_speed": int(li_attrs["speed"]),
                 }
             )
+    random.seed()  # 交还全局 RNG，避免泄漏播种状态给同进程的其他脚本
     return rows
 
 
@@ -248,7 +266,8 @@ def write_report(rows: list[dict[str, Any]], verdicts: list[str]) -> Path:
         )
     lines += [
         "",
-        "复跑：`uv run python design_docs/attribute-growth/sim_route_matchup.py [battles]`",
+        "复跑：`uv run python design_docs/attribute-growth/sim_route_matchup.py [battles]`"
+        "（战斗逐局播种，bd 9j1：同场次数复跑结果逐字节一致，diff 即真信号）",
         "",
     ]
     path = SCRIPT_DIR / "route-matchup-report.md"
@@ -358,9 +377,14 @@ def run_loadout_cells(
         for route in ("体修", "灵修"):
             piece = pick_armor(by_family, _ROUTE_ARMOR_FAMILY[route], level)
             rounds_list: list[int] = []
+            # 格标识：level*1000 + 路线序（体修 0 / 灵修 1），与跨路线格（+500）错开
+            rng = random.Random(
+                _BATTLE_SEED_BASE + level * 1000 + (0 if route == "体修" else 1)
+            )
             for _ in range(battles):
                 f_a = build_loadout_fighter(route, level, by_family, weapons)
                 f_b = build_loadout_fighter(route, level, by_family, weapons)
+                _seed_battle(rng)
                 result = ENGINE.resolve_combat(
                     f_a, f_b, combat_type="spar", merge_count=10
                 )
@@ -381,9 +405,11 @@ def run_loadout_cells(
         tixiu_wins = 0
         draws = 0
         rounds_list = []
+        rng = random.Random(_BATTLE_SEED_BASE + level * 1000 + 500)  # 跨路线格标识
         for _ in range(battles):
             f_ti = build_loadout_fighter("体修", level, by_family, weapons)
             f_ling = build_loadout_fighter("灵修", level, by_family, weapons)
+            _seed_battle(rng)
             result = ENGINE.resolve_combat(
                 f_ti, f_ling, combat_type="spar", merge_count=10
             )
@@ -405,6 +431,7 @@ def run_loadout_cells(
                 "rounds_mean": round(statistics.mean(rounds_list), 2),
             }
         )
+    random.seed()  # 交还全局 RNG，避免泄漏播种状态给同进程的其他脚本
     return mirror_rows, cross_rows
 
 
@@ -483,7 +510,8 @@ def write_loadout_appendix(
         "",
         *[f"- {v}" for v in verdicts],
         "",
-        "复跑：`uv run python design_docs/attribute-growth/sim_route_matchup.py --loadout [battles]`",
+        "复跑：`uv run python design_docs/attribute-growth/sim_route_matchup.py --loadout [battles]`"
+        "（战斗逐局播种，bd 9j1：同场次数复跑结果逐字节一致，diff 即真信号）",
         "",
     ]
     section = "\n".join(lines)
