@@ -20,7 +20,6 @@
 - `breakthrough.pity_hint` — 变量白名单: ['next_bonus', 'remaining', 'streak']
 - `breakthrough.survive`（双槽：flavor 分桶 + panel 单源） — 变量白名单: ['exp_penalty', 'experience', 'next_level_name', 'pity_msg', 'rate_info']
 - `combat.battle_opening` — 变量白名单: （无）
-- `combat.battle_vs` — 变量白名单: ['name1', 'name2']
 - `combat.battle_mutual_destruction` — 变量白名单: （无）
 - `combat.battle_victory` — 变量白名单: ['name']
 - `combat.battle_draw_stalemate` — 变量白名单: （无）
@@ -35,7 +34,9 @@
 - `combat.damage_normal` — 变量白名单: ['attacker_name', 'final_damage']
 - `combat.reflect` — 变量白名单: ['defender_name', 'reflect_dmg']
 - `combat.lifesteal` — 变量白名单: ['attacker_name', 'heal']
-- `combat.remaining_hp` — 变量白名单: ['defender_name', 'remaining_hp']
+- `combat.remaining_hp_mid` — 变量白名单: ['defender_name', 'remaining_hp']
+- `combat.remaining_hp_low` — 变量白名单: ['defender_name', 'remaining_hp']
+  （change `combat-report-structure`：旧 `combat.remaining_hp` 退役、按气血比例拆 mid/low 两档；本表为设计侧先行登记，声明集 `SCENE_VARS` 与内嵌默认由该 change 的代码任务同步落地）
 - `combat.survive` — 变量白名单: ['name']
 - `combat.buff_applied` — 变量白名单: ['actor_name', 'effect_name', 'target_name']
 - `combat.status_expired` — 变量白名单: ['effect_name', 'name']

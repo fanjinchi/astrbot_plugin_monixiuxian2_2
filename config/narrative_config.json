@@ -244,12 +244,6 @@
         "断崖之上，两道人影遥遥相对。山风把衣袍吹得猎猎作响，谁都没先动——先动的人先露出破绽，这个道理，你懂，对方也懂。"
       ]
     },
-    "battle_vs": {
-      "通用": [
-        "{name1} 与 {name2} 相对而立，互道一声名号。江湖规矩，先通名，后动手——名字落了地，这场架才算数。",
-        "{name1} 与 {name2} 隔着三步站定，杀气在半空凝成一线。谁先眨眼，谁先矮半截——对峙比的是耐性，耐性本身就是功夫。"
-      ]
-    },
     "battle_mutual_destruction": {
       "通用": [
         "最后一击同时落定——你的兵刃递进对方胸口，对方的掌力也拍在你肩头。两道身影同时退开，又同时站不住，一起跌坐在地，谁也没能站到最后。",
@@ -334,14 +328,6 @@
         "伤敌，也补己——{attacker_name} 借这一击之力，将对方的气血纳为己用，{heal} 生机入体，久战的气力又续上了几分。"
       ]
     },
-    "remaining_hp": {
-      "通用": [
-        "{defender_name} 气血将尽，{remaining_hp} 一线吊着——腿在抖，手没松。这口气只要还在，人就还站着，战就还没完。",
-        "{defender_name} 身上带伤，{remaining_hp} 堪堪撑着。地上已经溅了血，眼神却比方才更亮——越是残局，越见心性。",
-        "{defender_name} 晃了两晃，{remaining_hp} 的气血勉强稳住身形。身后没路可退，前面的人还在逼近——那就站着，站着就有说法。",
-        "打到这时，{defender_name} 的 {remaining_hp} 已经薄如纸，掌心却还扣着一招没用——残局里藏着后手的人，最不好惹。"
-      ]
-    },
     "survive": {
       "通用": [
         "{name} 气机将断之际，护身之物忽然一亮——绝境中硬生生吊住一条命。生死线上走了一遭，再睁眼时，眼神比方才更冷更稳。",
@@ -390,7 +376,22 @@
     "effect_dot_attach": "{actor_name} 使【{skill_name}】附着于 {target_name}",
     "effect_stack_cap_rejected": "{actor_name} 的【{effect_name}】未生效：同类效果已达叠加上限（{stack_cap}）",
     "effect_survive_grant": "{actor_name} 获得【{skill_name}】庇护！",
-    "effect_dot_tick": "{name} 受【{effect_name}】侵蚀，损失 {dot_dmg} 气血！"
+    "effect_dot_tick": "{name} 受【{effect_name}】侵蚀，损失 {dot_dmg} 气血！",
+    "remaining_hp_low": {
+      "通用": [
+        "{defender_name} 气血只剩 {remaining_hp} 点，一口气吊在喉咙口——腿在抖，手没松。这口气还在，人就还站着，战就还没完。",
+        "{defender_name} 的血淌了一路，气血只剩 {remaining_hp} 点，站姿歪了半分，半步却没退。越到这一步，越见心性。",
+        "{defender_name} 晃了两晃，靠一口气压住身形，气血只剩 {remaining_hp} 点。身后没路可退，前面的人还在逼近——那就站着，站着就有说法。",
+        "打到这时，{defender_name} 的气血只剩 {remaining_hp} 点，薄得像一张纸，掌心却还扣着一招没用——命悬一线的人藏着后手，最不好惹。"
+      ]
+    },
+    "remaining_hp_mid": {
+      "通用": [
+        "{defender_name} 肩头挨了一记，气血还剩 {remaining_hp} 点，步子顿了半拍又稳住。伤在身上，气还在——这一战离见分晓还早。",
+        "打了这一阵，{defender_name} 的气血还剩 {remaining_hp} 点，胸口起伏得厉害，架势却没散。喘匀这口气，还有得打。",
+        "{defender_name} 的气血还剩 {remaining_hp} 点，气息乱了，招式反倒比方才更快。越是挂彩，越不肯认输，这样的人最难缠。"
+      ]
+    }
   },
   "cultivation": {
     "retreat_start": {
