@@ -207,7 +207,9 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
   - 格挡 `_calc_block_rate`（:1257）：**来源分离**（openspec `separate-block-armor-source`）——`格挡率 = min(5% + block_armor_value × 0.001, block_cap(0.3))`，`block_armor_value` 仅含天生护甲 + 武器槽护甲（models.py `get_total_attributes` 汇总层产出，:258），防具/功法/心法槽护甲不计入；PvE 敌人/Boss（cfg 构建路径）护甲视为天生，回退 `block_armor_value = armor_value` 行为不变。格挡成功伤害减半（在护甲减伤之前结算，不受 40% 总减伤上限约束）
   - 暴击率基础 `base_crit_rate`（0.15，仅代码默认值，combat 段未配置）、上限 `crit_rate_cap`（0.5），暴击倍率 ×1.5（`crit_damage_multiplier`），减伤上限 `damage_reduction_cap`（0.4）
 - **胜负**：一方气血 ≤ 0 即败；切磋无实质惩罚，决斗败者气血置 1
-- **战报**：叙事化判定记录按合并条数输出（玩家可配 `battle_report_merge_count`，默认 10）
+- **战报**：叙事化判定记录按合并条数输出（玩家可配 `battle_report_merge_count`，默认 10；`_merge_log` 分块 :1409）
+  - **结构行（代码拼装，不走文案池）**：开战横幅 `_BANNER_OPENING`「☆━━━━ 战斗开始 ━━━━☆」（常量 :65，落盘 :288）→ 对阵行 `_VERSUS_LINE`「甲 VS 乙」（:71，落盘 :289）→ 双方面板行 `{name}：气血 hp/max_hp，伤害 …，身法 …，迅捷 …`（:296/:300）→ 回合行（`round_header` 文案池，:312）→ 收束横幅 `_BANNER_VICTORY`「☆━━━━ {name} 胜利！━━━━☆」/ `_BANNER_DRAW` / `_BANNER_DRAW_STALEMATE` / `_BANNER_MUTUAL_DESTRUCTION`（:66-69，分派 :344-362）。横幅与对阵行由代码常量拼装（原文案池场景 `battle_vs` 已随 change combat-report-structure 退役），改版式不再受文案池约束，功能用例也以这三行为最稳锚点
+  - **剩余气血行阈值分档**（change combat-report-structure D4）：`_resolve_attack` 每击结算后按 `ratio = 防守方气血 / max(1, max_hp)` 判定（:1281）——`ratio > mid` 不输出数据行（> 阈值的数据行是噪声），`low < ratio ≤ mid` 走 `remaining_hp_mid`（残局），`0 < ratio ≤ low` 走 `remaining_hp_low`（濒死）；防守方气血归 0 时不输出（死亡由收束横幅承载，濒死文案不得描述尸体）。阈值键 `combat.remaining_hp_mid_threshold`（默认 0.6）/ `combat.remaining_hp_low_threshold`（默认 0.3）（:211-212），合法域 `0 < low < mid < 1`，非法/倒置/非数值对回退代码默认——combat 段无 config_manager 校验器，故兜底在构造期；旧单场景键 `remaining_hp` 已退役。千分位由代码侧 `f"{hp:,}"` 注入（:1295），文案池模板只会收到带逗号的字符串（气血 < 1000 时自然无逗号）
 - **冷却**：切磋 60s / 决斗 300s（combat.spar_cooldown/duel_cooldown）
 - **战力公式**（ranking_manager.py:125-126）：`战力 = 伤害 + 身法 + 迅捷 + 气血 + 护甲//2`（含装备，不含临时丹药；玩家信息与排行榜同公式）
 
