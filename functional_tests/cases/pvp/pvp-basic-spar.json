@@ -1,7 +1,7 @@
 {
   "name": "pvp-basic-spar",
-  "description": "覆盖切磋路径；当前预期记录 handlers/combat_handlers.py handle_spar 疑似缺 result 赋值的 Bug（待修复用例，预期失败）。",
-  "scenario": "前置条件：固定群聊身份，GM_ADMINS/白名单已配，fixture 已准备或步骤内创建。覆盖：切磋、战斗冷却、战报。若此用例失败且运行轨迹出现 UnboundLocalError/服务端错误，即为已知 Bug 证据。断言锚在代码插值值（【技能名】/对战面板/回合行）而非文案字面量，并统一追加占位符残留负向断言（flavor-copy-assembly route A 回归）。pre_run_hook 跑 fixture --profile pvp 复位双方属性/冷却/功法位。",
+  "description": "覆盖切磋路径与战报结构（切磋不计惩罚，走同一战斗引擎）。",
+  "scenario": "前置条件：固定群聊身份，GM_ADMINS/白名单已配，fixture 已准备或步骤内创建。覆盖：切磋、战斗冷却、战报。若此用例失败且运行轨迹出现 UnboundLocalError/服务端错误，即为已知 Bug 证据。断言锚在代码结构行/代码插值值（战斗开始横幅、VS 对阵行、胜利横幅、【技能名】/对战面板/回合行）而非文案池字面量，并统一追加占位符残留负向断言（flavor-copy-assembly route A 回归）。pre_run_hook 跑 fixture --profile pvp 复位双方属性/冷却/功法位。",
   "tags": [
     "pvp",
     "core-smoke",
@@ -73,10 +73,10 @@
     },
     {
       "type": "expect",
-      "match": "re:气血 \\d+/\\d+，伤害 \\d+[\\s\\S]*第 \\d+ 回合[\\s\\S]*[\\d,]+ 点伤害[\\s\\S]*(收剑归鞘|抱拳一礼|尘土慢慢落回|脚步不停|战斗开始|胜利！)",
+      "match": "re:☆━━━━ 战斗开始 ━━━━☆[\\s\\S]*测试玩家\\d VS 测试玩家\\d[\\s\\S]*气血 \\d+/\\d+，伤害 \\d+[\\s\\S]*第 \\d+ 回合[\\s\\S]*[\\d,]+ 点伤害[\\s\\S]*☆━━━━ [^\\n]*胜利",
       "combine": true,
       "timeout": 60,
-      "note": "战报结构契约：代码拼装面板行 + 回合行 + 至少一条伤害行 + 收束语成组（评审 P2-1：打平的 | 会让 round_header 被改坏也绿）。「N 点伤害」只出现在 combat.damage_normal/damage_crit 与代码拼装行，故本断言同时正向覆盖这两个 route A 场景（评审 P1-4①）；收束语支取自 combat.battle_victory 全部变体 + 旧版横幅（bd -r0a 回滚兼容），文案再改需同步此处。实测本场 4 回合（气血 2000 速胜局，不断言触发技）"
+      "note": "战报结构契约：全部锚代码结构行/代码插值——战斗开始横幅（combat_manager._BANNER_OPENING）+ VS 对阵行（_VERSUS_LINE）+ 面板行 + 回合行 + 至少一条伤害行 + 胜利横幅（_BANNER_VICTORY）。横幅/对阵行由代码常量拼装，与 narrative_config 文案池解耦，取代旧版「收剑归鞘|抱拳一礼|…」文学变体交替支（bd astrbot_plugin_monixiuxian2_2-r0a 回滚补丁已由本变更转正）。「N 点伤害」只出现在 combat.damage_normal/damage_crit 与代码拼装行，故本断言同时正向覆盖这两个 route A 场景。本场为 2000 血速胜局（未调气血），不断言剩余气血分档行——分档需要多次穿档，由 pvp-basic-duel 的 8000 血长局覆盖"
     },
     {
       "type": "send",
