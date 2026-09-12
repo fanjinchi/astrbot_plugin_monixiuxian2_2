@@ -65,7 +65,7 @@ functional_tests/
 - 身份派生与隔离（v0.3.0）：`pin_players` 值可为对象 `{"user_id": "...", "isolate": true}`（可再带 `fresh: true`）派生隔离身份——派生身份与被测插件中按 `user_id` 精确匹配的特权（如 `GM_ADMINS`）不再匹配，需要 GM 指令的用例必须保留固定 pin 并配合 `pre_run_hook` 复位基线。
 - **断言锚点原则（2026-09-11 flavor-copy-assembly 复盘后新增，强制）**：文案变体会随内容导入整段改写，断言只能锚**代码侧不变量**：
   - 代码插值进文案的**值**：`【技能名/效果名/境界名】`、`… 点伤害`、`再败 N 回`（变体怎么写，变量都得出现）；
-  - 代码拼装的结构行：`-- 第 N 回合 --`（`round_header` 单源 str）、对战面板首行 `名字：气血 N/M，伤害 X，身法 Y，迅捷 Z`（`managers/combat_manager.py:247-253`）、GM 回执全串（数值带千分位，如 `999,999`）；
+  - 代码拼装的结构行：`-- 第 N 回合 --`（`round_header` 单源 str）、对战面板首行 `名字：气血 N/M，伤害 X，身法 Y，迅捷 Z`（`managers/combat_manager.py:295-302`）、GM 回执全串（数值带千分位，如 `999,999`）；
   - route B 双槽结构用 `re:[^\n]\n<面板首行>` 断“flavor 段存在且面板紧随其后”，不锚文学句；
   - **每个 `send` 只配一个断言**：平台 `cases/runner.py` 只在**新回复到达时**求值（`out_window` 在步骤循环外初始化、拼接与匹配都只在 `new_msgs` 非空的分支里，游标 `after` 整用例单调递增；首个失败步骤 fail-fast），串接的第二个 expect 永远等不到新消息而超时；跨条断言靠 `combine: true` 拼窗口，但**同一份回复的多条 `combine` 断言必须各自前置一条新 `send`**（哨兵 `#我的信息` 即可，实例：`cases/pvp/pvp-basic-duel.json` 的两条剩余气血分档断言）；该约束已由 `tests/test_functional_case_assertions.py` 静态护栏常驻守卫（bd -741）；
   - 负向守护（未渲染占位符、独占一行的 `---`）同样要 `combine: true`（扫全窗口），且**前面必须再发一条哨兵 `send`**（如 `#我的信息`）——否则无新回复、守护永不求值=假通过；

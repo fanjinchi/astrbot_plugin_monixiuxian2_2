@@ -1,7 +1,7 @@
 {
   "name": "pvp-basic-spar",
   "description": "覆盖切磋路径与战报结构（切磋不计惩罚，走同一战斗引擎）。",
-  "scenario": "前置条件：固定群聊身份，GM_ADMINS/白名单已配，fixture 已准备或步骤内创建。覆盖：切磋、战斗冷却、战报。若此用例失败且运行轨迹出现 UnboundLocalError/服务端错误，即为已知 Bug 证据。断言锚在代码结构行/代码插值值（战斗开始横幅、VS 对阵行、胜利横幅、【技能名】/对战面板/回合行）而非文案池字面量，并统一追加占位符残留负向断言（flavor-copy-assembly route A 回归）。pre_run_hook 跑 fixture --profile pvp 复位双方属性/冷却/功法位。",
+  "scenario": "前置条件：固定群聊身份，GM_ADMINS/白名单已配，fixture 已准备或步骤内创建。覆盖：切磋、战斗冷却、战报。切磋与决斗共用同一战斗引擎（`handlers/combat_handlers.py:211`）。断言锚在代码结构行/代码插值值（战斗开始横幅、VS 对阵行、胜利横幅、【技能名】/对战面板/回合行）而非文案池字面量，并统一追加占位符残留负向断言（flavor-copy-assembly route A 回归）。pre_run_hook 跑 fixture --profile pvp 复位双方属性/冷却/功法位。",
   "tags": [
     "pvp",
     "core-smoke",
