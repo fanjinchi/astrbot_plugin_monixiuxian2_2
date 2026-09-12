@@ -152,16 +152,22 @@ def test_tome_name_maps_to_skill_id(config_manager):
 
 
 def test_drop_tables_use_skill_names():
-    """Drop tables must no longer reference the disconnected old tome names."""
+    """All drop tables must use aligned tome names, not the retired old ones.
+
+    Scanning only config files left a blind spot: `config/game_config.json` once
+    carried an aligned copy of the rift table while the runtime table actually
+    read by the game (`RiftManager.RIFT_DROP_TABLE`) still returned 功法残页, so
+    keep both the config sources and the runtime tables in this list.
+    """
     stale = ("功法残页", "远古秘籍")
     for rel in (
         "config/adventure_config.json",
         "config/enemies.json",
-        "config/game_config.json",
         "config/bounty_templates.json",
+        "managers/rift_manager.py",
+        "managers/boss_manager.py",
     ):
-        with (PLUGIN_ROOT / rel).open(encoding="utf-8") as f:
-            text = f.read()
+        text = (PLUGIN_ROOT / rel).read_text(encoding="utf-8")
         assert not any(name in text for name in stale), f"{rel} still has stale names"
         assert "基础吐纳" in text or "铁布衫" in text, f"{rel} lacks aligned tomes"
 

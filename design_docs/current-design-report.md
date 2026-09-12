@@ -81,7 +81,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | `adventure_config.json` | 历练路线与事件 |
 | `bounty_templates.json` | 悬赏模板 |
 | `storage_rings.json` | 储物戒指容量与价格 |
-| `game_config.json` | 全局常量分区：`cultivation/combat/skill_system/fortune/pve/boss/bank/dual_cultivation/spirit_eye/rift`（含功能开关、战斗判定参数、成长参数，详见下文） |
+| `game_config.json` | 全局常量分区：`combat/skill_system/fortune/pve/boss/dual_cultivation`（含功能开关、战斗判定参数、成长参数，详见下文） |
 
 ### 2.4 动态配置（_conf_schema.json）
 
@@ -103,7 +103,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | 修为/经济 | experience、gold、level_up_rate（永久突破加成，整数百分点，接入突破成功率计算） |
 | 突破 | breakthrough_fail_streak（连败计数，保底机制用） |
 | 闭关/签到 | cultivation_start_time、last_check_in_date |
-| 装备栏 | weapon、armor、main_technique、techniques（JSON 列表，最多 4 个功法，`game_config.max_technique_slots`） |
+| 装备栏 | weapon、armor、main_technique、techniques（JSON 列表，最多 4 个功法，`game_config.skill_system.max_technique_slots`） |
 | **四主属性** | **damage（伤害/攻击）、agility（身法/闪避命中）、speed（迅捷/出手频率）、hp（气血/生命上限）** |
 | 护甲 | armor_value（装备提供的百分比减伤来源，不作为主属性；减伤率 = 护甲/(护甲+K)） |
 | 技能修习 | study_target（修习目标）、battle_report_merge_count（战报合并条数偏好） |
@@ -221,7 +221,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **升星**：3 星封顶（`max_star`）；升星加成按乘法 `(1 + STAR_UP_BONUS)^(星级-1)` 缩放触发率与效果值，`STAR_UP_BONUS = 0.10`（config 可调），触发率截断至 1.0；满星重复参悟不再升星，按品级修为基数 × 折算比例（默认 50%）补偿修为并提示
 - **领悟**：拥有与领悟分离，未领悟功法不可装备；领悟池 = 心法配套列表（按系数加权）+ 修习目标 +（仅突破渠道）通用池；三渠道概率见 §4.1/§4.2
 - **装备来源 = 已领悟表（player_skills 唯一依据，v25 表）**：激活/装备功法只查 `player_skills`，储物戒中的功法秘籍物品仅作为「未领悟拥有凭据」——可设为修习目标并通过领悟判定转为已领悟，MUST NOT 参与装备判定；秘籍可经「赠予」转交他人，转交不影响源玩家已领悟状态（仍可装备）
-- **功法秘籍物品**：物品名 = 技能名即为有效凭据（商店 `items.json` 4011 基础吐纳 / 4012 铁布衫；掉落表 adventure/enemies/bounty/rift 已从旧「功法残页/远古秘籍」改为掉具体秘籍名）；items.json 4001-4010 旧功法物品已标 `legacy` 并下架（无对应技能，不可作为凭据）
+- **功法秘籍物品**：物品名 = 技能名即为有效凭据（商店 `items.json` 4011 基础吐纳 / 4012 铁布衫；掉落表全部改掉具体秘籍名——配置侧 adventure/enemies/bounty 与运行时侧 `managers/rift_manager.py` 的 `RIFT_DROP_TABLE`（中→基础吐纳 / 高→铁布衫）、`managers/boss_manager.py`（中→基础吐纳 / 高→铁布衫）均已不再引用旧「功法残页/远古秘籍」；`tests/test_skill_equip_and_tome.py::test_drop_tables_use_skill_names` 同时扫配置与运行时表，防再次漂移）；items.json 4001-4010 旧功法物品已标 `legacy` 并下架（无对应技能，不可作为凭据）
 - **槽位与升星**：最多同时装备 4 本功法；重复获得同名功法自动升星强化（细节见上「升星」）
 - **路线装备池**：灵修/体修同属性池、各自专属心法/功法/武器池，通用功法对两路线应用不同倍率；心法被动加成按心法 `route_multiplier` 与玩家修炼路线乘算（百分比项与 armor_value 平加项，exp_multiplier 除外）
 
@@ -251,7 +251,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **宗门商店**：「宗门 商店 [购买 <名称>]」，贡献点结算（非灵石），商品池配在 faction `shop` 字段（`{id, price, min_position}`，id 引用 weapons.json/heart_methods.json，min_position 缺省 4=全员），购买走 `buy_sect_shop_item`（BEGIN IMMEDIATE 事务，先职阶门槛后贡献校验，物品入储物戒）（sect_manager.py §6.3）
 - **内容联动**：宗门悬赏与全局悬赏全生命周期独立——「宗门 悬赏」子命令组处理 sect_id 悬赏，全局悬赏指令只处理公共悬赏，分流校验先于缓存/冷却/活跃检查，悬赏缓存按 scope 分键（managers/bounty_manager.py scope 参数）；秘境 `sect_id`+`access=sect_member` 仅本宗成员可见（列表直接过滤，不再 🔒 标注）且准入校验不变（managers/rift_manager.py:145）；历练按权重 15 追加本宗事件组、结算消息带「🏯 宗门际遇」前缀标记（managers/adventure_manager.py:50/:331）；功法领悟全渠道注入宗门池并打 origin_sect_id/sect_bound 归属标记（core/skill_manager.py:94-105）
 
-### 4.9 银行（managers/bank_manager.py；game_config.json bank 区）
+### 4.9 银行（managers/bank_manager.py；参数为模块常量 `DEFAULT_*`，可被 AstrBot 插件配置 `BANK` 段同名大写键覆盖）
 
 - **存款利息（复利）**：`interest = balance × ((1 + 0.001)^days - 1)`，日利率 0.1%；存款上限 10,000,000
 - **普通贷款**：日息 0.5%，期限 7 天，额度 1,000~1,000,000
@@ -279,8 +279,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 ### 4.12 秘境（managers/rift_manager.py）
 
 - 探索时长 1800s；奖励 `exp/gold = randint(*rewards配置区间)`
-- 物品掉落按 game_config.json 的 drop_tables 权重表掉 1 件，中/高级 50% 追加 1 件
-- 稀有丹概率：1 层 3% / 2 层 5% / 3 层 10%（pill_drop_tables）
+- 物品掉落按 managers/rift_manager.py 内联的 drop_tables 权重表掉 1 件，中/高级 50% 追加 1 件
+- 稀有丹概率：1 层 3% / 2 层 5% / 3 层 10%（同文件内联 pill_drop_tables/pill_drop_chance）
 - 中途退出无奖励；秘境入口受 pve.enabled 开关控制
 - **结算后遭遇机制（v3.14.0，`add-rift-encounters`）**：基础结算完成后独立概率判定三类遭遇——古阵谜题（`puzzle_rate`）/妖兽拦路（`beast_rate`）/传承之地（沿用 `legacy_chance`），互不互斥可同时触发；秘境条目 `encounter_rate` 存在时覆盖谜题/妖兽两者（传承不受覆盖）。遭遇以内存 `EncounterStore`（core/encounter_store.py）按玩家挂起（每类最多一个，`encounter_ttl_seconds` 默认 600s 惰性过期，同类覆盖刷新，热重载丢失→"机缘已消散"），不写 UserStatus；响应入口为「探索秘境」子命令：`破阵 <答案>`/`迎战`/`传承`
 - **古阵谜题**（core/rift_puzzle_manager.py）：谜题族程序生成（五行破阵/洛书数阵/灵龟辨窟），题面自带解题线索；`puzzle_attempts`（默认 2）次机会，非法形式不耗次；答对 = 一次掉落 roll（item_chance=100）+ 修为基数×0.2；答错/耗尽/过期零惩罚

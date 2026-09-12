@@ -162,13 +162,13 @@ class BossManager:
             {"name": "灵兽内丹", "weight": 30, "min": 2, "max": 4},
             {"name": "星辰石", "weight": 25, "min": 2, "max": 4},
             {"name": "天材地宝", "weight": 20, "min": 1, "max": 2},
-            {"name": "功法残页", "weight": 25, "min": 1, "max": 2},
+            {"name": "基础吐纳", "weight": 25, "min": 1, "max": 2},
         ],
         "high": [  # 高级Boss (炼虚及以上)
             {"name": "天材地宝", "weight": 30, "min": 2, "max": 4},
             {"name": "混沌精华", "weight": 25, "min": 1, "max": 2},
             {"name": "神兽之骨", "weight": 20, "min": 1, "max": 1},
-            {"name": "远古秘籍", "weight": 15, "min": 1, "max": 1},
+            {"name": "铁布衫", "weight": 15, "min": 1, "max": 1},
             {"name": "仙器碎片", "weight": 10, "min": 1, "max": 1},
         ],
     }

@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.15.0
+> **版本:** v3.17.2
 > **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -317,10 +317,16 @@ astrbot_plugin_monixiuxian2_2/
 
 ---
 
-### v3.17.2 - 游戏配置默认值补齐
+### v3.17.2 - 游戏配置默认值与死键清理
+
+**🎮 玩法修正**
+
+- **秘境/首领掉落不再给不可用的旧名功法书**：`managers/rift_manager.py` 的 `RIFT_DROP_TABLE` 与 `managers/boss_manager.py` 的掉落表仍在引用已被体系弃用的「功法残页/远古秘籍」（无技能映射，掉到只是杂物），现对齐为具体秘籍名（秘境/首领 中级→基础吐纳、高级→铁布衫，权重不变）——此前只有 `game_config.json` 里的一份副本被改过，而游戏真正读取的运行时表没改；`design_docs/current-design-report.md` 口径同步修正
+- **掉落表守卫扫真源**：`tests/test_skill_equip_and_tome.py` 的旧名扫描原本只看 4 份配置（含那份被改过的副本），现已改为同时扫运行时真源（`rift_manager.py` / `boss_manager.py`），不再假绿
 
 **🔧 修复**
 
+- **清理无运行时读取点的历史残留段**：删除 `game_config.json` 的 `cultivation` / `bank` / `spirit_eye` / `rift` 四个段与 `combat.duel_cooldown` / `spar_cooldown` / `boss_crit_rate` 三键——它们的取值与代码常量逐项相同（真源分别为 `handlers/player_handler.py` 的闭关上限、`managers/bank_manager.py` 的 `DEFAULT_*`、`managers/spirit_eye_manager.py` 的 `SPIRIT_EYE_TYPES`、`config/rift_config.json` 与 `managers/rift_manager.py` 内联掉落表、`handlers/combat_handlers.py` 的冷却常量），留在配置里只制造“可调”错觉；`design_docs/current-design-report.md` 的对应口径与 `sim_exp_curve.py` 的被删段取值源同步改为真源
 - **全新部署的 `game_config.json` 不再落成空文件**：`data/default_configs.py` 新增 `GAME_CONFIG`（完整镜像装机文件，含 `combat.remaining_hp_mid_threshold` / `combat.remaining_hp_low_threshold` 等全部可调项），`config_manager.py` 在配置文件缺失时用它物化默认（此前传 `{}`）——缺失时那些可调项只能隐式落到各调用点的硬编码兜底值，既不可见也无从调整；两份取值漂移由 `tests/test_game_config_defaults.py` 守卫（解析后必须深度相等，并在临时目录模拟缺失物化）
 
 ---

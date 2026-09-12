@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import ast
 import csv
 import json
 from pathlib import Path
@@ -24,7 +25,6 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PLUGIN_ROOT = SCRIPT_DIR.parent.parent
 
 LEVEL_CONFIG_PATH = PLUGIN_ROOT / "config" / "level_config.json"
-GAME_CONFIG_PATH = PLUGIN_ROOT / "config" / "game_config.json"
 ADVENTURE_CONFIG_PATH = PLUGIN_ROOT / "config" / "adventure_config.json"
 OUTPUT_CSV = SCRIPT_DIR / "exp-curve-results.csv"
 OUTPUT_REPORT = SCRIPT_DIR / "exp-curve-report.md"
@@ -112,11 +112,20 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 level_config = load_json(LEVEL_CONFIG_PATH)
-game_config = load_json(GAME_CONFIG_PATH)
 adventure_config = load_json(ADVENTURE_CONFIG_PATH)
 
-# 灵眼加权平均修为/小时
-spirit_eye_cfg = game_config.get("spirit_eye", {}).get("types", {})
+# 灵眼加权平均修为/小时。真源为 managers/spirit_eye_manager.py 的 SPIRIT_EYE_TYPES：
+# game_config.json 的同名段无可读点，已作为死键清理（见 design_docs/current-design-report.md §4.9/§4.12 的同口径修正）
+_eye_module = ast.parse(
+    (PLUGIN_ROOT / "managers" / "spirit_eye_manager.py").read_text(encoding="utf-8")
+)
+_eye_types_node = next(
+    node
+    for node in _eye_module.body
+    if isinstance(node, ast.Assign)
+    and getattr(node.targets[0], "id", "") == "SPIRIT_EYE_TYPES"
+)
+spirit_eye_cfg = ast.literal_eval(_eye_types_node.value)
 weighted_spirit_eye_exp_per_hour = sum(
     eye["exp_per_hour"] * eye["spawn_rate"] for eye in spirit_eye_cfg.values()
 ) / sum(eye["spawn_rate"] for eye in spirit_eye_cfg.values())
