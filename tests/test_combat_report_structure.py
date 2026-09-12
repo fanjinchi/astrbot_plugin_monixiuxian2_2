@@ -301,21 +301,44 @@ def test_double_missing_scene_leaves_banner_only(monkeypatch):
 def _narrative_scene_args(source: str) -> set[str]:
     """Collect literal scene keys passed to ``_narrative(...)`` in ``source``.
 
-    Only the first positional argument is a scene key (later args carry template
-    variables such as ``remaining_hp``), and only literals are collected — the
-    tier code passes a computed ``scene`` variable instead.
+    The scene key is the first positional argument (later args carry template
+    variables such as ``remaining_hp``) or the ``scene=`` keyword; only literals
+    are collected — the tier code passes a computed ``scene`` variable instead,
+    which is out of this check's scope.
     """
     scenes = set()
     for node in ast.walk(ast.parse(source)):
-        if not isinstance(node, ast.Call) or not node.args:
+        if not isinstance(node, ast.Call) or (not node.args and not node.keywords):
             continue
         callee = getattr(node.func, "attr", None) or getattr(node.func, "id", None)
         if callee != "_narrative":
             continue
-        first = node.args[0]
-        if isinstance(first, ast.Constant) and isinstance(first.value, str):
-            scenes.add(first.value)
+        candidates = list(node.args[:1])
+        # ``scene=`` keyword form (``**kwargs`` yields arg=None and is skipped).
+        candidates += [kw.value for kw in node.keywords if kw.arg == "scene"]
+        for candidate in candidates:
+            if isinstance(candidate, ast.Constant) and isinstance(candidate.value, str):
+                scenes.add(candidate.value)
     return scenes
+
+
+def test_scene_arg_collector_covers_positional_and_keyword_literals():
+    """钉收集器自身：位置实参与 ``scene=`` 关键字字面量都收，计算值/``**kwargs`` 不收。"""
+    source = "\n".join(
+        [
+            "engine._narrative('battle_vs')",
+            "engine._narrative(scene='remaining_hp')",
+            "engine._narrative('battle_opening', {'x': 1})",
+            "engine._narrative(scene=computed)",
+            "engine._narrative(**kwargs)",
+        ]
+    )
+
+    assert _narrative_scene_args(source) == {
+        "battle_vs",
+        "remaining_hp",
+        "battle_opening",
+    }
 
 
 # ------------------------------------------------------------------
@@ -389,10 +412,23 @@ def test_thresholds_are_read_from_combat_config(monkeypatch):
         {"remaining_hp_mid_threshold": 1.5, "remaining_hp_low_threshold": 0.3},
         {"remaining_hp_mid_threshold": 0.6, "remaining_hp_low_threshold": 0},
         {"remaining_hp_mid_threshold": "0.6", "remaining_hp_low_threshold": 0.3},
+        # None / bool / negative are the three non-``str`` shapes config JSON or a
+        # hand-edited file can produce: ``isinstance(v, (int, float))`` rejects None,
+        # and ``bool`` is an ``int`` subclass but ``0 < True < 1`` is False (likewise
+        # ``0 < False``), so both fall back on the same branch as a negative value.
+        {"remaining_hp_mid_threshold": None, "remaining_hp_low_threshold": 0.3},
+        {"remaining_hp_mid_threshold": 0.6, "remaining_hp_low_threshold": None},
+        {"remaining_hp_mid_threshold": True, "remaining_hp_low_threshold": 0.3},
+        {"remaining_hp_mid_threshold": 0.6, "remaining_hp_low_threshold": False},
+        {"remaining_hp_mid_threshold": 0.6, "remaining_hp_low_threshold": -0.1},
     ],
 )
 def test_illegal_thresholds_fall_back_to_defaults(combat_cfg):
-    """非法阈值（倒置 / 越界 / 非数值）回退代码默认 0.6 / 0.3。"""
+    """非法阈值（倒置 / 越界 / 非数值 / None / 布尔 / 负数）回退代码默认 0.6 / 0.3。
+
+    校验是**成对**的：任一格非法则两格一起回退（``combat_manager`` 构造时的
+    ``all(...) or low >= mid`` 判定），故逐格断言两值都等于默认。
+    """
     engine = make_engine({"combat": combat_cfg})
 
     assert engine._hp_mid_threshold == 0.6

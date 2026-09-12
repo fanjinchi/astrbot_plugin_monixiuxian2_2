@@ -67,7 +67,7 @@ functional_tests/
   - 代码插值进文案的**值**：`【技能名/效果名/境界名】`、`… 点伤害`、`再败 N 回`（变体怎么写，变量都得出现）；
   - 代码拼装的结构行：`-- 第 N 回合 --`（`round_header` 单源 str）、对战面板首行 `名字：气血 N/M，伤害 X，身法 Y，迅捷 Z`（`managers/combat_manager.py:247-253`）、GM 回执全串（数值带千分位，如 `999,999`）；
   - route B 双槽结构用 `re:[^\n]\n<面板首行>` 断“flavor 段存在且面板紧随其后”，不锚文学句；
-  - **每个 `send` 只配一个断言**：平台 `cases/runner.py` 只在**新回复到达时**求值，串接的第二个 expect 永远等不到新消息而超时；跨条断言靠 `combine: true` 拼窗口；
+  - **每个 `send` 只配一个断言**：平台 `cases/runner.py` 只在**新回复到达时**求值（`out_window` 在步骤循环外初始化、拼接与匹配都只在 `new_msgs` 非空的分支里，游标 `after` 整用例单调递增；首个失败步骤 fail-fast），串接的第二个 expect 永远等不到新消息而超时；跨条断言靠 `combine: true` 拼窗口，但**同一份回复的多条 `combine` 断言必须各自前置一条新 `send`**（哨兵 `#我的信息` 即可，实例：`cases/pvp/pvp-basic-duel.json` 的两条剩余气血分档断言）；该约束已由 `tests/test_functional_case_assertions.py` 静态护栏常驻守卫（bd -741）；
   - 负向守护（未渲染占位符、独占一行的 `---`）同样要 `combine: true`（扫全窗口），且**前面必须再发一条哨兵 `send`**（如 `#我的信息`）——否则无新回复、守护永不求值=假通过；
   - 禁止 `re:<目标>|战斗开始` 这类恒真兼底分支：它把断言变成摆设（历史教训：bd -khh）；
   - 确实无名字变量的场景（`lifesteal`/`reflect`/`dodge`/`battle_victory` 等）只能锚文案时，取该场景**全部变体**的稳定子串并集，并在 `note` 注明“文案再改需同步此处”；

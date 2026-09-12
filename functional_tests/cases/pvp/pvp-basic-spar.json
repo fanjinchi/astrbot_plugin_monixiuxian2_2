@@ -76,7 +76,7 @@
       "match": "re:☆━━━━ 战斗开始 ━━━━☆[\\s\\S]*测试玩家\\d VS 测试玩家\\d[\\s\\S]*气血 \\d+/\\d+，伤害 \\d+[\\s\\S]*第 \\d+ 回合[\\s\\S]*[\\d,]+ 点伤害[\\s\\S]*☆━━━━ [^\\n]*胜利",
       "combine": true,
       "timeout": 60,
-      "note": "战报结构契约：全部锚代码结构行/代码插值——战斗开始横幅（combat_manager._BANNER_OPENING）+ VS 对阵行（_VERSUS_LINE）+ 面板行 + 回合行 + 至少一条伤害行 + 胜利横幅（_BANNER_VICTORY）。横幅/对阵行由代码常量拼装，与 narrative_config 文案池解耦，取代旧版「收剑归鞘|抱拳一礼|…」文学变体交替支（bd astrbot_plugin_monixiuxian2_2-r0a 回滚补丁已由本变更转正）。「N 点伤害」只出现在 combat.damage_normal/damage_crit 与代码拼装行，故本断言同时正向覆盖这两个 route A 场景。本场为 2000 血速胜局（未调气血），不断言剩余气血分档行——分档需要多次穿档，由 pvp-basic-duel 的 8000 血长局覆盖"
+      "note": "战报结构契约：全部锚代码结构行/代码插值——战斗开始横幅（combat_manager._BANNER_OPENING）+ VS 对阵行（_VERSUS_LINE）+ 面板行 + 回合行 + 至少一条伤害行 + 胜利横幅（_BANNER_VICTORY）。横幅/对阵行由代码常量拼装，与 narrative_config 文案池解耦，取代旧版「收剑归鞘|抱拳一礼|…」文学变体交替支（bd astrbot_plugin_monixiuxian2_2-r0a 回滚补丁已由本变更转正）。「N 点伤害」只出现在 combat.damage_normal/damage_crit 与代码拼装行，故本断言同时正向覆盖这两个 route A 场景。本场双方各 1000 血、1–5 回合（2000 次本地仿真，中位 2；fixture 气血 1000、攻击 1000/500），不断言剩余气血分档行——分档需要多次穿档，由 pvp-basic-duel 的 8000 血长局覆盖"
     },
     {
       "type": "send",
