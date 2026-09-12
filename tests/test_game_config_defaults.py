@@ -8,6 +8,7 @@ from a different parameter set than an upgraded one.
 
 import json
 import shutil
+from pathlib import Path
 
 from tests.helpers import load_package_module
 
@@ -21,15 +22,22 @@ _defaults_mod = load_package_module(
 )
 GAME_CONFIG = _defaults_mod.GAME_CONFIG
 
-PLUGIN_ROOT = _config_mod.Path(__file__).resolve().parent.parent
+PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_default_matches_shipped_file():
-    """GAME_CONFIG must deep-equal the shipped config/game_config.json."""
+    """GAME_CONFIG must be identical to the shipped config/game_config.json.
+
+    Compared through ``json.dumps`` instead of ``==`` on purpose: ``True == 1``
+    and ``3 == 3.0`` in Python, so a plain dict comparison would silently accept
+    a bool/int or int/float type drift that changes how the value is consumed.
+    """
     shipped = json.loads(
         (PLUGIN_ROOT / "config" / "game_config.json").read_text(encoding="utf-8")
     )
-    assert GAME_CONFIG == shipped
+    assert json.dumps(GAME_CONFIG, ensure_ascii=False, sort_keys=True) == json.dumps(
+        shipped, ensure_ascii=False, sort_keys=True
+    )
 
 
 def test_missing_file_materializes_full_default(tmp_path):
