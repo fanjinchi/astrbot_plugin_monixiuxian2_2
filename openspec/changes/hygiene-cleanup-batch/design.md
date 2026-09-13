@@ -15,22 +15,27 @@
 **Context**：`MigrationManager.migrate()`（`data/migration.py:537`）三条路径：全新安装（建表）、增量任务链（v32+ 且 pending 非空）、**重建**（版本低于任务链下限或无 pending 任务且 version < LATEST：:605-628 `PRAGMA foreign_keys = OFF` → `_drop_all_tables` → `_create_all_tables` → 数据全清）。注册表接缝（`MIGRATION_TASKS` + `@migration`）只挂了一个任务（v34），增量路径几乎不触发，第三路径才是绝大多数旧库的真实命运——但入口名 `migrate()` 不传达这一点。调用点：生产仅 `main.py:455`；测试 9 处。
 
 **Decisions**：
-- **D1 · 改名 `migrate_or_reset()`，不留兼容别名。** 调用点共 10 处全部在仓内（生产 1 + 测试 9），一次性机械改名成本低于永久维护别名的语义模糊。docstring 首句即写明「三条路径之一会重置数据，重置前自动备份」。
-- **D2 · 备份实现选 `VACUUM INTO`，不拷文件。** 进入 `migrate()` 时连接已 OPEN（`main.py` 先 `db.connect()` 后 migrate），直接 `shutil.copy(db_path)` 会复制到不一致快照（WAL/未落页）；SQLite 3.27+ `VACUUM INTO '<path>'` 从活连接产出一致备份。备份路径 `<db_path>.v<current_version>.pre-reset.bak`（version 取自重置前的 current_version）；失败策略：备份失败**不阻断**重置（否则旧库永远无法启动），但 ERROR 日志明示「未备份即重置」（现状本就无备份，不劣化）。备份仅第三路径执行；新建/增量路径零开销。
+- **D1 · 改名 `migrate_or_reset()`，不留兼容别名。** 调用点全部在仓内：生产 1 处（`main.py:455`）+ 测试 25 处 `.migrate()` 调用（`test_migration.py` 独占 17 处）+ 1 处按名 mock（`test_feature_switches.py:259` 的 `MagicMock(migrate=AsyncMock())`——grep `\.migrate\(` 抓不到，须显式同步）。一次性机械改名成本低于永久维护别名的语义模糊。docstring 首句即写明「三条路径之一会重置数据，重置前自动备份」。
+- **D2 · 备份实现选 `VACUUM INTO`，不拷文件。** 进入 `migrate()` 时连接已 OPEN（`main.py` 先 `db.connect()` 后 migrate），直接 `shutil.copy(db_path)` 会复制到不一致快照（WAL/未落页）；SQLite 3.27+ `VACUUM INTO '<path>'` 从活连接产出一致备份。备份路径 `<db_path>.v<current_version>.pre-reset.bak`（version 取自重置前的 current_version）。**db_path 获取**：`MigrationManager` 构造只收 conn、不持路径——实施时经 `PRAGMA database_list` 取主库文件路径；**空路径（`:memory:` 连接）必须跳过备份并 warning**（实测 `VACUUM INTO` 对 `:memory:` 连接会成功执行，naive 路径拼接会在 pytest CWD 写出流浪 `.bak`——既有 `:memory:` 重置路径测试 `test_migration.py:245` 即中此场景）。**插入位置**：`PRAGMA foreign_keys = OFF`（:614）之后、`BEGIN`（:615）**之前**——VACUUM 禁止在事务内执行，放错位置会每次静默降级为「无备份」。失败策略：备份失败**不阻断**重置（否则旧库永远无法启动），但 ERROR 日志明示「未备份即重置」（现状本就无备份，不劣化）。备份仅第三路径执行；新建/增量路径零开销。
 - **D3 · 备份目录不轮转。** 每次重置覆盖同名 `.bak`（旧库重置是低频一次性事件；多次重置间插件版本已变，旧备份价值衰减）。登记 bd 跟进项：若未来出现「连续跨版本重置」场景再评估保留多份。
 
-**Risk**：`VACUUM INTO` 要求 SQLite ≥3.27（Python 3.12 自带 sqlite3 远高于此，aiosqlite 透传，无环境风险）；备份写失败（磁盘满）→ 按 D2 降级为 ERROR 日志后继续，语义不劣于现状；测试 fake 连接（`MagicMock` conn，如 `test_gm_manager.py:897`）需让备份钩子在 conn 为 mock 时可跳过或 mock 掉——实施时以 `try/except` 包裹整段备份并以 `logger.warning` 降级，测试零改动。
+**Risk**：`VACUUM INTO` 要求 SQLite ≥3.27（Python 3.12 自带 sqlite3 远高于此，aiosqlite 透传，无环境风险）；备份写失败（磁盘满）→ 按 D2 降级为 ERROR 日志后继续，语义不劣于现状。经复核，`test_gm_manager.py:897` 的 conn 是**真实 `:memory:` 连接**（仅 config_manager 是 MagicMock），且走全新安装路径不触备份钩子——「mock conn 崩备份」仅为理论风险，真实风险点是 `test_feature_switches.py:259` 的按名 mock（D1）与 `:memory:` 空路径（D2）。备份整段以 `try/except` 包裹降级，现有测试零改动预期。
 
 ## 10e · 丹药查找合并为 ConfigManager.get_pill_config
 
-**Context**：两份实现见 proposal。关键事实（实测）：`pills.json`/`exp_pills.json`/`utility_pills.json` 三表名域**互不相交**；`items.json` 中 `type=丹药` 且与三表交叠者唯一「血煞丹」。因此任意「三表优先于 items」的合并顺序对全部现存药名与两旧实现解析结果逐位等价；两旧实现间的顺序差异（alchemy 把 exp/utility 置于 pills 前）在不相交名域下也是无差别。`hasattr` 守卫（alchemy :98-116）为测试 fake config_manager 而生——合并后 fake 只需提供 `get_pill_config`（测试 fixture 一并收敛）。
+**Context**：两份实现见 proposal。关键事实（实测）：`pills.json`/`exp_pills.json`/`utility_pills.json` 三表名域**互不相交**（26/30/143 个名字，两两交集为空）；`items.json` 中 `type=丹药` 的 33 个条目与三表**零交叠**（「血煞丹」实测在 utility_pills 表而非 items.json），items 兜底对今天任何现存药名都不触发。因此任意「三表优先于 items」的合并顺序对全部现存药名与两旧实现解析结果逐位等价；两旧实现间的顺序差异（alchemy 把 exp/utility 置于 pills 前）在不相交名域下也是无差别。`hasattr` 守卫（alchemy :98-116）为测试 fake config_manager 而生——合并后 fake 只需提供 `get_pill_config`（测试 fixture 一并收敛）。
 
 **Decisions**：
 - **D1 · 落点 `ConfigManager.get_pill_config`，顺序 pills→exp_pills→utility_pills→items 兜底。** 紧邻既有 `is_pill`(:485)/`get_all_pill_names`(:500)——丹药判定与丹药取值的权威已在 ConfigManager，查找并入同一 locality；pill_manager/alchemy_manager 退化为消费方。顺序取 pill_manager 版（三表首）+ alchemy 版独有的 items 兜底，两版行为的并集。
-- **D2 · `get_pill_by_name` 删除不留包装。** 仓内调用面仅 4 处（pill_manager 内部 2、pill_handler 1、alchemy 经自身方法 1），均随合并改调 `config_manager.get_pill_config`；删除测试防新增调用点。`_get_pill_config_by_name` 同样整方法删除。
+- **D2 · `get_pill_by_name` 删除不留包装。** 仓内调用面仅 4 处（pill_manager 内部 2、pill_handler 1、alchemy 经自身方法 1），均随合并改调 `config_manager.get_pill_config`；删除测试防新增调用点。`_get_pill_config_by_name` 同样整方法删除。**显式排除（out of scope）**：`handlers/breakthrough_handler.py:177` 与 `core/breakthrough_manager.py:154` 的 `config_manager.pills_data.get(pill_name)` 是**故意的只查破境丹表**——破境丹语义要求未知药名报「未找到破境丹」，若并入带 exp/utility/items 兜底的 `get_pill_config`，传入修为丹/功能丹名将意外解析成功，行为回退。这两处保持原样，不随合并改动。
 - **D3 · `hasattr` 守卫随委托消失。** 测试 fake（`FakeConfigManager` 等）在各自测试文件中补 `get_pill_config` 方法（多数 fake 已聚合 pills/exp/utility 三表字典，补一个 5 行方法）；这反而是收益——fake 与生产接口的偏差被强制对齐。
 
-**Risk**：「逐位等价」依赖三表不相交这一**数据事实**而非结构保证——tasks 中要求 `get_pill_config` 单测断言三表互不相交（加载时 warning 或测试断言），未来内容管线（`sync_content_to_config.py`）灌入重名条目时能被立即发现而非静默改变解析。
+**Risk**：「逐位等价」依赖三表不相交、items 与三表零交叠这两**数据事实**而非结构保证——tasks 中要求 `get_pill_config` 单测断言三表两两不相交且 items 丹药条目与三表零交叠（加载时 warning 或测试断言），未来内容管线（`sync_content_to_config.py`）灌入重名条目时能被立即发现而非静默改变解析。
+
+## 文档同步（随实施一并落地）
+
+- **10g 改名波及三处按名引用**：`design_docs/api-overview.md:29` 与 `:117` 的 `MigrationManager.migrate()` 同步改名（AGENTS.md 文档地图要求公开方法重命名必须更新 api-overview）；`openspec/specs/impart-system/spec.md:187-190` 场景 WHEN 的 `migrate()` 标识符做 **prose-only 同步**（行为不变、THEN 不动，`.openspec.yaml` 维持 `skip_specs: true`）。
+- **10c 摘 Pillow 后五处依赖声明修正**（「仅 Pillow」表述全部失效）：`AGENTS.md:12`、`AGENTS.md:37`、`design_docs/current-design-report.md:21`、`design_docs/project-architecture.md:15`、`README.md:261`（安装步骤的 `pip install Pillow`）。
 
 ## Migration Plan
 

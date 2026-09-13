@@ -31,3 +31,4 @@
 - **文档**：`design_docs/api-overview.md:55`（SectHandlers 行补「排行/贡献排行 → RankingManager 直调」）、`:68`（RankingHandlers 行收敛为四个全局排行）。
 - **无**数据库迁移、无配置变更、无对外行为变化。
 - **同文件编辑冲突提示**：`handlers/sect_handlers.py` 也是进行中的 `openspec/changes/busy-state-owner/`（busy-state 守卫收编）的触碰面（后者把 `:291-295,:302-306,:313-317,:335-339,:423-427` 等守卫替换为装饰器）。两者无逻辑冲突（本变更不动任何状态守卫），但同文件落地会产生 rebase/审阅噪音，**实施顺序应错开**：先落地 busy-state-owner 的守卫收编，再落地本重构（或反之，二选一，勿同批次合并）。
+- **并发变更重叠**：`openspec/changes/composition-root/` 同样删除 `main.py:350` 的 `sect_handlers.ranking_handlers` 回填（其 tasks 1.2/2.7）并把 main.py 装配段重构为 `_wire_core_services()`、给 `SectHandlers` 构造签名补可选协作者参数。与本 change 目标态一致（构造期注入），无逻辑冲突；但其合入会移动本变更引用的行号（main.py 装配段、sect_handlers 构造区），**后合入者须按先合入者的 `SectHandlers` 签名与装配结构落地**（见 tasks 前置检查）。
