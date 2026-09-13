@@ -82,7 +82,7 @@ flowchart TD
 | GM 工具 | 「修仙GM/修仙GM帮助」 | GM_ADMINS 独立权限；属性修改/给装备物品/卸装/清除CD（需确认）/强制结算/生成Boss；JSON 审计日志 500MB 滚动 |
 | 内容同步管道 | scripts/sync_content_to_config.py | weapons/heart_methods/skills CSV→config（name 键控、契约校验、预算闸门） |
 
-**排行榜**：战力 = 伤害 + 身法 + 迅捷 + 气血 + 护甲//2（含装备、不含临时丹；排行榜与玩家信息同公式）。
+**排行榜**：战力 = 伤害 + 身法 + 迅捷 + 气血 + 护甲//2（含装备、不含临时丹；与玩家信息面板同公式，面板另含临时丹药）。
 
 ## 4. 核心设计契约（openspec/specs/）
 
