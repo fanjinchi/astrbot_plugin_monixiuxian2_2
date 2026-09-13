@@ -6,27 +6,30 @@
 
 约定现状两种 flag 形态：`commit: bool = True`（**34 个定义**：`data_manager.py` 2、`database_extended.py` 25、`core/pill_manager.py` 1、`managers/bank_manager.py` 1、`managers/impart_manager.py` 4、`handlers/shop_handler.py` 1，commit=False 意为"外层拥有提交权"）与 `external_transaction: bool = False`（仅 2 个自事务 helper：自己 BEGIN 或完全跳过）。其中 **2 个 helper（`set_active_legacy_instance` :446、`learn_or_star_up` :793）用 commit 门控自己的 `BEGIN IMMEDIATE`** 而非 `conn.commit()`——D2 变换不覆盖它们，随第二阶段收编。另有 2 个 helper 自事务无 flag（`decrement_shop_item_stock` 有 flag、`increment_shop_item_stock` 无条件 BEGIN）。调用盘：50 处穿参点 + **26 个**手工 `BEGIN IMMEDIATE` 块（sect 8、bank 6、storage_ring 3、bounty 3、shop 1、utils 1、player_handler 1、spirit_eye 1、impart 1、gm 1）。
 
-aiosqlite 0.22.1（已在 AstrBot venv 验证）：`Connection.in_transaction` 存在（sync property，直连底层 sqlite3 连接，跨 worker 线程读）；`execute("BEGIN IMMEDIATE")` 在旧版 isolation_level 下按原样下发。**风险**：`in_transaction` 在连接关闭时抛 `ValueError`（`_conn` 守卫）；属性是 SimpleQueue 工作线程外的未同步读（实践安全：协程恢复前队列已排空，但列入 spike 压力验证）。
+**已实测的机制事实（2026-09-14 复核，aiosqlite 0.22.1 / Python 3.12 / `isolation_level=""`）**：裸 DML 会带出隐式 BEGIN，**DML 之后 `conn.in_transaction` 恒为 True**（裸 INSERT 后 True；此时再发 `BEGIN IMMEDIATE` 抛 `OperationalError: cannot start a transaction within a transaction`）。因此 `in_transaction` **不能**作为"我是否在事务里"的判据——"先执行 DML 再判 in_transaction"的 helper 门控会让独立调用永不提交（本 change 初版 D2 即因此不成立，评审实测拦下）。可用判据只有**所有权**：我们是否发过 BEGIN。`set_active_legacy_instance`/`learn_or_star_up` 的 BEGIN 判定碰巧对，正因为检查点在 DML 之前。另：`in_transaction` 在连接关闭时抛 `ValueError`（`_conn` 守卫）。
 
 ## Goals / Non-Goals
 
 **Goals:**
 - 事务边界跟着缩进走：`async with db.transaction():` 一眼可见，"提前 commit"在构造上不可能。
-- 行为与现状等价：原子性语义（块内任一步失败全回滚）不变，对外可观察行为零变化。
+- 行为与现状等价：原子性语义（块内任一步失败全回滚）不变；**正常路径**对外可观察行为零变化（**错误路径附带修复 `handle_buy` 写锁泄漏**，见 Risks 第一条——`except Exception` 捕不到 GeneratorExit，CM 的 `__aexit__` 顺手修复，spike 0.2 钉住）。
 - 绞杀者迁移：flag 与 CM 共存期内全部现有测试保持通过，作为逐块迁移的安全网。
 
 **Non-Goals:**
 - SAVEPOINT / 内层独立回滚（无调用点需要；逾期贷款的逐条容错用顺序兄弟事务，no-op join 天然支持）。
-- 改连接的 `isolation_level` / autocommit 配置。
+- 改连接的 `isolation_level` / autocommit 配置（**例外**：`connect()` 显式声明 `isolation_level=""` 属于"钉住现状默认值"而非改配置，见 D0）。
 - 候选2（BusyState owner）——本 change 只做基建，owner 是其首个真实消费者（后续 change）。
 
 ## Decisions
 
-**D1 · CM 归属 `DataBase`（data/data_manager.py），签名 `async with db.transaction():`，句柄暴露 `abort()`。**
-`DataBase` 拥有 `self.conn`，manager 层处处持有 `self.db`。语义：entry 时 `if not self.conn.in_transaction: BEGIN IMMEDIATE`（连接关闭时按 ValueError 视为 False 前先 ensure_connection 由调用方负责——本 change 不加事务内 ensure_connection，见风险 R5）；干净退出且无 abort → commit；异常 → rollback 后 re-raise。嵌套 = no-op join：内层只记深度标记，**内层块异常冒泡 = 整体回滚**（写进 docstring，等价于今天手工写法）。**`__aexit__` 按 `exc_type is not None` 分支判定异常路径（不得 `except Exception`）**——`CancelledError`/`GeneratorExit` 是 BaseException，`except Exception` 实现会在取消/生成器关闭时泄漏未关闭的事务。**嵌套 abort 传播**：任一层（含 no-op join 内层）调用 `txn.abort()` 都把标记传至最外层拥有者，内层 abort 不会被外层提交盖过。**abort 契约（对外承诺，下游 change 依赖）**：`txn.abort()` 只置标记不抛异常（幂等）；标记后块内 clean exit（return）→ `__aexit__` 走 rollback 且不 re-raise（调用方拿失败文案返回）；abort 与异常并存时按异常路径 rollback + re-raise。
+**D0 · 物理前提钉住（评审第 3 问决策）。**
+`connect()` 显式声明 `isolation_level=""`（现状默认值，显式化防静默变形——Python 3.12 引入 `autocommit` 属性、aiosqlite 换默认值都会改变隐式 BEGIN 行为，而 CM 与 helper 门控的全部推理建立在 `""` 的隐式 BEGIN 语义上），加一行注释说明 CM/门控依赖它；CM 单测加**前提断言**（默认值一变即红，不静默变形）。
 
-**D2 · helper 先行切 `in_transaction` 判定，block 迁移随后。**
-**25 个叶子 helper**（`data_manager.py` 2、`database_extended.py` 23）体内有 `if commit: await self.conn.commit()`，改为 `if commit and not self.conn.in_transaction: commit`（等价：事务外 = 今天的行为；事务内 = 不再提前提交——今天靠约定、今后靠构造）。**7 个纯透传 wrapper**（`core/pill_manager.py:654`、`managers/bank_manager.py:458`、`handlers/shop_handler.py:345`、`managers/impart_manager.py` ×4）无本地提交门控，第一阶段零改动，随叶子行为自动继承。**例外**：`set_active_legacy_instance` / `learn_or_star_up` 的 commit 门控的是 BEGIN IMMEDIATE（:460-461、:830-831），本阶段不动，随 4.2 收编时把 BEGIN 条件一并改为 `commit and not in_transaction`。已核验：全部 26 个块内调用均为 `commit=False`/`external_transaction=True` 或裸 SQL，生产代码不存在"事务内 commit=True 调用"——D2 不破坏任何现有 §7.1/§7.3 测试。这一步行为保持，且使之后每个块的转换"进 CM 即安全"，调用点的 `commit=False` 可留待第二阶段一并清理。
+**D1 · CM 归属 `DataBase`（data/data_manager.py），签名 `async with db.transaction():`，句柄暴露 `abort()`；所有权判据 = 深度计数器（评审第 1/2 问决策 = 方案 A）。**
+`DataBase` 拥有 `self.conn`，manager 层处处持有 `self.db`。**判据不用 `conn.in_transaction`（DML 后恒真，见 Context 实测），用挂在连接对象上的深度计数器 `conn._txn_depth`**（`DataBase` 与 `DatabaseExtended` 共享同一连接对象 data_manager.py:62，天然同见；`connect()` 初始化为 0、重连重建——插件单连接完全自有，一处私有属性可控；选 A 而非注入 `DatabaseExtended(conn, state)` 的理由：测试构造点零改动）。语义：entry 时 **`depth == 0` → `BEGIN IMMEDIATE`、`depth = 1`，该层为 owner**；否则 `depth += 1`（no-op join 内层）。退出时 `depth -= 1`，**仅 owner 层动作**：干净且无 abort → commit；abort 或异常 → rollback。未发 BEGIN 的层退出时**完全被动**——不 commit、不 rollback、只递减深度、异常照常传播（评审第 2 问钉死：否则就是把"提前提交"bug 搬进 CM 层）。**过渡约束（文档化，不做运行时检查）**：计数器看不见 raw BEGIN，CM 不得进入 raw BEGIN 块内部——AST 扫描已验证 26 个生产块无此嵌套、§7.1 测试 hand-BEGIN 后只调 helper 不进 CM。**`__aexit__` 按 `exc_type is not None` 分支判定异常路径（不得 `except Exception`）**——`CancelledError`/`GeneratorExit` 是 BaseException，`except Exception` 实现会在取消/生成器关闭时泄漏未关闭的事务。**嵌套 abort 传播**：任一层（含 no-op join 内层）调用 `txn.abort()` 都把标记传至 owner 层，内层 abort 不会被外层提交盖过。**abort 契约（对外承诺，下游 change 依赖）**：`txn.abort()` 只置标记不抛异常（幂等）；标记后块内 clean exit（return）→ owner 层 `__aexit__` 走 rollback 且不 re-raise（调用方拿失败文案返回）；abort 与异常并存时按异常路径 rollback + re-raise。
+
+**D2 · helper 先行切 `depth == 0` 门控，block 迁移随后。**
+**25 个叶子 helper**（`data_manager.py` 2、`database_extended.py` 23）体内有 `if commit: await self.conn.commit()`，改为 `if commit and getattr(self.conn, "_txn_depth", 0) == 0: commit`——判的是**所有权**（我们是否发过 BEGIN）而非 autocommit 状态。已实测验证：§7.1 那 9 个测试不改也过（hand-BEGIN + `commit=False` 调用本就不该提交；默认 commit 的独立调用 depth==0 正常提交）。**7 个纯透传 wrapper**（`core/pill_manager.py:654`、`managers/bank_manager.py:458`、`handlers/shop_handler.py:345`、`managers/impart_manager.py` ×4）无本地提交门控，第一阶段零改动，随叶子行为自动继承。**例外**：`set_active_legacy_instance` / `learn_or_star_up` 的 commit 门控的是 BEGIN IMMEDIATE（:460-461、:830-831，检查点在 DML 之前所以碰巧正确），本阶段不动，随 4.2 收编时把 BEGIN 条件一并改为 `depth == 0` 判定。已核验：全部 26 个块内调用均为 `commit=False`/`external_transaction=True` 或裸 SQL，生产代码不存在"事务内 commit=True 调用"——D2 不破坏任何现有 §7.1/§7.3 测试。这一步行为保持，且使之后每个块的转换"进 CM 即安全"，调用点的 `commit=False` 可留待第二阶段一并清理。
 
 **D3 · early-exit 收编策略（Q2 决策 = c 混合）。**
 现状 8+ 处 sect 块与若干 bank 块是"BEGIN → 锁内复查 → 显式 rollback → return 失败文案"。能前置的复查挪到 CM 之前（多数 bank 块成立）；必须锁内复查的（sect `complete_construction_task` 的锁内 re-read 正是其 BEGIN 目的）用 `txn.abort()`。commit-on-clean-exit + abort 标记实现，不改 return 文案。
@@ -34,15 +37,16 @@ aiosqlite 0.22.1（已在 AstrBot venv 验证）：`Connection.in_transaction` �
 **D4 · 迁移顺序：bank 试点 → 其余模块逐块 → 第二阶段删 flag。**
 bank_manager 6 块几乎同构（含 bd 9jt 刚修过的 claim_interest / 逾期追杀，回归价值最高）作试点；sect_manager 8 块（含锁内复查最复杂场景）随后；其余按模块清。每块转换 = "一个事务块 + 其调用点"，不是整个文件。第二阶段：50 处穿参清零后，从 34 个定义移除 flag（其中 2 个 BEGIN 门控 helper 随 4.2 收编），自事务 helper 收编为 CM，§7.1 kwarg 断言与 6 个 spy 测试改写为 CM 级测试。
 
-**D5 · 测试策略：§7.2/7.4/7.5 全程不动。**
-这三组（中途注入失败全回滚、D5 stale-player 回归、bd 9jt 贷款原子性）与设计无关，是原子性契约的核心守护，迁移期原样运行。flag 退役时仅动 §7.1/§7.3。
+**D5 · 测试策略：§7.2/7.4/7.5 全程不动；spy 断言断 ownership 信号（评审第 4 问决策）。**
+这三组（中途注入失败全回滚、D5 stale-player 回归、bd 9jt 贷款原子性）与设计无关，是原子性契约的核心守护，迁移期原样运行。flag 退役时仅动 §7.1/§7.3——**6 个 spy 测试改写断 `conn._txn_depth` 信号**（CM 内 >0、CM 外 == 0、仅 owner 层提交），不只断 `in_transaction`：后者在裸 DML 后恒真，区分不了"在 CM 里"和"刚做过一条裸 DML"，会"因为错误的原因通过"。
 
 ## Risks / Trade-offs
 
-- [生成器 handler `handle_buy` 在事务体内 yield，`except Exception`（:311）捕不到 GeneratorExit——**今天是预存的写锁泄漏**（生成器在任一 yield 点被关闭则 BEGIN 的写锁残留），CM 的 `__aexit__` 会静默修复它] → 转换时**删除块内现已失效的手工 `except Exception: rollback`**（勿与 CM 嵌套造成双 rollback）；spike 0.2 显式断言修复生效且无 "cannot rollback - no transaction" 告警。
+- [生成器 handler `handle_buy` 在事务体内 yield，`except Exception`（:311）捕不到 GeneratorExit——**今天是预存的写锁泄漏**（生成器在任一 yield 点被关闭则 BEGIN 的写锁残留），CM 的 `__aexit__` 会**顺带修复**它（错误路径行为变化，属修复非漂移——已写入 Goals）] → 转换时**删除块内现已失效的手工 `except Exception: rollback`**（勿与 CM 嵌套造成双 rollback）；spike 0.2 显式断言修复生效且无 "cannot rollback - no transaction" 告警。
 - [`_check_loan_status` 外层 except 吞异常返回 None，与 CM 的 rollback 叠加] → 内层 re-raise → CM rollback → 外层吞异常，组合正确；sqlite rollback 无事务时的告警行为未验证，spike 0.2 加"无活动事务时 rollback"探针确认无告警。
 - [abort 语义误用：调用方 abort 后继续写] → docstring 明示 abort 后块内写入仍会随事务回滚；CM 内不做运行时禁用（YAGNI）。
-- [`in_transaction` 在已关闭连接抛 ValueError] → helper 判定前先走既有 `_connection_alive`/ensure_connection 路径的调用方纪律不变；本 change 不新增事务内重连（`ensure_connection` 仅定时任务调用，现状已安全）。
+- [`_txn_depth` 随重连丢失/残留] → `connect()` 统一初始化为 0（含 `ensure_connection` 重建路径），属性只在连接对象上由本插件读写；连接关闭后 getattr 读到的是代理对象上的初始化值，不触及已关闭的底层连接。
+- [CM 误入 raw BEGIN 块内部 → 重复 BEGIN 抛 OperationalError] → 过渡约束已文档化（D1）：AST 扫描证明 26 个生产块无此嵌套；转换期每个块的迁移本身就是消除 raw BEGIN 的过程。
 - [迁移中途信号模糊：新旧两套检查并存] → 接受；§7.3 spy 测试在迁移完成前持续给出"哪块还没转"的信号，这正是保留它们到第二阶段的理由。
 - [某未转换块依赖 helper "在事务内也提交"的隐式行为] → 不存在：事务内 commit 即 bug 本体，D2 反而修复之；若注入测试暴露意外依赖，按 bug 处理并登记 bd。
 
@@ -52,5 +56,5 @@ bank_manager 6 块几乎同构（含 bd 9jt 刚修过的 claim_interest / 逾期
 
 ## Open Questions
 
-- spike（任务 0）回答，不影响本设计：`in_transaction` 跨线程读在并发事务压力下的正确性；`GeneratorExit` 进 `handle_buy` 的 rollback 行为（含写锁泄漏修复断言）与无活动事务时 rollback 的告警探针；`txn.abort()` 原型在 deposit 与一个 sect 块上的手感（按上文 abort 契约实现）。
+- spike（任务 0）回答，不影响本设计：`GeneratorExit` 进 `handle_buy` 的 rollback 行为（含写锁泄漏修复断言）与无活动事务时 rollback 的告警探针；`txn.abort()` 原型在 deposit 与一个 sect 块上的手感（按 D1 abort 契约实现）。注意：初版"in_transaction 跨线程读压力验证"问题已随判据改为 `_txn_depth`（纯 Python 属性、单事件循环内读写）而作废——Context 中已留实测记录。
 - 非目标备注：`data/migration.py:555,590,615` 迁移期 plain `BEGIN` 不在本 change 范围。
