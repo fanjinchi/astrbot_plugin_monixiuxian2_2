@@ -101,3 +101,74 @@ def test_heart_method_route_multiplier_defaults_to_one():
     )
     total = player.get_total_attributes([heart_missing])
     assert total["damage"] == 110
+
+
+def test_combat_power_sums_attributes_with_armor_floor_division():
+    """Combat power = four attributes + armor_value//2 (floor division pinned)."""
+    player = Player(
+        user_id="u1",
+        cultivation_type="灵修",
+        damage=100,
+        agility=50,
+        speed=50,
+        hp=200,
+        armor_value=35,  # odd value pins the //2 floor (35 // 2 == 17)
+    )
+    assert player.combat_power([]) == 417  # 100 + 50 + 50 + 200 + 17
+
+
+def test_combat_power_applies_pill_multipliers_when_passed():
+    """Temporary pill multipliers must flow through to combat power."""
+    player = Player(
+        user_id="u1",
+        cultivation_type="灵修",
+        damage=100,
+        agility=50,
+        speed=50,
+        hp=200,
+        armor_value=35,
+    )
+    base = player.combat_power([])
+    boosted = player.combat_power([], {"damage": 2.0})
+    assert boosted == 517  # 100*2 + 50 + 50 + 200 + 17
+    assert boosted != base
+
+
+def test_combat_power_ignores_block_armor_value():
+    """block_armor_value (innate + weapon-slot only) must not feed combat power."""
+    player = Player(
+        user_id="u1",
+        cultivation_type="灵修",
+        damage=100,
+        agility=50,
+        speed=50,
+        hp=200,
+        armor_value=35,
+    )
+    weapon = Item(
+        item_id="w1",
+        name="测试法器",
+        item_type="weapon",
+        armor_value=20,
+        route_multiplier='{"灵修": 1.0, "体修": 1.0}',
+    )
+    armor = Item(
+        item_id="a1",
+        name="测试防具",
+        item_type="armor",
+        armor_value=10,
+        route_multiplier='{"灵修": 1.0, "体修": 1.0}',
+    )
+    total = player.get_total_attributes([weapon, armor])
+    assert total["armor_value"] == 65  # 35 + 20 + 10
+    assert total["block_armor_value"] == 55  # 35 + 20 (weapon slot only)
+    expected = (
+        int(total["damage"])
+        + int(total["agility"])
+        + int(total["speed"])
+        + int(total["hp"])
+        + total["armor_value"] // 2
+    )
+    assert player.combat_power([weapon, armor]) == expected == 432
+    # Discriminating assert: 65 // 2 == 32 was used, not block path 55 // 2 == 27
+    assert player.combat_power([weapon, armor]) != 400 + 55 // 2

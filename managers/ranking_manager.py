@@ -121,16 +121,8 @@ class RankingManager:
 
             # 排行榜显示基础战力，不含临时丹药效果（更公平）
             total_attrs = player.get_total_attributes(equipped_items, None)
-
-            # 战力 = 伤害 + 身法 + 迅捷 + 气血 + 护甲值//2
-            combat_power = (
-                int(total_attrs["damage"])
-                + int(total_attrs["agility"])
-                + int(total_attrs["speed"])
-                + int(total_attrs["hp"])
-                + int(total_attrs.get("armor_value", 0)) // 2
-            )
-            player_power.append((player, combat_power, total_attrs))
+            power = player.combat_power(equipped_items, None)
+            player_power.append((player, power, total_attrs))
 
         # 按战力排序
         sorted_players = sorted(player_power, key=lambda x: x[1], reverse=True)[:limit]

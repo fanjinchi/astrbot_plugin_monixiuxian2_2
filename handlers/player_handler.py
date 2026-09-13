@@ -184,14 +184,7 @@ class PlayerHandler:
         )
         total_attrs = player.get_total_attributes(equipped_items, pill_multipliers)
 
-        # 新战力公式：四主属性 + 护甲//2
-        combat_power = (
-            int(total_attrs["damage"])
-            + int(total_attrs["agility"])
-            + int(total_attrs["speed"])
-            + int(total_attrs["hp"])
-            + int(total_attrs.get("armor_value", 0)) // 2
-        )
+        combat_power = player.combat_power(equipped_items, pill_multipliers)
 
         # 获取宗门信息
         sect_name = "无宗门"

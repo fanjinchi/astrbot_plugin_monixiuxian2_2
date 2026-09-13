@@ -796,7 +796,7 @@ astrbot_plugin_monixiuxian2_2/
 **🔴 BUG修复**
 | 问题 | 修复位置 | 说明 |
 |------|----------|------|
-| 战力排行榜与玩家信息战力不一致 | ranking_manager.py | 统一战力计算公式为：物伤+法伤+物防+法防+精神力/10 |
+| 战力排行榜与玩家信息战力不一致 | ranking_manager.py | 统一战力计算公式为：物伤+法伤+物防+法防+精神力/10（注：该公式已废弃，现状见 design_docs/current-design-report.md） |
 | 战力排行未考虑装备加成 | ranking_manager.py | 现在正确计算装备和丹药效果后的总属性 |
 | 境界排行显示Lv.X而非境界名称 | ranking_manager.py | 现在显示实际境界名称（如"玄体境初期"） |
 | user_id非字符串时切片报错 | ranking_manager.py | 封装`_short_id()`安全方法 |
@@ -827,7 +827,7 @@ astrbot_plugin_monixiuxian2_2/
 **🔴 BUG修复**
 | 问题 | 修复位置 | 说明 |
 |------|----------|------|
-| 战力排行榜与玩家信息战力不一致 | ranking_manager.py | 统一战力计算公式为：物伤+法伤+物防+法防+精神力/10 |
+| 战力排行榜与玩家信息战力不一致 | ranking_manager.py | 统一战力计算公式为：物伤+法伤+物防+法防+精神力/10（注：该公式已废弃，现状见 design_docs/current-design-report.md） |
 | 战力排行未考虑装备加成 | ranking_manager.py | 现在正确计算装备和丹药效果后的总属性 |
 | 战力排行显示ATK而非实际攻击属性 | ranking_manager.py | 根据修炼类型显示物伤(体修)或法伤(灵修) |
 

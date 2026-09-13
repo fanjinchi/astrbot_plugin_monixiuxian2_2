@@ -124,7 +124,7 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 
 - 所有用户可见输出用中文
 - 命令字符串用中文（如 "闭关"、"突破"）
-- 战力公式统一：`物伤 + 法伤 + 物防 + 法防 + 精神力/10`（已在 `ranking_manager.py` 和 `combat_manager.py` 中统一）
+- 战力公式单一实现在 `Player.combat_power`（models.py）；设计权威与公式文本见 `design_docs/current-design-report.md`；改公式须同步 design_docs（§14）
 
 ### 9. 消息发送注意事项
 

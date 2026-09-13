@@ -345,3 +345,32 @@ class Player:
             # pills feed block if the pill layer is ever wired into combat.
 
         return total
+
+    def combat_power(
+        self, equipped_items: list[Item], pill_multipliers: dict | None = None
+    ) -> int:
+        """Calculate total combat power from attributes, equipment, and pills.
+
+        Formula: damage + agility + speed + hp + armor_value // 2, matching the
+        legacy inline expression bit-for-bit (int() per term, armor halved with
+        floor division). Includes equipment and heart method bonuses, and
+        optionally temporary pill multipliers when ``pill_multipliers`` is
+        passed. ``block_armor_value`` (the block-rate source: innate armor plus
+        weapon-slot armor only) is deliberately NOT included.
+
+        Args:
+            equipped_items: List of equipped items
+            pill_multipliers: Optional pill attribute multipliers; ``None`` for
+                ranking display (no temporary pill effects)
+
+        Returns:
+            Total combat power as an integer.
+        """
+        total_attrs = self.get_total_attributes(equipped_items, pill_multipliers)
+        return (
+            int(total_attrs["damage"])
+            + int(total_attrs["agility"])
+            + int(total_attrs["speed"])
+            + int(total_attrs["hp"])
+            + int(total_attrs.get("armor_value", 0)) // 2
+        )

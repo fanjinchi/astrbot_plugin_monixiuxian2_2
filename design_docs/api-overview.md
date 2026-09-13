@@ -88,7 +88,7 @@
 | `SpiritEyeManager` | `spawn_spirit_eye` / `claim_spirit_eye` / `collect_spirit_eye` / `release_spirit_eye` | 灵眼定时生成、**原子抢占**、修为产出 |
 | `DualCultivationManager` | `send_request` / `accept_request` / `reject_request` | 双修请求-响应流程，双方修为奖励 |
 | `ImpartManager` / `ImpartPkManager` | `create_legacy` / `activate_legacy` / `add_active_impart_value` / `transfer_legacy` / `list_owner_legacies`；`challenge_impart` / `select_snatch_target` / `get_impart_ranking` | 传承实例生命周期（一人多条、激活累积、PK 转移、等阶奖励）；玩家间传承挑战（夺取制） |
-| `RankingManager` | `get_level/power/wealth/sect/deposit/contribution_ranking` | 六大排行榜；**战力公式权威实现**（伤害+身法+迅捷+气血+armor//2） |
+| `RankingManager` | `get_level/power/wealth/sect/deposit/contribution_ranking` | 六大排行榜；战力公式单一实现在 models.py `Player.combat_power`（伤害+身法+迅捷+气血+armor//2，含/不含临时丹药由调用方 `pill_multipliers` 实参决定） |
 | `EnemyManager` | `spawn_enemy(level_index)` / `get_drop_items` | 按玩家境界生成敌人与掉落 |
 | `PVECombatManager` | `trigger_pve_combat(player)` | PVE 触发主入口（选敌→CombatEngine→奖励→格式化战报） |
 
