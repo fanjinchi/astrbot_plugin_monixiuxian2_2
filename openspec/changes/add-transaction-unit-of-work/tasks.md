@@ -10,9 +10,9 @@
 ## 1. 核心基建（DataBase.transaction() + helper 先行切换）
 
 - [ ] 1.0 `connect()` 显式声明 `isolation_level=""`（钉住现状默认值）+ 注释说明 CM/门控依赖隐式 BEGIN 语义；`conn._txn_depth = 0` 初始化（含 `ensure_connection` 重建路径）
-- [ ] 1.1 `data/data_manager.py` 的 `DataBase` 新增 `transaction()` 异步上下文管理器（按 design D1 深度语义）：`depth == 0` → `BEGIN IMMEDIATE`、`depth = 1`、该层为 owner；否则 `depth += 1`（no-op join）；退出 `depth -= 1`，**仅 owner 层**动作（干净且无 abort → commit；abort 或异常 → rollback），未发 BEGIN 的层完全被动；**`__aexit__` 按 `exc_type is not None` 分支（BaseException 安全，不得 `except Exception`）**；**嵌套 abort 传播**（任一层 abort 标记传至 owner 层）；`txn.abort()` 按 design D1 契约（幂等标记；clean exit 走 rollback 不 re-raise）；docstring 写明 owner 语义、"内层块异常 = 整体回滚"、abort 语义与"CM 不得进入 raw BEGIN 块"过渡约束；英文 Google 风格 docstring
-- [ ] 1.2 **25 个叶子 helper**（`data_manager.py` 2、`database_extended.py` 23）的提交判定改为 `if commit and getattr(self.conn, "_txn_depth", 0) == 0`（所有权判据，非 `in_transaction`——评审实测其在 DML 后恒真）；**7 个纯透传 wrapper**（`core/pill_manager.py:654`、`bank_manager.py:458`、`shop_handler.py:345`、`impart_manager.py` ×4）零改动；**`set_active_legacy_instance` / `learn_or_star_up` 例外**（commit 门控 BEGIN），本阶段不动、随 4.2 收编
-- [ ] 1.3 新增 CM 级单测：嵌套 no-op join、仅 owner 层提交、abort 走 rollback、**前提断言**（连接 `isolation_level` 仍为 `""`，默认值一变即红）；`uv run python -m pytest tests/test_transaction_atomicity.py -v` 现有 **28 个测试函数**不改保持全绿（已实测：hand-BEGIN + `commit=False` 场景在新门控下语义不变）
+- [ ] 1.1 `data/data_manager.py` 的 `DataBase` 新增 `transaction()` 异步上下文管理器（按 design D1/D1.1 完整语义）：**一次性 `TxnState` 对象**（owner 入口创建、句柄共享引用、abort 标记随 owner 退出整体丢弃）；**`await BEGIN IMMEDIATE` 成功返回后同步置 `depth = 1`**（与置位间无 await 点），owner 层退出做 commit/rollback，**未发 BEGIN 层完全被动**；`depth` 递减与 state 丢弃用 **finally 语义**（owner 层 commit/rollback 自身抛异常也不残留状态）；**`__aenter__` 异常路径 best-effort rollback**；**`__aexit__` 按 `exc_type is not None` 分支（BaseException 安全，不得 `except Exception`）**；`txn.abort()` 按 design D1 契约（幂等标记；clean exit 走 rollback 不 re-raise）；docstring 写明 owner 语义、fail-open 门控的理由（3 个裸 conn 测试构造依赖默认 0=旧提交语义）、abort 语义与"CM 不得进入 raw BEGIN 块"过渡约束；英文 Google 风格 docstring
+- [ ] 1.2 **25 个叶子 helper**（`data_manager.py` 2、`database_extended.py` 23）的提交判定改为 `if commit and getattr(self.conn, "_txn_depth", 0) == 0`（所有权判据；**fail-open 默认 0 是设计**——data/database_extended 或 tests 的裸 conn 构造退回旧提交语义，行内注释说明）；**7 个纯透传 wrapper**（`core/pill_manager.py:654`、`bank_manager.py:458`、`shop_handler.py:345`、`impart_manager.py` ×4）零改动；**`set_active_legacy_instance` / `learn_or_star_up` 例外**（commit 门控 BEGIN），本阶段不动、随 4.2 收编
+- [ ] 1.3 新增 CM 级单测：嵌套 no-op join、仅 owner 层提交、abort 走 rollback、**abort 标记不泄漏到下一笔事务**（①的回归钉）、**BEGIN 失败时 depth 不残留**（②的回归钉）、**前提断言**（连接 `isolation_level` 仍为 `""`）；`uv run python -m pytest tests/test_transaction_atomicity.py -v` 现有 **28 个测试函数**不改保持全绿
 
 ## 2. 试点迁移（bank_manager 6 块）
 
@@ -36,5 +36,5 @@
 ## 5. 文档与收尾
 
 - [ ] 5.1 新建 `CONTEXT.md`（仓库根，中文）：**条目三字段格式——术语 / 一句话定义 / 权威代码符号（seam 位置 + 落地 change 链接）**；登记 `unit-of-work`（`async with db.transaction():`，`conn._txn_depth` 所有权判据，owner-only 提交，seam 在 `DataBase`）与（预留）`BusyState` 占位条目（busy-state-owner 按此格式替换落实）
-- [ ] 5.2 AGENTS.md 两处：§3 数据库操作规范补 CM 用法指针（一两句，不展开，替换纯手写 BEGIN 惯例表述）；**文档地图表登记 `CONTEXT.md`**（维护责任：新增/重命名领域概念时同步登记条目）
+- [ ] 5.2 AGENTS.md 两处：§3 数据库操作规范替换纯手写 BEGIN 惯例为 CM 指针，并写入**转换规则**（任何手工提交点未来包进 CM 时必须同步删除体内裸 `conn.commit()`）；**文档地图表登记 `CONTEXT.md`**（维护责任：新增/重命名领域概念时同步登记条目）
 - [ ] 5.3 用 `bd` 登记 spike 暴露的新发现（如有）；`openspec validate --changes add-transaction-unit-of-work` 通过；按块 conventional commit（试点/迁移/退役各自独立 commit）

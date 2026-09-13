@@ -10,7 +10,8 @@
 - `connect()` 显式声明 `isolation_level=""`（钉住现状默认值，CM 单测含前提断言，默认值一变即红）。
 - 写 helper（34 个定义：25 个叶子 helper 改 `depth == 0` 门控，7 个纯透传 wrapper 无需改动随叶子继承，2 个 BEGIN 门控 helper 随收编处理）改为依据**所有权**决定是否提交（连接自身已知道的事，替代 flag）；`commit`/`external_transaction` 参数标记为过渡兼容，第二阶段移除。
 - 绞杀者迁移 26 个手工 `BEGIN IMMEDIATE` 块 / 50 处穿参点（sect 15、bank 18、shop 3+4、utils 3、storage_ring 3、player_handler 2、impart 2），按块推进（bank_manager 6 块试点 → 其余 20 块）；early-exit 模式按"能前置的复查前置，必须锁内复查的用 `txn.abort()`"收编。
-- `tests/test_transaction_atomicity.py`：§7.2/7.4/7.5（与设计无关的原子性核心）全程守护；§7.1 kwarg 相关断言与 6 个 spy 测试（§7.3 ×4 + §7.5 ×2，spy `commit=False` kwarg）随 flag 移除改写为 CM 级测试（**断 `conn._txn_depth` ownership 信号**——裸 DML 后 `in_transaction` 恒真，不能作为断言依据）。
+- `tests/test_transaction_atomicity.py`：§7.2/7.4/7.5（与设计无关的原子性契约核心）全程守护；§7.1 kwarg 相关断言与 6 个 spy 测试随 flag 移除改写为 CM 级测试（断 `conn._txn_depth` ownership 信号）。
+- **范围声明**：42 处无 flag 手工提交（data 层 22 处叶子 CRUD + manager/handler 层 20 处单写）**非 bug、本 change 不收敛**——它们是 `isolation_level=""` 隐式事务原子性的现存受益方（也是不改 autocommit 的理由）；转换规则（未来包进 CM 必须删体内裸 commit）随 AGENTS.md §3 指针写入。
 - 同步创建 `CONTEXT.md` 并登记新概念 `unit-of-work`。
 
 **非目标**：不引入 SAVEPOINT 嵌套语义（无调用点需要）；**正常路径**不改任何对外可观察行为（**错误路径附带修复 `handle_buy` 写锁泄漏**——`except Exception` 捕不到 GeneratorExit 所致，spike 0.2 钉住，属修复非 scope 漂移）；不改 `isolation_level`（仅显式钉住现状默认值）；不做候选2（`BusyState`）——本 change 是其前置基建。
