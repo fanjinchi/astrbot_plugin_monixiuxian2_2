@@ -2,7 +2,7 @@
 
 ## 0. 前置检查
 
-- [ ] 0.1 确认 `add-transaction-unit-of-work` 已合入（`DataBase.transaction()` 可用，abort 契约按其 design D1）；未合入则本 change 挂起。**注意：其合入会移动本 change 引用的行号（尤其 sect_manager 块），实施前按当时代码重新锚定所有行号引用**
+- [ ] 0.1 确认 `add-transaction-unit-of-work` 已合入（`DataBase.transaction()` 可用，abort 契约按其 design D1）；未合入则本 change 挂起。**契约核对**：合入后 diff 实际落地的 `transaction()`/`txn.abort()` 语义与提案 D1 契约（幂等标记、clean exit 走 rollback 不 re-raise、TxnState 随 owner 退出丢弃）是否一致，如有偏差以代码为准并同步修正本 change 的引用——不能照提案文本读。**注意：其合入会移动本 change 引用的行号（尤其 sect_manager 块），实施前按当时代码重新锚定所有行号引用**
 
 ## 1. owner 核心（core/busy_state.py）
 
