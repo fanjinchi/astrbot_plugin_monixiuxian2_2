@@ -29,12 +29,12 @@
 ## 4. 第二阶段：flag 退役
 
 - [ ] 4.1 确认 50 处穿参点（sect 15、bank 18、shop 3+4、utils 3、storage_ring 3、player_handler 2、impart 2）清零后，从 34 个定义移除 `commit`/`external_transaction` 参数（含 manager 层重导出）
-- [ ] 4.2 5 个自事务 helper 收编为 CM：`decrement_shop_item_stock`、`increment_shop_item_stock`（**收编时须加 `depth == 0` 门控**，其当前无条件 BEGIN 在 CM 内会撞 "cannot start a transaction"）、`set_active_legacy_instance`、`learn_or_star_up`（后两者 BEGIN 条件一并改为 `depth == 0` 判定，替换其碰巧正确的 `in_transaction` 检查）、**`StorageRingManager.store_item`**（`core/storage_ring_manager.py:101`，第二个 `external_transaction` 持有者；~11 个独立调用方在事务外依赖其自 BEGIN 路径——equipment/storage_ring handlers、boss/adventure/spirit_farm/bounty/rift managers、gm_manager ×2、equipment_manager，收编后这些独立调用保持原语义）
+- [ ] 4.2 4 个自事务 helper 收编为 CM：`decrement_shop_item_stock`、`set_active_legacy_instance`、`learn_or_star_up`（后两者 BEGIN 条件一并改为 `depth == 0` 判定，替换其碰巧正确的 `in_transaction` 检查）、**`StorageRingManager.store_item`**（`core/storage_ring_manager.py:101`，第二个 `external_transaction` 持有者；~11 个独立调用方在事务外依赖其自 BEGIN 路径——equipment/storage_ring handlers、boss/adventure/spirit_farm/bounty/rift managers、gm_manager ×2、equipment_manager，收编后这些独立调用保持原语义）；**`increment_shop_item_stock` 不收编——它是死代码**（data/data_manager.py:336，全库无调用点，已 grep 核实），直接删除
 - [ ] 4.3 `tests/test_transaction_atomicity.py`：§7.1 kwarg 相关断言随 flag 退役移除/改写；**6 个 spy 测试**（§7.3 ×4 + §7.5 ×2）改写为 CM 级断言——**断 `conn._txn_depth` ownership 信号**（CM 内 >0、CM 外 == 0、仅 owner 层提交），不只断 `in_transaction`（裸 DML 后恒真，会"因错误的原因通过"）；不依赖 `kwargs.get("commit", True)` 默认值回读；合并进 1.3 的测试组去重
 - [ ] 4.4 全量质量门：`uv run python -m pytest tests/ -v` 全绿；`uv run ruff format . && uv run ruff check .` 通过
 
 ## 5. 文档与收尾
 
-- [ ] 5.1 新建 `CONTEXT.md`（仓库根，中文）：**条目三字段格式——术语 / 一句话定义 / 权威代码符号（seam 位置 + 落地 change 链接）**；登记 `unit-of-work`（`async with db.transaction():`，`conn._txn_depth` 所有权判据，owner-only 提交，seam 在 `DataBase`）与（预留）`BusyState` 占位条目（busy-state-owner 按此格式替换落实）
-- [ ] 5.2 AGENTS.md 两处：§3 数据库操作规范替换纯手写 BEGIN 惯例为 CM 指针，并写入**转换规则**（任何手工提交点未来包进 CM 时必须同步删除体内裸 `conn.commit()`）；**文档地图表登记 `CONTEXT.md`**（维护责任：新增/重命名领域概念时同步登记条目）
+- [ ] 5.1 新建本地临时文件 `CONTEXT.md`（仓库根，中文，**已入 `.gitignore`、不进 commit、不登记 AGENTS.md 文档地图、本批 change 工作结束后不维护**——仅用于领域词汇对齐）：条目三字段格式——术语 / 一句话定义 / 权威代码符号（seam 位置 + 落地 change 链接）；登记 `unit-of-work`（`async with db.transaction():`，`conn._txn_depth` 所有权判据，owner-only 提交，seam 在 `DataBase`）与（预留）`BusyState` 占位条目（busy-state-owner 按此格式替换落实）
+- [ ] 5.2 AGENTS.md §3 数据库操作规范替换纯手写 BEGIN 惯例为 CM 指针，并写入**转换规则**（任何手工提交点未来包进 CM 时必须同步删除体内裸 `conn.commit()`）
 - [ ] 5.3 用 `bd` 登记 spike 暴露的新发现（如有）；`openspec validate --changes add-transaction-unit-of-work` 通过；按块 conventional commit（试点/迁移/退役各自独立 commit）

@@ -13,6 +13,9 @@ uv.lock
 # OpenCode / LazyCodex workspace
 .omo/
 
+# Local AI-workflow context notes (temporary codebase glossary, not maintained)
+CONTEXT.md
+
 # Subagent / tooling output
 .pi-subagents/
 subagent-*.md
