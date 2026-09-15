@@ -9,7 +9,7 @@ AstrBot 插件（文字修仙游戏），Python 插件，无独立构建系统�
 - **插件目录**：`~/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/`
 - **宿主项目**：AstrBot 本体位于 `~/code/AstrBot/`，使用 **uv** 管理 Python 虚拟环境与依赖
 - **Python 版本**：跟随 AstrBot，当前要求 `>=3.12`
-- **依赖安装**：在 AstrBot 根目录执行 `uv sync`，插件额外依赖在 `requirements.txt`（当前仅 `Pillow>=9.0.0`），由 AstrBot 插件加载器在加载时自动安装
+- **依赖安装**：在 AstrBot 根目录执行 `uv sync`；本插件无额外依赖（`requirements.txt` 为空已删除），AstrBot 插件加载器无需自动安装任何包
 - **命令前缀**：本目录未配置独立 Python 解释器，应使用 AstrBot 的 uv 环境运行命令，例如：
 
   ```bash
@@ -34,7 +34,6 @@ models_extended.py   # UserStatus 等扩展模型
 config_manager.py    # 配置加载器（自动创建默认配置）
 metadata.yaml        # 插件元数据（AstrBot 识别插件依赖此文件）
 _conf_schema.json    # AstrBot 可视化配置 Schema（WebUI 动态配置）
-requirements.txt     # 插件依赖（pip 格式，目前仅 Pillow>=9.0.0）
 logo.png             # 插件 Logo（可选，推荐 256x256）
 ```
 

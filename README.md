@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.17.3
+> **版本:** v3.17.4
 > **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -254,17 +254,6 @@
 
 ---
 
-## 🖼️ 开启图片卡片 (可选)
-
-本插件支持生成精美个人信息卡片：
-
-1. **安装依赖**: `pip install Pillow`
-2. **获取素材**: 下载[卡图资源包](https://cowtransfer.com/s/82b90d2b879d43) (口令：k3jzr5)
-3. **放置素材**: 解压后将 `xiuxian` 文件夹放入 AstrBot 的 `data/` 目录中
-4. **生效验证**: 发送 `/我的信息`，若配置正确将发送图片
-
----
-
 ## 🛠️ 安装与部署
 
 1. 确保已安装 AstrBot
@@ -314,6 +303,14 @@ astrbot_plugin_monixiuxian2_2/
 ---
 
 ## 📝 更新日志
+
+---
+
+### v3.17.4 - 移除死代码 image_generator（摘 Pillow 依赖）
+
+**🧹 清理**
+
+- **删除 `utils/image_generator.py`**：`ImageGenerator` 全仓零调用（含测试与文档），其唯一依赖 Pillow 一并从依赖清单摘除，插件现无额外依赖；README 中过时的「开启图片卡片」安装指引同步移除
 
 ---
 
