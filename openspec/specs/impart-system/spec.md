@@ -186,5 +186,5 @@
 
 #### Scenario: 旧库重建为最新 schema
 
-- **WHEN** 数据库版本为 v21（旧 players 列结构）且启动插件执行 `migrate()`
-- **THEN** 数据库被重建为 v32 最新 schema：旧表清空重建（players 为新四主属性列）、`legacy_instances` 三传承表存在、`db_info.version=32`，旧玩家数据被清空
+- **WHEN** 数据库版本为 v21（旧 players 列结构）且启动插件执行 `migrate_or_reset()`
+- **THEN** 数据库被重建为 v34 最新 schema：旧表清空重建（players 为新四主属性列）、`legacy_instances` 三传承表存在、`db_info.version=34`，旧玩家数据被清空

@@ -534,17 +534,21 @@ class MigrationManager:
         self.conn = conn
         self.config_manager = config_manager
 
-    async def migrate(self):
-        """Bring the database up to LATEST_DB_VERSION.
+    async def migrate_or_reset(self):
+        """Bring the database up to LATEST_DB_VERSION; may reset all data.
 
-        三种路径：
-        1. 全新安装（无 db_info）：直接 `_create_all_tables()` 生成最新 schema；
-        2. 当前库已具备 v32 完整 schema（>= TASK_CHAIN_MIN_VERSION）且存在
-           已注册的后续迁移任务（版本高于当前）：按版本升序逐任务升级，
-           每个版本一个事务；
-        3. 旧版数据库（version < LATEST 且没有可用的迁移任务，含低于
-           TASK_CHAIN_MIN_VERSION 的库）：v3.11.0 起不再向前兼容——警告后
-           重建为最新 schema（数据重置）。
+        Four paths, one of which (path 3) wipes all data — a snapshot is
+        taken to `<db>.v<old_version>.pre-reset.bak` before that happens:
+        1. Fresh install (no db_info): `_create_all_tables()` builds the
+           latest schema directly;
+        2. v32+ schema with pending registered incremental tasks: upgrade
+           per-version, one transaction per version;
+        3. Old database (version < LATEST without usable migration tasks,
+           including libs below TASK_CHAIN_MIN_VERSION): since v3.11.0 there
+           is no forward compatibility — warn, back up, then rebuild to the
+           latest schema (**all data is reset**);
+        4. current_version > LATEST (downgrade attempt): raise RuntimeError
+           and refuse to run, since the new schema may break on old code.
         """
         await self.conn.execute("PRAGMA foreign_keys = ON")
         async with self.conn.execute(
@@ -612,6 +616,8 @@ class MigrationManager:
             # PRAGMA foreign_keys 必须在事务外切换（SQLite 禁止事务内修改），
             # 否则 drop 顺序任意时外键约束可能阻断删除
             await self.conn.execute("PRAGMA foreign_keys = OFF")
+            # 备份必须在 BEGIN 之前：VACUUM 不能在事务内执行；失败不阻断重置
+            await self._backup_before_reset(current_version)
             await self.conn.execute("BEGIN")
             try:
                 await _drop_all_tables(self.conn)
@@ -636,3 +642,39 @@ class MigrationManager:
             )
         else:
             logger.info("数据库已是最新版本，无需升级。")
+
+    async def _backup_before_reset(self, current_version: int) -> None:
+        """Snapshot the live database before a destructive rebuild.
+
+        Runs only on the reset path, after `PRAGMA foreign_keys = OFF` and
+        before `BEGIN` (VACUUM cannot run inside a transaction). Uses
+        `VACUUM INTO` on the open connection so the backup is a consistent
+        snapshot even with WAL/unflushed pages. Failure degrades to an ERROR
+        log — the reset proceeds without a backup, same as the historical
+        behavior, so an old database is never left unable to start.
+
+        Args:
+            current_version: Database version read before the reset; used in
+                the backup file name `<db>.v<current_version>.pre-reset.bak`.
+        """
+        try:
+            # The manager only holds a connection, not a path: resolve the
+            # main database file via database_list (row[2] = filename) instead
+            # of adding a constructor parameter.
+            async with self.conn.execute("PRAGMA database_list") as cursor:
+                rows = await cursor.fetchall()
+            db_path = next((row[2] for row in rows if row[1] == "main"), "")
+            if not db_path:
+                # :memory: connections report an empty filename; VACUUM INTO
+                # would succeed and write a stray .bak into the pytest CWD.
+                logger.warning("db 路径为空（:memory: 连接），跳过重置前备份")
+                return
+            backup_path = f"{db_path}.v{current_version}.pre-reset.bak"
+            # Escape single quotes in the path for the SQL string literal.
+            await self.conn.execute(
+                f"VACUUM INTO '{backup_path.replace(chr(39), chr(39) * 2)}'"
+            )
+            logger.info(f"重置前已备份数据库至: {backup_path}")
+        except Exception as e:
+            # 备份失败不阻断重置（现状本就无备份，不劣化），但必须明示
+            logger.error(f"备份失败，未备份即重置: {e}")

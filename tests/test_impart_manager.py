@@ -142,7 +142,7 @@ async def _setup_db():
     """Create a migrated in-memory database and attach DatabaseExtended."""
     db = DataBase(":memory:")
     await db.connect()
-    await MigrationManager(db.conn, DummyConfigManager()).migrate()
+    await MigrationManager(db.conn, DummyConfigManager()).migrate_or_reset()
     db.ext = DatabaseExtended(db.conn)
     return db
 

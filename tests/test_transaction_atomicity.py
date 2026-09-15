@@ -77,7 +77,7 @@ async def db(tmp_path):
     database = DataBase(str(tmp_path / "test.db"))
     await database.connect()
     # Fresh-install path never touches config_manager; a mock is sufficient.
-    await MigrationManager(database.conn, MagicMock()).migrate()
+    await MigrationManager(database.conn, MagicMock()).migrate_or_reset()
     yield database
     await database.close()
 

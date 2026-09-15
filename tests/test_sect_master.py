@@ -142,7 +142,7 @@ async def db():
     """Provide a migrated in-memory database and close it after the test."""
     database = DataBase(":memory:")
     await database.connect()
-    await MigrationManager(database.conn, FakeConfigManager()).migrate()
+    await MigrationManager(database.conn, FakeConfigManager()).migrate_or_reset()
     yield database
     await database.close()
 

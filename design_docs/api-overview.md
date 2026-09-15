@@ -26,7 +26,7 @@
 |---|---|
 | `CMD_XXX = "中文指令"`（顶部常量区） | 全部 109 个指令的中文字符串定义 |
 | `require_whitelist(func)` | 群聊白名单装饰器，非白名单群直接拒绝 |
-| `XiuXianPlugin.initialize()` | 启动钩子：连库 → `MigrationManager.migrate()` → `sect_mgr.ensure_system_sects()`（默认宗门幂等播种）→ 启动 4 个定时任务（Boss 生成/贷款逾期/灵眼生成/悬赏过期，Boss 可配置关闭） |
+| `XiuXianPlugin.initialize()` | 启动钩子：连库 → `MigrationManager.migrate_or_reset()` → `sect_mgr.ensure_system_sects()`（默认宗门幂等播种）→ 启动 4 个定时任务（Boss 生成/贷款逾期/灵眼生成/悬赏过期，Boss 可配置关闭） |
 | `XiuXianPlugin.terminate()` | 关闭钩子：取消全部后台任务 |
 | `handle_xxx(self, event, ...)` ×109 | 绝大多数为纯路由壳：docstring 标注指令名与下游 handler。例外（含少量逻辑）：`handle_boss_fight`/`handle_spawn_boss`（开关+权限检查、悬赏联动）、`handle_rift_complete`/`handle_adventure_complete`（悬赏进度联动）、`handle_gm`（管理员门槛） |
 
@@ -114,7 +114,7 @@
 |---|---|---|
 | `DataBase`（data_manager.py） | `connect/ensure_connection/reconnect` / `create_player` / `get_player_by_id` / `update_player` / `delete_player_cascade` / `get_shop_data` / `decrement_shop_item_stock` | 连接管理（定时任务前先 `ensure_connection`）；玩家 CRUD 字段从 `Player` dataclass 动态生成；商店库存**原子扣减/回滚** |
 | `DatabaseExtended`（database_extended.py，`db.ext`） | 按域分组：宗门 `*_sect*`、Boss `*_boss`、秘境 `*_rift`、状态 `create/get/update_user_cd`+`set_user_busy/free`、技能 `learn_or_star_up`/`get_learned_skills`/`is_skill_learned`、悬赏 `*_bounty`、银行/贷款 `*_loan*`/`add_bank_transaction`、赠予 `*_pending_gift*`、系统配置 `get/set_system_config`（KV 表，悬赏放弃冷却等都用它） | 全部扩展表 SQL |
-| `MigrationManager`（migration.py） | `migrate()` | 版本化迁移：新装直接建最新 schema（v30），旧库按版本升序逐个事务执行 `@migration(version)` 注册的任务 |
+| `MigrationManager`（migration.py） | `migrate_or_reset()` | 版本化迁移：新装直接建最新 schema（v34）；旧库按版本升序逐个事务执行 `@migration(version)` 注册的任务；低于任务链下限的旧库整体重建为最新 schema（**重置前自动备份** `<db>.v<版本>.pre-reset.bak`）；版本高于 v34 时拒绝降级运行 |
 
 并发敏感操作惯例：`await db.conn.execute("BEGIN IMMEDIATE")` + try/commit/rollback（参照 `BountyManager.accept_bounty`）。
 

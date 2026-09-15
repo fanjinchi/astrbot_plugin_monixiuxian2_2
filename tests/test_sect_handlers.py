@@ -103,7 +103,7 @@ class FakeConfigManager:
 async def _make_db() -> DataBase:
     db = DataBase(":memory:")
     await db.connect()
-    await MigrationManager(db.conn, FakeConfigManager()).migrate()
+    await MigrationManager(db.conn, FakeConfigManager()).migrate_or_reset()
     return db
 
 

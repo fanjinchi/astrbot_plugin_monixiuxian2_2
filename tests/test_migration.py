@@ -42,7 +42,7 @@ async def _player_columns(db_conn) -> set[str]:
 async def test_fresh_install_reaches_latest_version():
     """A brand-new database is created with the latest schema and version."""
     async with aiosqlite.connect(":memory:") as db_conn:
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
 
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
             row = await cursor.fetchone()
@@ -67,7 +67,7 @@ async def test_fresh_install_reaches_latest_version():
 
     # 全部 24 张业务表齐备
     async with aiosqlite.connect(":memory:") as db_conn2:
-        await MigrationManager(db_conn2, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn2, DummyConfigManager()).migrate_or_reset()
         tables = await _all_tables(db_conn2)
         expected_tables = {
             "db_info",
@@ -151,7 +151,7 @@ async def test_fresh_install_seeds_rifts_and_eyes():
     import json
 
     async with aiosqlite.connect(":memory:") as db_conn:
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
 
         async with db_conn.execute(
             "SELECT rift_id, rift_name, rift_level, required_level, rewards FROM rifts"
@@ -175,7 +175,7 @@ async def test_fresh_install_player_crud_works():
     """DataManager create_player/update_player must work against the migrated schema."""
     db = DataBase(":memory:")
     await db.connect()
-    await MigrationManager(db.conn, DummyConfigManager()).migrate()
+    await MigrationManager(db.conn, DummyConfigManager()).migrate_or_reset()
 
     player = Player(user_id="u1", user_name="Tester", spiritual_root="天灵根")
     await db.create_player(player)
@@ -196,14 +196,14 @@ async def test_fresh_install_player_crud_works():
 async def test_migrate_is_idempotent_on_fresh():
     """Running migrate() twice on a fresh database is a no-op."""
     async with aiosqlite.connect(":memory:") as db_conn:
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
 
         # 写入用户数据后二次 migrate：数据必须保留（区分真 no-op 与破坏性重建）
         await db_conn.execute(
             "INSERT INTO players (user_id, user_name, spiritual_root) VALUES ('u1', 'T', '天灵根')"
         )
         await db_conn.commit()
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
 
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
             assert (await cursor.fetchone())[0] == LATEST_DB_VERSION
@@ -219,7 +219,7 @@ async def test_migrate_is_idempotent_on_fresh():
 async def test_newer_db_version_raises_without_touching_data():
     """Version above LATEST must raise (no silent downgrade) and leave the DB intact."""
     async with aiosqlite.connect(":memory:") as db_conn:
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
         # 预置一条玩家数据，断言 raise 后数据库未被改动
         await db_conn.execute(
             "INSERT INTO players (user_id, user_name, spiritual_root) VALUES ('u1', 'T', '天灵根')"
@@ -230,7 +230,7 @@ async def test_newer_db_version_raises_without_touching_data():
         await db_conn.commit()
 
         with pytest.raises(RuntimeError, match="不允许降级运行"):
-            await MigrationManager(db_conn, DummyConfigManager()).migrate()
+            await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
 
         # 版本号与数据均未被改动
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
@@ -280,7 +280,7 @@ async def test_legacy_db_rebuilt_to_latest_schema():
         await db_conn.execute("INSERT INTO impart_info VALUES ('u1', 50)")
         await db_conn.commit()
 
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
 
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
             assert (await cursor.fetchone())[0] == LATEST_DB_VERSION
@@ -352,7 +352,7 @@ async def test_registered_migration_task_chain(monkeypatch):
 
         assert _migration_mod.MIGRATION_TASKS[33] is _v33_task
 
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
 
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
             assert (await cursor.fetchone())[0] == 33
@@ -363,7 +363,7 @@ async def test_registered_migration_task_chain(monkeypatch):
             assert await cursor.fetchone() is not None
 
         # 幂等：再跑一次不触发
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
         assert ran == [True]
 
     # 体验证失败回滚路径：任务抛错时版本不前进、表不保留
@@ -380,7 +380,7 @@ async def test_registered_migration_task_chain(monkeypatch):
         await db_conn.commit()
 
         with pytest.raises(RuntimeError):
-            await MigrationManager(db_conn, DummyConfigManager()).migrate()
+            await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
 
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
             assert (await cursor.fetchone())[0] == 33
@@ -410,7 +410,7 @@ async def test_v34_task_removes_trial_rift_on_existing_db():
         await db_conn.execute("INSERT INTO db_info (version) VALUES (33)")
         await db_conn.commit()
 
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
 
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
             assert (await cursor.fetchone())[0] == 34
@@ -420,7 +420,7 @@ async def test_v34_task_removes_trial_rift_on_existing_db():
             assert (await cursor.fetchone())[0] == 0
 
         # 幂等：再次 migrate 仍为 0（DELETE no-op）
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
         async with db_conn.execute(
             "SELECT COUNT(*) FROM rifts WHERE rift_id = 7"
         ) as cursor:
@@ -431,7 +431,7 @@ async def test_v34_task_removes_trial_rift_on_existing_db():
 async def test_player_skills_crud():
     """player_skills CRUD: learn, check, star level, get all."""
     async with aiosqlite.connect(":memory:") as db_conn:
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
         db = DataBase(":memory:")
         db.conn = db_conn
         db.ext = _data_mod.DatabaseExtended(db_conn)
@@ -469,7 +469,7 @@ async def test_player_skills_crud():
 async def test_player_skills_sect_attribution_pass_through():
     """learn_or_star_up stores origin_sect_id/sect_bound on first learn only."""
     async with aiosqlite.connect(":memory:") as db_conn:
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
         db = DataBase(":memory:")
         db.conn = db_conn
         db.ext = _data_mod.DatabaseExtended(db_conn)
@@ -501,7 +501,7 @@ async def test_player_skills_sect_attribution_pass_through():
 async def test_active_owner_partial_unique_index():
     """The partial unique index enforces at most one active legacy per owner."""
     async with aiosqlite.connect(":memory:") as db_conn:
-        await MigrationManager(db_conn, DummyConfigManager()).migrate()
+        await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
 
         await db_conn.execute(
             "INSERT INTO legacy_instances (owner_id, legacy_type, is_active, acquired_at)"

@@ -452,7 +452,7 @@ class XiuXianPlugin(Star):
         """
         await self.db.connect()
         migration_manager = MigrationManager(self.db.conn, self.config_manager)
-        await migration_manager.migrate()
+        await migration_manager.migrate_or_reset()
 
         # 播种默认宗门（幂等 upsert，失败不阻断插件加载）
         try:

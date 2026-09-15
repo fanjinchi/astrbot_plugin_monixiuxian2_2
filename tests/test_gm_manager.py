@@ -894,7 +894,7 @@ async def real_db():
     """Provide a migrated in-memory database and close it after the test."""
     database = DataBase(":memory:")
     await database.connect()
-    await MigrationManager(database.conn, MagicMock()).migrate()
+    await MigrationManager(database.conn, MagicMock()).migrate_or_reset()
     yield database
     await database.close()
 

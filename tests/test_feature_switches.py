@@ -256,7 +256,7 @@ class TestScheduledTask:
         _main_mod = sys.modules["astrbot_plugin_monixiuxian2_2.main_test"]
         original_migration = _main_mod.MigrationManager
         _main_mod.MigrationManager = MagicMock(
-            return_value=MagicMock(migrate=AsyncMock())
+            return_value=MagicMock(migrate_or_reset=AsyncMock())
         )
 
         import asyncio
