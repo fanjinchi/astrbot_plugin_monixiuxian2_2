@@ -67,6 +67,11 @@ class FakeConfigManager:
     def is_pill(self, item_name: str) -> bool:
         return item_name in self.pills_data
 
+    def get_pill_config(self, name: str) -> dict | None:
+        # This fake only carries the breakthrough-pill table; the production
+        # ConfigManager also checks exp/utility/items sources.
+        return self.pills_data.get(name)
+
     def get_level_name(self, level_index: int, cultivation_type: str = "灵修") -> str:
         return f"境界{level_index}"
 

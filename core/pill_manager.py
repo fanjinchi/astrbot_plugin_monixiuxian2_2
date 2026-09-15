@@ -32,30 +32,8 @@ class PillManager:
             if value < 0:
                 setattr(player, attr, 0)
 
-    def get_pill_by_name(self, pill_name: str) -> dict | None:
-        """根据名称获取丹药配置
-
-        Args:
-            pill_name: 丹药名称
-
-        Returns:
-            丹药配置字典，如果找不到返回None
-        """
-        # 尝试从破境丹中查找
-        pill = self.config_manager.pills_data.get(pill_name)
-        if pill:
-            return pill
-
-        # 尝试从修为丹中查找
-        pill = self.config_manager.exp_pills_data.get(pill_name)
-        if pill:
-            return pill
-
-        # 尝试从功能丹中查找
-        pill = self.config_manager.utility_pills_data.get(pill_name)
-        if pill:
-            return pill
-
+        # 丹药查找已合并至 ConfigManager.get_pill_config（10e）；pill_manager
+        # 仅作为消费方调用，不再维护自己的查找顺序
         return None
 
     async def update_temporary_effects(self, player: Player):
@@ -102,7 +80,7 @@ class PillManager:
             return False, f"你的背包中没有【{pill_name}】！"
 
         # 获取丹药配置
-        pill_data = self.get_pill_by_name(pill_name)
+        pill_data = self.config_manager.get_pill_config(pill_name)
         if not pill_data:
             return False, f"丹药【{pill_name}】配置不存在！"
 
@@ -685,7 +663,7 @@ class PillManager:
 
         lines = ["--- 丹药背包 ---"]
         for pill_name, count in inventory.items():
-            pill_data = self.get_pill_by_name(pill_name)
+            pill_data = self.config_manager.get_pill_config(pill_name)
             if pill_data:
                 rank = pill_data.get("rank", "未知")
                 lines.append(f"[{rank}] {pill_name} × {count}")

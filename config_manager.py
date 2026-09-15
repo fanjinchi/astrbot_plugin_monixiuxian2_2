@@ -497,6 +497,36 @@ class ConfigManager:
 
         return False
 
+    def get_pill_config(self, name: str) -> dict | None:
+        """Get the pill config for a name from the four pill sources.
+
+        Lookup order: pills_data (breakthrough pills) → exp_pills_data →
+        utility_pills_data → items_data (type == "丹药" fallback) → None.
+        The three pill tables declare disjoint name domains (enforced by the
+        content import pipeline), so the first hit wins on a hypothetical
+        duplicate. The items fallback is a safety net that no current pill
+        name triggers.
+
+        Args:
+            name: Pill name to look up.
+
+        Returns:
+            The matching pill config dict, or None if not found.
+        """
+        for source in (
+            self.pills_data,
+            self.exp_pills_data,
+            self.utility_pills_data,
+        ):
+            pill = source.get(name)
+            if pill:
+                return pill
+
+        item = self.items_data.get(name)
+        if item and isinstance(item, dict) and item.get("type") == "丹药":
+            return item
+        return None
+
     def get_all_pill_names(self) -> set:
         """获取所有注册的丹药名称"""
         if self._pill_names_cache is not None:

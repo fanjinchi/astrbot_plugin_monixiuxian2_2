@@ -137,7 +137,7 @@ class PillHandler:
         pill_name = pill_name.strip()
 
         # 获取丹药配置
-        pill_data = self.pill_manager.get_pill_by_name(pill_name)
+        pill_data = self.config_manager.get_pill_config(pill_name)
         if not pill_data:
             yield event.plain_result(f"❌ 找不到丹药【{pill_name}】的信息！")
             return

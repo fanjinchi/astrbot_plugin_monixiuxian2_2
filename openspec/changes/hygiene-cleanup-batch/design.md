@@ -23,7 +23,7 @@
 
 ## 10e · 丹药查找合并为 ConfigManager.get_pill_config
 
-**Context**：两份实现见 proposal。关键事实（实测）：`pills.json`/`exp_pills.json`/`utility_pills.json` 三表名域**互不相交**（26/30/143 raw 条目，两两交集为空；**三轮补审修正**：utility_pills 去重后实为 142 名——「混元血容丹」表内重名一组，两个不同 tier 共名，dict 去重遮蔽其一（util_128 皇品被遮），见 bd `-czl`；去重后名域仍两两不相交）；`items.json` 中 `type=丹药` 的 33 个条目与三表**零交叠**（「血煞丹」实测在 utility_pills 表而非 items.json），items 兜底对今天任何现存药名都不触发。因此任意「三表优先于 items」的合并顺序对全部现存药名与两旧实现解析结果逐位等价；两旧实现间的顺序差异（alchemy 把 exp/utility 置于 pills 前）在不相交名域下也是无差别。`hasattr` 守卫（alchemy :98-116）为测试 fake config_manager 而生——合并后 fake 只需提供 `get_pill_config`（测试 fixture 一并收敛）。
+**Context**：两份实现见 proposal。关键事实（实测）：`pills.json`/`exp_pills.json`/`utility_pills.json` 三表名域**互不相交**（26/30/143 raw 条目，两两交集为空；**三轮补审修正**：utility_pills 去重后实为 142 名——「混元血容丹」表内重名一组，两个不同 tier 共名，dict 去重遮蔽其一（util_128 皇品被遮），见 bd `-czl`；去重后名域仍两两不相交）；`items.json` 中 `type=丹药` 的 33 个条目与三表名域的交叠仅 1 个：**「血煞丹」同时在 utility_pills 与 items 登记**（其余 32 个为 items 独有；**三轮补审修正**：初稿称「血煞丹实测在 utility_pills 表而非 items.json」失实——两表都有）。items 兜底对三表药名不触发、对 items 独有丹药名触发（补足旧 pill_manager 路径对这些名字返回未找到的缺陷，行为与旧 alchemy 一致）；血煞丹在两旧实现与新实现中均经 util 表解析，items 重复登记从不触发，无解析分叉。因此任意「三表优先于 items」的合并顺序对全部现存药名与两旧实现**逐位等价**（唯一放宽：pill_manager 旧路径对 32 个 items 独有丹药名返回未找到 → 新实现可解析，属修复方向）；两旧实现间的顺序差异（alchemy 把 exp/utility 置于 pills 前）在不相交名域下也是无差别。`hasattr` 守卫（alchemy :98-116）为测试 fake config_manager 而生——合并后 fake 只需提供 `get_pill_config`（测试 fixture 一并收敛）。
 
 **Decisions**：
 - **D1 · 落点 `ConfigManager.get_pill_config`，顺序 pills→exp_pills→utility_pills→items 兜底。** 紧邻既有 `is_pill`(:485)/`get_all_pill_names`(:500)——丹药判定与丹药取值的权威已在 ConfigManager，查找并入同一 locality；pill_manager/alchemy_manager 退化为消费方。顺序取 pill_manager 版（三表首）+ alchemy 版独有的 items 兜底，两版行为的并集。

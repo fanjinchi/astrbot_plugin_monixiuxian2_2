@@ -156,3 +156,92 @@ class TestLevelConfigCentralApi:
         assert config_manager.get_level_index_by_name("地仙九阶") == 99
         assert config_manager.get_level_index_by_name("不存在") is None
         assert config_manager.get_level_index_by_name("练气一阶", "体修") == 1
+
+
+class TestGetPillConfig:
+    """10e: merged pill lookup via ConfigManager.get_pill_config."""
+
+    def test_hits_each_of_four_sources(self, config_manager):
+        """Each of the four sources resolves a representative name."""
+        pill_name = next(iter(config_manager.pills_data))
+        exp_name = next(iter(config_manager.exp_pills_data))
+        util_name = next(iter(config_manager.utility_pills_data))
+        item_pill = next(
+            name
+            for name, item in config_manager.items_data.items()
+            if isinstance(item, dict) and item.get("type") == "丹药"
+        )
+
+        assert config_manager.get_pill_config(pill_name) is config_manager.pills_data[pill_name]
+        assert (
+            config_manager.get_pill_config(exp_name) is config_manager.exp_pills_data[exp_name]
+        )
+        assert (
+            config_manager.get_pill_config(util_name)
+            is config_manager.utility_pills_data[util_name]
+        )
+        assert config_manager.get_pill_config(item_pill) is config_manager.items_data[item_pill]
+
+    def test_unknown_name_returns_none(self, config_manager):
+        """An unregistered name resolves to None."""
+        assert config_manager.get_pill_config("不存在的丹药xyz") is None
+
+    def test_three_pill_tables_have_disjoint_names(self, config_manager):
+        """Data fact ①: the three pill tables are pairwise name-disjoint."""
+        pk, ek, uk = (
+            set(config_manager.pills_data),
+            set(config_manager.exp_pills_data),
+            set(config_manager.utility_pills_data),
+        )
+        assert not (pk & ek)
+        assert not (pk & uk)
+        assert not (ek & uk)
+
+    def test_items_dan_entries_do_not_overlap_pill_tables(self, config_manager):
+        """Data fact ②: items(type=丹药) names overlap the pill tables only in
+        the known, harmless set {血煞丹}.
+
+        血煞丹 is registered in both utility_pills.json and items.json; both
+        old implementations and get_pill_config resolve it via the util table
+        first, so the duplicate items entry is never reachable. A new overlap
+        introduced by the content pipeline turns this test red for review.
+        """
+        pk, ek, uk = (
+            set(config_manager.pills_data),
+            set(config_manager.exp_pills_data),
+            set(config_manager.utility_pills_data),
+        )
+        dan = {
+            name
+            for name, item in config_manager.items_data.items()
+            if isinstance(item, dict) and item.get("type") == "丹药"
+        }
+        assert dan & (pk | ek | uk) <= {"血煞丹"}, "items 丹药条目与三表出现新交叠"
+
+    def _raw_names(self, fname: str) -> list[str]:
+        import json
+
+        raw = json.loads(
+            (PLUGIN_ROOT / "config" / fname).read_text(encoding="utf-8")
+        )
+        return [item.get("name") for item in raw]
+
+    def test_no_duplicates_in_pills_table(self):
+        """Gate ③ for pills.json: raw count equals dedup name count."""
+        names = self._raw_names("pills.json")
+        assert len(names) == len(set(names)), "pills.json 表内重名"
+
+    def test_no_duplicates_in_exp_pills_table(self):
+        """Gate ③ for exp_pills.json: raw count equals dedup name count."""
+        names = self._raw_names("exp_pills.json")
+        assert len(names) == len(set(names)), "exp_pills.json 表内重名"
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="blocked by bd -czl: utility_pills.json 混元血容丹两个不同 tier 共名（raw 143 → unique 142），"
+        "内容管线修复后移除本标记即转绿",
+    )
+    def test_no_duplicates_in_utility_pills_table(self):
+        """Gate ③ for utility_pills.json: raw count equals dedup name count."""
+        names = self._raw_names("utility_pills.json")
+        assert len(names) == len(set(names)), "utility_pills.json 表内重名"

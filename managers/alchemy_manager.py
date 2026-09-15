@@ -48,7 +48,7 @@ class AlchemyManager:
 
         desc = recipe.get("desc", None)
         if not desc and self.config_manager:
-            pill_config = self._get_pill_config_by_name(name)
+            pill_config = self.config_manager.get_pill_config(name)
             if pill_config:
                 desc = self._generate_pill_desc(pill_config)
         if not desc:
@@ -91,33 +91,6 @@ class AlchemyManager:
                 return f"{'，'.join(effects)}（{rank}）"
 
         return f"{rank}丹药"
-
-    def _get_pill_config_by_name(self, name: str) -> dict | None:
-        """根据丹药名称从配置中获取丹药信息"""
-        if not self.config_manager:
-            return None
-
-        if hasattr(self.config_manager, "exp_pills_data"):
-            pill = self.config_manager.exp_pills_data.get(name)
-            if pill:
-                return pill
-
-        if hasattr(self.config_manager, "utility_pills_data"):
-            pill = self.config_manager.utility_pills_data.get(name)
-            if pill:
-                return pill
-
-        if hasattr(self.config_manager, "pills_data"):
-            pill = self.config_manager.pills_data.get(name)
-            if pill:
-                return pill
-
-        if hasattr(self.config_manager, "items_data"):
-            item = self.config_manager.items_data.get(name)
-            if item and item.get("type") == "丹药":
-                return item
-
-        return None
 
     async def get_available_recipes(self, user_id: str) -> tuple[bool, str]:
         """
