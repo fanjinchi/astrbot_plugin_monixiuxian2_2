@@ -29,3 +29,14 @@
 - [x] 4.2 按 AGENTS.md §7 版本 checklist 评估并执行：10c 摘依赖建议至少补丁版本号——**显式更新 `metadata.yaml` 的 `version`** + README changelog 一行（依赖变化对部署可见）；10g/10e 无玩法变化
 - [x] 4.3 用 `bd` 登记跟进 issue：10g D3 备份轮转策略（若未来出现连续跨版本重置场景）
 - [x] 4.4 `openspec validate --changes hygiene-cleanup-batch` 通过；本地分三个 conventional commit（`chore: remove dead image_generator…`、`refactor(db): rename migrate to migrate_or_reset with pre-reset backup…`、`refactor(config): merge pill lookup into ConfigManager.get_pill_config…`），不 push
+
+## 5. 追加批次（实施后 review + 丹药内容开工前清理，2026-09-16 决策）
+
+背景：items.json 的 33 个 `type=丹药` 条目是 first commit（067d391，上游 v2 旧九品体系）遗留，现行丹药系统（pills/exp/utility 三表）从未接入（商店拒收、无产出、无名域注册）。用户决策：**items 表从此不再承载丹药，兜底分支一并删除**（bd `-yf7` 的 schema 陷阱失去未来触发面）。
+
+- [ ] 5.1 `config/items.json` 删除 32 个 items-only 丹药条目 + items 侧血煞丹冗余条目（现行解析走 utility 表）——共 33 条；删除后全仓 grep 这 33 个名字确认零代码引用（`adventure_config.json` 的「解毒丹」是纯叙事 flavor 文本，保留不动——它是文案不是物品引用）
+- [ ] 5.2 `config_manager.py` `get_pill_config` 删除 items 兜底分支（改为三表查找→None）；docstring 改为「丹药=三表名域，items 表不承载丹药类型」；**10e design 修订**：四来源变三来源，任务 3.1/3.5 的 items 相关描述同步（design.md 追加修订注记，不改原始决策叙述）
+- [ ] 5.3 测试更新：`tests/test_config_manager.py` 的「四来源各命中一例」改三来源（items 用例删除）；数据事实断言②从「交叠 ⊆ {血煞丹}」恢复为「items 丹药条目与三表零交叠」；断言③（表内无重名，xfail blocked by -czl）不动
+- [ ] 5.4 design_docs 登记：`design_docs/content-design/` 增补「旧九品丹药体系退役」说明（32+1 条目自 items.json 移除、丹药名域收敛三表、旧 schema `effect.add_hp/add_experience` 不再使用），并按 §15 在 content-design/README 或主 README 资料清单登记
+- [ ] 5.5 bd 收尾：`-yf7`（items 兜底 schema 陷阱）随兜底删除关闭；`-czl`（混元血容丹重名）保持 open（内容管线改名后断言③转绿）
+- [ ] 5.6 质量门：pytest 全绿（xfail 仅 -czl 一项）+ ruff；commit message `chore(config): retire legacy items-based pill entries and drop items fallback`（追加为 hygiene 的第四个 commit）

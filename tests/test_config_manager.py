@@ -161,16 +161,16 @@ class TestLevelConfigCentralApi:
 class TestGetPillConfig:
     """10e: merged pill lookup via ConfigManager.get_pill_config."""
 
-    def test_hits_each_of_four_sources(self, config_manager):
-        """Each of the four sources resolves a representative name."""
+    def test_hits_each_of_three_sources(self, config_manager):
+        """Each of the three pill tables resolves a representative name.
+
+        items.json intentionally carries no pill entries since the legacy
+        items-based pills were retired (hygiene batch 5); there is no
+        fourth source anymore.
+        """
         pill_name = next(iter(config_manager.pills_data))
         exp_name = next(iter(config_manager.exp_pills_data))
         util_name = next(iter(config_manager.utility_pills_data))
-        item_pill = next(
-            name
-            for name, item in config_manager.items_data.items()
-            if isinstance(item, dict) and item.get("type") == "丹药"
-        )
 
         assert config_manager.get_pill_config(pill_name) is config_manager.pills_data[pill_name]
         assert (
@@ -180,7 +180,15 @@ class TestGetPillConfig:
             config_manager.get_pill_config(util_name)
             is config_manager.utility_pills_data[util_name]
         )
-        assert config_manager.get_pill_config(item_pill) is config_manager.items_data[item_pill]
+
+    def test_items_carry_no_pill_entries(self, config_manager):
+        """Data fact ② (batch 5): items.json has zero type=丹药 entries."""
+        dan = [
+            name
+            for name, item in config_manager.items_data.items()
+            if isinstance(item, dict) and item.get("type") == "丹药"
+        ]
+        assert dan == [], f"items.json 仍承载丹药条目（应已退役）: {dan}"
 
     def test_unknown_name_returns_none(self, config_manager):
         """An unregistered name resolves to None."""
@@ -196,27 +204,6 @@ class TestGetPillConfig:
         assert not (pk & ek)
         assert not (pk & uk)
         assert not (ek & uk)
-
-    def test_items_dan_entries_do_not_overlap_pill_tables(self, config_manager):
-        """Data fact ②: items(type=丹药) names overlap the pill tables only in
-        the known, harmless set {血煞丹}.
-
-        血煞丹 is registered in both utility_pills.json and items.json; both
-        old implementations and get_pill_config resolve it via the util table
-        first, so the duplicate items entry is never reachable. A new overlap
-        introduced by the content pipeline turns this test red for review.
-        """
-        pk, ek, uk = (
-            set(config_manager.pills_data),
-            set(config_manager.exp_pills_data),
-            set(config_manager.utility_pills_data),
-        )
-        dan = {
-            name
-            for name, item in config_manager.items_data.items()
-            if isinstance(item, dict) and item.get("type") == "丹药"
-        }
-        assert dan & (pk | ek | uk) <= {"血煞丹"}, "items 丹药条目与三表出现新交叠"
 
     def _raw_names(self, fname: str) -> list[str]:
         import json

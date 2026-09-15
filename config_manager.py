@@ -498,14 +498,14 @@ class ConfigManager:
         return False
 
     def get_pill_config(self, name: str) -> dict | None:
-        """Get the pill config for a name from the four pill sources.
+        """Get the pill config for a name from the three pill tables.
 
         Lookup order: pills_data (breakthrough pills) → exp_pills_data →
-        utility_pills_data → items_data (type == "丹药" fallback) → None.
-        The three pill tables declare disjoint name domains (enforced by the
-        content import pipeline), so the first hit wins on a hypothetical
-        duplicate. The items fallback is a safety net that no current pill
-        name triggers.
+        utility_pills_data → None. Pill names live only in the three pill
+        tables; items.json does not carry pill entries (legacy items-based
+        pills retired in hygiene-cleanup-batch batch 5). The three tables
+        declare disjoint name domains (enforced by the content import
+        pipeline), so the first hit wins on a hypothetical duplicate.
 
         Args:
             name: Pill name to look up.
@@ -522,9 +522,6 @@ class ConfigManager:
             if pill:
                 return pill
 
-        item = self.items_data.get(name)
-        if item and isinstance(item, dict) and item.get("type") == "丹药":
-            return item
         return None
 
     def get_all_pill_names(self) -> set:

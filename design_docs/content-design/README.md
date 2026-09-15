@@ -1,4 +1,4 @@
-# 玩家侧内容设计工作区：武器 / 功法 / 心法
+# 玩家侧内容设计工作区：武器 / 功法 / 心法 / 丹药
 
 > 2026-08-06 建立。目标：以 My Brute / Q宠大乐斗 的内容为原型蓝本，按本项目的
 > 数值框架（`design_docs/attribute-growth/growth-balance-proposals.md`）适配产出
@@ -7,6 +7,11 @@
 >
 > **路线定位（2026-08-27 起生效）**：灵修/体修的身份差异、成长表定稿、内容三族
 > 系数规范与机制预算表统一见 **`route-identity.md`**，填充内容前必读。
+>
+> **丹药（2026-09-16 起）**：丹药名域 = `pills.json` / `exp_pills.json` /
+> `utility_pills.json` 三表，items.json 不承载丹药（旧九品体系已退役，见
+> **`pills-legacy-retirement.md`**）；秘境丹药掉落机制一并移除，待丹药内容设计
+> 时按三表名域重建。
 
 ---
 
