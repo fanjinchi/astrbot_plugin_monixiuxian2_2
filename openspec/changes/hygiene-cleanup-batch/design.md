@@ -32,6 +32,8 @@
 
 **Risk**：「逐位等价」依赖三表不相交、items 与三表零交叠这两**数据事实**而非结构保证——tasks 中要求 `get_pill_config` 单测断言三表两两不相交、items 丹药条目与三表零交叠、**且每表 raw 条目数==去重名字数（表内无重名）**——只断前两条查不出表内重名（交集仍空、dict 静默覆盖），第三条才是防内容管线灌入重名的闸门（加载时 warning 或测试断言；已知 utility_pills 重名挂 bd `-czl`，闸门先于内容修复转红是预期行为），未来内容管线（`sync_content_to_config.py`）灌入重名条目时能被立即发现而非静默改变解析。
 
+**追加批次修订注记（2026-09-16，commit d7c4167）**：10e 决策随追加批次修订——`get_pill_config` 由四来源（pills→exp_pills→utility_pills→items `type=="丹药"` 兜底）改为三来源（pills→exp_pills→utility_pills→None），「丹药 = 三表名域」由数据事实升格为**结构保证**：`items.json` 已删除全部 33 个 `type=丹药` 条目（32 个 items-only + 血煞丹 items 侧重复登记），旧九品体系退役说明见 `design_docs/content-design/pills-legacy-retirement.md`（tasks 5.4 登记）。原 D1/D2 四来源叙述保留为历史决策，不做改动；对应 tasks 第 5 节（5.1–5.6）全部完成。
+
 ## 文档同步（随实施一并落地）
 
 - **10g 改名波及三处按名引用**：`design_docs/api-overview.md:29` 与 `:117` 的 `MigrationManager.migrate()` 同步改名（AGENTS.md 文档地图要求公开方法重命名必须更新 api-overview）；`openspec/specs/impart-system/spec.md:187-190` 场景 WHEN 的 `migrate()` 标识符做 **prose-only 同步**（行为不变、THEN 不动，`.openspec.yaml` 维持 `skip_specs: true`）。
