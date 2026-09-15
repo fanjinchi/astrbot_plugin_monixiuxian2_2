@@ -32,10 +32,6 @@ class PillManager:
             if value < 0:
                 setattr(player, attr, 0)
 
-        # 丹药查找已合并至 ConfigManager.get_pill_config（10e）；pill_manager
-        # 仅作为消费方调用，不再维护自己的查找顺序
-        return None
-
     async def update_temporary_effects(self, player: Player):
         """更新临时丹药效果，移除过期效果
 
