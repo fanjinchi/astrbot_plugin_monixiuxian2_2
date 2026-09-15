@@ -28,7 +28,7 @@
 **Decisions**：
 - **D1 · 落点 `ConfigManager.get_pill_config`，顺序 pills→exp_pills→utility_pills→items 兜底。** 紧邻既有 `is_pill`(:485)/`get_all_pill_names`(:500)——丹药判定与丹药取值的权威已在 ConfigManager，查找并入同一 locality；pill_manager/alchemy_manager 退化为消费方。顺序取 pill_manager 版（三表首）+ alchemy 版独有的 items 兜底，两版行为的并集。
 - **D2 · `get_pill_by_name` 删除不留包装。** 仓内调用面仅 4 处（pill_manager 内部 2、pill_handler 1、alchemy 经自身方法 1），均随合并改调 `config_manager.get_pill_config`；删除测试防新增调用点。`_get_pill_config_by_name` 同样整方法删除。**显式排除（out of scope）**：`handlers/breakthrough_handler.py:177` 与 `core/breakthrough_manager.py:154` 的 `config_manager.pills_data.get(pill_name)` 是**故意的只查破境丹表**——破境丹语义要求未知药名报「未找到破境丹」，若并入带 exp/utility/items 兜底的 `get_pill_config`，传入修为丹/功能丹名将意外解析成功，行为回退。这两处保持原样，不随合并改动。
-- **D3 · `hasattr` 守卫随委托消失。** 测试 fake（`FakeConfigManager` 等）在各自测试文件中补 `get_pill_config` 方法（多数 fake 已聚合 pills/exp/utility 三表字典，补一个 5 行方法）；这反而是收益——fake 与生产接口的偏差被强制对齐。
+- **D3 · `hasattr` 守卫随委托消失。** 测试 fake 补 `get_pill_config` 方法——**实测收敛面很窄**：需补的只有 `tests/test_transaction_atomicity.py:58` 的 FakeConfigManager（`test_pill_manager.py` 用真实 ConfigManager；其余 fake 仅服务 MigrationManager 构造、不碰 pill 数据）；这反而是收益——fake 与生产接口的偏差被强制对齐。
 
 **Risk**：「逐位等价」依赖三表不相交、items 与三表零交叠这两**数据事实**而非结构保证——tasks 中要求 `get_pill_config` 单测断言三表两两不相交、items 丹药条目与三表零交叠、**且每表 raw 条目数==去重名字数（表内无重名）**——只断前两条查不出表内重名（交集仍空、dict 静默覆盖），第三条才是防内容管线灌入重名的闸门（加载时 warning 或测试断言；已知 utility_pills 重名挂 bd `-czl`，闸门先于内容修复转红是预期行为），未来内容管线（`sync_content_to_config.py`）灌入重名条目时能被立即发现而非静默改变解析。
 
