@@ -142,7 +142,22 @@ class _TransactionCM:
             # Passive inner layer: decrement depth only; the owner commits or
             # rolls back. Exceptions propagate untouched.
             if conn is not None:
-                conn._txn_depth -= 1
+                # bd ip5 guard: never let the depth go negative. ``conn`` is
+                # re-read from ``db.conn`` here rather than captured at enter,
+                # so if the handle was replaced while this layer was alive
+                # (ensure_connection() → reconnect() → connect() rebuilds the
+                # connection and resets _txn_depth/_txn_owner_task/_txn_state on
+                # the NEW one), this decrement would land on a fresh depth of 0.
+                # A negative depth makes every helper's 'depth == 0' commit gate
+                # permanently false → writes linger uncommitted. Clamp at 0 and
+                # warn: the joined transaction went away with the old handle.
+                if conn._txn_depth <= 0:
+                    logger.warning(
+                        "[database] joined transaction layer exited on a depth-0 "
+                        f"connection (depth={conn._txn_depth}); the transaction it "
+                        "joined was lost with a replaced connection — keeping depth at 0"
+                    )
+                conn._txn_depth = max(0, conn._txn_depth - 1)
             return False
         # Owner layer (F2 reset order: depth → owner → state → notify inside
         # the lock, all in finally so a failing commit/rollback leaves no

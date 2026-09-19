@@ -3,7 +3,9 @@
 Tasks 0.1-0.5 of the change plan answer the design.md Open Questions.
 Task 1.3 promotes the durable assertions into regression pins in this file
 (the 0.5 cross-task probes are the F1/F2 pins); the 1.3 additions live in the
-tail section below.
+tail section below. The tail also carries the hardening pin filed by the final
+review of that change (bd ip5: a joined exit after a reconnect must clamp the
+depth at 0).
 """
 
 import asyncio
@@ -787,3 +789,43 @@ async def test_05_claim_cancel_compensation_frees_ownership(db):
         assert (await db.get_player_by_id("u1")).gold == 777
     finally:
         monitor.restore()
+
+
+@pytest.mark.asyncio
+async def test_ip5_joined_exit_after_reconnect_clamps_depth_at_zero(db):
+    """ip5 guard: a joined layer exiting after a connection swap keeps depth >= 0.
+
+    ``__aexit__`` re-reads ``db.conn`` instead of keeping the handle captured at
+    enter, so when the connection is replaced while an inner joined layer is
+    alive — ``ensure_connection()`` → ``reconnect()`` → ``connect()`` rebuilds
+    the connection and resets ``_txn_depth``/``_txn_owner_task``/``_txn_state``
+    on the NEW handle (data/data_manager.py connect()) — this layer's ``-= 1``
+    used to land on a fresh depth of 0 and drive it to -1. Every helper's
+    ``depth == 0`` commit gate would then stay false forever, so writes would
+    linger uncommitted; the guard clamps the depth at 0 instead.
+    """
+    await _make_player(db)
+    player = await db.get_player_by_id("u1")
+
+    async with db.transaction():
+        async with db.transaction():
+            # The swap happens while the inner (joined) layer is alive.
+            await db.reconnect()
+            assert db.conn._txn_depth == 0, "fresh handle: ownership fields reset"
+
+        # The joined layer has just exited against the replacement handle.
+        assert db.conn._txn_depth >= 0, "joined exit must never drive depth negative"
+        assert db.conn._txn_depth == 0
+        # Gate sanity on the (unowned) replacement handle: a leaf call must
+        # commit by itself instead of leaving its DML pending (fail-open).
+        player.gold = 700
+        await db.update_player(player)
+        assert not db.conn.in_transaction, "commit gate must still fire after the swap"
+
+    # An independent write path after the CM still commits standalone.
+    player = await db.get_player_by_id("u1")
+    player.gold = 800
+    await db.update_player(player)
+    assert not db.conn.in_transaction
+    assert (await db.get_player_by_id("u1")).gold == 800
+    assert db.conn._txn_depth == 0
