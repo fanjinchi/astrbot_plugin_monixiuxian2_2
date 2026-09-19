@@ -626,7 +626,7 @@ class PillManager:
             await self.db.update_player(player)
 
     async def add_pill_to_inventory(
-        self, player: Player, pill_name: str, count: int = 1, commit: bool = True
+        self, player: Player, pill_name: str, count: int = 1
     ):
         """添加丹药到背包
 
@@ -634,7 +634,6 @@ class PillManager:
             player: 玩家对象
             pill_name: 丹药名称
             count: 数量
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         inventory = player.get_pills_inventory()
         if pill_name in inventory:
@@ -642,7 +641,7 @@ class PillManager:
         else:
             inventory[pill_name] = count
         player.set_pills_inventory(inventory)
-        await self.db.update_player(player, commit=commit)
+        await self.db.update_player(player)
 
     def get_pill_inventory_display(self, player: Player) -> str:
         """获取丹药背包显示文本

@@ -517,7 +517,7 @@ async def test_master_settlement_rolls_back_skill_when_progress_write_fails(
     )
     await db.update_player(player)
 
-    async def _boom(player, commit=True):
+    async def _boom(player):
         raise RuntimeError("simulated progress write failure")
 
     monkeypatch.setattr(db, "update_player", _boom)

@@ -157,27 +157,26 @@ async def _check_loan_status(db, player: Player) -> dict:
 
         # 检查是否已逾期
         if now > due_at:
-            # 使用事务保护，防止并发删除
-            await db.conn.execute("BEGIN IMMEDIATE")
-            try:
+            # 使用事务保护，防止并发删除（CM 跨任务互斥）
+            async with db.transaction() as txn:
                 # 重新检查贷款状态（可能已被其他请求处理）
                 loan = await db.ext.get_active_loan(player.user_id)
                 if not loan or loan["status"] != "active":
-                    await db.conn.rollback()
+                    txn.abort()
                     return None
 
                 # 再次检查是否逾期
                 if now <= loan["due_at"]:
-                    await db.conn.rollback()
+                    txn.abort()
                     return None
 
                 player_name = player.user_name or f"道友{player.user_id[:6]}"
 
                 # 删除玩家（级联删除所有关联数据）
-                await db.delete_player_cascade(player.user_id, commit=False)
+                await db.delete_player_cascade(player.user_id)
 
                 # 标记贷款逾期
-                await db.ext.mark_loan_overdue(loan["id"], commit=False)
+                await db.ext.mark_loan_overdue(loan["id"])
 
                 # 记录流水
                 await db.ext.add_bank_transaction(
@@ -187,10 +186,9 @@ async def _check_loan_status(db, player: Player) -> dict:
                     0,
                     "逾期未还款，被银行追杀致死",
                     now,
-                    commit=False,
                 )
 
-                await db.conn.commit()
+                # 正常退出触发 owner 层提交（CM 统一提交/回滚）
 
                 loan_type_name = (
                     "突破贷款" if loan["loan_type"] == "breakthrough" else "普通贷款"
@@ -210,9 +208,6 @@ async def _check_loan_status(db, player: Player) -> dict:
                         f"若想重新修仙，请使用「我要修仙」命令"
                     ),
                 }
-            except Exception:
-                await db.conn.rollback()
-                raise
 
         # 计算剩余时间
         remaining_seconds = due_at - now

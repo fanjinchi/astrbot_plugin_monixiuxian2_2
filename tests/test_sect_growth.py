@@ -689,7 +689,7 @@ async def test_claim_treasure_rolls_back_when_update_fails(monkeypatch):
     sect = await _join_qingyun(db, mgr, "u1", level_index=2)
     await db.ext.update_player_sect_info("u1", sect.sect_id, 3)
 
-    async def _boom(player, commit=True):
+    async def _boom(player):
         raise RuntimeError("simulated write failure")
 
     monkeypatch.setattr(db, "update_player", _boom)
@@ -714,7 +714,7 @@ async def test_perform_sect_task_rolls_back_on_first_write_failure(monkeypatch):
     sect = await _join_qingyun(db, mgr, "u1", level_index=2, gold=1000)
     scale_before = sect.sect_scale
 
-    async def _boom(sect_id, stone_num, scale_ratio=10, commit=True):
+    async def _boom(sect_id, stone_num, scale_ratio=10):
         raise RuntimeError("simulated write failure")
 
     monkeypatch.setattr(db.ext, "donate_to_sect", _boom)
@@ -743,7 +743,7 @@ async def test_perform_sect_task_rolls_back_on_cooldown_write_failure(monkeypatc
     sect = await _join_qingyun(db, mgr, "u1", level_index=2, gold=1000)
     scale_before = sect.sect_scale
 
-    async def _boom(user_id, busy_type, scheduled_time=0, extra_data=None, commit=True):
+    async def _boom(user_id, busy_type, scheduled_time=0, extra_data=None):
         raise RuntimeError("simulated cooldown write failure")
 
     monkeypatch.setattr(db.ext, "set_user_busy", _boom)
@@ -773,7 +773,7 @@ async def test_claim_elixir_rolls_back_when_update_fails(monkeypatch):
     sect.elixir_room_level = 1
     await db.ext.update_sect(sect)
 
-    async def _boom(player, commit=True):
+    async def _boom(player):
         raise RuntimeError("simulated write failure")
 
     monkeypatch.setattr(db, "update_player", _boom)
@@ -798,7 +798,7 @@ async def test_upgrade_building_rolls_back_when_update_sect_fails(monkeypatch):
     sect.sect_materials = 1000
     await db.ext.update_sect(sect)
 
-    async def _boom(sect, commit=True):
+    async def _boom(sect):
         raise RuntimeError("simulated write failure")
 
     monkeypatch.setattr(db.ext, "update_sect", _boom)

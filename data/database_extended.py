@@ -91,12 +91,11 @@ class DatabaseExtended:
                 return Sect(**dict(row))
             return None
 
-    async def update_sect(self, sect: Sect, commit: bool = True):
+    async def update_sect(self, sect: Sect):
         """更新宗门信息
 
         Args:
             sect: 宗门对象
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         await self.conn.execute(
             """
@@ -124,7 +123,9 @@ class DatabaseExtended:
                 sect.sect_id,
             ),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
     async def delete_sect(self, sect_id: int):
@@ -141,7 +142,7 @@ class DatabaseExtended:
             return [Sect(**dict(row)) for row in rows]
 
     async def update_sect_materials(
-        self, sect_id: int, materials: int, operation: int = 1, commit: bool = True
+        self, sect_id: int, materials: int, operation: int = 1
     ):
         """更新宗门资材
 
@@ -149,7 +150,6 @@ class DatabaseExtended:
             sect_id: 宗门ID
             materials: 资材数量
             operation: 1=增加, 2=减少
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         if operation == 1:
             await self.conn.execute(
@@ -161,19 +161,18 @@ class DatabaseExtended:
                 "UPDATE sects SET sect_materials = sect_materials - ? WHERE sect_id = ?",
                 (materials, sect_id),
             )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
-    async def donate_to_sect(
-        self, sect_id: int, stone_num: int, scale_ratio: int = 10, commit: bool = True
-    ):
+    async def donate_to_sect(self, sect_id: int, stone_num: int, scale_ratio: int = 10):
         """宗门捐献（增加灵石和建设度，建设度 = 灵石 × scale_ratio）
 
         Args:
             sect_id: 宗门ID
             stone_num: 捐献灵石数量
             scale_ratio: 建设度换算比率
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         await self.conn.execute(
             """
@@ -184,7 +183,9 @@ class DatabaseExtended:
             """,
             (stone_num, stone_num * scale_ratio, sect_id),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
     # ===== BuffInfo 系统 CRUD =====
@@ -371,7 +372,6 @@ class DatabaseExtended:
         legacy_type: str,
         sect_id: int | None = None,
         is_active: bool = False,
-        commit: bool = True,
     ) -> int:
         """Create a legacy instance and return its row id.
 
@@ -380,7 +380,6 @@ class DatabaseExtended:
             legacy_type: One of common/sect/adventure/rift.
             sect_id: Owning sect for sect-type legacies, else None.
             is_active: Whether the instance starts as the active one.
-            commit: Whether to commit immediately (False inside outer txn).
 
         Returns:
             The new instance row id.
@@ -395,7 +394,9 @@ class DatabaseExtended:
             """,
             (owner_id, legacy_type, sect_id, int(is_active), int(time.time())),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
         async with self.conn.execute("SELECT last_insert_rowid()") as cursor:
             row = await cursor.fetchone()
@@ -443,21 +444,21 @@ class DatabaseExtended:
         row["is_active"] = int(row.get("is_active", 0))
         return LegacyInstance(**row)
 
-    async def set_active_legacy_instance(
-        self, owner_id: str, instance_id: int, commit: bool = True
-    ) -> bool:
+    async def set_active_legacy_instance(self, owner_id: str, instance_id: int) -> bool:
         """Mark instance_id active for owner and deactivate the rest (atomic).
 
         Args:
             owner_id: 玩家 ID。
             instance_id: 要激活的传承实例 ID。
-            commit: True 时自行 BEGIN IMMEDIATE 并提交（缺省）；False 时假定
-                调用方已开启外层事务，不另起事务、不提交、失败也不回滚外层。
 
         Returns:
             False when the instance does not belong to the owner.
         """
-        if commit:
+        # D2 ownership gate (4.2 收编): own the transaction only when no
+        # outer CM transaction is active; otherwise join it (no BEGIN,
+        # no commit/rollback of the outer txn).
+        own_txn = getattr(self.conn, "_txn_depth", 0) == 0
+        if own_txn:
             await self.conn.execute("BEGIN IMMEDIATE")
         try:
             async with self.conn.execute(
@@ -465,7 +466,7 @@ class DatabaseExtended:
                 (instance_id, owner_id),
             ) as cursor:
                 if await cursor.fetchone() is None:
-                    if commit:
+                    if own_txn:
                         await self.conn.rollback()
                     return False
             await self.conn.execute(
@@ -476,17 +477,15 @@ class DatabaseExtended:
                 "UPDATE legacy_instances SET is_active = 1 WHERE id = ?",
                 (instance_id,),
             )
-            if commit:
+            if own_txn:
                 await self.conn.commit()
             return True
         except Exception:
-            if commit:
+            if own_txn:
                 await self.conn.rollback()
             raise
 
-    async def clear_active_legacy_instance(
-        self, owner_id: str, instance_id: int, commit: bool = True
-    ):
+    async def clear_active_legacy_instance(self, owner_id: str, instance_id: int):
         """Deactivate the given instance if it is the owner's active one.
 
         Used when an active instance is snatched/reclaimed/deleted.
@@ -495,17 +494,16 @@ class DatabaseExtended:
             "UPDATE legacy_instances SET is_active = 0 WHERE id = ? AND owner_id = ?",
             (instance_id, owner_id),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
-    async def update_legacy_instance(
-        self, instance: LegacyInstance, commit: bool = True
-    ):
+    async def update_legacy_instance(self, instance: LegacyInstance):
         """Update value/claimed/owner/active fields of a legacy instance.
 
         Args:
             instance: The instance to persist (matched by id).
-            commit: Whether to commit immediately (False inside outer txn).
         """
         await self.conn.execute(
             """
@@ -524,19 +522,23 @@ class DatabaseExtended:
                 instance.id,
             ),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
-    async def delete_legacy_instance(self, instance_id: int, commit: bool = True):
+    async def delete_legacy_instance(self, instance_id: int):
         """Delete a legacy instance by primary key."""
         await self.conn.execute(
             "DELETE FROM legacy_instances WHERE id = ?", (instance_id,)
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
     async def delete_legacy_instances_by_owner_sect(
-        self, owner_id: str, sect_id: int, commit: bool = True
+        self, owner_id: str, sect_id: int
     ) -> int:
         """Delete the player's sect-bound legacy instances (leave-sect reclaim).
 
@@ -549,7 +551,9 @@ class DatabaseExtended:
         )
         rowcount = cursor.rowcount
         await cursor.close()
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
         return rowcount
 
@@ -585,7 +589,7 @@ class DatabaseExtended:
             return row[0] if row else None
 
     async def upsert_impart_pk_cooldown(
-        self, challenger_id: str, target_id: str, failed_at: int, commit: bool = True
+        self, challenger_id: str, target_id: str, failed_at: int
     ):
         """Record a challenge failure timestamp for a challenger→target pair."""
         await self.conn.execute(
@@ -596,7 +600,9 @@ class DatabaseExtended:
             """,
             (challenger_id, target_id, failed_at),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
     async def get_impart_snatch_protection(self, user_id: str) -> int | None:
@@ -608,9 +614,7 @@ class DatabaseExtended:
             row = await cursor.fetchone()
             return row[0] if row else None
 
-    async def upsert_impart_snatch_protection(
-        self, user_id: str, snatched_at: int, commit: bool = True
-    ):
+    async def upsert_impart_snatch_protection(self, user_id: str, snatched_at: int):
         """Record/refresh the player's snatch protection timestamp."""
         await self.conn.execute(
             """
@@ -620,12 +624,12 @@ class DatabaseExtended:
             """,
             (user_id, snatched_at),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
-    async def delete_impart_pk_cooldowns(
-        self, challenger_id: str, commit: bool = True
-    ) -> int:
+    async def delete_impart_pk_cooldowns(self, challenger_id: str) -> int:
         """Delete all challenge cooldowns where the player is the challenger.
 
         Returns:
@@ -635,13 +639,13 @@ class DatabaseExtended:
             "DELETE FROM impart_pk_cooldown WHERE challenger_id = ?", (challenger_id,)
         ) as cursor:
             deleted = cursor.rowcount
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
         return deleted
 
-    async def delete_impart_snatch_protection(
-        self, user_id: str, commit: bool = True
-    ) -> int:
+    async def delete_impart_snatch_protection(self, user_id: str) -> int:
         """Delete a player's snatch protection entry.
 
         Returns:
@@ -651,18 +655,19 @@ class DatabaseExtended:
             "DELETE FROM impart_snatch_protection WHERE user_id = ?", (user_id,)
         ) as cursor:
             deleted = cursor.rowcount
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
         return deleted
 
     # ===== 用户CD系统 CRUD =====
 
-    async def create_user_cd(self, user_id: str, commit: bool = True):
+    async def create_user_cd(self, user_id: str):
         """初始化用户CD信息
 
         Args:
             user_id: 用户ID
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         await self.conn.execute(
             """
@@ -671,7 +676,9 @@ class DatabaseExtended:
             """,
             (user_id,),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
     async def get_user_cd(self, user_id: str) -> UserCd | None:
@@ -708,7 +715,6 @@ class DatabaseExtended:
         busy_type: int,
         scheduled_time: int = 0,
         extra_data: dict = None,
-        commit: bool = True,
     ):
         """设置用户忙碌状态（无 user_cd 行时自动插入，保证双层状态检查一致）
 
@@ -717,7 +723,6 @@ class DatabaseExtended:
             busy_type: 0=空闲, 1=闭关, 2=历练, 3=探索秘境
             scheduled_time: 计划完成时间戳
             extra_data: 额外数据（如秘境ID等）
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         import time
 
@@ -734,7 +739,9 @@ class DatabaseExtended:
             """,
             (user_id, busy_type, int(time.time()), scheduled_time, extra_json),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
     async def set_user_free(self, user_id: str):
@@ -799,7 +806,6 @@ class DatabaseExtended:
         max_star_exp_compensation: int = 0,
         origin_sect_id: str | None = None,
         sect_bound: bool = False,
-        commit: bool = True,
     ) -> tuple[bool, int]:
         """Learn a new skill or increment the star level if already learned.
 
@@ -814,11 +820,6 @@ class DatabaseExtended:
                 on first learn; star-ups keep the original attribution).
             sect_bound: Whether the skill is inherently sect-bound (only
                 passable to members of the same sect); stored on first learn.
-            commit: When True (default), wrap the write in its own
-                ``BEGIN IMMEDIATE`` transaction and commit it. Pass False
-                when calling inside an outer transaction — no BEGIN is
-                issued, nothing is committed or rolled back here, and the
-                caller owns commit/rollback.
 
         Returns:
             (is_new_learn, new_star_level). If already at max_star,
@@ -827,7 +828,11 @@ class DatabaseExtended:
         import time
 
         now = int(time.time())
-        if commit:
+        # D2 ownership gate (4.2 收编): own the transaction only when no
+        # outer CM transaction is active; otherwise join it (no BEGIN,
+        # no commit/rollback of the outer txn).
+        own_txn = getattr(self.conn, "_txn_depth", 0) == 0
+        if own_txn:
             await self.conn.execute("BEGIN IMMEDIATE")
         try:
             async with self.conn.execute(
@@ -855,7 +860,7 @@ class DatabaseExtended:
                         int(sect_bound),
                     ),
                 )
-                if commit:
+                if own_txn:
                     await self.conn.commit()
                 return True, 1
 
@@ -866,7 +871,7 @@ class DatabaseExtended:
                         "UPDATE players SET experience = experience + ? WHERE user_id = ?",
                         (max_star_exp_compensation, user_id),
                     )
-                if commit:
+                if own_txn:
                     await self.conn.commit()
                 return False, max_star
 
@@ -878,11 +883,11 @@ class DatabaseExtended:
                 """,
                 (new_star, source, now, user_id, skill_id),
             )
-            if commit:
+            if own_txn:
                 await self.conn.commit()
             return False, new_star
         except Exception:
-            if commit:
+            if own_txn:
                 await self.conn.rollback()
             raise
 
@@ -896,7 +901,7 @@ class DatabaseExtended:
         await self.conn.commit()
 
     async def update_player_sect_info(
-        self, user_id: str, sect_id: int, sect_position: int, commit: bool = True
+        self, user_id: str, sect_id: int, sect_position: int
     ):
         """更新玩家宗门信息
 
@@ -904,13 +909,14 @@ class DatabaseExtended:
             user_id: 用户ID
             sect_id: 宗门ID
             sect_position: 宗门职位
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         await self.conn.execute(
             "UPDATE players SET sect_id = ?, sect_position = ? WHERE user_id = ?",
             (sect_id, sect_position, user_id),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
     async def update_player_sect_contribution(self, user_id: str, contribution: int):
@@ -921,41 +927,42 @@ class DatabaseExtended:
         )
         await self.conn.commit()
 
-    async def increment_sect_task_count(
-        self, user_id: str, count: int = 1, commit: bool = True
-    ):
+    async def increment_sect_task_count(self, user_id: str, count: int = 1):
         """增加宗门任务完成次数
 
         Args:
             user_id: 用户ID
             count: 增加次数
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         await self.conn.execute(
             "UPDATE players SET sect_task = sect_task + ? WHERE user_id = ?",
             (count, user_id),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
-    async def reset_sect_tasks(self, commit: bool = True):
+    async def reset_sect_tasks(self):
         """重置所有用户的宗门任务次数（定时任务）
 
         Args:
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         await self.conn.execute("UPDATE players SET sect_task = 0")
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
-    async def reset_sect_elixir_get(self, commit: bool = True):
+    async def reset_sect_elixir_get(self):
         """重置所有用户的宗门丹药领取标记（定时任务）
 
         Args:
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         await self.conn.execute("UPDATE players SET sect_elixir_get = 0")
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
     async def get_sect_members(self, sect_id: int) -> list:
@@ -990,7 +997,7 @@ class DatabaseExtended:
             return None
 
     async def update_bank_account(
-        self, user_id: str, balance: int, last_interest_time: int, commit: bool = True
+        self, user_id: str, balance: int, last_interest_time: int
     ):
         """更新或创建银行账户
 
@@ -998,7 +1005,6 @@ class DatabaseExtended:
             user_id: 用户ID
             balance: 账户余额
             last_interest_time: 上次利息结算时间戳
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         await self.conn.execute(
             """
@@ -1010,7 +1016,9 @@ class DatabaseExtended:
             """,
             (user_id, balance, last_interest_time),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
     # ===== Phase 2: 悬赏令系统 CRUD =====
@@ -1266,7 +1274,6 @@ class DatabaseExtended:
         borrowed_at: int,
         due_at: int,
         loan_type: str = "normal",
-        commit: bool = True,
     ) -> int:
         """创建贷款记录
 
@@ -1277,7 +1284,6 @@ class DatabaseExtended:
             borrowed_at: 借出时间戳
             due_at: 到期时间戳
             loan_type: 贷款类型 (normal/breakthrough)
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback。
                 last_insert_rowid() 是连接级状态，查询保持原位随事务内执行，
                 与是否提交无关（design D2）
         """
@@ -1286,36 +1292,40 @@ class DatabaseExtended:
                VALUES (?, ?, ?, ?, ?, 'active', ?)""",
             (user_id, principal, interest_rate, borrowed_at, due_at, loan_type),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
         async with self.conn.execute("SELECT last_insert_rowid()") as cursor:
             row = await cursor.fetchone()
             return row[0] if row else 0
 
-    async def close_loan(self, loan_id: int, commit: bool = True):
+    async def close_loan(self, loan_id: int):
         """关闭贷款（标记为已还清）
 
         Args:
             loan_id: 贷款记录ID
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         await self.conn.execute(
             "UPDATE bank_loans SET status = 'closed' WHERE id = ?", (loan_id,)
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
-    async def mark_loan_overdue(self, loan_id: int, commit: bool = True):
+    async def mark_loan_overdue(self, loan_id: int):
         """标记贷款逾期
 
         Args:
             loan_id: 贷款记录ID
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         await self.conn.execute(
             "UPDATE bank_loans SET status = 'overdue' WHERE id = ?", (loan_id,)
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
     async def get_overdue_loans(self, current_time: int) -> list[dict]:
@@ -1350,7 +1360,6 @@ class DatabaseExtended:
         balance_after: int,
         description: str,
         created_at: int,
-        commit: bool = True,
     ):
         """添加银行交易流水
 
@@ -1361,14 +1370,15 @@ class DatabaseExtended:
             balance_after: 交易后余额
             description: 交易描述
             created_at: 交易时间戳
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
         """
         await self.conn.execute(
             """INSERT INTO bank_transactions (user_id, trans_type, amount, balance_after, description, created_at)
                VALUES (?, ?, ?, ?, ?, ?)""",
             (user_id, trans_type, amount, balance_after, description, created_at),
         )
-        if commit:
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 
     async def get_bank_transactions(self, user_id: str, limit: int = 20) -> list[dict]:

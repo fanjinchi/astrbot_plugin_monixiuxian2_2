@@ -1183,17 +1183,14 @@ class GMManager:
             )
 
         # 多表改写包在一个事务里，避免快进一半留下混合时间态
+        # （CM 单事务：正常退出整体提交，任何失败整体回滚——全有或全无）
         counts: list[tuple[str, int]] = []
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction():
             for label, sql in _TIME_SKIP_RULES:
                 params = (seconds,) * sql.count("?")
                 async with self.db.conn.execute(sql, params) as cursor:
                     counts.append((label, max(cursor.rowcount, 0)))
-            await self.db.conn.commit()
-        except Exception:
-            await self.db.conn.rollback()
-            raise
+        # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
 
         detail = "\n".join(f"  {label}：{count} 条" for label, count in counts)
         total = sum(count for _, count in counts)

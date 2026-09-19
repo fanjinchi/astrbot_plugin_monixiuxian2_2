@@ -828,28 +828,28 @@ class SectManager:
         keeps the existing ``user_cd`` busy-state write (SECT_TASK type).
         The whole read-check-settle section (player/cooldown reads, cost
         deduction, reward grant, counter bumps, cooldown write) runs inside
-        a single ``BEGIN IMMEDIATE`` transaction — helpers are called with
-        ``commit=False`` so the first write cannot silently end the
-        transaction, and a mid-settlement failure cannot charge the player
-        without granting rewards.
+        a single ``async with db.transaction()`` unit of work — the leaf
+        helpers carry no commit parameter (D2 depth gate, fail-open), so a
+        first write cannot silently end the transaction, and a
+        mid-settlement failure cannot charge the player without granting
+        rewards.
         """
         tasks = (self.sect_tasks or {}).get("construction_tasks", [])
 
         # 玩家/冷却读取在事务内进行，避免并发下读到旧快照
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction() as txn:
             player = await self.db.get_player_by_id(user_id)
             if not player or player.sect_id == 0:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 你还未加入宗门！"
 
             if not isinstance(tasks, list) or not tasks:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 宗门暂无建设任务发布！"
 
             user_cd = await self.db.ext.get_user_cd(user_id)
             if not user_cd:
-                await self.db.ext.create_user_cd(user_id, commit=False)
+                await self.db.ext.create_user_cd(user_id)
                 user_cd = await self.db.ext.get_user_cd(user_id)
 
             current_time = int(time.time())
@@ -858,7 +858,7 @@ class SectManager:
                 and current_time < user_cd.scheduled_time
             ):
                 remaining = user_cd.scheduled_time - current_time
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, f"❌ 宗门任务冷却中！还需 {remaining // 60} 分钟。"
 
             task = random.choice(tasks)
@@ -873,7 +873,7 @@ class SectManager:
             # 灵石类任务前置校验（资材类任务由玩家外出采集，不消耗玩家货币）
             stones_cost = int(cost.get("stones", 0) or 0)
             if stones_cost > 0 and player.gold < stones_cost:
-                await self.db.conn.rollback()
+                txn.abort()
                 return (
                     False,
                     f"❌ 灵石不足！建设任务【{task_name}】需捐献 {stones_cost} 灵石，"
@@ -886,7 +886,7 @@ class SectManager:
                 player.gold -= stones_cost
                 # 灵石入宗门库房并按 scale_ratio 折算建设度
                 await self.db.ext.donate_to_sect(
-                    player.sect_id, stones_cost, scale_ratio, commit=False
+                    player.sect_id, stones_cost, scale_ratio
                 )
                 lines.append(
                     f"捐献灵石：-{stones_cost}（宗门建设度 +{stones_cost * scale_ratio}）"
@@ -896,7 +896,7 @@ class SectManager:
             if materials_gain > 0:
                 # 玩家为宗门采集/筹备资材，资材直接入宗门库房
                 await self.db.ext.update_sect_materials(
-                    player.sect_id, materials_gain, 1, commit=False
+                    player.sect_id, materials_gain, 1
                 )
                 lines.append(f"宗门资材：+{materials_gain}")
 
@@ -910,17 +910,13 @@ class SectManager:
                 player.experience += exp_gain
                 lines.append(f"获得修为：+{exp_gain}")
 
-            await self.db.update_player(player, commit=False)
-            await self.db.ext.increment_sect_task_count(user_id, commit=False)
+            await self.db.update_player(player)
+            await self.db.ext.increment_sect_task_count(user_id)
 
             # 冷却使用任务配置的 cooldown 字段，状态写法保持不变
             await self.db.ext.set_user_busy(
-                user_id, UserStatus.SECT_TASK, current_time + cooldown, commit=False
+                user_id, UserStatus.SECT_TASK, current_time + cooldown
             )
-            await self.db.conn.commit()
-        except Exception:
-            await self.db.conn.rollback()
-            raise
 
         return True, "\n".join(lines)
 
@@ -1043,33 +1039,33 @@ class SectManager:
         The pill granted is the one unlocked at the sect's current elixir
         room level. The claim writes ``player.sect_elixir_get``; the flag is
         reset daily (wired at the check-in settlement point). The
-        read-check-write critical section runs inside a ``BEGIN IMMEDIATE``
-        transaction so concurrent claims cannot double-grant the pill.
+        read-check-write critical section runs inside an
+        ``async with db.transaction()`` unit of work so concurrent claims
+        cannot double-grant the pill.
         """
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction() as txn:
             player = await self.db.get_player_by_id(user_id)
             if not player or player.sect_id == 0:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 你还未加入宗门！"
             sect = await self.db.ext.get_sect_by_id(player.sect_id)
             if not sect:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 宗门信息异常！"
 
             if sect.elixir_room_level <= 0:
-                await self.db.conn.rollback()
+                txn.abort()
                 return (
                     False,
                     "❌ 宗门丹房尚未建成！可通过「宗门 建设 丹房」升级丹房。",
                 )
             if player.sect_elixir_get:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 你今日已在丹房领取过丹药，请明日再来！"
 
             unlocked = self.get_unlocked_elixir_pills(sect)
             if not unlocked:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 丹房当前等级未配置可领取的丹药！"
 
             pill_name = unlocked[-1]
@@ -1077,19 +1073,14 @@ class SectManager:
                 logger.warning(
                     f"【修仙插件】宗门「{sect.sect_name}」丹房配置的丹药「{pill_name}」不存在，领取失败。"
                 )
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, f"❌ 丹房存丹【{pill_name}】的配置缺失，请联系管理员！"
 
             inventory = player.get_pills_inventory()
             inventory[pill_name] = inventory.get(pill_name, 0) + 1
             player.set_pills_inventory(inventory)
             player.sect_elixir_get = 1
-            await self.db.update_player(player, commit=False)
-
-            await self.db.conn.commit()
-        except Exception:
-            await self.db.conn.rollback()
-            raise
+            await self.db.update_player(player)
 
         return (
             True,
@@ -1191,24 +1182,23 @@ class SectManager:
         by current level). System sects allow any member to upgrade;
         player-built sects require the second-highest permission tier
         (elder and above) to prevent griefing.
-        The read-check-write critical section runs inside a
-        ``BEGIN IMMEDIATE`` transaction so concurrent upgrades cannot
-        double-spend sect materials.
+        The read-check-write critical section runs inside an
+        ``async with db.transaction()`` unit of work so concurrent upgrades
+        cannot double-spend sect materials.
         """
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction() as txn:
             player = await self.db.get_player_by_id(user_id)
             if not player or player.sect_id == 0:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 你还未加入宗门！"
             sect = await self.db.ext.get_sect_by_id(player.sect_id)
             if not sect:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 宗门信息异常！"
 
             key = self.BUILDING_ALIASES.get((building_key or "").strip())
             if not key:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 未知建筑！可升级：洞天、丹房（例如：宗门建设 洞天）"
 
             # 玩家宗门需长老及以上权限，防止低阶弟子擅动宗门资材
@@ -1218,13 +1208,13 @@ class SectManager:
                     ladder[1] if len(ladder) > 1 else (ladder[0] if ladder else 0)
                 )
                 if self.get_position_permission(player.sect_position) < threshold:
-                    await self.db.conn.rollback()
+                    txn.abort()
                     return False, "❌ 只有宗主和长老才能主持宗门建设！"
 
             buildings = self.get_sect_buildings(sect)
             cfg = buildings.get(key, {})
             if not isinstance(cfg, dict) or not cfg:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 本宗门未配置该建筑！"
 
             current_level = (
@@ -1232,7 +1222,7 @@ class SectManager:
             )
             max_level = int(cfg.get("max_level", 0) or 0)
             if current_level >= max_level:
-                await self.db.conn.rollback()
+                txn.abort()
                 return (
                     False,
                     f"❌ {self.BUILDING_DISPLAY_NAMES[key]}已达满级（{max_level}级）！",
@@ -1240,16 +1230,16 @@ class SectManager:
 
             costs = cfg.get("upgrade_cost", [])
             if not isinstance(costs, list) or current_level >= len(costs):
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 该建筑未配置升级消耗，无法升级！"
             try:
                 cost = int(costs[current_level])
             except (TypeError, ValueError):
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 该建筑升级消耗配置异常，无法升级！"
 
             if sect.sect_materials < cost:
-                await self.db.conn.rollback()
+                txn.abort()
                 return (
                     False,
                     f"❌ 宗门资材不足！升级需 {cost} 资材，当前仅有 {sect.sect_materials}。"
@@ -1271,12 +1261,7 @@ class SectManager:
                     if unlocked
                     else "暂无新丹药解锁。"
                 )
-            await self.db.ext.update_sect(sect, commit=False)
-
-            await self.db.conn.commit()
-        except Exception:
-            await self.db.conn.rollback()
-            raise
+            await self.db.ext.update_sect(sect)
 
         name = self.BUILDING_DISPLAY_NAMES[key]
         return (
@@ -1363,32 +1348,31 @@ class SectManager:
         its ``promotion`` config defines the dual gates (contribution +
         level_index). Positions with ``promotion: null`` (e.g. 宗主) have no
         promotion channel — sect-master transfer logic is untouched. The
-        read-check-write critical section runs inside a ``BEGIN IMMEDIATE``
-        transaction.
+        read-check-write critical section runs inside an
+        ``async with db.transaction()`` unit of work.
         """
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction() as txn:
             player = await self.db.get_player_by_id(user_id)
             if not player or player.sect_id == 0:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 你还未加入宗门！"
 
             positions = self._get_positions()
             current = player.sect_position
             if current == 0:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 你已是一宗之主，无需晋升！"
 
             target = current - 1
             target_info = positions.get(str(target))
             if not isinstance(target_info, dict):
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 你已是可晋升的最高职阶！"
 
             target_name = target_info.get("name", f"职位{target}")
             promotion = target_info.get("promotion")
             if not isinstance(promotion, dict):
-                await self.db.conn.rollback()
+                txn.abort()
                 return (
                     False,
                     f"❌ 【{target_name}】之位不设晋升通道（宗主之位只能传位获得）！",
@@ -1413,18 +1397,12 @@ class SectManager:
                 )
                 gaps.append(f"境界不足（需达到{level_name or f'境界{need_level}'}）")
             if gaps:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, (
                     f"❌ 晋升【{target_name}】未达门槛：\n" + "\n".join(gaps)
                 )
 
-            await self.db.ext.update_player_sect_info(
-                user_id, player.sect_id, target, commit=False
-            )
-            await self.db.conn.commit()
-        except Exception:
-            await self.db.conn.rollback()
-            raise
+            await self.db.ext.update_player_sect_info(user_id, player.sect_id, target)
 
         benefits = self.get_position_benefits(target)
         welfare_lines = []
@@ -1582,23 +1560,25 @@ class SectManager:
         ``player.sect_treasure_claims``) and are reclaimed on leaving the
         sect; heart methods can only be claimed by members who do not
         already own them. The read-check-write critical section runs inside
-        a ``BEGIN IMMEDIATE`` transaction so concurrent claims cannot
-        double-grant the same item.
+        an ``async with db.transaction()`` unit of work so concurrent
+        claims cannot double-grant the same item. Legacy claims only
+        pre-check inside the unit (reads only); the guardian battle runs
+        after it exits (async combat never holds the write lock).
         """
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        claim_legacy = False
+        async with self.db.transaction() as txn:
             player = await self.db.get_player_by_id(user_id)
             if not player or player.sect_id == 0:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 你还未加入宗门！"
             sect = await self.db.ext.get_sect_by_id(player.sect_id)
             if not sect:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 宗门信息异常！"
 
             ref = (item_ref or "").strip()
             if not ref:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 请指定要领取的传承，例如：宗门 宝库 青云镇山剑"
 
             entries = self._get_treasury_entries(sect)
@@ -1606,7 +1586,7 @@ class SectManager:
                 (e for e in entries if e["id"] == ref or e["name"] == ref), None
             )
             if not entry:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, f"❌ 宝库中没有【{ref}】！"
 
             if not self._can_claim_entry(entry, player.sect_position):
@@ -1615,15 +1595,16 @@ class SectManager:
                     if entry["min_position"] < 99
                     else "需职阶福利解锁"
                 )
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, f"❌ 你的职阶不足以领取【{entry['name']}】（{gate}）！"
 
             # 宗门传承：守护挑战须在事务外进行（异步战斗不可入事务），
-            # 此处仅做预检，实际挑战与创建在事务提交后执行
+            # 此处仅做预检（纯读），通过后标记 claim_legacy，随 CM 干净退出
+            # （空事务提交，等价原“预检事务提前 commit”），战斗在事务外继续
             if entry["kind"] == "legacy":
                 claims = player.get_sect_treasure_claims()
                 if entry["id"] in claims:
-                    await self.db.conn.rollback()
+                    txn.abort()
                     return (
                         False,
                         f"❌ 你已领取过【{entry['name']}】，宗门传承每人限领一次！",
@@ -1634,40 +1615,37 @@ class SectManager:
                     i.legacy_type == "sect" and i.sect_id == player.sect_id
                     for i in held
                 ):
-                    await self.db.conn.rollback()
+                    txn.abort()
                     return False, f"❌ 你已持有【{entry['name']}】，无需重复领取！"
-                await self.db.conn.commit()
-                return await self._claim_sect_legacy(player, sect, entry)
-
-            claims = player.get_sect_treasure_claims()
-            items = player.get_storage_ring_items()
-
-            if entry["kind"] == "treasure":
-                if entry["id"] in claims:
-                    await self.db.conn.rollback()
-                    return (
-                        False,
-                        f"❌ 你已领取过【{entry['name']}】，每件宗门之宝每人限领一次！",
-                    )
+                claim_legacy = True
             else:
-                # 心法限未学者（储物戒持有或已装备均视为已习得）
-                if entry["name"] in items or player.main_technique == entry["name"]:
-                    await self.db.conn.rollback()
-                    return False, f"❌ 你已习得【{entry['name']}】，无需重复领取！"
-                if entry["id"] in claims:
-                    await self.db.conn.rollback()
-                    return False, f"❌ 你已领取过【{entry['name']}】！"
+                claims = player.get_sect_treasure_claims()
+                items = player.get_storage_ring_items()
 
-            items[entry["name"]] = items.get(entry["name"], 0) + 1
-            player.set_storage_ring_items(items)
-            claims.append(entry["id"])
-            player.set_sect_treasure_claims(claims)
-            await self.db.update_player(player, commit=False)
-            await self.db.conn.commit()
-        except Exception:
-            await self.db.conn.rollback()
-            raise
+                if entry["kind"] == "treasure":
+                    if entry["id"] in claims:
+                        txn.abort()
+                        return (
+                            False,
+                            f"❌ 你已领取过【{entry['name']}】，每件宗门之宝每人限领一次！",
+                        )
+                else:
+                    # 心法限未学者（储物戒持有或已装备均视为已习得）
+                    if entry["name"] in items or player.main_technique == entry["name"]:
+                        txn.abort()
+                        return False, f"❌ 你已习得【{entry['name']}】，无需重复领取！"
+                    if entry["id"] in claims:
+                        txn.abort()
+                        return False, f"❌ 你已领取过【{entry['name']}】！"
 
+                items[entry["name"]] = items.get(entry["name"], 0) + 1
+                player.set_storage_ring_items(items)
+                claims.append(entry["id"])
+                player.set_sect_treasure_claims(claims)
+                await self.db.update_player(player)
+
+        if claim_legacy:
+            return await self._claim_sect_legacy(player, sect, entry)
         if entry["kind"] == "treasure":
             return True, (
                 f"🎁 你从宗门宝库领取了【{entry['name']}】，已存入储物戒！\n"
@@ -1705,21 +1683,20 @@ class SectManager:
         # 守护挑战胜利后，事务内创建实例 + 占名额（防并发重复领取）。
         # 重取玩家最新状态：守护战斗耗时较长，in-memory player 可能已陈旧，
         # 并发双领取必须读取 DB 内最新 claims，否则会穿透「每人限领一次」检查
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction() as txn:
             fresh_player = await self.db.get_player_by_id(player.user_id)
             if fresh_player is None:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 玩家数据不存在，请稍后再试。"
             # 归属复核：战斗期间玩家可能已退宗/转会，必须以事务内最新状态为准；
             # 战斗前的守卫（str(player.sect_id) != str(sect.sect_id)）用的是
             # 战前快照，无法覆盖此窗口
             if str(fresh_player.sect_id) != str(sect.sect_id):
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 你当前已不在该宗门，无法领取宗门传承。"
             claims = fresh_player.get_sect_treasure_claims()
             if entry["id"] in claims:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, f"❌ 你已领取过【{entry['name']}】！"
             # 同宗门已持有 sect 实例则拒绝（防并发双开不同 entry 绕过
             # 「已持有本宗传承不可重复领取」——战前预检基于旧快照，事务内需重查）
@@ -1728,25 +1705,20 @@ class SectManager:
                 i.legacy_type == "sect" and str(i.sect_id) == str(sect.sect_id)
                 for i in held
             ):
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 你已持有本宗传承，无需重复领取！"
             instance = await self.impart_mgr.create_legacy(
                 fresh_player.user_id,
                 "sect",
                 sect_id=sect.sect_id,
                 activate=False,
-                commit=False,
             )
             if not instance:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 传承实例创建失败，请稍后再试。"
             claims.append(entry["id"])
             fresh_player.set_sect_treasure_claims(claims)
-            await self.db.update_player(fresh_player, commit=False)
-            await self.db.conn.commit()
-        except Exception:
-            await self.db.conn.rollback()
-            raise
+            await self.db.update_player(fresh_player)
 
         return True, render_narrative(
             self.config_manager,
@@ -1825,23 +1797,22 @@ class SectManager:
     async def buy_sect_shop_item(self, user_id: str, item_ref: str) -> tuple[bool, str]:
         """Buy a sect shop entry with sect contribution (transactional).
 
-        读-校验-扣减-发放全程在 ``BEGIN IMMEDIATE`` 事务内，防止并发购买
-        重复扣费或超扣贡献。商品按名称存入储物戒（与宝库领取一致）。
+        读-校验-扣减-发放全程在 ``async with db.transaction()`` 单位内，防止并发
+        购买重复扣费或超扣贡献。商品按名称存入储物戒（与宝库领取一致）。
         """
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction() as txn:
             player = await self.db.get_player_by_id(user_id)
             if not player or player.sect_id == 0:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 你还未加入宗门！加入宗门后可使用「宗门 商店」。"
             sect = await self.db.ext.get_sect_by_id(player.sect_id)
             if not sect:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 宗门信息异常！"
 
             ref = (item_ref or "").strip()
             if not ref:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "❌ 请指定要购买的商品，例如：宗门 商店 购买 青云天剑"
 
             entries = self._get_shop_entries(sect)
@@ -1849,18 +1820,18 @@ class SectManager:
                 (e for e in entries if e["id"] == ref or e["name"] == ref), None
             )
             if not entry:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, f"❌ 宗门商店中没有【{ref}】！"
 
             if player.sect_position > entry["min_position"]:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, (
                     f"❌ 你的职阶不足以购买【{entry['name']}】"
                     f"（需{self.get_position_name(entry['min_position'])}及以上）！"
                 )
 
             if player.sect_contribution < entry["price"]:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, (
                     f"❌ 贡献点不足！购买【{entry['name']}】需 {entry['price']} 贡献，"
                     f"你当前有 {player.sect_contribution} 贡献。"
@@ -1870,11 +1841,7 @@ class SectManager:
             items = player.get_storage_ring_items()
             items[entry["name"]] = items.get(entry["name"], 0) + 1
             player.set_storage_ring_items(items)
-            await self.db.update_player(player, commit=False)
-            await self.db.conn.commit()
-        except Exception:
-            await self.db.conn.rollback()
-            raise
+            await self.db.update_player(player)
 
         return True, (
             f"🏪 购买成功！【{entry['name']}】已存入储物戒。\n"
@@ -2054,13 +2021,13 @@ class SectManager:
         ``learn_or_star_up`` with sect attribution; max-star duplicates
         follow the existing exp-compensation rule), and the chain advances
         to the next stage (or completes). The whole settlement — skill
-        grant (``commit=False``), player re-read, contribution/exp and
-        stage progress write — runs inside a single ``BEGIN IMMEDIATE``
-        transaction, so a half-settled stage (skill granted but progress
-        not advanced, or vice versa) is impossible and a retry on the next
-        matching event is always safe; if the skill grant fails, the
-        transaction is rolled back and the stage is NOT marked complete
-        (stored progress is kept).
+        grant, player re-read, contribution/exp and stage progress write —
+        runs inside a single
+        ``async with db.transaction()`` unit of work, so a half-settled
+        stage (skill granted but progress not advanced, or vice versa) is
+        impossible and a retry on the next matching event is always safe;
+        if the skill grant fails, the unit is rolled back and the stage is
+        NOT marked complete (stored progress is kept).
 
         Args:
             user_id: Player user ID.
@@ -2120,14 +2087,13 @@ class SectManager:
         reward_lines = []
 
         # 功法发放（learn_or_star_up，含满星折算修为）+ 重新读取玩家 +
-        # 落贡献/修为/阶段进度（update_player）放进同一 BEGIN IMMEDIATE 事务，
-        # 全部 helper 传 commit=False、由本处统一 commit/rollback：
+        # 落贡献/修为/阶段进度（update_player）放进同一 CM 事务，叶子 helper
+        # 无 commit 参数（深度门控）、由 owner 层统一提交/回滚：
         # "功法已发但进度未落"或反过来的分裂状态都不可能发生，重试天然安全
-        # （要么全成要么全不成）。功法发放失败时回滚事务、阶段不标记完成
+        # （要么全成要么全不成）。功法发放失败时 abort 回滚事务、阶段不标记完成
         # （进度保持），下次事件可重试结算。
         pool_name = reward.get("skill_learn_chance")
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction() as txn:
             if pool_name:
                 skill_msg = await self._grant_master_skill(
                     user_id, str(pool_name), faction.get("id")
@@ -2135,7 +2101,7 @@ class SectManager:
                 if skill_msg:
                     reward_lines.append(skill_msg)
                 else:
-                    await self.db.conn.rollback()
+                    txn.abort()
                     return (
                         f"\n\n⚠️ 师承任务【{stage_name}】的功法传承发放失败，"
                         "本次进度已保留，请再次触发对应行为重试结算。"
@@ -2144,7 +2110,7 @@ class SectManager:
             # 功法发放可能已原子写入折算修为，事务内重新读取玩家避免整行覆盖
             player = await self.db.get_player_by_id(user_id)
             if not player:
-                await self.db.conn.rollback()
+                txn.abort()
                 return None
 
             contribution = int(reward.get("contribution", 0) or 0)
@@ -2166,11 +2132,7 @@ class SectManager:
                     "done": finished,
                 }
             )
-            await self.db.update_player(player, commit=False)
-            await self.db.conn.commit()
-        except Exception:
-            await self.db.conn.rollback()
-            raise
+            await self.db.update_player(player)
 
         lines = [f"📜 师承任务【{stage_name}】完成！"]
         if stage.get("text"):
@@ -2193,7 +2155,7 @@ class SectManager:
         attribution. A duplicate at max star follows the existing max-star
         exp-compensation rule (same config keys as SkillManager). Must be
         called inside the caller's ``BEGIN IMMEDIATE`` transaction:
-        ``learn_or_star_up`` is invoked with ``commit=False`` so the grant
+        leaf helpers carry no commit parameter (depth-gated), so the grant
         commits or rolls back together with the stage settlement. Database
         failures are caught and logged here; the method returns None so the
         caller rolls back, keeps the stage unsettled and retries on the
@@ -2244,7 +2206,6 @@ class SectManager:
                 max_star_exp_compensation=compensation,
                 origin_sect_id=faction_id,
                 sect_bound=True,
-                commit=False,
             )
         except Exception:
             logger.warning(

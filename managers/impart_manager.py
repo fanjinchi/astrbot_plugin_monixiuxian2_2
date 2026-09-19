@@ -101,7 +101,6 @@ class ImpartManager:
         legacy_type: str,
         sect_id: int | None = None,
         activate: bool = True,
-        commit: bool = True,
     ) -> LegacyInstance | None:
         """Create a legacy instance for a player.
 
@@ -112,20 +111,17 @@ class ImpartManager:
             activate: When True (default), the new instance becomes the
                 player's active one; when False (e.g. snatched legacies),
                 activation is left untouched.
-            commit: Whether to commit immediately; False inside outer txn.
 
         Returns:
             The created instance, or None on failure.
         """
         instance_id = await self.db.ext.create_legacy_instance(
-            owner_id, legacy_type, sect_id=sect_id, is_active=False, commit=commit
+            owner_id, legacy_type, sect_id=sect_id, is_active=False
         )
         if not instance_id:
             return None
         if activate:
-            await self.db.ext.set_active_legacy_instance(
-                owner_id, instance_id, commit=commit
-            )
+            await self.db.ext.set_active_legacy_instance(owner_id, instance_id)
         return await self.db.ext.get_legacy_instance_by_id(instance_id)
 
     async def list_owner_legacies(self, user_id: str) -> list[LegacyInstance]:
@@ -147,18 +143,12 @@ class ImpartManager:
 
     # ===== 传承值累积（仅激活实例） =====
 
-    async def add_active_impart_value(
-        self, player: Player, delta: int, commit: bool = True
-    ) -> str | None:
+    async def add_active_impart_value(self, player: Player, delta: int) -> str | None:
         """Add impart value to the player's ACTIVE instance (cultivation hook).
 
         Args:
             player: The settling player (for tier reward grants).
             delta: Points to add (effective_minutes // 15); <=0 is a no-op.
-            commit: Whether instance updates commit immediately; True by
-                default since the cultivation settlement calls this outside
-                any transaction. Reward persistence always commits via
-                ``update_player``.
 
         Returns:
             A Chinese message line for the settlement report, or None when
@@ -171,9 +161,9 @@ class ImpartManager:
             return None
 
         instance.impart_value += delta
-        await self.db.ext.update_legacy_instance(instance, commit=commit)
+        await self.db.ext.update_legacy_instance(instance)
 
-        granted = await self._grant_pending_rewards(player, instance, commit=commit)
+        granted = await self._grant_pending_rewards(player, instance)
         name = self.get_type_name(instance.legacy_type)
         msg = f"🌟 【{name}】传承值 +{delta}（当前 {instance.impart_value}）"
         if granted:
@@ -222,29 +212,25 @@ class ImpartManager:
             The updated instance, or None when not found / ownership
             changed (expected_owner mismatch).
         """
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction() as txn:
             instance = await self.db.ext.get_legacy_instance_by_id(instance_id)
             if not instance:
-                await self.db.conn.rollback()
+                txn.abort()
                 return None
             if expected_owner is not None and instance.owner_id != expected_owner:
                 # 并发双开：实例已被他人夺走，不得从新主人手里再夺
-                await self.db.conn.rollback()
+                txn.abort()
                 return None
             await self.db.ext.clear_active_legacy_instance(
-                instance.owner_id, instance_id, commit=False
+                instance.owner_id, instance_id
             )
             instance.owner_id = new_owner
             instance.impart_value = 0
             instance.set_claimed_tiers([])
             instance.is_active = 0
-            await self.db.ext.update_legacy_instance(instance, commit=False)
-            await self.db.conn.commit()
+            await self.db.ext.update_legacy_instance(instance)
+            # 正常退出触发 owner 层提交
             return instance
-        except Exception:
-            await self.db.conn.rollback()
-            raise
 
     # ===== 失败冷却 / 被夺保护 =====
 
@@ -280,11 +266,9 @@ class ImpartManager:
             return 0
         return IMPART_SNATCH_PROTECTION_SECONDS - elapsed
 
-    async def record_snatch_protection(self, user_id: str, commit: bool = True):
+    async def record_snatch_protection(self, user_id: str):
         """Record that the player's legacy was just snatched (3-day protection)."""
-        await self.db.ext.upsert_impart_snatch_protection(
-            user_id, int(time.time()), commit=commit
-        )
+        await self.db.ext.upsert_impart_snatch_protection(user_id, int(time.time()))
 
     # ===== 排行 =====
 
@@ -343,7 +327,7 @@ class ImpartManager:
     # ===== 奖励发放 =====
 
     async def _grant_pending_rewards(
-        self, player: Player, instance: LegacyInstance, commit: bool = True
+        self, player: Player, instance: LegacyInstance
     ) -> list[str]:
         """Grant all unclaimed tier rewards the instance has reached.
 
@@ -370,7 +354,7 @@ class ImpartManager:
 
         if claimed != set(instance.get_claimed_tiers()):
             instance.set_claimed_tiers(sorted(claimed))
-            await self.db.ext.update_legacy_instance(instance, commit=commit)
+            await self.db.ext.update_legacy_instance(instance)
 
         if player_changed:
             await self.db.update_player(player)

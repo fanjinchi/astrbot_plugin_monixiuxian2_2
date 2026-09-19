@@ -23,6 +23,30 @@ def _make_event() -> MagicMock:
     return event
 
 
+def _fake_transaction(mock_db: MagicMock) -> MagicMock:
+    """Bind a transaction-CM stand-in onto a mocked db.
+
+    Mirrors the real CM contract (owner commit on clean exit, rollback on
+    exception) so spy tests keep asserting the transaction outcome at the
+    ``db`` seam instead of at handler-level ``conn.commit`` calls (which the
+    CM owns after the unit-of-work migration).
+    """
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def _txn():
+        txn = MagicMock()
+        try:
+            yield txn
+        except BaseException:
+            await mock_db.conn.rollback()
+            raise
+        await mock_db.conn.commit()
+
+    mock_db.transaction = _txn
+    return mock_db.transaction
+
+
 def _make_player() -> MagicMock:
     player = MagicMock()
     player.user_id = "u1"
@@ -87,6 +111,7 @@ async def test_handle_buy_valid_pill_still_succeeds():
     handler.db.update_player = AsyncMock()
     handler.pill_manager = MagicMock()
     handler.pill_manager.add_pill_to_inventory = AsyncMock()
+    _fake_transaction(handler.db)
 
     event = _make_event()
     player = _make_player()
@@ -96,4 +121,5 @@ async def test_handle_buy_valid_pill_still_succeeds():
     msg = str(outputs[0])
     assert "成功购买【筑基丹】x1" in msg and "花费灵石: 5000" in msg
     handler.pill_manager.add_pill_to_inventory.assert_awaited_once()
+    # 提交由事务 CM 的 owner 层完成（unit-of-work 迁移后 handler 不再直接 commit）
     handler.db.conn.commit.assert_awaited_once()

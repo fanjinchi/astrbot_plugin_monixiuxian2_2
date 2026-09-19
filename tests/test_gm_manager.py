@@ -733,7 +733,7 @@ class _FakeImpartManager:
         self.created = []
 
     async def create_legacy(
-        self, owner_id, legacy_type, sect_id=None, activate=False, commit=True
+        self, owner_id, legacy_type, sect_id=None, activate=False
     ):
         inst = _FakeLegacyInstance(self._next_id, owner_id, legacy_type, sect_id)
         self._next_id += 1

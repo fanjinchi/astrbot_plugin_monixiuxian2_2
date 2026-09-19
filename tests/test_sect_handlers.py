@@ -252,7 +252,7 @@ async def test_check_in_daily_reset_failure_does_not_break_check_in(monkeypatch)
 
     await _make_player(db, "u1", check_in_date="2000-01-01")
 
-    async def _boom(commit=True):
+    async def _boom():
         raise RuntimeError("simulated reset failure")
 
     monkeypatch.setattr(db.ext, "reset_sect_elixir_get", _boom)

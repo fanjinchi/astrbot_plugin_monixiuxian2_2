@@ -3,7 +3,7 @@
 import re
 import time
 
-from astrbot.api import AstrBotConfig, logger
+from astrbot.api import AstrBotConfig
 from astrbot.api.event import AstrMessageEvent
 
 from ..config_manager import ConfigManager
@@ -205,11 +205,10 @@ class ShopHandler:
             return
         result_lines = []
 
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction() as txn:
             player = await self.db.get_player_by_id(event.get_sender_id())
             if player.gold < total_price:
-                await self.db.conn.rollback()
+                txn.abort()
                 yield event.plain_result(
                     f"灵石不足！\n【{target_item['name']}】价格: {price} 灵石\n"
                     f"购买数量: {quantity}\n需要灵石: {total_price}\n你的灵石: {player.gold}"
@@ -217,10 +216,10 @@ class ShopHandler:
                 return
 
             reserved, _, remaining = await self.db.decrement_shop_item_stock(
-                pavilion_id, item_name, quantity, external_transaction=True
+                pavilion_id, item_name, quantity
             )
             if not reserved:
-                await self.db.conn.rollback()
+                txn.abort()
                 yield event.plain_result(f"【{item_name}】已售罄，请等待刷新。")
                 return
 
@@ -232,7 +231,7 @@ class ShopHandler:
                 "accessory",
             ]:
                 success, msg = await self.storage_ring_manager.store_item(
-                    player, target_item["name"], quantity, external_transaction=True
+                    player, target_item["name"], quantity
                 )
                 if success:
                     type_name = {
@@ -252,23 +251,23 @@ class ShopHandler:
                     result_lines.append(f"⚠️ 存入储物戒失败：{msg}")
             elif item_type in ["pill", "exp_pill", "utility_pill"]:
                 await self.pill_manager.add_pill_to_inventory(
-                    player, target_item["name"], count=quantity, commit=False
+                    player, target_item["name"], count=quantity
                 )
                 result_lines.append(
                     f"成功购买【{target_item['name']}】x{quantity}，已添加到背包。"
                 )
             elif item_type == "legacy_pill":
                 success, message = await self._apply_legacy_pill_effects(
-                    player, target_item, quantity, commit=False
+                    player, target_item, quantity
                 )
                 if not success:
-                    await self.db.conn.rollback()
+                    txn.abort()
                     yield event.plain_result(message)
                     return
                 result_lines.append(message)
             elif item_type == "material":
                 success, msg = await self.storage_ring_manager.store_item(
-                    player, target_item["name"], quantity, external_transaction=True
+                    player, target_item["name"], quantity
                 )
                 if success:
                     result_lines.append(
@@ -281,7 +280,7 @@ class ShopHandler:
                     result_lines.append(f"⚠️ 存入储物戒失败：{msg}")
             elif item_type == "功法":
                 success, msg = await self.storage_ring_manager.store_item(
-                    player, target_item["name"], quantity, external_transaction=True
+                    player, target_item["name"], quantity
                 )
                 if success:
                     result_lines.append(
@@ -293,13 +292,13 @@ class ShopHandler:
                     )
                     result_lines.append(f"⚠️ 存入储物戒失败：{msg}")
             else:
-                await self.db.conn.rollback()
+                txn.abort()
                 yield event.plain_result(f"未知的物品类型：{item_type}")
                 return
 
             player.gold -= total_price
-            await self.db.update_player(player, commit=False)
-            await self.db.conn.commit()
+            await self.db.update_player(player)
+            # 正常退出触发 owner 层提交（yield 的消息发送完成后提交）
 
             result_lines.append(f"花费灵石: {total_price}，剩余: {player.gold}")
             if sect_discount < 1.0:
@@ -308,10 +307,6 @@ class ShopHandler:
                 f"剩余库存: {remaining}" if remaining > 0 else "该物品已售罄！"
             )
             yield event.plain_result("\n".join(result_lines))
-        except Exception as e:
-            await self.db.conn.rollback()
-            logger.error(f"购买异常: {e}")
-            raise
 
     def _get_acquire_hint(self, item_type: str) -> str:
         """根据类型返回获取提示"""
@@ -343,7 +338,7 @@ class ShopHandler:
         yield event.plain_result("\n".join(lines))
 
     async def _apply_legacy_pill_effects(
-        self, player: Player, item: dict, quantity: int, commit: bool = True
+        self, player: Player, item: dict, quantity: int
     ) -> tuple:
         """应用旧系统丹药效果（items.json中的丹药）
 
@@ -351,7 +346,6 @@ class ShopHandler:
             player: 玩家对象
             item: 物品配置字典
             quantity: 购买数量
-            commit: 是否立即提交；事务块内调用传 False，由外层统一 commit/rollback
 
         Returns:
             (是否成功, 消息)
@@ -452,7 +446,7 @@ class ShopHandler:
         player.hp = max(1, player.hp)
         player.armor_value = max(0, player.armor_value)
 
-        await self.db.update_player(player, commit=commit)
+        await self.db.update_player(player)
 
         # 去重效果消息
         unique_effects = list(dict.fromkeys(effect_msgs))

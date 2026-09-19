@@ -328,11 +328,10 @@ class BountyManager:
         now = int(time.time())
         time_limit = cached.get("time_limit", template.get("time_limit", 3600))
 
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction() as txn:
             active = await self.db.ext.get_active_bounty(player.user_id)
             if active:
-                await self.db.conn.rollback()
+                txn.abort()
                 return (
                     False,
                     f"你已有进行中的悬赏：{active['bounty_name']}，请先完成或放弃。",
@@ -343,7 +342,7 @@ class BountyManager:
             if cd_value:
                 cd_time = int(cd_value)
                 if now < cd_time:
-                    await self.db.conn.rollback()
+                    txn.abort()
                     remaining = (cd_time - now) // 60 or 1
                     return (
                         False,
@@ -364,6 +363,7 @@ class BountyManager:
                 ensure_ascii=False,
             )
 
+            # 接取成功后正常退出触发 owner 层提交（CM 统一提交/回滚）
             await self.db.conn.execute(
                 """
                 INSERT INTO bounty_tasks (
@@ -383,10 +383,6 @@ class BountyManager:
                     expire_time,
                 ),
             )
-            await self.db.conn.commit()
-        except Exception:
-            await self.db.conn.rollback()
-            raise
 
         return True, (
             f"🎯 接取悬赏成功！\n"
@@ -442,11 +438,10 @@ class BountyManager:
         self, player: Player, scope: str = "global"
     ) -> tuple[bool, str]:
         """Settle a finished bounty transactionally (stone/exp into players, status -> done), then roll item drops into the storage ring (best-effort)."""
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction() as txn:
             active = await self.db.ext.get_active_bounty(player.user_id)
             if not active:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, "你当前没有进行中的悬赏任务。"
 
             mismatch = self._scope_mismatch_message(
@@ -456,21 +451,21 @@ class BountyManager:
                 "完成",
             )
             if mismatch:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, mismatch
 
             if int(time.time()) > active["expire_time"]:
+                # 超时自动取消：UPDATE 后正常退出触发 owner 层提交
                 await self.db.conn.execute(
                     "UPDATE bounty_tasks SET status = 0 WHERE user_id = ? AND status = 1",
                     (player.user_id,),
                 )
-                await self.db.conn.commit()
                 return False, "悬赏任务已超时，自动取消。"
 
             progress = active.get("current_progress", 0)
             target = active.get("target_count", 1)
             if progress < target:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, (
                     f"❌ 任务尚未完成！\n"
                     f"任务：{active['bounty_name']}\n"
@@ -495,10 +490,7 @@ class BountyManager:
                 "UPDATE players SET gold = ?, experience = ? WHERE user_id = ?",
                 (player.gold, player.experience, player.user_id),
             )
-            await self.db.conn.commit()
-        except Exception:
-            await self.db.conn.rollback()
-            raise
+            # 结算写完后正常退出触发 owner 层提交
 
         item_msg = ""
         if self.storage_ring_manager:
@@ -596,15 +588,14 @@ class BountyManager:
         if not activity_tag:
             return False, ""
 
-        await self.db.conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self.db.transaction() as txn:
             active = await self.db.ext.get_active_bounty(player.user_id)
             if not active:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, ""
 
             if int(time.time()) > active["expire_time"]:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, ""
 
             rewards_data = {}
@@ -622,13 +613,13 @@ class BountyManager:
                 ]
 
             if activity_tag not in allowed_tags:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, ""
 
             progress = active.get("current_progress", 0)
             target = active.get("target_count", 1)
             if progress >= target:
-                await self.db.conn.rollback()
+                txn.abort()
                 return False, ""
 
             new_progress = min(target, progress + count)
@@ -636,7 +627,7 @@ class BountyManager:
                 "UPDATE bounty_tasks SET current_progress = ? WHERE user_id = ? AND status = 1 AND current_progress = ?",
                 (new_progress, player.user_id, progress),
             )
-            await self.db.conn.commit()
+            # 进度 UPDATE 后正常退出触发 owner 层提交
 
             if new_progress >= target:
                 # 完成提示按悬赏类型指向对应入口（宗门悬赏走 /宗门 悬赏 完成）
@@ -650,9 +641,6 @@ class BountyManager:
                     f"\n\n📜 悬赏【{active['bounty_name']}】已完成！使用 {complete_cmd} 领取奖励",
                 )
             return True, f"\n\n📜 悬赏进度：{new_progress}/{target}"
-        except Exception:
-            await self.db.conn.rollback()
-            raise
 
     async def check_and_expire_bounties(self) -> int:
         """Mark overdue active bounties as expired (status 3). Entry point of the scheduled expiry task."""

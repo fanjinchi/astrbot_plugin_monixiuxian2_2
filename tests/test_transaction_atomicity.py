@@ -1,10 +1,11 @@
-"""Regression tests for transaction atomicity (openspec: fix-fake-atomic-transactions).
+"""Regression tests for transaction atomicity (openspec: add-transaction-unit-of-work).
 
-Covers design D6:
-1. Helper contract — every helper that gained a ``commit`` parameter must not
-   commit when called with ``commit=False`` (same-connection SELECT sees the
-   write, rollback undoes it), while the default ``commit=True`` keeps the
-   legacy standalone behavior.
+Covers design D1/D1.2 + D2:
+1. Helper contract — every data-layer leaf carries NO commit parameter; the
+   D2 depth gate commits only when ``conn._txn_depth == 0`` (fail-open keeps
+   legacy standalone semantics). Inside a ``db.transaction()`` CM block the
+   write stays in the transaction (same-connection SELECT sees it, rollback
+   undoes it); the owner commits on clean exit.
 2. Mid-transaction failure rollback — bank deposit, storage-ring retrieve,
    shop purchase and the overdue-loan kill path must roll back every write
    when the last write of the block raises.
@@ -131,52 +132,66 @@ def _make_shop_handler(db: DataBase) -> ShopHandler:
 
 
 def _spy_in_transaction(db: DataBase, monkeypatch, obj, name: str, states: list):
-    """Wrap a helper so each call records (name, commit kwarg, in_transaction)."""
+    """Wrap a helper so each call records (name, in_transaction, _txn_depth).
+
+    No commit kwarg exists anymore (D2 gate is depth-based). Two signals are
+    captured: in_transaction catches an early leaf commit, _txn_depth is the
+    ownership signal proving the call ran inside a CM block (depth > 0) —
+    bare DML keeps in_transaction True by itself, so depth is what proves
+    the transaction was actually owned by the CM.
+    """
     original = getattr(obj, name)
 
     async def spy(*args, **kwargs):
         await original(*args, **kwargs)
-        states.append((name, kwargs.get("commit", True), db.conn.in_transaction))
+        states.append((name, db.conn.in_transaction, db.conn._txn_depth))
 
     monkeypatch.setattr(obj, name, spy)
 
 
-# ===== 7.1 helper 守约测试：commit=False 不提交、可回滚；默认 commit=True 落盘 =====
+# ===== 7.1 helper 守约测试：无 commit 参数（D2 深度门控）；CM 内不提交、abort 可回滚、干净退出提交；独立调用落盘 =====
 
 
 @pytest.mark.asyncio
 async def test_update_bank_account_commit_contract(db):
-    await db.conn.execute("BEGIN IMMEDIATE")
-    await db.ext.update_bank_account("u1", 500, 123, commit=False)
-    assert db.conn.in_transaction  # 未提前提交
-    assert await db.ext.get_bank_account("u1") == {
-        "balance": 500,
-        "last_interest_time": 123,
-    }
-    await db.conn.rollback()
+    # CM 内调用：不提前提交，abort 后回滚可撤销
+    async with db.transaction() as txn:
+        await db.ext.update_bank_account("u1", 500, 123)
+        assert db.conn.in_transaction  # 未提前提交
+        assert await db.ext.get_bank_account("u1") == {
+            "balance": 500,
+            "last_interest_time": 123,
+        }
+        txn.abort()
     assert await db.ext.get_bank_account("u1") is None  # 回滚可撤销
 
-    await db.ext.update_bank_account("u1", 500, 123)  # 默认提交，存量语义不变
+    # CM 干净退出 → 提交
+    async with db.transaction():
+        await db.ext.update_bank_account("u1", 500, 123)
     assert not db.conn.in_transaction
     assert (await db.ext.get_bank_account("u1"))["balance"] == 500
+
+    # 独立调用（无 CM）：fail-open 提交，存量语义不变
+    await db.ext.update_bank_account("u1", 700, 456)
+    assert not db.conn.in_transaction
+    assert (await db.ext.get_bank_account("u1"))["balance"] == 700
 
 
 @pytest.mark.asyncio
 async def test_create_loan_commit_contract(db):
     now = int(time.time())
-    await db.conn.execute("BEGIN IMMEDIATE")
-    # last_insert_rowid 是连接级状态，commit=False 时查询留在事务内仍能取到 id（design D2）
-    loan_id = await db.ext.create_loan(
-        "u1", 1000, 0.005, now, now + 7 * 86400, commit=False
-    )
-    assert loan_id > 0
-    assert db.conn.in_transaction
-    assert (await db.ext.get_active_loan("u1"))["principal"] == 1000
-    await db.conn.rollback()
+    # CM 内：last_insert_rowid 是连接级状态，事务内查询仍能取到 id（design D2）
+    async with db.transaction() as txn:
+        loan_id = await db.ext.create_loan("u1", 1000, 0.005, now, now + 7 * 86400)
+        assert loan_id > 0
+        assert db.conn.in_transaction
+        assert (await db.ext.get_active_loan("u1"))["principal"] == 1000
+        txn.abort()
     assert await db.ext.get_active_loan("u1") is None
 
-    loan_id = await db.ext.create_loan("u1", 1000, 0.005, now, now + 7 * 86400)
-    assert loan_id > 0
+    async with db.transaction():
+        loan_id = await db.ext.create_loan("u1", 1000, 0.005, now, now + 7 * 86400)
+        assert loan_id > 0
     assert not db.conn.in_transaction
     assert (await db.ext.get_active_loan("u1"))["id"] == loan_id
 
@@ -186,16 +201,19 @@ async def test_close_loan_commit_contract(db):
     now = int(time.time())
     loan_id = await db.ext.create_loan("u1", 1000, 0.005, now, now + 7 * 86400)
 
-    await db.conn.execute("BEGIN IMMEDIATE")
-    await db.ext.close_loan(loan_id, commit=False)
-    assert db.conn.in_transaction
-    row = await _fetchone(db, "SELECT status FROM bank_loans WHERE id = ?", (loan_id,))
-    assert row[0] == "closed"
-    await db.conn.rollback()
+    async with db.transaction() as txn:
+        await db.ext.close_loan(loan_id)
+        assert db.conn.in_transaction
+        row = await _fetchone(
+            db, "SELECT status FROM bank_loans WHERE id = ?", (loan_id,)
+        )
+        assert row[0] == "closed"
+        txn.abort()
     row = await _fetchone(db, "SELECT status FROM bank_loans WHERE id = ?", (loan_id,))
     assert row[0] == "active"
 
-    await db.ext.close_loan(loan_id)
+    async with db.transaction():
+        await db.ext.close_loan(loan_id)
     row = await _fetchone(db, "SELECT status FROM bank_loans WHERE id = ?", (loan_id,))
     assert row[0] == "closed"
 
@@ -205,33 +223,35 @@ async def test_mark_loan_overdue_commit_contract(db):
     now = int(time.time())
     loan_id = await db.ext.create_loan("u1", 1000, 0.005, now, now + 7 * 86400)
 
-    await db.conn.execute("BEGIN IMMEDIATE")
-    await db.ext.mark_loan_overdue(loan_id, commit=False)
-    assert db.conn.in_transaction
-    row = await _fetchone(db, "SELECT status FROM bank_loans WHERE id = ?", (loan_id,))
-    assert row[0] == "overdue"
-    await db.conn.rollback()
+    async with db.transaction() as txn:
+        await db.ext.mark_loan_overdue(loan_id)
+        assert db.conn.in_transaction
+        row = await _fetchone(
+            db, "SELECT status FROM bank_loans WHERE id = ?", (loan_id,)
+        )
+        assert row[0] == "overdue"
+        txn.abort()
     row = await _fetchone(db, "SELECT status FROM bank_loans WHERE id = ?", (loan_id,))
     assert row[0] == "active"
 
-    await db.ext.mark_loan_overdue(loan_id)
+    async with db.transaction():
+        await db.ext.mark_loan_overdue(loan_id)
     row = await _fetchone(db, "SELECT status FROM bank_loans WHERE id = ?", (loan_id,))
     assert row[0] == "overdue"
 
 
 @pytest.mark.asyncio
 async def test_add_bank_transaction_commit_contract(db):
-    await db.conn.execute("BEGIN IMMEDIATE")
-    await db.ext.add_bank_transaction(
-        "u1", "deposit", 100, 600, "存入灵石", 1, commit=False
-    )
-    assert db.conn.in_transaction
-    txs = await db.ext.get_bank_transactions("u1")
-    assert len(txs) == 1 and txs[0]["amount"] == 100
-    await db.conn.rollback()
+    async with db.transaction() as txn:
+        await db.ext.add_bank_transaction("u1", "deposit", 100, 600, "存入灵石", 1)
+        assert db.conn.in_transaction
+        txs = await db.ext.get_bank_transactions("u1")
+        assert len(txs) == 1 and txs[0]["amount"] == 100
+        txn.abort()
     assert await db.ext.get_bank_transactions("u1") == []
 
-    await db.ext.add_bank_transaction("u1", "deposit", 100, 600, "存入灵石", 1)
+    async with db.transaction():
+        await db.ext.add_bank_transaction("u1", "deposit", 100, 600, "存入灵石", 1)
     assert not db.conn.in_transaction
     assert len(await db.ext.get_bank_transactions("u1")) == 1
 
@@ -240,16 +260,21 @@ async def test_add_bank_transaction_commit_contract(db):
 async def test_delete_player_cascade_commit_contract(db):
     await _make_player(db)
 
-    await db.conn.execute("BEGIN IMMEDIATE")
-    await db.delete_player_cascade("u1", commit=False)
-    assert db.conn.in_transaction
-    assert (
-        await _fetchone(db, "SELECT user_id FROM players WHERE user_id = 'u1'") is None
-    )
-    await db.conn.rollback()
+    async with db.transaction() as txn:
+        await db.delete_player_cascade("u1")
+        assert db.conn.in_transaction
+        assert (
+            await _fetchone(db, "SELECT user_id FROM players WHERE user_id = 'u1'") is None
+        )
+        txn.abort()
     assert await db.get_player_by_id("u1") is not None  # 回滚可撤销
 
-    await db.delete_player_cascade("u1")  # 默认提交，存量语义不变
+    async with db.transaction():
+        await db.delete_player_cascade("u1")
+    assert not db.conn.in_transaction
+    assert await db.get_player_by_id("u1") is None
+
+    await db.delete_player_cascade("u1")  # 独立调用：fail-open 提交，存量语义不变
     assert not db.conn.in_transaction
     assert await db.get_player_by_id("u1") is None
 
@@ -258,11 +283,11 @@ async def test_delete_player_cascade_commit_contract(db):
 async def test_bank_manager_add_transaction_commit_contract(db):
     mgr = BankManager(db)
 
-    await db.conn.execute("BEGIN IMMEDIATE")
-    await mgr._add_transaction("u1", "deposit", 100, 600, "存入灵石", commit=False)
-    assert db.conn.in_transaction
-    assert len(await db.ext.get_bank_transactions("u1")) == 1
-    await db.conn.rollback()
+    async with db.transaction() as txn:
+        await mgr._add_transaction("u1", "deposit", 100, 600, "存入灵石")
+        assert db.conn.in_transaction
+        assert len(await db.ext.get_bank_transactions("u1")) == 1
+        txn.abort()
     assert await db.ext.get_bank_transactions("u1") == []
 
     await mgr._add_transaction("u1", "deposit", 100, 600, "存入灵石")
@@ -276,18 +301,18 @@ async def test_add_pill_to_inventory_commit_contract(db):
     await _make_player(db)
 
     player = await db.get_player_by_id("u1")
-    await db.conn.execute("BEGIN IMMEDIATE")
-    await pill_mgr.add_pill_to_inventory(player, "回气丹", 2, commit=False)
-    assert db.conn.in_transaction
-    row = await _fetchone(
-        db, "SELECT pills_inventory FROM players WHERE user_id = 'u1'"
-    )
-    assert "回气丹" in row[0]
-    await db.conn.rollback()
+    async with db.transaction() as txn:
+        await pill_mgr.add_pill_to_inventory(player, "回气丹", 2)
+        assert db.conn.in_transaction
+        row = await _fetchone(
+            db, "SELECT pills_inventory FROM players WHERE user_id = 'u1'"
+        )
+        assert "回气丹" in row[0]
+        txn.abort()
     assert (await db.get_player_by_id("u1")).get_pills_inventory() == {}
 
     player = await db.get_player_by_id("u1")  # 重取，避免沿用被 mutation 的旧对象
-    await pill_mgr.add_pill_to_inventory(player, "回气丹", 2)
+    await pill_mgr.add_pill_to_inventory(player, "回气丹", 2)  # 独立调用：fail-open 提交
     assert not db.conn.in_transaction
     assert (await db.get_player_by_id("u1")).get_pills_inventory() == {"回气丹": 2}
 
@@ -303,17 +328,17 @@ async def test_apply_legacy_pill_effects_commit_contract(db):
     }
 
     player = await db.get_player_by_id("u1")
-    await db.conn.execute("BEGIN IMMEDIATE")
-    ok, _ = await handler._apply_legacy_pill_effects(player, item, 1, commit=False)
-    assert ok
-    assert db.conn.in_transaction
-    row = await _fetchone(db, "SELECT experience FROM players WHERE user_id = 'u1'")
-    assert row[0] == 100
-    await db.conn.rollback()
+    async with db.transaction() as txn:
+        ok, _ = await handler._apply_legacy_pill_effects(player, item, 1)
+        assert ok
+        assert db.conn.in_transaction
+        row = await _fetchone(db, "SELECT experience FROM players WHERE user_id = 'u1'")
+        assert row[0] == 100
+        txn.abort()
     assert (await db.get_player_by_id("u1")).experience == 0
 
     player = await db.get_player_by_id("u1")  # 重取，避免沿用被 mutation 的旧对象
-    ok, _ = await handler._apply_legacy_pill_effects(player, item, 1)
+    ok, _ = await handler._apply_legacy_pill_effects(player, item, 1)  # 独立调用
     assert ok
     assert not db.conn.in_transaction
     assert (await db.get_player_by_id("u1")).experience == 100
@@ -349,8 +374,8 @@ async def test_retrieve_item_rolls_back_when_write_fails(db, monkeypatch):
 
     original = db.update_player
 
-    async def update_then_boom(player, commit=True):
-        await original(player, commit=commit)
+    async def update_then_boom(player):
+        await original(player)
         raise RuntimeError("injected failure")
 
     monkeypatch.setattr(db, "update_player", update_then_boom)
@@ -428,7 +453,7 @@ async def test_check_loan_status_rolls_back_when_kill_fails(db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_bank_blocks_never_leave_transaction(db, monkeypatch):
-    """deposit/withdraw/borrow/repay 四块：helper 全部 commit=False 且不提前提交。"""
+    """deposit/withdraw/borrow/repay 四块：无 commit 参数，深度门控下均不提前提交。"""
     mgr = BankManager(db)
     await _make_player(db, gold=20000)
 
@@ -451,14 +476,16 @@ async def test_bank_blocks_never_leave_transaction(db, monkeypatch):
     ok, msg = await mgr.repay(await db.get_player_by_id("u1"))
     assert ok, msg
 
-    # 四个块共触发 12 次 helper 写，全部 commit=False 且调用后仍在事务内
+    # 四个块共触发 12 次 helper 写：全程在事务内且 CM 层 depth > 0（无提前提交、
+    # 所有权确在 CM）；块结束后 depth 归零（仅 owner 层提交）
     assert len(states) == 12, states
-    assert all(commit is False and in_tx for _, commit, in_tx in states), states
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    assert db.conn._txn_depth == 0
 
 
 @pytest.mark.asyncio
 async def test_storage_ring_blocks_never_leave_transaction(db, monkeypatch):
-    """store/retrieve/discard 三块：块内 update_player 全部 commit=False 且不提前提交。"""
+    """store/retrieve/discard 三块：块内 update_player 均不提前提交。"""
     ring = StorageRingManager(db, FakeConfigManager())
     await _make_player(db, storage_items={"青铜剑": 2})
 
@@ -476,12 +503,13 @@ async def test_storage_ring_blocks_never_leave_transaction(db, monkeypatch):
     assert ok, msg
 
     assert len(states) == 3, states
-    assert all(commit is False and in_tx for _, commit, in_tx in states), states
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    assert db.conn._txn_depth == 0
 
 
 @pytest.mark.asyncio
 async def test_shop_buy_block_never_leaves_transaction(db, monkeypatch):
-    """商店购买块（装备路径）：store_item 与最终扣款两次 update_player 均 commit=False。"""
+    """商店购买块（装备路径）：store_item 与最终扣款两次 update_player 均不提前提交。"""
     handler = _make_shop_handler(db)
     await _make_player(db, gold=10000)
     await db.update_shop_data(
@@ -497,12 +525,13 @@ async def test_shop_buy_block_never_leaves_transaction(db, monkeypatch):
     _ = [item async for item in handler.handle_buy(event, "青铜剑")]
 
     assert len(states) == 2, states  # store_item 一次 + 最终扣款一次
-    assert all(commit is False and in_tx for _, commit, in_tx in states), states
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    assert db.conn._txn_depth == 0
 
 
 @pytest.mark.asyncio
 async def test_check_loan_status_block_never_leaves_transaction(db, monkeypatch):
-    """逾期追杀块：cascade/mark_overdue/add_bank_transaction 均 commit=False 且不提前提交。"""
+    """逾期追杀块：cascade/mark_overdue/add_bank_transaction 均不提前提交。"""
     await _make_player(db)
     now = int(time.time())
     await db.ext.create_loan("u1", 1000, 0.005, now - 10 * 86400, now - 1)
@@ -524,7 +553,8 @@ async def test_check_loan_status_block_never_leaves_transaction(db, monkeypatch)
         "mark_loan_overdue",
         "add_bank_transaction",
     ]
-    assert all(commit is False and in_tx for _, commit, in_tx in states), states
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    assert db.conn._txn_depth == 0
 
     # 追杀成功路径语义不变：玩家删除、贷款 overdue、流水入账
     assert await db.get_player_by_id("u1") is None
@@ -601,7 +631,7 @@ async def test_buy_pill_credits_inventory_and_deducts_gold(db):
 
 @pytest.mark.asyncio
 async def test_store_item_standalone_still_refetches(db):
-    """external_transaction=False 的独立调用路径保持重取语义（D5 不改变的行为）。"""
+    """无外层 CM 的独立调用路径保持重取语义（D5 不改变的行为）。"""
     ring = StorageRingManager(db, FakeConfigManager())
     await _make_player(db, gold=100)
 
@@ -678,7 +708,7 @@ async def test_claim_interest_rolls_back_when_transaction_fails(
 
 @pytest.mark.asyncio
 async def test_claim_interest_block_never_leaves_transaction(db, bank_mgr, monkeypatch):
-    """claim_interest: both writes are commit=False and stay inside the tx."""
+    """claim_interest: both writes stay inside the tx (depth gate, no early commit)."""
     await _seed_claimable_account(db)
 
     states = []
@@ -692,7 +722,8 @@ async def test_claim_interest_block_never_leaves_transaction(db, bank_mgr, monke
     assert ok, msg
 
     assert [s[0] for s in states] == ["update_bank_account", "add_bank_transaction"]
-    assert all(commit is False and in_tx for _, commit, in_tx in states), states
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    assert db.conn._txn_depth == 0
 
 
 async def _seed_overdue_loan(db: DataBase, user_id: str = "u1") -> None:
@@ -762,7 +793,7 @@ async def test_overdue_loans_rolls_back_when_transaction_fails(
 async def test_overdue_loans_loop_block_never_leaves_transaction(
     db, bank_mgr, monkeypatch
 ):
-    """Kill loop: cascade/mark_overdue/transaction are commit=False in one tx."""
+    """Kill loop: cascade/mark_overdue/transaction stay inside one tx."""
     await _seed_overdue_loan(db)
 
     states = []
@@ -781,4 +812,5 @@ async def test_overdue_loans_loop_block_never_leaves_transaction(
         "mark_loan_overdue",
         "add_bank_transaction",
     ]
-    assert all(commit is False and in_tx for _, commit, in_tx in states), states
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    assert db.conn._txn_depth == 0

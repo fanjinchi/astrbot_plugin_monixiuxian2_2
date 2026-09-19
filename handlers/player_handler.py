@@ -530,8 +530,7 @@ class PlayerHandler:
         # 任何失败不得影响签到主流程。
         try:
             now_ts = int(time.time())
-            await self.db.conn.execute("BEGIN IMMEDIATE")
-            try:
+            async with self.db.transaction():
                 cursor = await self.db.conn.execute(
                     """
                     INSERT INTO system_config (key, value, updated_at)
@@ -543,12 +542,9 @@ class PlayerHandler:
                     (today, now_ts),
                 )
                 if cursor.rowcount > 0:
-                    await self.db.ext.reset_sect_elixir_get(commit=False)
-                    await self.db.ext.reset_sect_tasks(commit=False)
-                await self.db.conn.commit()
-            except Exception:
-                await self.db.conn.rollback()
-                raise
+                    await self.db.ext.reset_sect_elixir_get()
+                    await self.db.ext.reset_sect_tasks()
+                # 正常退出触发 owner 层提交（CM 统一提交/回滚）
         except Exception as e:
             logger.warning("【修仙插件】宗门每日重置失败（不影响签到）: %s", e)
 
