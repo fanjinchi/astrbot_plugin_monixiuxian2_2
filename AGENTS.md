@@ -79,7 +79,9 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 ### 3. 数据库操作规范
 
 - 使用 **aiosqlite**，所有操作都是 async
-- **事务保护**：并发敏感操作必须使用 `await db.conn.execute("BEGIN IMMEDIATE")` + `commit/rollback`
+- **多语句事务（unit-of-work）**：统一使用 `async with db.transaction() as txn:`（`DataBase.transaction()`，seam 在 data/data_manager.py 返回 `_TransactionCM`）——BEGIN/COMMIT/ROLLBACK 由 CM 按所有权语义统一管理，业务模块不再自管理事务；单语句写操作可直接 `await db.execute(...)`（叶子 helper 按 `conn._txn_depth` 门控自动提交，无活动事务时 fail-open 退回旧提交语义）
+- **转换规则**：任何手工提交点未来包进 CM 时，必须同步删除块内裸 `conn.commit()`（残留块内提交 = 提前提交 bug）；CM 不得进入 raw `BEGIN IMMEDIATE` 块内部
+- **CM 并发语义**：同任务嵌套 = no-op join（共享 TxnState，仅 owner 层提交）；跨任务互斥——事务归属 `conn._txn_owner_task`，后到者等待前一个 owner 退出后串行执行，禁止静默共享事务（详见 design D1.2）；新增并发敏感操作一律直接套 CM，不自管事务
 - **自动重连**：定时任务中调用 `await db.ensure_connection()` 后再操作
 - 数据库路径由 `StarTools.get_data_dir("astrbot_plugin_monixiuxian2_2")` 决定，不要写死
 - 新增表需在 `data/migration.py` 中写迁移脚本，`migrate()` 会自动按版本执行
