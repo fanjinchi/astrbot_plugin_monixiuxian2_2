@@ -41,4 +41,4 @@
 
 - [x] 5.1 新建本地临时文件 `CONTEXT.md`（仓库根，中文，**已入 `.gitignore`、不进 commit、不登记 AGENTS.md 文档地图、本批 change 工作结束后不维护**——仅用于领域词汇对齐）：条目三字段格式——术语 / 一句话定义 / 权威代码符号（seam 位置 + 落地 change 链接）；登记 `unit-of-work`（`async with db.transaction():`，`conn._txn_depth` 所有权判据，owner-only 提交，seam 在 `DataBase`）与（预留）`BusyState` 占位条目（busy-state-owner 按此格式替换落实）
 - [x] 5.2 AGENTS.md §3 数据库操作规范替换纯手写 BEGIN 惯例为 CM 指针，并写入**转换规则**（任何手工提交点未来包进 CM 时必须同步删除体内裸 `conn.commit()`）与 CM 并发语义摘要（同任务 join / 跨任务串行化，指向 design D1.2）
-- [x] 5.3 用 `bd` 登记 spike 暴露的新发现（如有）；`openspec validate --changes add-transaction-unit-of-work` 通过；按块 conventional commit（试点/迁移/退役各自独立 commit）
+- [x] 5.3 用 `bd` 登记 spike 暴露的新发现（如有）；`openspec validate --changes add-transaction-unit-of-work` 通过；按块 conventional commit（试点/迁移/退役各自独立 commit）→ 实际以单个提交 `40ec282` 落地（回滚粒度为全量，未分块）；后续阶段采用分块提交
