@@ -99,6 +99,17 @@ class _TransactionCM:
         if conn is None:
             raise RuntimeError("database is not connected")
         current_task = asyncio.current_task()
+        if current_task is None:
+            # bd mxt guard: the ownership test below compares task identity,
+            # and 'None is None' is True — a task-less caller on an unowned
+            # connection would be mistaken for a same-task join (no BEGIN, no
+            # ownership, nothing committed on exit). The CM is only meaningful
+            # inside a Task (handlers and timers always are), so fail fast
+            # instead of silently dropping the transaction boundary.
+            raise RuntimeError(
+                "transaction() requires a running asyncio task "
+                "(asyncio.current_task() returned None)"
+            )
         if conn._txn_owner_task is current_task:
             # Same-task fast path: no-op join, share the existing state.
             # Never touches the condition — zero overhead on the single-task path.

@@ -3,9 +3,10 @@
 Tasks 0.1-0.5 of the change plan answer the design.md Open Questions.
 Task 1.3 promotes the durable assertions into regression pins in this file
 (the 0.5 cross-task probes are the F1/F2 pins); the 1.3 additions live in the
-tail section below. The tail also carries the hardening pin filed by the final
-review of that change (bd ip5: a joined exit after a reconnect must clamp the
-depth at 0).
+tail section below. The tail also carries the two hardening pins filed by the
+final review of that change (bd ip5: a joined exit after a reconnect must clamp
+the depth at 0; bd mxt: a task-less entry must raise instead of silently
+joining the same-task fast path).
 """
 
 import asyncio
@@ -829,3 +830,56 @@ async def test_ip5_joined_exit_after_reconnect_clamps_depth_at_zero(db):
     assert not db.conn.in_transaction
     assert (await db.get_player_by_id("u1")).gold == 800
     assert db.conn._txn_depth == 0
+
+
+@pytest.mark.asyncio
+async def test_mxt_taskless_entry_raises_instead_of_joining(db):
+    """mxt guard: ``current_task() is None`` must fail fast, not silently join.
+
+    Outside a Task ``asyncio.current_task()`` returns None, and the ownership
+    test ``conn._txn_owner_task is current_task`` is then trivially true on an
+    unowned connection: the CM used to take the same-task join path (no BEGIN,
+    no ownership taken, nothing committed or rolled back on exit) — treating
+    "no transaction protection" as "already inside a transaction".
+
+    The task-less call is produced for real instead of monkeypatching
+    ``asyncio.current_task`` (which the test runner itself uses): a plain
+    ``loop.call_soon`` callback is not a Task, so driving ``__aenter__`` from
+    one sees ``current_task() is None`` — pinned by the first assertion.
+    """
+    await _make_player(db)
+    assert db.conn._txn_owner_task is None, "unowned conn: fast path would match"
+
+    driven: dict = {}
+
+    def drive_enter() -> None:
+        """Enter the CM from a non-Task callback and record the outcome."""
+        driven["current_task"] = asyncio.current_task()
+        coro = db.transaction().__aenter__()
+        try:
+            driven["entered"] = coro.send(None)
+        except StopIteration as stop:  # pragma: no cover - the silent-join bug
+            driven["entered"] = stop.value
+        except BaseException as exc:
+            driven["error"] = exc
+
+    asyncio.get_running_loop().call_soon(drive_enter)
+    await asyncio.sleep(0)  # let the callback run
+
+    assert driven["current_task"] is None, "driver must run outside any Task"
+    assert isinstance(driven.get("error"), RuntimeError), (
+        f"task-less entry must raise RuntimeError, got {driven!r}"
+    )
+    assert "requires a running asyncio task" in str(driven["error"])
+    # The rejected entry took no ownership at all.
+    assert db.conn._txn_depth == 0
+    assert db.conn._txn_owner_task is None
+    assert db.conn._txn_state is None
+
+    # A normal in-Task transaction afterwards still works end to end.
+    player = await db.get_player_by_id("u1")
+    player.gold = 900
+    async with db.transaction():
+        await db.update_player(player)
+        assert db.conn._txn_depth == 1
+    assert (await db.get_player_by_id("u1")).gold == 900
