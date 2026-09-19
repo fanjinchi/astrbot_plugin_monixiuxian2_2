@@ -20,6 +20,7 @@ Covers design D1/D1.2 + D2:
    above (plus a repaid-after-snapshot guard so a closed loan never kills).
 """
 
+import json
 import sys
 import time
 from unittest.mock import MagicMock
@@ -814,3 +815,736 @@ async def test_overdue_loans_loop_block_never_leaves_transaction(
     ]
     assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
     assert db.conn._txn_depth == 0
+
+
+# ===== 8. bd 2w1：两段式提交收编（S1-S10，openspec fix-two-stage-commit-atomicity）=====
+# Each spot below was two-stage (segment 1 committed before segment 2 was written):
+# a failure between the two stages left a half-applied state (gold deducted without
+# the farm, EXP paid without the collect timestamp, bounty cancelled without the
+# cooldown...). All ten spots now run inside one unit-of-work CM, so the failure
+# path is all-or-nothing and the D2 depth gate keeps every leaf from committing
+# early. Assertions per spot:
+#   (a) inject an exception in the SECOND stage -> the FIRST stage is rolled back;
+#   (b) success path -> both stages persist, the CM leaves no open transaction;
+#   (c) every leaf called inside the block reports ``_txn_depth > 0`` (ownership).
+
+_farm_mod = load_package_module(
+    "managers/spirit_farm_manager.py",
+    "astrbot_plugin_monixiuxian2_2.managers.spirit_farm_manager",
+)
+SpiritFarmManager = _farm_mod.SpiritFarmManager
+_eye_mod = load_package_module(
+    "managers/spirit_eye_manager.py",
+    "astrbot_plugin_monixiuxian2_2.managers.spirit_eye_manager",
+)
+SpiritEyeManager = _eye_mod.SpiritEyeManager
+_land_mod = load_package_module(
+    "managers/blessed_land_manager.py",
+    "astrbot_plugin_monixiuxian2_2.managers.blessed_land_manager",
+)
+BlessedLandManager = _land_mod.BlessedLandManager
+_dual_mod = load_package_module(
+    "managers/dual_cultivation_manager.py",
+    "astrbot_plugin_monixiuxian2_2.managers.dual_cultivation_manager",
+)
+DualCultivationManager = _dual_mod.DualCultivationManager
+_bounty_mod = load_package_module(
+    "managers/bounty_manager.py",
+    "astrbot_plugin_monixiuxian2_2.managers.bounty_manager",
+)
+BountyManager = _bounty_mod.BountyManager
+GMManager = _core_pkg.GMManager
+
+
+class _RaisingResult:
+    """aiosqlite ``execute()`` stand-in that raises on both await and async-with."""
+
+    def __init__(self, exc: BaseException):
+        self._exc = exc
+
+    async def __aenter__(self):
+        raise self._exc
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    def __await__(self):
+        async def _fail():
+            raise self._exc
+
+        return _fail().__await__()
+
+
+def _boom_on_sql(db: DataBase, monkeypatch, marker: str):
+    """Make any ``conn.execute()`` whose SQL contains ``marker`` raise RuntimeError.
+
+    Used to fail the raw-SQL second stage of a converted spot (INSERT/UPDATE that
+    has no leaf helper to monkeypatch), so the first stage's rollback is proven.
+    """
+    original = db.conn.execute
+
+    def execute(sql, *args, **kwargs):
+        if marker in sql:
+            return _RaisingResult(RuntimeError("injected failure"))
+        return original(sql, *args, **kwargs)
+
+    monkeypatch.setattr(db.conn, "execute", execute)
+
+
+def _assert_committed_and_idle(db: DataBase):
+    """A finished CM block must leave no open transaction and zero depth."""
+    assert db.conn.in_transaction is False
+    assert db.conn._txn_depth == 0
+
+
+def _make_dual_manager(db: DataBase) -> DualCultivationManager:
+    """Build a DualCultivationManager with real db and dict-based config stubs."""
+    config_manager = MagicMock()
+    config_manager.game_config = {
+        "dual_cultivation": {"k_hours": 2, "realm_factor": "linear"}
+    }
+    return DualCultivationManager(
+        db, {"VALUES": {"BASE_EXP_PER_MINUTE": 100}}, config_manager
+    )
+
+
+async def _seed_mature_farm(db: DataBase, user_id: str = "u1") -> None:
+    """Insert a farm holding one mature (not withered) 灵草."""
+    now = int(time.time())
+    crops = json.dumps(
+        [{"name": "灵草", "plant_time": now - 7200, "mature_time": now - 3600}]
+    )
+    await db.conn.execute(
+        "INSERT INTO spirit_farms (user_id, level, crops) VALUES (?, 1, ?)",
+        (user_id, crops),
+    )
+    await db.conn.commit()
+
+
+async def _seed_spirit_eye(db: DataBase, user_id: str = "u1") -> None:
+    """Insert a claimed spirit eye whose 2-hour collection window is due."""
+    now = int(time.time())
+    await db.conn.execute(
+        "INSERT INTO spirit_eyes (eye_type, eye_name, exp_per_hour, spawn_time, "
+        "owner_id, owner_name, claim_time, last_collect_time) "
+        "VALUES (1, '下品灵眼', 500, ?, ?, ?, ?, ?)",
+        (now - 7200, user_id, f"道友{user_id}", now - 7200, now - 7200),
+    )
+    await db.conn.commit()
+
+
+async def _seed_blessed_land(
+    db: DataBase, user_id: str = "u1", last_collect_time: int | None = None
+) -> None:
+    """Insert a Lv.1 小洞天 for the given user."""
+    await db.conn.execute(
+        "INSERT INTO blessed_lands (user_id, land_type, land_name, level, exp_bonus, "
+        "gold_per_hour, last_collect_time) VALUES (?, 1, '小洞天', 1, 0.05, 100, ?)",
+        (user_id, int(time.time()) if last_collect_time is None else last_collect_time),
+    )
+    await db.conn.commit()
+
+
+async def _seed_dual_request(
+    db: DataBase, from_id: str = "u1", target_id: str = "u2"
+) -> None:
+    """Insert one pending (non-expired) dual-cultivation request."""
+    now = int(time.time())
+    await db.conn.execute(
+        "INSERT INTO dual_cultivation_requests (from_id, from_name, target_id, "
+        "created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+        (from_id, f"道友{from_id}", target_id, now, now + 600),
+    )
+    await db.conn.commit()
+
+
+async def _seed_active_bounty(db: DataBase, user_id: str = "u1") -> None:
+    """Insert one in-progress bounty row.
+
+    ``bounty_id`` is deliberately unknown to the template config: a template that
+    is gone classifies as ``None`` and must not block the abandon path.
+    """
+    now = int(time.time())
+    await db.conn.execute(
+        "INSERT INTO bounty_tasks (user_id, bounty_id, bounty_name, target_type, "
+        "target_count, rewards, start_time, expire_time, status) "
+        "VALUES (?, 999999, '后山巡视', 'adventure', 3, '{}', ?, ?, 1)",
+        (user_id, now - 10, now + 7200),
+    )
+    await db.conn.commit()
+
+
+# -------- S1-S3: managers/spirit_farm_manager.py --------
+
+
+@pytest.mark.asyncio
+async def test_create_farm_rolls_back_when_farm_insert_fails(db, monkeypatch):
+    """S1 create_farm: farm INSERT fails -> the 10,000-gold fee must roll back."""
+    mgr = SpiritFarmManager(db, StorageRingManager(db, FakeConfigManager()))
+    await _make_player(db, gold=10000)
+
+    _boom_on_sql(db, monkeypatch, "INSERT INTO spirit_farms")
+
+    with pytest.raises(RuntimeError):
+        await mgr.create_farm(await db.get_player_by_id("u1"))
+
+    assert (await db.get_player_by_id("u1")).gold == 10000  # 开垦费已回滚
+    assert await mgr.get_user_farm("u1") is None  # 无半建成的灵田
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_create_farm_commits_fee_and_farm_together(db, monkeypatch):
+    """S1 success path: both stages persist and the fee write stays gated."""
+    mgr = SpiritFarmManager(db, StorageRingManager(db, FakeConfigManager()))
+    await _make_player(db, gold=10000)
+
+    states = []
+    _spy_in_transaction(db, monkeypatch, db, "update_player", states)
+
+    ok, msg = await mgr.create_farm(await db.get_player_by_id("u1"))
+
+    assert ok and "灵田开垦成功" in msg
+    assert (await db.get_player_by_id("u1")).gold == 0
+    farm = await mgr.get_user_farm("u1")
+    assert farm is not None and farm["level"] == 1
+    assert [s[0] for s in states] == ["update_player"]
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_harvest_rolls_back_when_store_item_fails(db, monkeypatch):
+    """S2 harvest: storage-ring write fails -> EXP/gold payout and crop reset roll back."""
+    ring = StorageRingManager(db, FakeConfigManager())
+    mgr = SpiritFarmManager(db, ring)
+    await _make_player(db, gold=0)
+    await _seed_mature_farm(db)
+
+    async def boom(*args, **kwargs):
+        raise RuntimeError("injected failure")
+
+    monkeypatch.setattr(ring, "store_item", boom)
+
+    with pytest.raises(RuntimeError):
+        await mgr.harvest(await db.get_player_by_id("u1"))
+
+    fresh = await db.get_player_by_id("u1")
+    assert (fresh.experience, fresh.gold) == (0, 0)  # 发奖已回滚
+    farm = await mgr.get_user_farm("u1")
+    assert len(farm["crops"]) == 1  # 已收获的作物未被清空（可重试）
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_harvest_commits_payout_ring_and_crops_together(db, monkeypatch):
+    """S2 success path: payout, ring deposit and crop reset commit as one unit."""
+    ring = StorageRingManager(db, FakeConfigManager())
+    mgr = SpiritFarmManager(db, ring)
+    await _make_player(db, gold=0)
+    await _seed_mature_farm(db)
+
+    states = []
+    _spy_in_transaction(db, monkeypatch, db, "update_player", states)
+    # store_item is spied locally (not via the shared helper) because harvest
+    # unpacks its return value — the local spy must forward it.
+    original_store = ring.store_item
+
+    async def spy_store(*args, **kwargs):
+        result = await original_store(*args, **kwargs)
+        states.append(("store_item", db.conn.in_transaction, db.conn._txn_depth))
+        return result
+
+    monkeypatch.setattr(ring, "store_item", spy_store)
+
+    ok, msg = await mgr.harvest(await db.get_player_by_id("u1"))
+
+    assert ok and "收获结果" in msg and "储物戒已满" not in msg
+    fresh = await db.get_player_by_id("u1")
+    assert (fresh.experience, fresh.gold) == (500, 100)  # 灵草收益
+    assert fresh.get_storage_ring_items() == {"灵草": 1}
+    assert (await mgr.get_user_farm("u1"))["crops"] == []
+    # update_player 出现在 store_item 之前两次：一次是发奖，一次是 store_item
+    # 内部持久化储物戒（储物戒与玩家同连接）
+    assert states[0][0] == "update_player" and states[-1][0] == "store_item"
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_upgrade_farm_rolls_back_when_level_update_fails(db, monkeypatch):
+    """S3 upgrade_farm: level UPDATE fails -> the 5,000-gold fee must roll back."""
+    mgr = SpiritFarmManager(db, StorageRingManager(db, FakeConfigManager()))
+    await _make_player(db, gold=5000)
+    await db.conn.execute(
+        "INSERT INTO spirit_farms (user_id, level, crops) VALUES ('u1', 1, '[]')"
+    )
+    await db.conn.commit()
+
+    _boom_on_sql(db, monkeypatch, "UPDATE spirit_farms SET level")
+
+    with pytest.raises(RuntimeError):
+        await mgr.upgrade_farm(await db.get_player_by_id("u1"))
+
+    assert (await db.get_player_by_id("u1")).gold == 5000  # 升级费已回滚
+    assert (await mgr.get_user_farm("u1"))["level"] == 1
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_upgrade_farm_commits_fee_and_level_together(db, monkeypatch):
+    """S3 success path: fee and new level persist in one transaction."""
+    mgr = SpiritFarmManager(db, StorageRingManager(db, FakeConfigManager()))
+    await _make_player(db, gold=10000)
+    await db.conn.execute(
+        "INSERT INTO spirit_farms (user_id, level, crops) VALUES ('u1', 1, '[]')"
+    )
+    await db.conn.commit()
+
+    states = []
+    _spy_in_transaction(db, monkeypatch, db, "update_player", states)
+
+    ok, msg = await mgr.upgrade_farm(await db.get_player_by_id("u1"))
+
+    assert ok and "灵田升级到 Lv.2" in msg
+    assert (await db.get_player_by_id("u1")).gold == 5000
+    assert (await mgr.get_user_farm("u1"))["level"] == 2
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    _assert_committed_and_idle(db)
+
+
+# -------- S4: managers/spirit_eye_manager.py --------
+
+
+@pytest.mark.asyncio
+async def test_collect_spirit_eye_rolls_back_when_timestamp_update_fails(db, monkeypatch):
+    """S4 collect_spirit_eye: timestamp UPDATE fails -> the EXP payout must roll back."""
+    mgr = SpiritEyeManager(db)
+    await _make_player(db, gold=0)
+    await _seed_spirit_eye(db)
+    before = await _fetchone(
+        db, "SELECT last_collect_time FROM spirit_eyes WHERE owner_id = 'u1'"
+    )
+
+    _boom_on_sql(db, monkeypatch, "UPDATE spirit_eyes SET last_collect_time")
+
+    with pytest.raises(RuntimeError):
+        await mgr.collect_spirit_eye(await db.get_player_by_id("u1"))
+
+    assert (await db.get_player_by_id("u1")).experience == 0  # 修为已回滚
+    after = await _fetchone(
+        db, "SELECT last_collect_time FROM spirit_eyes WHERE owner_id = 'u1'"
+    )
+    assert after[0] == before[0]  # 领取时间戳未推进（不会重复领取）
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_collect_spirit_eye_commits_exp_and_timestamp_together(db, monkeypatch):
+    """S4 success path: 2-hour payout and its timestamp commit as one unit."""
+    mgr = SpiritEyeManager(db)
+    await _make_player(db, gold=0)
+    await _seed_spirit_eye(db)
+    before = await _fetchone(
+        db, "SELECT last_collect_time FROM spirit_eyes WHERE owner_id = 'u1'"
+    )
+
+    states = []
+    _spy_in_transaction(db, monkeypatch, db, "update_player", states)
+
+    ok, msg = await mgr.collect_spirit_eye(await db.get_player_by_id("u1"))
+
+    assert ok and "灵眼收取成功" in msg
+    assert (await db.get_player_by_id("u1")).experience == 1000  # 500/h × 2h
+    after = await _fetchone(
+        db, "SELECT last_collect_time FROM spirit_eyes WHERE owner_id = 'u1'"
+    )
+    assert after[0] > before[0]
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    _assert_committed_and_idle(db)
+
+
+# -------- S5-S7: managers/blessed_land_manager.py --------
+
+
+@pytest.mark.asyncio
+async def test_purchase_blessed_land_rolls_back_when_insert_fails(db, monkeypatch):
+    """S5 purchase_blessed_land: INSERT fails -> the land price must roll back."""
+    mgr = BlessedLandManager(db)
+    await _make_player(db, gold=10000)
+
+    _boom_on_sql(db, monkeypatch, "INSERT INTO blessed_lands")
+
+    with pytest.raises(RuntimeError):
+        await mgr.purchase_blessed_land(await db.get_player_by_id("u1"), 1)
+
+    assert (await db.get_player_by_id("u1")).gold == 10000  # 购买费已回滚
+    assert await mgr.get_user_blessed_land("u1") is None
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_purchase_blessed_land_commits_price_and_land_together(db, monkeypatch):
+    """S5 success path: price deduction and land row persist as one unit."""
+    mgr = BlessedLandManager(db)
+    await _make_player(db, gold=10000)
+
+    states = []
+    _spy_in_transaction(db, monkeypatch, db, "update_player", states)
+
+    ok, msg = await mgr.purchase_blessed_land(await db.get_player_by_id("u1"), 1)
+
+    assert ok and "恭喜获得【小洞天】" in msg
+    assert (await db.get_player_by_id("u1")).gold == 0
+    land = await mgr.get_user_blessed_land("u1")
+    assert land is not None and land["level"] == 1
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_upgrade_blessed_land_rolls_back_when_update_fails(db, monkeypatch):
+    """S6 upgrade_blessed_land: UPDATE fails -> the upgrade cost must roll back."""
+    mgr = BlessedLandManager(db)
+    await _make_player(db, gold=5000)
+    await _seed_blessed_land(db)
+
+    _boom_on_sql(db, monkeypatch, "UPDATE blessed_lands SET level")
+
+    with pytest.raises(RuntimeError):
+        await mgr.upgrade_blessed_land(await db.get_player_by_id("u1"))
+
+    assert (await db.get_player_by_id("u1")).gold == 5000  # 升级费用已回滚
+    assert (await mgr.get_user_blessed_land("u1"))["level"] == 1
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_upgrade_blessed_land_commits_cost_and_level_together(db, monkeypatch):
+    """S6 success path: cost and land upgrade persist in one transaction."""
+    mgr = BlessedLandManager(db)
+    await _make_player(db, gold=5000)
+    await _seed_blessed_land(db)
+
+    states = []
+    _spy_in_transaction(db, monkeypatch, db, "update_player", states)
+
+    ok, msg = await mgr.upgrade_blessed_land(await db.get_player_by_id("u1"))
+
+    assert ok and "升级到 Lv.2" in msg
+    assert (await db.get_player_by_id("u1")).gold == 0
+    assert (await mgr.get_user_blessed_land("u1"))["level"] == 2
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_collect_income_rolls_back_when_timestamp_update_fails(db, monkeypatch):
+    """S7 collect_income: timestamp UPDATE fails -> the income payout must roll back."""
+    mgr = BlessedLandManager(db)
+    await _make_player(db, gold=1234)
+    await _seed_blessed_land(db, last_collect_time=int(time.time()) - 7200)
+    before = await _fetchone(
+        db, "SELECT last_collect_time FROM blessed_lands WHERE user_id = 'u1'"
+    )
+
+    _boom_on_sql(db, monkeypatch, "UPDATE blessed_lands SET last_collect_time")
+
+    with pytest.raises(RuntimeError):
+        await mgr.collect_income(await db.get_player_by_id("u1"))
+
+    assert (await db.get_player_by_id("u1")).gold == 1234  # 产出已回滚
+    after = await _fetchone(
+        db, "SELECT last_collect_time FROM blessed_lands WHERE user_id = 'u1'"
+    )
+    assert after[0] == before[0]  # 领取时间戳未推进（不会重复领取）
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_collect_income_commits_payout_and_timestamp_together(db, monkeypatch):
+    """S7 success path: 2-hour income and its timestamp commit as one unit."""
+    mgr = BlessedLandManager(db)
+    await _make_player(db, gold=1234)
+    await _seed_blessed_land(db, last_collect_time=int(time.time()) - 7200)
+    before = await _fetchone(
+        db, "SELECT last_collect_time FROM blessed_lands WHERE user_id = 'u1'"
+    )
+
+    states = []
+    _spy_in_transaction(db, monkeypatch, db, "update_player", states)
+
+    ok, msg = await mgr.collect_income(await db.get_player_by_id("u1"))
+
+    assert ok and "洞天收取成功" in msg
+    assert (await db.get_player_by_id("u1")).gold == 1434  # 100/h × 2h
+    after = await _fetchone(
+        db, "SELECT last_collect_time FROM blessed_lands WHERE user_id = 'u1'"
+    )
+    assert after[0] > before[0]
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    _assert_committed_and_idle(db)
+
+
+# -------- S8: managers/dual_cultivation_manager.py --------
+
+
+@pytest.mark.asyncio
+async def test_accept_request_rolls_back_when_request_delete_fails(db, monkeypatch):
+    """S8 accept_request: last write fails -> EXP, cooldowns and the request all roll back."""
+    mgr = _make_dual_manager(db)
+    await _make_player(db, gold=0)
+    await _make_player(db, user_id="u2", gold=0)
+    await _seed_dual_request(db)
+
+    async def boom(*args, **kwargs):
+        raise RuntimeError("injected failure")
+
+    monkeypatch.setattr(mgr, "_delete_request", boom)
+
+    with pytest.raises(RuntimeError):
+        await mgr.accept_request(await db.get_player_by_id("u2"))
+
+    for uid in ("u1", "u2"):
+        assert (await db.get_player_by_id(uid)).experience == 0  # 修为未结算
+        assert await mgr._get_last_dual_time(uid) is None  # 冷却未记录
+    # 请求保留，玩家可重试（不会出现「修为已加但请求仍在」的重复结算）
+    assert (await mgr._get_pending_request("u2"))["from_id"] == "u1"
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_accept_request_commits_all_five_writes(db, monkeypatch):
+    """S8 success path: 2 EXP + 2 cooldown + 1 request delete commit as one unit."""
+    mgr = _make_dual_manager(db)
+    await _make_player(db, gold=0)
+    await _make_player(db, user_id="u2", gold=0)
+    await _seed_dual_request(db)
+    expected_gain = mgr._calculate_exp_gain(await db.get_player_by_id("u1"))
+
+    states = []
+    for obj, name in [
+        (db, "update_player"),
+        (mgr, "_set_last_dual_time"),
+        (mgr, "_delete_request"),
+    ]:
+        _spy_in_transaction(db, monkeypatch, obj, name, states)
+
+    ok, msg = await mgr.accept_request(await db.get_player_by_id("u2"))
+
+    assert ok and "双修成功" in msg
+    for uid in ("u1", "u2"):
+        assert (await db.get_player_by_id(uid)).experience == expected_gain
+        assert await mgr._get_last_dual_time(uid) is not None
+    assert await mgr._get_pending_request("u2") is None  # 请求已清除
+    assert [s[0] for s in states] == [
+        "update_player",
+        "update_player",
+        "_set_last_dual_time",
+        "_set_last_dual_time",
+        "_delete_request",
+    ]
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    _assert_committed_and_idle(db)
+
+
+# -------- S9: core/gm_manager.py cmd_clear_all_cooldowns --------
+
+
+async def _seed_clear_all_cooldowns_state(db: DataBase, user_id: str = "u1") -> int:
+    """Seed one row per cleared domain; returns the seeded duel timestamp."""
+    now = int(time.time())
+    await _make_player(db, gold=0)
+    await db.ext.set_user_busy(user_id, 1, now + 3600)
+    await db.conn.execute(
+        "UPDATE players SET state = '修炼中' WHERE user_id = ?", (user_id,)
+    )
+    await db.conn.execute(
+        "INSERT INTO combat_cooldowns (user_id, last_duel_time, last_spar_time) "
+        "VALUES (?, ?, ?)",
+        (user_id, now - 100, now - 50),
+    )
+    await db.conn.execute(
+        "INSERT INTO dual_cultivation (user_id, last_dual_time) VALUES (?, ?)",
+        (user_id, now - 200),
+    )
+    await _seed_active_bounty(db, user_id)
+    await db.ext.set_system_config(f"bounty_abandon_cd_{user_id}", str(now + 1800))
+    return now - 100
+
+
+@pytest.mark.asyncio
+async def test_clear_all_cooldowns_rolls_back_and_keeps_route_cooldowns(db, monkeypatch):
+    """S9: step-3 failure -> earlier steps roll back AND the in-memory route cooldown stays."""
+    uid = "u1"
+    duel_before = await _seed_clear_all_cooldowns_state(db, uid)
+    adventure = MagicMock()
+    adventure._route_cooldowns = {uid: {"route_a": int(time.time()) + 300}}
+    gm = GMManager(
+        db=db,
+        config_manager=MagicMock(),
+        storage_ring_manager=MagicMock(),
+        equipment_manager=MagicMock(),
+        adventure_manager=adventure,
+    )
+    event = _make_event(f"{uid} 确认")
+    event.message_obj = None
+
+    _boom_on_sql(db, monkeypatch, "UPDATE dual_cultivation SET last_dual_time")
+
+    with pytest.raises(RuntimeError):
+        await gm.cmd_clear_all_cooldowns(event, f"{uid} 确认")
+
+    # 步骤 1-2 已回滚（忙碌状态与决斗冷却保持原值）
+    assert (await db.get_player_by_id(uid)).state == "修炼中"
+    row = await _fetchone(
+        db, "SELECT last_duel_time FROM combat_cooldowns WHERE user_id = ?", (uid,)
+    )
+    assert row[0] == duel_before
+    # 步骤 6 未执行：内存态冷却不可回滚，必须在 CM 退出后才弹出
+    assert uid in adventure._route_cooldowns
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_clear_all_cooldowns_commits_everything_then_pops_memory(db, monkeypatch):
+    """S9 success path: all domains cleared, message unchanged, memory popped after commit."""
+    uid = "u1"
+    await _seed_clear_all_cooldowns_state(db, uid)
+    adventure = MagicMock()
+    adventure._route_cooldowns = {uid: {"route_a": int(time.time()) + 300}}
+    gm = GMManager(
+        db=db,
+        config_manager=MagicMock(),
+        storage_ring_manager=MagicMock(),
+        equipment_manager=MagicMock(),
+        adventure_manager=adventure,
+    )
+    event = _make_event(f"{uid} 确认")
+    event.message_obj = None
+
+    states = []
+    for obj, name in [
+        (db.ext, "set_user_free"),
+        (db.ext, "cancel_bounty"),
+        (db.ext, "set_system_config"),
+    ]:
+        _spy_in_transaction(db, monkeypatch, obj, name, states)
+
+    ok, msg = await gm.cmd_clear_all_cooldowns(event, f"{uid} 确认")
+
+    assert ok and "已清除【道友u1】的全部冷却状态" in msg
+    assert "忙碌状态：1 条" in msg
+    assert "决斗/切磋冷却：1 条" in msg
+    assert "双修冷却：1 条" in msg
+    assert "进行中悬赏：1 条（后山巡视）" in msg
+    assert "悬赏放弃冷却：1 条" in msg
+    assert "历练路线休整冷却：1 条" in msg
+
+    assert (await db.get_player_by_id(uid)).state == "空闲"
+    assert (await db.ext.get_user_cd(uid)).type == 0
+    row = await _fetchone(
+        db,
+        "SELECT last_duel_time, last_spar_time FROM combat_cooldowns WHERE user_id = ?",
+        (uid,),
+    )
+    assert (row[0], row[1]) == (0, 0)
+    dual = await _fetchone(
+        db, "SELECT last_dual_time FROM dual_cultivation WHERE user_id = ?", (uid,)
+    )
+    assert dual[0] == 0
+    assert await db.ext.get_active_bounty(uid) is None
+    assert await db.ext.get_system_config(f"bounty_abandon_cd_{uid}") == "0"
+    assert uid not in adventure._route_cooldowns  # 内存态在提交后弹出
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    _assert_committed_and_idle(db)
+
+
+# -------- S10: managers/bounty_manager.py abandon_bounty --------
+
+
+@pytest.mark.asyncio
+async def test_abandon_bounty_rolls_back_when_cooldown_write_fails(db, monkeypatch):
+    """S10 abandon_bounty: cooldown write fails -> the bounty must stay in progress."""
+    uid = "u1"
+    mgr = BountyManager(db)
+    await _make_player(db, gold=0)
+    await _seed_active_bounty(db, uid)
+
+    async def boom(*args, **kwargs):
+        raise RuntimeError("injected failure")
+
+    monkeypatch.setattr(db.ext, "set_system_config", boom)
+
+    with pytest.raises(RuntimeError):
+        await mgr.abandon_bounty(await db.get_player_by_id(uid))
+
+    assert await db.ext.get_active_bounty(uid) is not None  # 悬赏未被取消
+    assert await db.ext.get_system_config(f"bounty_abandon_cd_{uid}") is None
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_abandon_bounty_commits_cancel_and_cooldown_together(db, monkeypatch):
+    """S10 success path: cancel + 30-minute cooldown commit as one unit, text unchanged."""
+    uid = "u1"
+    mgr = BountyManager(db)
+    await _make_player(db, gold=0)
+    await _seed_active_bounty(db, uid)
+
+    states = []
+    _spy_in_transaction(db, monkeypatch, db.ext, "cancel_bounty", states)
+    _spy_in_transaction(db, monkeypatch, db.ext, "set_system_config", states)
+
+    ok, msg = await mgr.abandon_bounty(await db.get_player_by_id(uid))
+
+    assert ok
+    assert msg == "已放弃悬赏：后山巡视\n⚠️ 30分钟内无法接取新悬赏"
+    assert await db.ext.get_active_bounty(uid) is None  # status=0
+    cooldown = await db.ext.get_system_config(f"bounty_abandon_cd_{uid}")
+    assert cooldown is not None and int(cooldown) > time.time()
+    assert [s[0] for s in states] == ["cancel_bounty", "set_system_config"]
+    assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
+    _assert_committed_and_idle(db)
+
+
+# -------- 8.6 门控回归：CM 外独立调用仍提交（fail-open 语义不变）--------
+
+
+@pytest.mark.asyncio
+async def test_dual_cultivation_leaf_gates_commit_when_standalone(db):
+    """S8 leaves keep their standalone-commit semantics outside any CM block."""
+    mgr = _make_dual_manager(db)
+
+    await mgr._set_last_dual_time("u9", 111)
+    assert db.conn.in_transaction is False  # 门控提交已生效
+    assert await mgr._get_last_dual_time("u9") == 111
+
+    # _get_pending_request 会先清理过期请求，独立调用时必须自行提交
+    await _seed_dual_request(db, from_id="u8", target_id="u9")
+    request = await mgr._get_pending_request("u9")
+    assert request is not None and db.conn.in_transaction is False
+
+    await mgr._delete_request(request["id"])
+    assert db.conn.in_transaction is False
+    remaining = await _fetchone(
+        db, "SELECT COUNT(*) FROM dual_cultivation_requests WHERE target_id = 'u9'"
+    )
+    assert remaining[0] == 0
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_ext_leaf_gates_commit_when_standalone(db):
+    """S9/S10 leaves (cancel_bounty / set_system_config) commit when called outside a CM."""
+    await _make_player(db, gold=0)
+    await _seed_active_bounty(db, "u1")
+
+    await db.ext.cancel_bounty("u1")
+    assert db.conn.in_transaction is False
+    assert await db.ext.get_active_bounty("u1") is None
+
+    await db.ext.set_system_config("bounty_abandon_cd_u1", "123")
+    assert db.conn.in_transaction is False
+    assert await db.ext.get_system_config("bounty_abandon_cd_u1") == "123"
+    _assert_committed_and_idle(db)
