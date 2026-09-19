@@ -77,6 +77,6 @@
 
 ## 10. 关闭与文档同步
 
-- [ ] 10.1 bd 关闭：`bd close astrbot_plugin_monixiuxian2_2-2w1 --reason "9 例 + 同族 S10 共 10 例 CM 收编完成，commit <hash>，测试 §8 覆盖" --json`
-- [ ] 10.2 conventional commit 提交（按阶段分块，如 `fix(transaction): wrap two-stage commits of 10 spots in unit-of-work CM`），**不 push**
-- [ ] 10.3 文档同步核对：本 change 不改数值/玩法 → `design_docs/` 与 `design_docs/content-design/` 无需改动；核对 AGENTS.md §3 的转换规则段落无需新增（前置 change 已写入），`git status` 干净
+- [x] 10.1 bd 关闭：`bd close astrbot_plugin_monixiuxian2_2-2w1 --reason "10 例 CM 收编完成，commits 460995f/92784ee/6586197/406566a/d9e3cd2，测试 §8 新增 22 例，pytest 894 passed" --json`（status: closed，2026-09-19）
+- [x] 10.2 conventional commit 提交（分块：`460995f` S1-S7 → `92784ee` S8 → `6586197` S9+S10+门控 → `406566a` §8 测试 → 本文件勾选 commit），**不 push**
+- [x] 10.3 文档同步核对：本 change 不改数值/玩法 → `design_docs/` 与 `design_docs/content-design/` 无改动（`git status` 确认）；AGENTS.md §3 的转换规则段落由前置 change 写入，无需新增；工作树干净
