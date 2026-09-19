@@ -32,10 +32,10 @@
 
 ## 4. 第二阶段：flag 退役
 
-- [ ] 4.1 确认 50 处穿参点（sect 15、bank 18、shop 3+4、utils 3、storage_ring 3、player_handler 2、impart 2）清零后，从 34 个定义移除 `commit`/`external_transaction` 参数（含 manager 层重导出）
-- [ ] 4.2 4 个自事务 helper 收编为 CM：`decrement_shop_item_stock`、`set_active_legacy_instance`、`learn_or_star_up`（后两者 BEGIN 条件一并改为 `depth == 0` 判定，替换其碰巧正确的 `in_transaction` 检查）、**`StorageRingManager.store_item`**（`core/storage_ring_manager.py:101`，第二个 `external_transaction` 持有者；~11 个独立调用方在事务外依赖其自 BEGIN 路径——equipment/storage_ring handlers、boss/adventure/spirit_farm/bounty/rift managers、gm_manager ×2、equipment_manager，收编后这些独立调用保持原语义）；**`increment_shop_item_stock` 不收编——它是死代码**（data/data_manager.py:336，全库无调用点，已 grep 核实），直接删除
-- [ ] 4.3 `tests/test_transaction_atomicity.py`：§7.1 kwarg 相关断言随 flag 退役移除/改写；**6 个 spy 测试**（§7.3 ×4 + §7.5 ×2）改写为 CM 级断言——**断 `conn._txn_depth` ownership 信号**（CM 内 >0、CM 外 == 0、仅 owner 层提交），不只断 `in_transaction`（裸 DML 后恒真，会"因错误的原因通过"）；不依赖 `kwargs.get("commit", True)` 默认值回读；合并进 1.3 的测试组去重
-- [ ] 4.4 全量质量门：`uv run python -m pytest tests/ -v` 全绿；`uv run ruff format . && uv run ruff check .` 通过
+- [x] 4.1 确认 50 处穿参点（sect 15、bank 18、shop 3+4、utils 3、storage_ring 3、player_handler 2、impart 2）清零后，从 34 个定义移除 `commit`/`external_transaction` 参数（含 manager 层重导出）
+- [x] 4.2 4 个自事务 helper 收编为 CM：`decrement_shop_item_stock`、`set_active_legacy_instance`、`learn_or_star_up`（后两者 BEGIN 条件一并改为 `depth == 0` 判定，替换其碰巧正确的 `in_transaction` 检查）、**`StorageRingManager.store_item`**（`core/storage_ring_manager.py:101`，第二个 `external_transaction` 持有者；~11 个独立调用方在事务外依赖其自 BEGIN 路径——equipment/storage_ring handlers、boss/adventure/spirit_farm/bounty/rift managers、gm_manager ×2、equipment_manager，收编后这些独立调用保持原语义）；**`increment_shop_item_stock` 不收编——它是死代码**（data/data_manager.py:336，全库无调用点，已 grep 核实），直接删除
+- [x] 4.3 `tests/test_transaction_atomicity.py`：§7.1 kwarg 相关断言随 flag 退役移除/改写；**6 个 spy 测试**（§7.3 ×4 + §7.5 ×2）改写为 CM 级断言——**断 `conn._txn_depth` ownership 信号**（CM 内 >0、CM 外 == 0、仅 owner 层提交），不只断 `in_transaction`（裸 DML 后恒真，会"因错误的原因通过"）；不依赖 `kwargs.get("commit", True)` 默认值回读；合并进 1.3 的测试组去重
+- [x] 4.4 全量质量门：`uv run python -m pytest tests/ -v` 全绿；`uv run ruff format . && uv run ruff check .` 通过
 
 ## 5. 文档与收尾
 
