@@ -15,7 +15,7 @@
 - [ ] 2.1 `handlers/player_handler.py:335-338`（闭关）/`:455-459`（出关）改道 `BusyState.set_busy/clear`——R2 双写并入单事务。**机制明确**：调用方（handler）整体包在 `async with self.db.transaction():` 里，owner 内部 CM no-op join；`update_player`（含 `cultivation_start_time` 等同行字段）也在**同一事务内**调用——owner 方法签名需支持传入待持久化的 player 变更（或文档约定调用方在 owner 调用后、事务内自行 `update_player`），不得留在事务外形成第二次提交；**更新 `:438-441` 的时序注释**（两次 commit 窗口已消失，clear 与传承结算的先后关系保持）
 - [ ] 2.2 `managers/adventure_manager.py:222-224/:314`、`managers/rift_manager.py:325-327/:421/:485` 改道（顺带收编两 manager 的手抄守卫 :198/:301 到 assert_idle）
 - [ ] 2.3 `managers/sect_manager.py:917-920` 改道 `set_cooldown`（SECT_TASK 冷却语义）；`:856-862` 到期判定逻辑不动
-- [ ] 2.4 `core/gm_manager.py:908-910` / `:1236-1239` 手动双重置改 `clear(player)`；`:986/:1060` force-settle 的 `update_user_cd`（仅 bump `scheduled_time`，非常态忙碌写入）保持直连，在 owner docstring 里注明此例外
+- [ ] 2.4 `core/gm_manager.py:908-910` / `:1237-1240` 手动双重置改 `clear(player)`；`:986/:1060` force-settle 的 `update_user_cd`（仅 bump `scheduled_time`，非常态忙碌写入）保持直连，在 owner docstring 里注明此例外。⚠ `:1237-1240` 已在 `fix-two-stage-commit-atomicity`（S9）的 CM 内（`core/gm_manager.py:1234`）：`clear(player)` 必须留在该 CM 块内，否则该处退回两段提交
 - [ ] 2.5 残留核对：grep 确认运行时代码不再直接赋值 `player.state`；**显式排除** `scripts/test_suite_ctl.py:1134`（fixture SQL 直写，测试工具性质）、`tests/test_gm_manager.py:377`、`tests/test_sect_handlers.py:445`（测试桩写入）；用 `bd` 登记预存问题：`scripts/test_suite_ctl.py:1148` 注释 "set_user_busy 只 UPDATE 不 INSERT" 已过时（bd qv9 起为 upsert）
 
 ## 3. 读侧收编（R3-ii）

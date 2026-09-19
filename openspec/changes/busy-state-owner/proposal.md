@@ -2,7 +2,7 @@
 
 ## Why
 
-玩家忙碌状态由两个独立系统维护（`player.state` 字符串 + `user_cd` 表），写侧无 owner：全仓仅 4 处写 `player.state`（全部非原子双写——两次独立 commit，中途崩溃即两层漂移）；历练/秘境/宗门任务只写 `user_cd` 从不镜像；GM 清冷却要手动双重置（`core/gm_manager.py:908,1237` 的注释自证）。读侧 12 处手抄守卫话术漂移（"闭关中" vs "修炼中" 两套词）。AGENTS.md §2 把"双层同步"写成文档义务，但义务没有被任何模块承接——每次新增活动系统都再付一次税，并存在并发 start-race（两命令同读 IDLE 都放行，last write wins）。
+玩家忙碌状态由两个独立系统维护（`player.state` 字符串 + `user_cd` 表），写侧无 owner：全仓仅 4 处写 `player.state`（其中 3 处为非原子双写——两次独立 commit，中途崩溃即两层漂移；`cmd_clear_all_cooldowns` 那处已由 `fix-two-stage-commit-atomicity`（S9）包进 CM，原子性不再是它的问题）；历练/秘境/宗门任务只写 `user_cd` 从不镜像；GM 清冷却要手动双重置（`core/gm_manager.py:908`、`:1237` 的注释自证；后者已在 CM 内，替换时不可外移）。读侧 12 处手抄守卫话术漂移（"闭关中" vs "修炼中" 两套词）。AGENTS.md §2 把"双层同步"写成文档义务，但义务没有被任何模块承接——每次新增活动系统都再付一次税，并存在并发 start-race（两命令同读 IDLE 都放行，last write wins）。
 
 事实基础（探索报告）：`player.state` 只是 `user_cd.type == CULTIVATING` 的纯镜像——所有运行时代码中没有非忙碌用途的读取（连"我的信息"面板都不显示它：状态行取自 user_cd，handle_player_info 根本没有状态行）。
 

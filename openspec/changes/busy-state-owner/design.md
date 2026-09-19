@@ -2,7 +2,7 @@
 
 ## Context
 
-写侧盘点（全部运行时代码）：`player.state` 仅 4 处写入——`handlers/player_handler.py:335-338`（闭关，"修炼中"）、`:455-459`（出关，"空闲"）、`core/gm_manager.py:908-910` / `:1236-1239`（GM 双清）。全部非原子：先 `update_player` commit、再 `set_user_busy/free` 独立 commit。`user_cd` 写点另见于 adventure（:222-224/:313-314）、rift（:325-327/:418-421/:485）、sect（:917-920，唯一已在事务内的）、GM force-settle（:986,:1060）。读侧：所有 `player.state` 读取都是忙碌检查——6 处 Python 读取（`utils.py:116,121`、`player_handler.py:323,353,618`、`gm_manager.py:1236`）+ 1 处 SQL WHERE（`gm_manager.py:77`），无任何展示/序列化用途。
+写侧盘点（全部运行时代码）：`player.state` 仅 4 处写入——`handlers/player_handler.py:335-338`（闭关，"修炼中"）、`:455-459`（出关，"空闲"）、`core/gm_manager.py:908-910` / `:1237-1240`（GM 双清）。写侧原子性：3 处仍非原子（先 `update_player` commit、再 `set_user_busy/free` 独立 commit）；清全部冷却那处已由 `fix-two-stage-commit-atomicity`（S9）把步骤 1-5 包进 CM（`core/gm_manager.py:1234`），**2.4 替换 `clear(player)` 时必须留在该 CM 内**，否则退回两段提交。`user_cd` 写点另见于 adventure（:222-224/:313-314）、rift（:325-327/:418-421/:485）、sect（:917-920，唯一已在事务内的）、GM force-settle（:986,:1060）。读侧：所有 `player.state` 读取都是忙碌检查——6 处 Python 读取（`utils.py:116,121`、`player_handler.py:323,353,618`、`gm_manager.py:1236`）+ 1 处 SQL WHERE（`gm_manager.py:77`），无任何展示/序列化用途。
 
 `UserStatus` 枚举五值（`models_extended.py:12-31`）：IDLE/CULTIVATING/ADVENTURING/EXPLORING/SECT_TASK。镜像只覆盖 CULTIVATING；SECT_TASK 实为时间戳冷却（`scheduled_time` 到期由 sect_manager:857 判定），不是活动状态。`set_user_busy` 已是带回归测试的 upsert（`database_extended.py:705-738`，`test_user_busy_upsert.py`）。
 
