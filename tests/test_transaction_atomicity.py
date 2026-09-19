@@ -1553,3 +1553,261 @@ async def test_ext_leaf_gates_commit_when_standalone(db):
     assert db.conn.in_transaction is False
     assert await db.ext.get_system_config("bounty_abandon_cd_u1") == "123"
     _assert_committed_and_idle(db)
+
+
+# -------- bd 3ar: S9 同族残留（GM 清除悬赏 / 清除传承状态 / 弃道重修）--------
+# 三处都是「两段写各自提交、无 CM」（bd astrbot_plugin_monixiuxian2_2-3ar，S9 扫描
+# 口径外的新发现），中途失败留下半提交状态：悬赏已取消 / 挑战冷却已清 / 角色已删
+# 而 7 天冷却键未写。修复形态与 S1-S10 相同——包一个 CM，失败即整段回滚，异常向上
+# 传播（不得静默成功）。每例注入第二段（或第三段）失败，用真实 DB 查询断言第一段
+# 的写入已回滚，并断言第一段叶子观察到 ``_txn_depth > 0``（CM 确实生效）。
+
+_player_mod = load_package_module(
+    "handlers/player_handler.py",
+    "astrbot_plugin_monixiuxian2_2.handlers.player_handler",
+)
+PlayerHandler = _player_mod.PlayerHandler
+_sect_mod = load_package_module(
+    "managers/sect_manager.py",
+    "astrbot_plugin_monixiuxian2_2.managers.sect_manager",
+)
+SectManager = _sect_mod.SectManager
+
+
+class _SectFakeConfig(FakeConfigManager):
+    """FakeConfigManager + one sect treasure, so 弃道重修 的第一段真的落库。
+
+    ``SectManager._find_item_config`` 查的是 weapons_data/items_data 等表；
+    基类 FakeConfigManager 没有这些表（getattr 落到 None），回收会空手而回，
+    第一段的回滚断言就成了空断言。
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.weapons_data = {
+            "青云镇山剑": {"id": "wpn_qy_001", "sect_id": "qingyun", "treasure": True}
+        }
+        self.items_data = {}
+        self.heart_methods_data = {}
+
+
+def _make_gm(db: DataBase) -> GMManager:
+    """Assemble a GMManager with a real db and mocked collaborators."""
+    return GMManager(
+        db=db,
+        config_manager=MagicMock(),
+        storage_ring_manager=MagicMock(),
+        equipment_manager=MagicMock(),
+        adventure_manager=MagicMock(),
+        impart_manager=MagicMock(),
+    )
+
+
+async def _raise_on_leaf(monkeypatch, obj, name: str) -> None:
+    """Make one leaf helper raise, so the caller's CM must roll stage 1 back.
+
+    Patches the bound helper on the shared ``db``/``db.ext`` instance, which is
+    the object the code under test resolves the leaf through.
+    """
+
+    async def boom(*args, **kwargs):
+        raise RuntimeError("injected failure")
+
+    monkeypatch.setattr(obj, name, boom)
+
+
+@pytest.mark.asyncio
+async def test_clear_bounty_rolls_back_cancel_when_cooldown_write_fails(
+    db, monkeypatch
+):
+    """bd 3ar GM 清除悬赏: stage-2 failure -> the cancelled bounty comes back."""
+    uid = "u1"
+    await _make_player(db, gold=0)
+    await _seed_active_bounty(db, uid)
+    cd_key = f"bounty_abandon_cd_{uid}"
+    cd_before = str(int(time.time()) + 1800)
+    await db.ext.set_system_config(cd_key, cd_before)
+    gm = _make_gm(db)
+    event = _make_event(f"{uid} 确认")
+    event.message_obj = None
+
+    states: list = []
+    _spy_in_transaction(db, monkeypatch, db.ext, "cancel_bounty", states)
+    await _raise_on_leaf(monkeypatch, db.ext, "set_system_config")
+
+    with pytest.raises(RuntimeError):
+        await gm.cmd_clear_bounty(event, f"{uid} 确认")
+
+    # 第一段（取消悬赏）已回滚：悬赏仍在进行中、冷却键保持原值（无残留写）
+    assert await db.ext.get_active_bounty(uid) is not None
+    assert await db.ext.get_system_config(cd_key) == cd_before
+    # CM 生效：第一段叶子在事务内执行（包 CM 前 depth 恒为 0，即提前提交）
+    assert states == [("cancel_bounty", True, 1)]
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_clear_bounty_commits_cancel_and_cooldown_together(db, monkeypatch):
+    """bd 3ar GM 清除悬赏 success path: both stages persist, message unchanged."""
+    uid = "u1"
+    await _make_player(db, gold=0)
+    await _seed_active_bounty(db, uid)
+    cd_key = f"bounty_abandon_cd_{uid}"
+    await db.ext.set_system_config(cd_key, str(int(time.time()) + 1800))
+    gm = _make_gm(db)
+    event = _make_event(f"{uid} 确认")
+    event.message_obj = None
+
+    ok, msg = await gm.cmd_clear_bounty(event, f"{uid} 确认")
+
+    assert ok
+    assert msg == "✅ 已清除【道友u1】的进行中悬赏【后山巡视】、放弃冷却"
+    assert await db.ext.get_active_bounty(uid) is None
+    assert await db.ext.get_system_config(cd_key) == "0"
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_clear_legacy_state_rolls_back_cooldowns_when_protection_fails(
+    db, monkeypatch
+):
+    """bd 3ar GM 清除传承状态: stage-2 failure -> deleted cooldowns come back."""
+    uid = "u1"
+    now = int(time.time())
+    await _make_player(db, gold=0)
+    await db.conn.execute(
+        "INSERT INTO impart_pk_cooldown (challenger_id, target_id, failed_at) "
+        "VALUES (?, ?, ?)",
+        (uid, "u2", now - 10),
+    )
+    await db.conn.execute(
+        "INSERT INTO impart_snatch_protection (user_id, snatched_at) VALUES (?, ?)",
+        (uid, now - 10),
+    )
+    await db.conn.commit()
+    gm = _make_gm(db)
+    event = _make_event(f"{uid} 确认")
+    event.message_obj = None
+
+    states: list = []
+    _spy_in_transaction(db, monkeypatch, db.ext, "delete_impart_pk_cooldowns", states)
+    await _raise_on_leaf(monkeypatch, db.ext, "delete_impart_snatch_protection")
+
+    with pytest.raises(RuntimeError):
+        await gm.cmd_clear_legacy_state(event, f"{uid} 确认")
+
+    # 第一段（挑战冷却删除）已回滚：DELE 未落盘，冷却行仍在
+    row = await _fetchone(
+        db, "SELECT COUNT(*) FROM impart_pk_cooldown WHERE challenger_id = ?", (uid,)
+    )
+    assert row[0] == 1
+    row = await _fetchone(
+        db, "SELECT COUNT(*) FROM impart_snatch_protection WHERE user_id = ?", (uid,)
+    )
+    assert row[0] == 1  # 第二段自身也未曾生效
+    # CM 生效：第一段叶子在事务内执行
+    assert states == [("delete_impart_pk_cooldowns", True, 1)]
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_clear_legacy_state_commits_both_deletes(db, monkeypatch):
+    """bd 3ar GM 清除传承状态 success path: both deletes persist, message unchanged."""
+    uid = "u1"
+    now = int(time.time())
+    await _make_player(db, gold=0)
+    await db.conn.execute(
+        "INSERT INTO impart_pk_cooldown (challenger_id, target_id, failed_at) "
+        "VALUES (?, ?, ?)",
+        (uid, "u2", now - 10),
+    )
+    await db.conn.execute(
+        "INSERT INTO impart_snatch_protection (user_id, snatched_at) VALUES (?, ?)",
+        (uid, now - 10),
+    )
+    await db.conn.commit()
+    gm = _make_gm(db)
+    event = _make_event(f"{uid} 确认")
+    event.message_obj = None
+
+    ok, msg = await gm.cmd_clear_legacy_state(event, f"{uid} 确认")
+
+    assert ok
+    assert msg == "✅ 已清除 道友u1 的传承状态：挑战冷却 1 条、保护期 1 条"
+    row = await _fetchone(
+        db, "SELECT COUNT(*) FROM impart_pk_cooldown WHERE challenger_id = ?", (uid,)
+    )
+    assert row[0] == 0
+    row = await _fetchone(
+        db, "SELECT COUNT(*) FROM impart_snatch_protection WHERE user_id = ?", (uid,)
+    )
+    assert row[0] == 0
+    _assert_committed_and_idle(db)
+
+
+async def _seed_sect_treasure_state(db: DataBase, user_id: str = "u1") -> None:
+    """Put the player in a sect holding one sect treasure (青云镇山剑)."""
+    await db.conn.execute(
+        "INSERT INTO sects (sect_name, sect_owner, faction_id) "
+        "VALUES ('青云门', ?, 'qingyun')",
+        (user_id,),
+    )
+    sect_id = (
+        await _fetchone(db, "SELECT sect_id FROM sects WHERE sect_name = '青云门'")
+    )[0]
+    await db.conn.commit()
+    await _make_player(db, user_id, storage_items={"青云镇山剑": 1})
+    await db.conn.execute(
+        "UPDATE players SET sect_id = ? WHERE user_id = ?", (sect_id, user_id)
+    )
+    await db.conn.commit()
+
+
+@pytest.mark.asyncio
+async def test_rebirth_rolls_back_delete_when_cooldown_write_fails(db, monkeypatch):
+    """bd 3ar 弃道重修: stage-3 failure -> character delete and reclaim roll back.
+
+    The pre-fix bug this test pins: ``delete_player_cascade`` committed on its
+    own, so a failure in the following cooldown-key write left the character
+    deleted with NO 7-day cooldown — the player could immediately restart
+    cultivation, and the reclaimed sect treasures were gone as well.
+    """
+    uid = "u1"
+    await _seed_sect_treasure_state(db, uid)
+    handler = PlayerHandler.__new__(PlayerHandler)
+    handler.db = db
+    handler.sect_mgr = SectManager(db, _SectFakeConfig())
+    event = _make_event("弃道重修 确认", sender_id=uid)
+
+    await _raise_on_leaf(monkeypatch, db.ext, "set_system_config")
+
+    outputs = []
+    with pytest.raises(RuntimeError):
+        async for item in handler.handle_rebirth(event, "确认"):
+            outputs.append(item)
+
+    assert outputs == []  # 失败不得吐告别词（不得静默成功）
+    player = await db.get_player_by_id(uid)
+    assert player is not None  # 角色级联删除已回滚
+    assert "青云镇山剑" in player.get_storage_ring_items()  # 宗门之宝回收已回滚
+    assert await db.ext.get_system_config(f"rebirth_last_{uid}") is None  # 冷却键未写
+    _assert_committed_and_idle(db)
+
+
+@pytest.mark.asyncio
+async def test_rebirth_commits_reclaim_delete_and_cooldown(db):
+    """bd 3ar 弃道重修 success path: reclaim + delete + cooldown key all persist."""
+    uid = "u1"
+    await _seed_sect_treasure_state(db, uid)
+    handler = PlayerHandler.__new__(PlayerHandler)
+    handler.db = db
+    handler.sect_mgr = SectManager(db, _SectFakeConfig())
+    event = _make_event("弃道重修 确认", sender_id=uid)
+
+    outputs = [item async for item in handler.handle_rebirth(event, "确认")]
+
+    assert len(outputs) == 1
+    assert "青云镇山剑" in str(outputs[0]) and "已归还宗门" in str(outputs[0])
+    assert await db.get_player_by_id(uid) is None  # 角色已删除
+    assert await db.ext.get_system_config(f"rebirth_last_{uid}") is not None
+    _assert_committed_and_idle(db)

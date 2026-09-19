@@ -550,10 +550,14 @@ class GMManager:
         if not self.impart_manager:
             return False, "❌ 传承系统未就绪！"
 
-        cooldown_deleted = await self.db.ext.delete_impart_pk_cooldowns(target_id)
-        protection_deleted = await self.db.ext.delete_impart_snatch_protection(
-            target_id
-        )
+        # 两段删除同属一次清除动作，必须同生共死：各自提交时第二段失败会留下
+        # 「挑战冷却已清、保护期未清」的半提交状态（S9 同族残留）。CM 单事务；
+        # 两叶子已按 D2 门控，块内不自提交
+        async with self.db.transaction():
+            cooldown_deleted = await self.db.ext.delete_impart_pk_cooldowns(target_id)
+            protection_deleted = await self.db.ext.delete_impart_snatch_protection(
+                target_id
+            )
         return True, (
             f"✅ 已清除 {player.user_name} 的传承状态："
             f"挑战冷却 {cooldown_deleted} 条、保护期 {protection_deleted} 条"
@@ -938,22 +942,29 @@ class GMManager:
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"
 
-        cleared = []
+        # 校验读（GM 命令单条指令触发、幂等可重跑）留在 CM 外：无可清状态时
+        # 不进事务、零写入（早退语义逐字不变）
         active = await self.db.ext.get_active_bounty(target_id)
-        if active:
-            await self.db.ext.cancel_bounty(target_id)
-            cleared.append(f"进行中悬赏【{active['bounty_name']}】")
-
         cd_key = f"bounty_abandon_cd_{target_id}"
-        if await self.db.ext.get_system_config(cd_key):
-            await self.db.ext.set_system_config(cd_key, "0")
-            cleared.append("放弃冷却")
-
-        if not cleared:
+        cd_existing = await self.db.ext.get_system_config(cd_key)
+        if not active and not cd_existing:
             return (
                 False,
                 f"❌ 【{player.user_name or target_id}】没有可清除的悬赏状态！",
             )
+
+        # 悬赏取消与放弃冷却键失效必须同生共死：两段各自提交时，第二段失败会留下
+        # 「悬赏已取消、冷却仍生效」的半提交状态（S9 同族残留）——命令报失败却已
+        # 生效，重跑也补不回被取消的悬赏。CM 单事务；两叶子已按 D2 门控（块内不提交）
+        cleared = []
+        async with self.db.transaction():
+            if active:
+                await self.db.ext.cancel_bounty(target_id)
+                cleared.append(f"进行中悬赏【{active['bounty_name']}】")
+            if cd_existing:
+                await self.db.ext.set_system_config(cd_key, "0")
+                cleared.append("放弃冷却")
+
         return (
             True,
             f"✅ 已清除【{player.user_name or target_id}】的{'、'.join(cleared)}",

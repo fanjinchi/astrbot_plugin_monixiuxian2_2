@@ -642,15 +642,20 @@ class PlayerHandler:
             )
             return
 
-        # 弃道重修视同离宗：回收宗门之宝归还宗门（sect_bound 功法随角色删除）
+        # 弃道重修视同离宗：回收宗门之宝归还宗门（sect_bound 功法随角色删除）。
+        # 三段写（回收宗门之宝 → 级联删除角色 → 写 7 天冷却键）必须同生共死：
+        # 第二段提交后第三段失败会留下「角色已删、冷却键未写」的半提交状态，
+        # 玩家可立刻重开角色绕过 7 天冷却。CM 只包写序列，块内不跨 yield——
+        # 生成器在 yield 点挂起会长期持写锁（参考 shop_handler.handle_buy 的摆法）
         reclaimed = []
-        if self.sect_mgr and player.sect_id != 0:
-            reclaimed = await self.sect_mgr.reclaim_sect_treasures(
-                player.user_id, player.sect_id
-            )
+        async with self.db.transaction():
+            if self.sect_mgr and player.sect_id != 0:
+                reclaimed = await self.sect_mgr.reclaim_sect_treasures(
+                    player.user_id, player.sect_id
+                )
 
-        await self.db.delete_player_cascade(player.user_id)
-        await self.db.ext.set_system_config(key, str(now))
+            await self.db.delete_player_cascade(player.user_id)
+            await self.db.ext.set_system_config(key, str(now))
 
         reclaim_msg = ""
         if reclaimed:
