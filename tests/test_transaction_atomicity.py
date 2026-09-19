@@ -1390,7 +1390,9 @@ async def test_clear_all_cooldowns_rolls_back_and_keeps_route_cooldowns(db, monk
     event = _make_event(f"{uid} 确认")
     event.message_obj = None
 
-    _boom_on_sql(db, monkeypatch, "UPDATE dual_cultivation SET last_dual_time")
+    # marker 必须取到 "= 0"：与 _TIME_SKIP_RULES 的时间快进 SQL（core/gm_manager.py:87，
+    # "... last_dual_time - ?"）只差运算符，前缀重名会误伤/漏检
+    _boom_on_sql(db, monkeypatch, "UPDATE dual_cultivation SET last_dual_time = 0")
 
     with pytest.raises(RuntimeError):
         await gm.cmd_clear_all_cooldowns(event, f"{uid} 确认")
@@ -1401,6 +1403,9 @@ async def test_clear_all_cooldowns_rolls_back_and_keeps_route_cooldowns(db, monk
         db, "SELECT last_duel_time FROM combat_cooldowns WHERE user_id = ?", (uid,)
     )
     assert row[0] == duel_before
+    # 步骤 1 的 user_cd 行同样回滚：只断言 player.state 时，这一层的门控回退不会变红
+    row = await _fetchone(db, "SELECT type FROM user_cd WHERE user_id = ?", (uid,))
+    assert row[0] == 1  # 仍为忙碌（_seed_clear_all_cooldowns_state 的 set_user_busy 种子值）
     # 步骤 6 未执行：内存态冷却不可回滚，必须在 CM 退出后才弹出
     assert uid in adventure._route_cooldowns
     _assert_committed_and_idle(db)
