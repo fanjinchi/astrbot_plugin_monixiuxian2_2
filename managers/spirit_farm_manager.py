@@ -87,16 +87,20 @@ class SpiritFarmManager:
             return False, f"❌ 开垦灵田需要 {cost:,} 灵石。"
 
         player.gold -= cost
-        await self.db.update_player(player)
 
-        await self.db.conn.execute(
-            """
-            INSERT INTO spirit_farms (user_id, level, crops)
-            VALUES (?, 1, '[]')
-            """,
-            (player.user_id,),
-        )
-        await self.db.conn.commit()
+        # 扣费与建田必须同生共死：分开提交时扣费已落库、建田失败会重复扣费。
+        # CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
+        async with self.db.transaction():
+            await self.db.update_player(player)
+
+            await self.db.conn.execute(
+                """
+                INSERT INTO spirit_farms (user_id, level, crops)
+                VALUES (?, 1, '[]')
+                """,
+                (player.user_id,),
+            )
+        # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
 
         return True, (
             "🌱 灵田开垦成功！\n"
@@ -190,30 +194,34 @@ class SpiritFarmManager:
             harvest_details.append(herb_name)
             herb_counts[herb_name] = herb_counts.get(herb_name, 0) + 1
 
-        # 应用奖励
-        if total_exp > 0 or total_gold > 0:
-            player.experience += total_exp
-            player.gold += total_gold
-            await self.db.update_player(player)
+        # 发奖 / 入储物戒 / 清 crops 三段写必须同生共死：任一步失败整体回滚，
+        # 否则已发的收益或已入库的灵草会随玩家重试重复生效。
+        # CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
+        async with self.db.transaction():
+            # 应用奖励
+            if total_exp > 0 or total_gold > 0:
+                player.experience += total_exp
+                player.gold += total_gold
+                await self.db.update_player(player)
 
-        # 将灵草存入储物戒
-        stored_items = []
-        if self.storage_ring_manager:
-            for herb_name, count in herb_counts.items():
-                success, _ = await self.storage_ring_manager.store_item(
-                    player, herb_name, count, silent=True
-                )
-                if success:
-                    stored_items.append(f"{herb_name}×{count}")
-                else:
-                    stored_items.append(f"{herb_name}×{count}（储物戒已满，丢失）")
+            # 将灵草存入储物戒（已门控叶子：CM 内 join，不自行提交）
+            stored_items = []
+            if self.storage_ring_manager:
+                for herb_name, count in herb_counts.items():
+                    success, _ = await self.storage_ring_manager.store_item(
+                        player, herb_name, count, silent=True
+                    )
+                    if success:
+                        stored_items.append(f"{herb_name}×{count}")
+                    else:
+                        stored_items.append(f"{herb_name}×{count}（储物戒已满，丢失）")
 
-        # 更新灵田
-        await self.db.conn.execute(
-            "UPDATE spirit_farms SET crops = ? WHERE user_id = ?",
-            (json.dumps(remaining_crops), player.user_id),
-        )
-        await self.db.conn.commit()
+            # 更新灵田
+            await self.db.conn.execute(
+                "UPDATE spirit_farms SET crops = ? WHERE user_id = ?",
+                (json.dumps(remaining_crops), player.user_id),
+            )
+        # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
 
         # 构建返回消息
         msg_lines = ["🌾 收获结果", "━━━━━━━━━━━━━━━"]
@@ -255,14 +263,18 @@ class SpiritFarmManager:
             return False, f"❌ 升级需要 {cost:,} 灵石。"
 
         player.gold -= cost
-        await self.db.update_player(player)
 
-        new_level = current_level + 1
-        await self.db.conn.execute(
-            "UPDATE spirit_farms SET level = ? WHERE user_id = ?",
-            (new_level, player.user_id),
-        )
-        await self.db.conn.commit()
+        # 扣费与升级必须同生共死：分开提交时扣费已落库、升级失败会重复扣费。
+        # CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
+        async with self.db.transaction():
+            await self.db.update_player(player)
+
+            new_level = current_level + 1
+            await self.db.conn.execute(
+                "UPDATE spirit_farms SET level = ? WHERE user_id = ?",
+                (new_level, player.user_id),
+            )
+        # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
 
         new_slots = FARM_LEVELS[new_level]["slots"]
         return True, f"🎉 灵田升级到 Lv.{new_level}！格数增加到 {new_slots}"

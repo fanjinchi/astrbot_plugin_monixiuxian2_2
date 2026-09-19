@@ -137,14 +137,18 @@ class SpiritEyeManager:
         exp_income = eye["exp_per_hour"] * hours
 
         player.experience += exp_income
-        await self.db.update_player(player)
 
-        # 更新last_collect_time
-        await self.db.conn.execute(
-            "UPDATE spirit_eyes SET last_collect_time = ? WHERE owner_id = ?",
-            (now, player.user_id),
-        )
-        await self.db.conn.commit()
+        # 发修为与推进领取时间戳必须同生共死：分开提交时修为已落库、时间戳未推进
+        # 会让玩家重复领取同一段收益。CM 单事务（全有或全无）
+        async with self.db.transaction():
+            await self.db.update_player(player)
+
+            # 更新last_collect_time
+            await self.db.conn.execute(
+                "UPDATE spirit_eyes SET last_collect_time = ? WHERE owner_id = ?",
+                (now, player.user_id),
+            )
+        # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
 
         return True, (
             f"✅ 灵眼收取成功！\n"

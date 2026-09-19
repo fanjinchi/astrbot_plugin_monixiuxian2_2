@@ -95,25 +95,29 @@ class BlessedLandManager:
 
         # 扣除灵石
         player.gold -= price
-        await self.db.update_player(player)
 
-        # 创建洞天
-        await self.db.conn.execute(
-            """
-            INSERT INTO blessed_lands (user_id, land_type, land_name, level, exp_bonus,
-                                       gold_per_hour, last_collect_time)
-            VALUES (?, ?, ?, 1, ?, ?, ?)
-            """,
-            (
-                player.user_id,
-                land_type,
-                land_config["name"],
-                land_config["exp_bonus"],
-                land_config["gold_per_hour"],
-                int(time.time()),
-            ),
-        )
-        await self.db.conn.commit()
+        # 扣费与建洞天必须同生共死：分开提交时扣费已落库、建洞天失败会重复扣费。
+        # CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
+        async with self.db.transaction():
+            await self.db.update_player(player)
+
+            # 创建洞天
+            await self.db.conn.execute(
+                """
+                INSERT INTO blessed_lands (user_id, land_type, land_name, level, exp_bonus,
+                                           gold_per_hour, last_collect_time)
+                VALUES (?, ?, ?, 1, ?, ?, ?)
+                """,
+                (
+                    player.user_id,
+                    land_type,
+                    land_config["name"],
+                    land_config["exp_bonus"],
+                    land_config["gold_per_hour"],
+                    int(time.time()),
+                ),
+            )
+        # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
 
         return True, (
             f"✨ 恭喜获得【{land_config['name']}】！\n"
@@ -152,16 +156,20 @@ class BlessedLandManager:
         new_gold_per_hour = int(config["gold_per_hour"] * (1 + new_level * 0.15))
 
         player.gold -= upgrade_cost
-        await self.db.update_player(player)
 
-        await self.db.conn.execute(
-            """
-            UPDATE blessed_lands SET level = ?, exp_bonus = ?, gold_per_hour = ?
-            WHERE user_id = ?
-            """,
-            (new_level, new_exp_bonus, new_gold_per_hour, player.user_id),
-        )
-        await self.db.conn.commit()
+        # 扣费与升级必须同生共死：分开提交时扣费已落库、升级失败会重复扣费。
+        # CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
+        async with self.db.transaction():
+            await self.db.update_player(player)
+
+            await self.db.conn.execute(
+                """
+                UPDATE blessed_lands SET level = ?, exp_bonus = ?, gold_per_hour = ?
+                WHERE user_id = ?
+                """,
+                (new_level, new_exp_bonus, new_gold_per_hour, player.user_id),
+            )
+        # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
 
         return True, (
             f"🎉 {land['land_name']}升级到 Lv.{new_level}！\n"
@@ -199,13 +207,17 @@ class BlessedLandManager:
 
         player.gold += gold_income
         player.experience += exp_income
-        await self.db.update_player(player)
 
-        await self.db.conn.execute(
-            "UPDATE blessed_lands SET last_collect_time = ? WHERE user_id = ?",
-            (now, player.user_id),
-        )
-        await self.db.conn.commit()
+        # 发产出与推进领取时间戳必须同生共死：分开提交时收益已落库、时间戳未推进
+        # 会让玩家重复领取同一段产出。CM 单事务（全有或全无）
+        async with self.db.transaction():
+            await self.db.update_player(player)
+
+            await self.db.conn.execute(
+                "UPDATE blessed_lands SET last_collect_time = ? WHERE user_id = ?",
+                (now, player.user_id),
+            )
+        # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
 
         return True, (
             f"✅ 洞天收取成功！\n"
