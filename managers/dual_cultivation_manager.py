@@ -148,7 +148,10 @@ class DualCultivationManager:
         await self.db.conn.execute(
             "DELETE FROM dual_cultivation_requests WHERE expires_at < ?", (now,)
         )
-        await self.db.conn.commit()
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.db.conn, "_txn_depth", 0) == 0:
+            await self.db.conn.commit()
 
         async with self.db.conn.execute(
             """
@@ -176,7 +179,10 @@ class DualCultivationManager:
         await self.db.conn.execute(
             "DELETE FROM dual_cultivation_requests WHERE id = ?", (request_id,)
         )
-        await self.db.conn.commit()
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.db.conn, "_txn_depth", 0) == 0:
+            await self.db.conn.commit()
 
     async def send_request(self, initiator: Player, target_id: str) -> tuple[bool, str]:
         """发起双修请求"""
@@ -280,18 +286,22 @@ class DualCultivationManager:
         init_factor = self._get_realm_factor(initiator.level_index)
         accept_factor = self._get_realm_factor(acceptor.level_index)
 
-        # 应用收益
-        initiator.experience += init_exp_gain
-        acceptor.experience += accept_exp_gain
-        await self.db.update_player(initiator)
-        await self.db.update_player(acceptor)
+        # 双方修为 + 双方冷却时间戳 + 删请求共 5 次写必须同生共死：分开提交时
+        # 前几段已落库、后段失败会造成重复结算（修为已加但请求仍在 / 冷却未记）。
+        # CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
+        async with self.db.transaction():
+            # 应用收益
+            initiator.experience += init_exp_gain
+            acceptor.experience += accept_exp_gain
+            await self.db.update_player(initiator)
+            await self.db.update_player(acceptor)
 
-        # 记录冷却
-        await self._set_last_dual_time(initiator.user_id, now)
-        await self._set_last_dual_time(acceptor.user_id, now)
+            # 记录冷却
+            await self._set_last_dual_time(initiator.user_id, now)
+            await self._set_last_dual_time(acceptor.user_id, now)
 
-        # 清除请求
-        await self._delete_request(request["id"])
+            # 清除请求
+            await self._delete_request(request["id"])
 
         initiator_name = initiator.user_name or initiator.user_id[:8]
         acceptor_name = acceptor.user_name or acceptor.user_id[:8]
@@ -337,4 +347,7 @@ class DualCultivationManager:
             """,
             (user_id, timestamp),
         )
-        await self.db.conn.commit()
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.db.conn, "_txn_depth", 0) == 0:
+            await self.db.conn.commit()
