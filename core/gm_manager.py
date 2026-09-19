@@ -1285,6 +1285,8 @@ class GMManager:
         # 6. 历练路线休整冷却（内存态不落库，同 cmd_force_adventure 的弹出方式）
         # 必须在 CM 退出后执行：内存态无法回滚，事务回滚时不得弹出（否则回滚了
         # 数据库却把冷却清掉了，玩家可重复刷取历练）
+        # 提交与 pop 之间是 await 点、事件循环可切走；窗口方向保守——最坏多保留
+        # 一次历练冷却（不会造成重复刷取），GM 命令幂等可重跑，故不加同步
         if self.adventure_manager:
             popped = self.adventure_manager._route_cooldowns.pop(target_id, None)
             if popped:
