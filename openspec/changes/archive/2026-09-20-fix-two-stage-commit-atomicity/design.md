@@ -14,7 +14,7 @@
 
 **Goals:**
 
-- 10 例同形收编：9 处两段式提交（含 S10 的两次自提交叶子）+ 1 处四叶提交，全部变为"全成或全不成"的单一事务边界。
+- 10 例同形收编：9 处两段式提交（含 S10 的两次自提交叶子）+ 1 处五叶提交（S8 的 5 个自提交叶子），全部变为"全成或全不成"的单一事务边界。
 - 正常路径**零可观察变化**（返回文案、数值、结算顺序逐字不变）。
 - 生产代码里"写函数体内裸 `conn.commit()` 分段"这一模式清零（便于将来 grep 闸门与 review 判据，不再留下会误导人的示范）。
 - 每个 spot 至少一条原子性回归测试（第 2 段前注入异常 → 第 1 段回滚）+ 一条正常路径测试 + 一条"CM 内无提前提交"的深度断言。
@@ -39,7 +39,7 @@
 | S5 | `managers/blessed_land_manager.py` `purchase_blessed_land`（def :72，裸 commit :116） | `update_player`（`gold -= price`） | `INSERT INTO blessed_lands` | 包住"扣费 + 建洞天"，删 :116 | 无（仅 `blessed_land_handlers.py:46`） | 低 |
 | S6 | `managers/blessed_land_manager.py` `upgrade_blessed_land`（def :127，裸 commit :164） | `update_player`（`gold -= upgrade_cost`） | `UPDATE blessed_lands SET level, exp_bonus, gold_per_hour` | 同上，删 :164 | 无（仅 `blessed_land_handlers.py:52`） | 低 |
 | S7 | `managers/blessed_land_manager.py` `collect_income`（def :174，裸 commit :208） | `update_player`（`gold += / experience +=`） | `UPDATE blessed_lands SET last_collect_time = ?` | 同上，删 :208 | 无（仅 `blessed_land_handlers.py:58`） | 低 |
-| S8 | `managers/dual_cultivation_manager.py` `accept_request`（def :237，无裸 commit；4 个自动提交点） | `update_player(initiator)` :286、`update_player(acceptor)` :287 | `_set_last_dual_time` ×2（def :330/commit :340）、`_delete_request`（def :174/commit :179） | 把"发修为 ×2 + 记冷却 ×2 + 删请求"整段包一个 CM；**三个叶子补 D2 门控**（见 D2）。函数首步 `_get_pending_request`（:143/commit :151）也需门控，因为它会在 CM 内被调用 | 有：本 spot 是**叶子 join 密集点**——`update_player` 已门控，`_set_last_dual_time`/`_delete_request`/`_get_pending_request` 三个叶子补门控后，CM 外调用方（`send_request` :181、`reject_request` :311）仍走 fail-open 独立提交，逐字不变 | 中：CM 边界需与 4 处 `_delete_request` 早退分支（修为差距超限、双方冷却未结等）共存——早退分支的删请求发生在 CM 外，仍为独立提交（语义不变） |
+| S8 | `managers/dual_cultivation_manager.py` `accept_request`（def :243，无裸 commit；**5 个自提交叶子** = `update_player` ×2 + `_set_last_dual_time` ×2 + `_delete_request`） | `update_player(initiator)` :297、`update_player(acceptor)` :298 | `_set_last_dual_time` ×2（def :340/门控 commit :353）、`_delete_request`（def :177/门控 commit :185） | 把"发修为 ×2 + 记冷却 ×2 + 删请求"整段包一个 CM（实测 CM :292）；**三个叶子补 D2 门控**（见 D2）。函数首步 `_get_pending_request`（:143/门控 commit :154）也需门控，因为它在 CM 外也会被调用（早退分支） | 有：本 spot 是**叶子 join 密集点**——`update_player` 已门控，`_set_last_dual_time`/`_delete_request`/`_get_pending_request` 三个叶子补门控后，CM 外调用方（`accept_request` 早退分支 :245/:251/:259/:268/:274、`reject_request` :323/:328）仍走 fail-open 独立提交，逐字不变 | 中：CM 边界需与 4 处 `_delete_request` 早退分支（修为差距超限、双方冷却未结等）共存——早退分支的删请求发生在 CM 外，仍为独立提交（语义不变） |
 | S9 | `core/gm_manager.py` `cmd_clear_all_cooldowns`（def :1204，裸 commit :1246、:1257） | 步骤 1 忙碌状态（`set_user_free` + `update_player`）、步骤 2 `UPDATE combat_cooldowns` | 步骤 3 `UPDATE dual_cultivation` 起至步骤 5 传承清除 | 把步骤 1-5 的 DB 写整段包 CM，删 :1246/:1257；**顺带给 `cancel_bounty`(:1087)、`set_system_config`(:1105) 补 D2 门控**；步骤 6 的**内存态**历练路线休整冷却弹出移到 CM 块退出之后 | 无（GM `dispatch` :350 分发，无外层 CM）；`set_user_free`/`update_player`/`delete_impart_*` 均已门控 | 中：涉及 2 个 ext helper 补门控（D4）；`git` 上与活跃 change `busy-state-owner` 同段（D6） |
 | S10 | `managers/bounty_manager.py` `abandon_bounty`（def :530，体内**无**裸 commit；两个自提交叶子：`cancel_bounty` 调用 :546、`set_system_config` 调用 :548-550） | `cancel_bounty`（`UPDATE bounty_tasks SET status = 0`） | `set_system_config("bounty_abandon_cd_<uid>", now+1800)` | 从 `cancel_bounty` 前包 CM 到 `set_system_config` 后结束（`async with self.db.transaction():` 包住两段写）；读与早退校验（`get_active_bounty` :534、`_scope_mismatch_message` :538-545）留在 CM 外；**无新增门控**（两段叶子由 S9 已补） | 无（仅 `handlers/bounty_handlers.py` 的放弃入口调用，handler 不在 CM 内）；CM 外调用方有 `complete_bounty` 结算路径与其它域对 `set_system_config` 的写——fail-open 逐字不变 | 低：两段叶子与 S9 共用，修复形态同族；不与 `complete_bounty` 的 best-effort 掉落设计相交 |
 
@@ -48,7 +48,7 @@
 ### D2 叶子 helper 用 D2 门控，而不是删 `commit()`
 
 - **决策**：`_get_pending_request`、`_delete_request`、`_set_last_dual_time`（S8）与 `cancel_bounty`、`set_system_config`（S9）**补 D2 门控**（`if getattr(self.conn, "_txn_depth", 0) == 0: await self.conn.commit()`），而不是直接删掉 `commit()`。
-- **理由**：这 5 个叶子同时被 CM 外路径调用——`send_request`（:181）用 `_create_request`/`_get_pending_request`/`_delete_request`；`reject_request`（:311）用 `_delete_request`；`bounty_manager.abandon_bounty`（:530，即 S10）与 GM 悬赏清除路径（S9）用 `cancel_bounty`/`set_system_config`，`set_system_config` 另被其它域的到期键写入复用。删 commit 会让这些路径丢失提交（写丢失但看起来成功），是比现状更坏的 bug。
+- **理由**：这 5 个叶子中 **4 个有 CM 外调用方**——`_get_pending_request`（:143）与 `_delete_request`（:177）由 `accept_request` 的早退分支（:245、:251/:259/:268/:274）与 `reject_request`（:323、:328）调用（`send_request`（:187）只走 `_create_request`，不碰这两个叶子）；`bounty_manager.abandon_bounty`（:530，即 S10）与 GM 悬赏清除路径（S9）用 `cancel_bounty`/`set_system_config`，`set_system_config` 另被其它域的到期键写入复用。第 5 个 `_set_last_dual_time`（:340）的调用点只有 `accept_request`（:300/:301，均在 CM 内），**没有 CM 外调用方**，补门控只为与其它叶子同形（对它而言删 commit 同样安全）。删 commit 会让上述 CM 外路径丢失提交（写丢失但看起来成功），是比现状更坏的 bug。
 - **备选与否决**：(a) 给叶子加 `commit: bool` 参数透传——被前置 change 明确标记为**过渡兼容、第二阶段移除**的旧模式，不新增；(b) CM 边界只包到"叶子之前的写"、把叶子挡在 CM 外——做不到，叶子的写是同一逻辑单元的一部分（删请求必须与发修为同生共死），挡在外面正是本 bug 的成因。
 - **一致性收益**：门控后，叶子的提交决策依据"连接自身已知的所有权"，与 `update_player` / `store_item` / `set_user_busy` 同形，CM 内自动被动、CM 外自动提交。
 - **S10 的门控复用**：`abandon_bounty` 包 CM 所需的两个门控叶子与 S9 完全重合，故 S10 **不产生**额外门控工作；实现时必须先完成 S9 的门控步骤（tasks 阶段 6.1）再包 S10（阶段 7.1），以免重复劳动或漏补。

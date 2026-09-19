@@ -7,7 +7,7 @@
 > - `managers/dual_cultivation_manager.py`：`_create_request`:118（裸 commit :137，Non-Goal）、`_get_pending_request`:143（门控 :154）、`_delete_request`:177（门控 :185）、`accept_request`:243（CM :292）、`_set_last_dual_time`:340（门控 :353）
 > - `core/gm_manager.py`：`cmd_clear_cooldowns`:1188 起（原有 CM）、`cmd_clear_all_cooldowns`:1204（CM :1234）
 > - `managers/bounty_manager.py`：`abandon_bounty`:530（CM :549）、`check_and_expire_bounties`:649（裸 commit :656，Non-Goal）、`complete_bounty`:437（已声明设计，不动）
-> - `data/database_extended.py`：`cancel_bounty`:1087（门控 :1095）、`set_system_config`:1108（门控 :1121）
+> - `data/database_extended.py`：`cancel_bounty`:1087（门控 `if` :1095 → commit :1096）、`set_system_config`:1108（门控 `if` :1121 → commit :1122）
 > - `BEGIN` 复核：6 个实施文件内**无**手工 `BEGIN IMMEDIATE`（裸 BEGIN 仅存在于 `data/database_extended.py` 的 own_txn 回退分支），无 CM 嵌套冲突。
 
 ## 1. 锚点复核与前置确认（apply 首步，必做）
@@ -41,7 +41,7 @@
 
 - [x] 5.1 三个叶子补 D2 门控（照 `data/data_manager.py:322-325` 的形态，含注释）：`_get_pending_request`（实测 :143 → 门控 :154）、`_delete_request`（:177 → :185）、`_set_last_dual_time`（:340 → :353）
 - [x] 5.2 `accept_request`（:237）：把"`update_player(initiator)` + `update_player(acceptor)` + `_set_last_dual_time` ×2 + `_delete_request`"整段包进一个 CM；确认无"CM 内 return"（4 处早退分支全部前置在 CM 外），故不需要 `txn.abort()`（实测 CM :292）
-- [x] 5.3 核验 CM 外调用方语义不变：`send_request`（:181）与 `reject_request`（:311）在无 CM 时叶子仍独立提交（fail-open 默认 `_txn_depth == 0`）
+- [x] 5.3 核验 CM 外调用方语义不变：`accept_request` 的早退分支（:245/:251/:259/:268/:274）与 `reject_request`（:323/:328）在无 CM 时叶子仍独立提交（fail-open 默认 `_txn_depth == 0`）；`send_request`（:187）只调 `_create_request`（非门控叶子），不受影响
 - [x] 5.4 核验：`grep -n "conn.commit()" managers/dual_cultivation_manager.py` 只剩门控式提交（`_create_request` 实测 :137 保持原样——不在 `accept_request` 路径上、单语句自包含）
 
 ## 6. S9：`core/gm_manager.py` 清除全部冷却（GM cosmetic；已拍板纳入）
@@ -72,7 +72,7 @@
 - [x] 9.1 `uv run ruff format .`（89 files left unchanged）
 - [x] 9.2 `uv run ruff check .`（All checks passed!）
 - [x] 9.3 `uv run python -m pytest tests/ -v`：全绿（`894 passed, 1 xfailed` = 基线 872 + §8 新增 22），无新增 warning/失败
-- [x] 9.4 裸 commit 闸门：`grep -rn "await self.db.conn.commit()" managers/ core/ | grep -v tests` 与 1.1 的快照对比——本 change 的 9 处裸 commit（S1-S7、S9 ×2）全部消失，`database_extended.py` 两个叶子改为门控式提交，剩余 8 处命中全部为既有 Non-Goal（farm `plant_herb`、eye `spawn`/`release`、dual `_create_request`、bounty `check_and_expire_bounties`），且**未引入**其它改动
+- [x] 9.4 裸 commit 闸门：`grep -rn "await self.db.conn.commit()" managers/ core/ | grep -v tests` 与 1.1 的快照对比——本 change 实删 **14 处**裸 commit（`managers/`+`core/` 12 处 `self.db.conn.commit()` + `data/database_extended.py` 2 处 `self.conn.commit()`，后者改为门控式提交），剩余 8 处命中 = **5 处既有 Non-Goal**（farm `plant_herb`:144、eye `spawn`:66 / `release`:174、dual `_create_request`:137、bounty `check_and_expire_bounties`:656）+ **3 处本 change 新补门控的双修叶子**（dual `_get_pending_request`:154、`_delete_request`:185、`_set_last_dual_time`:353），且**未引入**其它改动
 - [x] 9.5 `uv run openspec validate --changes fix-two-stage-commit-atomicity` 通过（且 `--all` 基线 23 items 仍全过）
 
 ## 10. 关闭与文档同步
