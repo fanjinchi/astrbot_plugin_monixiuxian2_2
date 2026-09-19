@@ -1090,7 +1090,10 @@ class DatabaseExtended:
             "UPDATE bounty_tasks SET status = 0 WHERE user_id = ? AND status = 1",
             (user_id,),
         )
-        await self.conn.commit()
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
+            await self.conn.commit()
 
     # ===== 系统配置 CRUD =====
 
@@ -1113,7 +1116,10 @@ class DatabaseExtended:
             """,
             (key, value, int(time.time()), value, int(time.time())),
         )
-        await self.conn.commit()
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
+            await self.conn.commit()
 
     # ===== 赠予请求系统 CRUD =====
 

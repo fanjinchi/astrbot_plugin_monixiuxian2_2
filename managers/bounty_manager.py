@@ -543,11 +543,15 @@ class BountyManager:
         )
         if mismatch:
             return False, mismatch
-        await self.db.ext.cancel_bounty(player.user_id)
-        abandon_cooldown = int(time.time()) + 1800
-        await self.db.ext.set_system_config(
-            f"bounty_abandon_cd_{player.user_id}", str(abandon_cooldown)
-        )
+        # 取消悬赏（bounty_tasks.status=0）与写入 30 分钟放弃冷却必须同生共死：
+        # 分开提交时若第二段失败，玩家悬赏已被取消却没有冷却（白白放弃且可立即重接，
+        # 若刷新路径已发过放弃收益则是白拿）。CM 单事务（全有或全无）
+        async with self.db.transaction():
+            await self.db.ext.cancel_bounty(player.user_id)
+            abandon_cooldown = int(time.time()) + 1800
+            await self.db.ext.set_system_config(
+                f"bounty_abandon_cd_{player.user_id}", str(abandon_cooldown)
+            )
         return True, f"已放弃悬赏：{active['bounty_name']}\n⚠️ 30分钟内无法接取新悬赏"
 
     # -------- 进度与奖励 --------

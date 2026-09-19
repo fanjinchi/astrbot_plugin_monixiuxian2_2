@@ -1228,58 +1228,63 @@ class GMManager:
 
         cleared: list[str] = []
 
-        # 1. 忙碌状态（同「清除CD」）：user_cd 与 player.state 双层同步复位
-        user_cd = await self.db.ext.get_user_cd(target_id)
-        if (user_cd and user_cd.type != UserStatus.IDLE) or player.state != "空闲":
-            await self.db.ext.set_user_free(target_id)
-            player.state = "空闲"
-            await self.db.update_player(player)
-            cleared.append("忙碌状态：1 条")
+        # 步骤 1-5 涉及多表改写（user_cd/players/combat_cooldowns/dual_cultivation/
+        # bounty_tasks/system_config/impart_*），必须同生共死：中途失败会留下「清了一半」
+        # 的混合状态。CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
+        async with self.db.transaction():
+            # 1. 忙碌状态（同「清除CD」）：user_cd 与 player.state 双层同步复位
+            user_cd = await self.db.ext.get_user_cd(target_id)
+            if (user_cd and user_cd.type != UserStatus.IDLE) or player.state != "空闲":
+                await self.db.ext.set_user_free(target_id)
+                player.state = "空闲"
+                await self.db.update_player(player)
+                cleared.append("忙碌状态：1 条")
 
-        # 2. 决斗/切磋冷却清零（无 ext 方法，与 combat_handlers 一样直连 conn）
-        async with self.db.conn.execute(
-            "UPDATE combat_cooldowns SET last_duel_time = 0, last_spar_time = 0 "
-            "WHERE user_id = ? AND (last_duel_time > 0 OR last_spar_time > 0)",
-            (target_id,),
-        ) as cursor:
-            combat_cleared = cursor.rowcount
-        await self.db.conn.commit()
-        if combat_cleared:
-            cleared.append(f"决斗/切磋冷却：{combat_cleared} 条")
+            # 2. 决斗/切磋冷却清零（无 ext 方法，与 combat_handlers 一样直连 conn）
+            async with self.db.conn.execute(
+                "UPDATE combat_cooldowns SET last_duel_time = 0, last_spar_time = 0 "
+                "WHERE user_id = ? AND (last_duel_time > 0 OR last_spar_time > 0)",
+                (target_id,),
+            ) as cursor:
+                combat_cleared = cursor.rowcount
+            if combat_cleared:
+                cleared.append(f"决斗/切磋冷却：{combat_cleared} 条")
 
-        # 3. 双修冷却清零
-        async with self.db.conn.execute(
-            "UPDATE dual_cultivation SET last_dual_time = 0 "
-            "WHERE user_id = ? AND last_dual_time > 0",
-            (target_id,),
-        ) as cursor:
-            dual_cleared = cursor.rowcount
-        await self.db.conn.commit()
-        if dual_cleared:
-            cleared.append(f"双修冷却：{dual_cleared} 条")
+            # 3. 双修冷却清零
+            async with self.db.conn.execute(
+                "UPDATE dual_cultivation SET last_dual_time = 0 "
+                "WHERE user_id = ? AND last_dual_time > 0",
+                (target_id,),
+            ) as cursor:
+                dual_cleared = cursor.rowcount
+            if dual_cleared:
+                cleared.append(f"双修冷却：{dual_cleared} 条")
 
-        # 4. 悬赏（同「清除悬赏」）：进行中悬赏移除 + 放弃冷却键置 "0"
-        # （db 层无 delete_system_config，过期时间戳写 "0" 即失效）
-        active = await self.db.ext.get_active_bounty(target_id)
-        if active:
-            await self.db.ext.cancel_bounty(target_id)
-            cleared.append(f"进行中悬赏：1 条（{active['bounty_name']}）")
-        cd_key = f"bounty_abandon_cd_{target_id}"
-        if await self.db.ext.get_system_config(cd_key):
-            await self.db.ext.set_system_config(cd_key, "0")
-            cleared.append("悬赏放弃冷却：1 条")
+            # 4. 悬赏（同「清除悬赏」）：进行中悬赏移除 + 放弃冷却键置 "0"
+            # （db 层无 delete_system_config，过期时间戳写 "0" 即失效）
+            active = await self.db.ext.get_active_bounty(target_id)
+            if active:
+                await self.db.ext.cancel_bounty(target_id)
+                cleared.append(f"进行中悬赏：1 条（{active['bounty_name']}）")
+            cd_key = f"bounty_abandon_cd_{target_id}"
+            if await self.db.ext.get_system_config(cd_key):
+                await self.db.ext.set_system_config(cd_key, "0")
+                cleared.append("悬赏放弃冷却：1 条")
 
-        # 5. 传承（同「清除传承状态」）：挑战冷却 + 被夺保护期，不删除传承实例
-        pk_deleted = await self.db.ext.delete_impart_pk_cooldowns(target_id)
-        if pk_deleted:
-            cleared.append(f"传承挑战冷却：{pk_deleted} 条")
-        protection_deleted = await self.db.ext.delete_impart_snatch_protection(
-            target_id
-        )
-        if protection_deleted:
-            cleared.append(f"传承被夺保护期：{protection_deleted} 条")
+            # 5. 传承（同「清除传承状态」）：挑战冷却 + 被夺保护期，不删除传承实例
+            pk_deleted = await self.db.ext.delete_impart_pk_cooldowns(target_id)
+            if pk_deleted:
+                cleared.append(f"传承挑战冷却：{pk_deleted} 条")
+            protection_deleted = await self.db.ext.delete_impart_snatch_protection(
+                target_id
+            )
+            if protection_deleted:
+                cleared.append(f"传承被夺保护期：{protection_deleted} 条")
+        # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
 
         # 6. 历练路线休整冷却（内存态不落库，同 cmd_force_adventure 的弹出方式）
+        # 必须在 CM 退出后执行：内存态无法回滚，事务回滚时不得弹出（否则回滚了
+        # 数据库却把冷却清掉了，玩家可重复刷取历练）
         if self.adventure_manager:
             popped = self.adventure_manager._route_cooldowns.pop(target_id, None)
             if popped:
