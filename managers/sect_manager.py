@@ -2154,12 +2154,14 @@ class SectManager:
         The skill is recorded with ``origin_sect_id`` / ``sect_bound``
         attribution. A duplicate at max star follows the existing max-star
         exp-compensation rule (same config keys as SkillManager). Must be
-        called inside the caller's ``BEGIN IMMEDIATE`` transaction:
-        leaf helpers carry no commit parameter (depth-gated), so the grant
-        commits or rolls back together with the stage settlement. Database
-        failures are caught and logged here; the method returns None so the
-        caller rolls back, keeps the stage unsettled and retries on the
-        next event.
+        called inside the caller's ``async with db.transaction()`` block
+        (``advance_master_progress`` stage settlement): being inside the CM
+        means this leaf joins the caller's transaction — leaf helpers carry
+        no commit parameter (depth-gated), so the grant commits or rolls
+        back together with the stage settlement. Database failures are
+        caught and logged here; the method returns None so the caller
+        aborts the transaction (``txn.abort()``), keeps the stage unsettled
+        and retries on the next event.
         """
         if not self.config_manager:
             return None
