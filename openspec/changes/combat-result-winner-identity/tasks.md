@@ -14,7 +14,7 @@
 ## 2. 运行时调用点改查询/显式比较
 
 - [ ] 2.1 `managers/pve_combat_manager.py`（helper 保持接收 legacy dict，设计 D6；**不**穿 CombatResult）：
-  - `_calculate_rewards`（:234-248）：删 `isinstance(winner, str) and winner.startswith("enemy_")`，改显式相等比较——`is_enemy_winner = winner == enemy.user_id`、`is_draw = winner == "draw"`（`enemy` 已是该 helper 实参 :206，`enemy.user_id` 存在 :196；dict 形态与 `"winner"` 值域不变，胜利=玩家 id / 失败=敌人 id（`enemy_`/`guardian_` 前缀）/ 平局=`"draw"`）
+  - `_calculate_rewards`（:234-248）：删 `isinstance(winner, str) and winner.startswith("enemy_")`，改显式相等比较——`is_enemy_winner = winner == enemy.user_id`、`is_draw = winner == "draw"`（`enemy` 已是该 helper 实参 :211，`enemy.user_id` 存在 :196；dict 形态与 `"winner"` 值域不变，胜利=玩家 id / 失败=敌人 id（`enemy_`/`guardian_` 前缀）/ 平局=`"draw"`）
   - `_format_combat_result`（:273-275）：同上改写
   - `trigger_pve_combat` legacy dict（:357）：`"winner": result.winner_id or "draw"`（下游 `_calculate_rewards`/`_format_combat_result` 接收的 dict 值域保持不变）
   - `challenge_rift_beast`（:412-413）：`won = result.winner_id == player.user_id` 语义不变（design D2 显式比较），`is_draw = result.winner_side == "draw"`；**核对 fighter1 归属为玩家**；`:409-411` 的补丁注释更新为「接口已结构化，前缀判定不可复活」类简述

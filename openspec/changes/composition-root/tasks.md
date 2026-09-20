@@ -2,7 +2,7 @@
 
 ## 0. 前置检查
 
-- [ ] 0.1 重新锚定行号：`add-transaction-unit-of-work`（动 `core/breakthrough_manager.py`）、`busy-state-owner`（动 handler 守卫段）、`unify-combat-power-formula`（同改 `player_handler.py`）的在飞状态逐一核对；**与 `unify-combat-power-formula` 串行实施**（同文件，本 change 动构造器 + :179,:388 两处设备获取，彼动 :187-194 战力求和，区域不重叠但避免同 PR 互相 rebase）；`decouple-handler-to-handler-calls`（同删 main.py:349-350 回填、同改 `SectHandlers` 构造）——**排序规则：若 decouple 先合入，本 change 采用其 `SectHandlers` `rank_mgr=None` 签名形态并删除 :350 回填项；绝不复活 `ranking_handlers` 接线**
+- [ ] 0.1 重新锚定行号：`add-transaction-unit-of-work`（2026-09-19 已归档，**未**动 `core/breakthrough_manager.py`，原预警不实）、`unify-combat-power-formula`（2026-09-14 已归档，`player_handler.py:187-194` 战力求和块已落为 :187 单行 `Player.combat_power` 调用）——两者行号引用已随 2026-09-20 重锚核验；仍须核对 `busy-state-owner`（动 handler 守卫段，在途）；`decouple-handler-to-handler-calls`（同删 main.py:349-350 回填、同改 `SectHandlers` 构造）——**排序规则：若 decouple 先合入，本 change 采用其 `SectHandlers` `rank_mgr=None` 签名形态并删除 :350 回填项；绝不复活 `ranking_handlers` 接线**
 - [ ] 0.2 全仓构造点基线 grep：`EquipmentManager(` / `PillManager(` / `CultivationManager(` / `StorageRingManager(` / `ShopManager(` 的每一处（运行时代码）与本 tasks 清单一致；测试目录的直构造点单独登记（跟随签名用，不删除）
 
 ## 1. 装配段（main.py）
@@ -13,7 +13,7 @@
 
 ## 2. 消费方改造（删 per-site 重建）
 
-- [ ] 2.1 `handlers/player_handler.py`：构造器（:45-48）改收注入的 `cultivation_manager`/`pill_manager`/`equipment_manager`（签名补参数，main.py 传入）；删 :179-184 与 :388-393 的 per-request 局部导入 + 两参构造，改用 `self.equipment_manager`；这两条路径只调 `get_equipped_items`（只读展示/修为计算），**行为完全不变**——假 seam 纯为结构隐患，无回落能力变化可断言（4.1 为不回归核对）
+- [ ] 2.1 `handlers/player_handler.py`：构造器（:45-48）改收注入的 `cultivation_manager`/`pill_manager`/`equipment_manager`（签名补参数，main.py 传入）；删 :179-184 与 :381-386 的 per-request 局部导入 + 两参构造，改用 `self.equipment_manager`；这两条路径只调 `get_equipped_items`（只读展示/修为计算），**行为完全不变**——假 seam 纯为结构隐患，无回落能力变化可断言（4.1 为不回归核对）
 - [ ] 2.2 `handlers/equipment_handler.py:31-35`、`handlers/shop_handler.py:41-45`（含 `ShopManager`，:40）：改收注入的 `storage_ring_manager`/`equipment_manager`/`pill_manager`/`shop_manager`；构造内自建全删
 - [ ] 2.3 `handlers/breakthrough_handler.py:32-35`、`handlers/pill_handler.py:24`、`handlers/storage_ring_handler.py:58`：改收注入；`BreakthroughHandler` 同步把 `storage_ring_manager`/`pill_manager` 传入 `BreakthroughManager` 新必填参数
 - [ ] 2.4 `core/breakthrough_manager.py`：删 :39-42 的 `or StorageRingManager(...)`/`or PillManager(...)` 回退（D2，签名改必填）；:423-425 死亡分支的局部导入 + 临时构造改 `self.pill_manager.handle_resurrection(player)`（接线等价替换）；`tests/test_breakthrough_manager.py` 覆盖突破成功发药路径（:591/:612，依赖注入的 ring/pill manager），回退删除后该文件必须保持绿
@@ -23,7 +23,7 @@
 
 ## 3. 测试与文档
 
-- [ ] 3.1 测试跟随构造签名（机械性，fake 直填构造参数）：以 0.2 登记清单为准，已知真构造点——`tests/test_sect_handlers.py:212,251,439`（PlayerHandler）、`tests/test_equipment_handler.py:118`、`tests/test_content_design_apply.py:580`（EquipmentHandler）、`tests/test_dual_cultivation.py:47`（DualCultivationManager）、`tests/test_breakthrough_manager.py:97,129`（BreakthroughHandler）；注意 `tests/test_transaction_atomicity.py:117-124`、`tests/test_sect_manager.py:511-535` 等走 `__new__`+属性挂载，签名变化不影响、无需改动；**不强制回改**事后塞桩风格（D6，收益顺带、非本 change 义务，登记见 4.5）
+- [ ] 3.1 测试跟随构造签名（机械性，fake 直填构造参数）：以 0.2 登记清单为准，已知真构造点——`tests/test_sect_handlers.py:212,251,439`（PlayerHandler）、`tests/test_equipment_handler.py:118`、`tests/test_content_design_apply.py:580`（EquipmentHandler）、`tests/test_dual_cultivation.py:47`（DualCultivationManager）、`tests/test_breakthrough_manager.py:97,129`（BreakthroughHandler）；注意 `tests/test_transaction_atomicity.py:124-131`、`tests/test_sect_manager.py:511-535` 等走 `__new__`+属性挂载，签名变化不影响、无需改动；**不强制回改**事后塞桩风格（D6，收益顺带、非本 change 义务，登记见 4.5）
 - [ ] 3.5 装配段冒烟：`tests/test_feature_switches.py`、`tests/test_rift_encounter_commands.py` 会加载 main.py 并实例化 `XiuXianPlugin`（子包 MagicMock 化），是 `__init__` 装配的唯一 pytest 覆盖——接线/重排改动后两文件必须显式跑过并保持绿（装配段内不得引入对真实子包模块的依赖）
 - [ ] 3.2 `AGENTS.md` §13 新增系统接入模板补一条：core 服务一律从 `_wire_core_services()` 装配段注入，禁止在 handler/manager 内自构造；§3 数据库段或架构速览处可加装配段一句话指针
 - [ ] 3.3 `design_docs/api-overview.md` 的 main.py 初始化链路描述若枚举了「handler 自建 manager」先例，改指装配段；`design_docs/project-architecture.md` 分层图接线说明核对
