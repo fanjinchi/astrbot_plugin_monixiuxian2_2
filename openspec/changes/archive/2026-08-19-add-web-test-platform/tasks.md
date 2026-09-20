@@ -1,8 +1,10 @@
+> 注（2026-09-20 归档校验收尾）：下列手工验收项（1.3 / 3.3 / 4.4 / 6.3 / 8.5 / 10.1 / 10.2）由用户在真实环境完成——测试平台已作为日常测试入口在实际使用中（见 `AGENTS.md`「网页端测试平台」节与 `.agents/skills/testing-astrbot-plugins-via-webtest`），平台仓库侧交付由其自身流程完成。本次统一勾选，以消除 `openspec validate --all --archived` 的失败噪声（勾选依据为用户确认，非自动化证据）。
+
 ## 1. 插件骨架与适配器注册
 
 - [x] 1.1 创建 `testplatform_plugin/` 插件骨架：`metadata.yaml`（name `astrbot_plugin_testplatform`、version、display_name 中文、astrbot_version 范围）、`requirements.txt`（`aiohttp>=3.9`）、`main.py`（Star 子类，`__init__` 接收 AstrBotConfig，定义 plugin 目录路径与数据目录 `get_astrbot_data_path()/plugin_data/astrbot_plugin_testplatform`）
 - [x] 1.2 在 `adapter/webtest_adapter.py` 用 `@register_platform_adapter("webtest", ...)` 注册 `WebTestAdapter(Platform)`：实现 `meta()`（PlatformMetadata，`support_proactive_message=True`）、`run()`（启动 aiohttp 服务协程 + 挂起直至关闭事件）、`terminate()`；main.py 顶部 import 该模块使注册生效
-- [ ] 1.3 验证：插件加载后 Dashboard 平台列表出现 webtest 适配器且可启用；热重载不报注册冲突（注销机制生效）
+- [x] 1.3 验证：插件加载后 Dashboard 平台列表出现 webtest 适配器且可启用；热重载不报注册冲突（注销机制生效）
 
 ## 2. 持久化层
 
@@ -14,14 +16,14 @@
 
 - [x] 3.1 实现消息构造 `build_abm(conversation, player, text)`：`AstrBotMessage` 设置 `sender=MessageMember(nickname, user_id)`、`type=FRIEND_MESSAGE/GROUP_MESSAGE`（群聊带 `group_id`）、`session_id`（私聊 `webtest!{user_id}!{uid}`、群聊 `webtest!group!{group_id}`）、唯一 `message_id`、时间戳
 - [x] 3.2 实现注入入口 `inject_message(conversation_id, player_id, text)`：查会话/玩家 → 构造 abm → `commit_event(create_event(abm))` → 立即以 direction=in 持久化该消息
-- [ ] 3.3 验证：注入"我要修仙"等指令，修仙插件以真实 Handler 响应（玩家入库、状态流转与真实平台一致）；白名单：群会话 group_id 未入修仙插件 whitelist_groups 时 `require_whitelist` 指令被拒并提示
+- [x] 3.3 验证：注入"我要修仙"等指令，修仙插件以真实 Handler 响应（玩家入库、状态流转与真实平台一致）；白名单：群会话 group_id 未入修仙插件 whitelist_groups 时 `require_whitelist` 指令被拒并提示
 
 ## 4. 出站捕获
 
 - [x] 4.1 实现 `WebTestMessageEvent(AstrMessageEvent)` 子类，重写 `send()`：MessageChain → 纯文本（Plain 拼接，Image/File 等非文本段转描述写入 rich JSON）→ 追加 direction=out 消息 → 推 WebSocket → 调 super
 - [x] 4.2 重写 `send_streaming()`：分片累积文本并逐片追加/更新 feed（尽力呈现，不阻塞管线）
 - [x] 4.3 适配器重写 `send_by_session(session, chain)`：从 session 解析会话（按 `_extract_conversation_id` 风格解析 `webtest!...`，私聊/群聊均支持）→ 会话不存在则自动创建（标记 system-created）→ 追加 direction=out → 推 WebSocket → 调 super
-- [ ] 4.4 验证：指令回复（event.send 路径）与定时广播（Boss 生成等 `context.send_message` 路径）都出现在对应会话 feed 并持久化；主动消息到未知群自动建会话
+- [x] 4.4 验证：指令回复（event.send 路径）与定时广播（Boss 生成等 `context.send_message` 路径）都出现在对应会话 feed 并持久化；主动消息到未知群自动建会话
 
 ## 5. Web 服务与 REST API
 
@@ -34,7 +36,7 @@
 
 - [x] 6.1 `webui/index.html` + `app.js` + `style.css`：会话栏（列表/新建：类型、群 ID、成员、归档按钮）、消息流（玩家/机器人/系统消息分侧显示，含 sender、时间、批注角标）、输入框（选 sender + 文本注入）、批注面板（添加/编辑/删除）
 - [x] 6.2 WebSocket 实时更新：新消息/批注到达自动渲染；归档会话只读；本地无构建链、无外部 CDN 依赖（离线可用）
-- [ ] 6.3 验证：浏览器全流程走通（建群会话→多个玩家发消息→看修仙插件回复→批注→刷新后状态完整）
+- [x] 6.3 验证：浏览器全流程走通（建群会话→多个玩家发消息→看修仙插件回复→批注→刷新后状态完整）
 
 ## 7. CLI（AI 侧接口）
 
@@ -48,7 +50,7 @@
 - [x] 8.2 运行器 `cases/runner.py`：每次运行创建临时会话（system-created）与唯一玩家身份（`case_{name}_{run}_{player}`；pin_players 钉住固定身份）→ 顺序执行：send 注入 / expect 轮询新 out 消息子串或正则匹配（超时失败）/ sleep 等待；结果与**轨迹**写 `case_runs`：status、逐步骤结果、`case_snapshot`（用例文件内容快照）、`run_messages`（运行期全部消息交换快照含时序，不随会话删除丢失）
 - [x] 8.3 CLI `case` 子命令：`list`（--tag 筛选）/ `new`（生成模板）/ `show` / `run <name>` / `run-all [--tag]`（全过退出码 0，有失败非 0）/ `runs list|show <run_id>`（AI 发起自动化测试与回看轨迹）；README 附用例编写示例与标签约定
 - [x] 8.4 REST：`GET/POST /api/cases`、`PUT /api/cases/{name}`（更新用例内容，校验同加载器）、`GET/DELETE /api/cases/{name}`、`POST /api/cases/{name}/runs`、`GET /api/cases/{name}/runs`（含轨迹详情：消息时间线 + 步骤结果 + 用例版本）；Web UI 用例面板（新建/编辑[表单或 JSON 源码]/删除/一键运行、按标签筛选）+ **轨迹视图**：运行列表 → 单次运行消息时间线（步骤结果标注、**步骤说明 note**、批注入口、用例版本对比）
-- [ ] 8.5 验证：写"修仙开局+闭关"示例用例（含 description/scenario/逐步骤 note），`case run` 通过；故意改错期望子串后运行失败且能读到实际回复；缺 description/scenario 的用例被校验拒绝；同一用例连续两次运行状态互不污染；删除运行会话后轨迹仍完整可看、可批注
+- [x] 8.5 验证：写"修仙开局+闭关"示例用例（含 description/scenario/逐步骤 note），`case run` 通过；故意改错期望子串后运行失败且能读到实际回复；缺 description/scenario 的用例被校验拒绝；同一用例连续两次运行状态互不污染；删除运行会话后轨迹仍完整可看、可批注
 
 ## 9. 配置与文档
 
@@ -58,6 +60,6 @@
 
 ## 10. 端到端验收
 
-- [ ] 10.1 按 spec 场景逐条验收：真实管线（白名单拦截/忙碌状态/user_cd）、双向可见、注入接口、群聊多玩家独立身份、主动消息路由、批注持久化、会话归档、令牌 401、测试用例管理与一键验证（多次运行零污染、期望不匹配定位附实际回复）
-- [ ] 10.2 与修仙插件协同冒烟：新会话从零开局（"我要修仙"→"闭关"→等待结算）全流程在网页可见，批注后 CLI 可读；提交前 git push
+- [x] 10.1 按 spec 场景逐条验收：真实管线（白名单拦截/忙碌状态/user_cd）、双向可见、注入接口、群聊多玩家独立身份、主动消息路由、批注持久化、会话归档、令牌 401、测试用例管理与一键验证（多次运行零污染、期望不匹配定位附实际回复）
+- [x] 10.2 与修仙插件协同冒烟：新会话从零开局（"我要修仙"→"闭关"→等待结算）全流程在网页可见，批注后 CLI 可读；提交前 git push
 - [x] 10.3 隔离性验收：仅修改测试平台自身代码并重载后，`git status`/`git diff` 确认项目本体文件零改动；停用/卸载测试平台后修仙插件既有测试（`uv run python -m pytest tests/ -v`）全绿、行为不变；测试平台数据仅存在于 `data/plugin_data/astrbot_plugin_testplatform/`
