@@ -1,0 +1,146 @@
+[
+  {
+    "id": 10878,
+    "conversation_id": 790,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我要修仙 体修",
+    "rich": null,
+    "created_at": 1790009547.5758579
+  },
+  {
+    "id": 10879,
+    "conversation_id": 790,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1790009547.5884
+  },
+  {
+    "id": 10880,
+    "conversation_id": 790,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 给予装备 900000002 铁叶甲 1",
+    "rich": null,
+    "created_at": 1790009547.88638
+  },
+  {
+    "id": 10881,
+    "conversation_id": 790,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已向【测试玩家1】的储物戒放入 铁叶甲 x1",
+    "rich": [],
+    "created_at": 1790009547.917017
+  },
+  {
+    "id": 10882,
+    "conversation_id": 790,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#装备 铁叶甲",
+    "rich": null,
+    "created_at": 1790009548.2039564
+  },
+  {
+    "id": 10883,
+    "conversation_id": 790,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已装备防具【铁叶甲】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：护甲+7",
+    "rich": [],
+    "created_at": 1790009548.2358515
+  },
+  {
+    "id": 10884,
+    "conversation_id": 790,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我的装备",
+    "rich": null,
+    "created_at": 1790009548.5182762
+  },
+  {
+    "id": 10885,
+    "conversation_id": 790,
+    "direction": "out",
+    "sender": "bot",
+    "text": "=== p1 的装备 ===\n【武器】未装备\n【防具】铁叶甲\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--- 装备属性加成 ---\n🛡️ 护甲 +7\n============================",
+    "rich": [],
+    "created_at": 1790009548.536024
+  },
+  {
+    "id": 10886,
+    "conversation_id": 790,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#卸下 防具",
+    "rich": null,
+    "created_at": 1790009548.8339887
+  },
+  {
+    "id": 10887,
+    "conversation_id": 790,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已卸下防具【铁叶甲】\n已存入储物戒",
+    "rich": [],
+    "created_at": 1790009548.8607824
+  },
+  {
+    "id": 10888,
+    "conversation_id": 790,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 给予装备 900000002 粗布法袍 1",
+    "rich": null,
+    "created_at": 1790009549.143975
+  },
+  {
+    "id": 10889,
+    "conversation_id": 790,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#装备 粗布法袍",
+    "rich": null,
+    "created_at": 1790009549.158655
+  },
+  {
+    "id": 10890,
+    "conversation_id": 790,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已向【测试玩家1】的储物戒放入 粗布法袍 x1",
+    "rich": [],
+    "created_at": 1790009549.1733186
+  },
+  {
+    "id": 10891,
+    "conversation_id": 790,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已装备防具【粗布法袍】（凡品）\n━━━━━━━━━━━━━━━\n属性加成：气血+8、护甲+3",
+    "rich": [],
+    "created_at": 1790009549.1931176
+  },
+  {
+    "id": 10892,
+    "conversation_id": 790,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我的装备",
+    "rich": null,
+    "created_at": 1790009549.470642
+  },
+  {
+    "id": 10893,
+    "conversation_id": 790,
+    "direction": "out",
+    "sender": "bot",
+    "text": "=== p1 的装备 ===\n【武器】未装备\n【防具】粗布法袍\n【主修心法】未装备\n【功法】(0/4)\n  未装备\n\n--- 装备属性加成 ---\n❤️ 气血 +8\n🛡️ 护甲 +3\n============================",
+    "rich": [],
+    "created_at": 1790009549.482903
+  }
+]
