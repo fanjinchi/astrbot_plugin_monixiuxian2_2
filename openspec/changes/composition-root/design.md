@@ -30,8 +30,9 @@
 **D1 · 落点：main.py `__init__` 内的 `_wire_core_services()` 装配段，不引入容器。**
 组件规模 ~20 个、依赖深度 ≤3，手工装配段即足够且最透明（AstrBot 插件无独立启动框架，装配必须在 `Star.__init__` 内完成）。独立容器模块会把 30 行装配藏到第二文件，收益为负。装配段按依赖序排列并段内注释声明顺序约束（如 sect_mgr 先于 player_handler），替代现有「init 顺序在其后，此处注入」类回填注释。
 
-**D2 · 假 seam 关闭方式：构造器必填注入，删除 `or XxxManager(...)` 回退。**
+**D2 · 假 seam 关闭方式：构造器必填注入，删除 `or XxxManager(...)` 回退；新协作者默认必填。**
 `BreakthroughManager.__init__`（`core/breakthrough_manager.py:26-42`）的两个 `or` 回退删除，签名改必填；调用方（`handlers/breakthrough_handler.py:32-34`）从装配段取实例传入。回退形态让「协作者缺失」成为静默降级而非构造错误，正是 `player_handler` 换装无回落的病根。
+**注入边界总则（2026-09-21 评审补）**：本 change 新增/收紧的构造参数**一律必填**，例外白名单只有三个——`SectManager`/`RiftManager`/`AdventureManager` 的新协作者参数保持可选 + None 默认，判据有二且必须同时成立：① 存在大批量测试直构造（~50 处 `SectManager(db, FakeConfigManager())` 等，必填即批量编译错）；② 新协作者不服务既有测试路径（测试不触发 impart/pve 调用面）。7 个 handler/manager 消费方（`PlayerHandler`/`EquipmentHandler`/`ShopHandler`/`PillHandler`/`StorageRingHandler`/`RankingManager`/`DualCultivationManager`）**全部必填**——它们的测试直构造点已登记（tasks 3.1），且 `ShopHandler`/`PillHandler`/`StorageRingHandler`/`RankingManager` 测试零直构造，必填零成本。反向论证：若做可选+None，装配段漏传时静默 None、运行期才炸 `AttributeError`——比旧假 seam 更隐蔽（旧假 seam 至少只读路径能工作），是 D3 诊断的假 seam 在 handler 层复发。
 
 **D3 · seam 留在构造签名，不用服务定位器。**
 拒绝 `getattr(self, 'equipment_manager', ...)`/全局注册表等模式：seam 应是可以静态阅读的参数列表。测试以 fake 直填构造参数即完成替身，无需 mock.patch。
@@ -49,7 +50,7 @@
 
 - [行号漂移] → `add-transaction-unit-of-work`（已归档）未触碰 `core/breakthrough_manager.py`（原预警不实，行号仍准）、`unify-combat-power-formula`（已归档）已把 `player_handler.py:187-194` 战力求和落为 :187 单行调用——两者均非在飞；`busy-state-owner` 仍会移动 handler 守卫段（在途）——tasks 0.1 要求实施前全量重新锚定行号。
 - [构造签名收紧导致外部直构造点（tests/脚本）批量编译错] → fail fast 改名，无静默面；受影响点已在 proposal Impact 列明（`test_transaction_atomicity.py:130-131`、`test_sect_manager.py:513,535` 等），tasks 逐文件跟随。
-- [纯接线重排引入行为回归] → 本 change 全部构造替换均为等价实例替换，唯一「行为」面是 `player_handler`/`ranking_manager` 的 `get_equipped_items` 只读路径（注入前后同类同参，回落语义不介入）；验证任务 4.1 为纯不回归断言。另两条实施纪律：`SectManager`/`rift_mgr`/`adventure_mgr` 的新协作者参数**必须保持可选 + None 默认**（~50 处测试直构造 `SectManager(db, FakeConfigManager())`，必填即批量编译错）——D2 的必填注入规则**仅适用于 `BreakthroughManager`**；`tests/test_breakthrough_manager.py` 覆盖突破成功发药路径（`core/breakthrough_manager.py:591/:612`，依赖注入的 ring/pill manager），回退删除后该文件必须保持绿。
+- [纯接线重排引入行为回归] → 本 change 全部构造替换均为等价实例替换，唯一「行为」面是 `player_handler`/`ranking_manager` 的 `get_equipped_items` 只读路径（注入前后同类同参，回落语义不介入）；验证任务 4.1 为纯不回归断言。另两条实施纪律：`SectManager`/`rift_mgr`/`adventure_mgr` 的新协作者参数**必须保持可选 + None 默认**（~50 处测试直构造 `SectManager(db, FakeConfigManager())`，必填即批量编译错）——按 D2 总则，这三个是**唯一**的例外白名单（双判据见 D2），其余消费方一律必填；`tests/test_breakthrough_manager.py` 覆盖突破成功发药路径（`core/breakthrough_manager.py:591/:612`，依赖注入的 ring/pill manager），回退删除后该文件必须保持绿。
 - [装配段两阶段重排引入初始化顺序回归] → 重排仅移动构造语句、不改变任何任务/定时任务的初始化点（`initialize()` 不动）；段内注释声明顺序约束，review 核对 `main.py:238`（sect_mgr 提前）与 :270-279 的回填链被两阶段装配完整吸收。
 - [有人在新 handler 里恢复 `XxxManager(...)` 自建] → AGENTS.md §13 新增系统接入模板补一条「core 服务一律从 `_wire_core_services()` 注入，禁止自构造」；review checklist 含构造点 grep。
 

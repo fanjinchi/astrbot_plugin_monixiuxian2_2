@@ -36,4 +36,4 @@
 - **测试**：新增 owner 原子性 + race 测试；更新 `test_gm_manager.py`(:377-389 断言双重置）与装饰器相关测试；`test_user_busy_upsert.py` 保持有效。
 - **风险标注**：R1 改变并发下的放行行为（竞争 loser 收到忙碌报错，而非静默丢状态）——用户可见但属修复；functional_tests 守卫消息锚点不变（文案未动）。
 - **无**数据库迁移（本 change 不删 `players.state` 列；删列是后续 (b) 阶段，需先 spike 外部消费者）。
-- **协调依赖**：`BusyState(db)` 的构造与注入落点由先行 change `composition-root`（装配段 `_wire_core_services()`）承接——该 change 应先于本 change 合入，本 change 实施时把 `BusyState` 追加进其装配段（其 tasks 1.1b 已回写指向 `composition-root`）。
+- **协调依赖**：`BusyState(db)` 的构造与注入落点由先行 change `composition-root`（装配段 `_wire_core_services()`）承接——该 change 应先于本 change 合入，本 change 实施时把 `BusyState` 追加进其装配段（其 tasks 1.1b 已回写指向 `composition-root`）。**三 change 合入顺序已定（2026-09-21）**：`composition-root` → 本 change → `decouple-handler-to-handler-calls`——理由：decouple 的移动段（`sect_handlers.py:191-263`）位于本 change 守卫清单（`:292+`）之前，若 decouple 先合入，本 change 的守卫行号清单会再漂移一次；让守卫清单落在静止的 `sect_handlers.py` 上，decouple 后合入时在 `SectHandlers.__init__` 上**叠加**本 change 的 `busy_state` 参数即可（叠加规则已回写 decouple 文档）。

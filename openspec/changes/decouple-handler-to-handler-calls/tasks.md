@@ -2,7 +2,7 @@
 
 ## 0. 前置检查
 
-- [ ] 0.1 **行号重新锚定**：进行中的 `composition-root`（main.py 装配段重构为 `_wire_core_services()`、`SectHandlers` 签名补参数、删 main.py:350 回填）与 `busy-state-owner`（sect_handlers.py 守卫收编）合入后，本 change 引用的行号（main.py:340-350、sect_handlers.py 构造区与 `:191-263` 等）会漂移。若二者中任一已先合入，实施前按当时代码重新锚定所有行号引用（镜像 busy-state-owner tasks 0.1 的约定）；两者都未合入则按现状锚点直接实施，但合并顺序仍按 proposal Impact 的冲突提示错开。
+- [ ] 0.1 **行号重新锚定**：进行中的 `composition-root`（main.py 装配段重构为 `_wire_core_services()`、`SectHandlers` 签名补参数、删 main.py:350 回填）与 `busy-state-owner`（sect_handlers.py 守卫收编）合入后，本 change 引用的行号（main.py:340-350、sect_handlers.py 构造区与 `:191-263` 等）会漂移。若二者中任一已先合入，实施前按当时代码重新锚定所有行号引用（镜像 busy-state-owner tasks 0.1 的约定）；两者都未合入则按现状锚点直接实施，但合并顺序仍按 proposal Impact 的冲突提示错开。**已定序（2026-09-21）：`composition-root` → `busy-state-owner` → 本 change**——busy-state 先合入时，`SectHandlers.__init__` 已带 `busy_state` 参数，本 change 的 1.4 步在其上**叠加** `rank_mgr`（不得改名/删除 `busy_state`），构造调用点同步传两者。
 
 ## 1. 排行子命令收编（消除 handler→handler 调用）
 
