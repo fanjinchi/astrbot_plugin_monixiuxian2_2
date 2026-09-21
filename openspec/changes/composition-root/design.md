@@ -17,7 +17,7 @@
 - 单一装配段（main.py `_wire_core_services()`）一次构建无状态 core 服务图，构造参数注入全部消费方；对象图在**一个函数**内可读完全。
 - 三种接线风格归一为构造注入；事后属性回填与 per-site 重建（含局部导入构造）全数删除。
 - 假 seam 关闭：`EquipmentManager` 只有完整三参构造一种形态；`BreakthroughManager` 协作者必填。
-- 有状态组件（`EncounterStore`、`CombatManager`/`CombatEngine`、`GMManager`、`bounty`/`shop` 种子态）的既有单例装配不动——它们没有病灶。
+- 有状态组件（`EncounterStore`、`CombatManager`/`CombatEngine`、`GMManager`、`bounty`/`shop` 种子态）的构造方式与协作关系不变——无新增注入参数、无回填、业务面零改动；但构造语句统一收编进装配段（tasks 1.1 ⑦-⑳）并按依赖序排列，可移动位置（如 sect_mgr 从 :238 挪后至 :269 之后），段内排序对它们同样适用——它们没有病灶，病灶只在接线风格。
 
 **Non-Goals:**
 - 不引入 DI 框架/服务定位器/独立容器模块（见 D1）。

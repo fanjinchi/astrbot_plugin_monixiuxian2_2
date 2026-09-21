@@ -8,7 +8,7 @@
 
 - main.py `__init__` 建立**唯一装配段**（`_wire_core_services()`）：一次性构建 core 服务图——`storage_ring_mgr` → `equipment_mgr(db, cfg, storage_ring_mgr)`（完整三参，假 seam 消失）→ `pill_mgr` → `cultivation_mgr` → `shop_mgr`，并以构造参数注入全部 handler/manager。
 - 删除事后属性回填：main.py:271、:278-279、:308、:318、:350（`impart_mgr`/`pve_combat_mgr`/`ranking_handlers` 改为构造期注入；`sect_mgr`/`rift_mgr`/`adventure_mgr` 构造签名补可选协作者参数）。
-- 删除 per-site 重建（含 per-request 局部导入 `player_handler.py:179,381-383`、方法中途导入 `core/breakthrough_manager.py:423-425`）：`player_handler`(:45-48)、`equipment_handler`(:31-35)、`shop_handler`(:41-45)、`breakthrough_handler`(:35)、`pill_handler`(:24)、`storage_ring_handler`(:58)、`ranking_manager`(:60-63，懒导入一并删除，改模块顶导入)、`dual_cultivation_manager`(:35)。
+- 删除 per-site 重建（含 per-request 局部导入 `player_handler.py:179,381-383`、方法中途导入 `core/breakthrough_manager.py:423-425`）：`player_handler`(:45-48)、`equipment_handler`(:31-35)、`shop_handler`(:41-45)、`breakthrough_handler`(:35)、`pill_handler`(:24)、`storage_ring_handler`(:58)、`ranking_manager`(:60-63，懒导入一并删除，`EquipmentManager` import 改走 `if TYPE_CHECKING:` 块（tasks 2.5，比模块顶导入更彻底——注入后 ranking 不再构造它，仅类型注解需要，运行时零依赖、彻底消环）)、`dual_cultivation_manager`(:35)。
 - 构造器收紧：`BreakthroughManager` 的 `storage_ring_manager or StorageRingManager(...)` / `pill_manager or PillManager(...)` 自建回退（`core/breakthrough_manager.py:39-42`）删除，改必填注入——「缺协作者时悄悄降级」是假 seam 的根源。
 - **协调（先合约束）**：本 change 先行落地，建立装配段与注入惯例；`busy-state-owner` 的 `BusyState(db)` 接线（其 tasks 1.1b）由本装配段承接——两个 change 的 Impact 已互相引用（已回写 busy-state-owner 的 proposal/tasks）。
 
