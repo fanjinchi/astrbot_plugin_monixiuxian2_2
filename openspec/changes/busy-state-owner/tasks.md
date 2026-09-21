@@ -7,7 +7,7 @@
 ## 1. owner 核心（core/busy_state.py）
 
 - [ ] 1.1 新增 `BusyState(db)`：`set_busy(player, status, scheduled_time=0) -> tuple[bool, str | None]`（事务内锁内复查，竞争 loser `txn.abort()` 返回忙碌文案；CULTIVATING 镜像"修炼中"、其余活动镜像"空闲"）、`set_cooldown(user_id, status, scheduled_time)`（纯冷却，无镜像无 clear）、`clear(player)`（`set_user_free` + 镜像"空闲"，单事务）、`assert_idle(user_id, template: str = DEFAULT) -> str | None`（读侧单点；**template 参数必填项**——16 处守卫文案各异：战斗系"你当前正在{status}，无法进行战斗！"/对方版、sect"无法进行此操作！"、历练/秘境/炼丹/弃道重修各有专属后缀且弃道重修用「{status}」括号格式，收编时逐站传入原文案模板）；英文 Google 风格 docstring 写明双语义与 race 语义
-- [ ] 1.1b 接线方式定案（**已由先行 change `composition-root` 定案并预留落点**）：`BusyState` 实例由 main.py 装配段 `_wire_core_services()` 构造（`BusyState(db)`）注入 handler/manager——core 服务一律经装配段注入、禁止消费方自构造；gm_manager 位于 core、直接持有 db，同样注入。实施前确认 `composition-root` 已合入，BusyState 追加进其装配段即可，无需再定接线方式
+- [ ] 1.1b 接线方式定案（**已由先行 change `composition-root` 定案并预留落点**）：`BusyState` 实例由 main.py 装配段 `_wire_core_services()` 构造（`BusyState(db)`）注入 handler/manager——core 服务一律经装配段注入、禁止消费方自构造；gm_manager 位于 core、直接持有 db，同样注入。实施前确认 `composition-root` 已合入，BusyState 追加进其装配段即可，无需再定接线方式。**注入边界（2026-09-22 定）**：新增 `busy_state` 协作者一律**必填**注入，遵循 composition-root D2 总则，Sect/Rift/Adventure 例外白名单**不扩展**——守卫型协作者缺失即构造错误，不留静默None；落地时按必填逐一更新全部直构造测试点（含 ~50 处 `SectManager(db, FakeConfigManager())` 等，实施前先 grep 登记实测点清单，判据②「新协作者不服务既有测试路径」对守卫型协作者不成立，白名单不再适用）
 - [ ] 1.2 新增 owner 单测：双写原子性（注入失败全回滚）、race 锁内复查（并发 set_busy 仅一胜）、`set_cooldown` 不配镜像、assert_idle 各状态分支与各 template
 
 ## 2. 写侧改道（5 文件）
