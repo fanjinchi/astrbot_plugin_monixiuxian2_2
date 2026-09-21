@@ -32,7 +32,7 @@
 ## 4. 验证与收尾
 
 - [x] 4.1 不回归验证（本 change 无行为变化，纯接线）：`player_handler` 两条原两参路径的装备读取（`handle_player_info` 面板、`handle_end_cultivation` 心法修为加成）输出与改造前一致；全装备流程快照：穿戴替换旧装备时旧装备入戒并输出回落消息（该能力改造前后均经 `equipment_handler` 三参实例提供，确认无静默丢弃、无新增差异）
-- [ ] 4.2 初始化回归：插件重载（webtest `POST /api/ops/plugin-reload` 或 Dashboard 重载）无异常；定时任务（boss/loan/spirit_eye/bounty）照常注册
-- [ ] 4.3 functional_tests 冒烟：装备/丹药/商店/排行域用例各至少一条通过（接线改动面所在域）
+- [x] 4.2 初始化回归：webtest 平台实测（2026-09-22）——`POST /api/ops/plugin-reload` 返回 ok、控制台出现「【修仙插件】XiuXianPlugin 初始化完成」、无异常；boss/loan/spirit_eye/bounty 定时任务注册路径正常执行；「修仙帮助」「我的面板」冒烟应答正常
+- [x] 4.3 functional_tests 冒烟（2026-09-22，5/5 通过，结果归档 `functional_tests/results/2026-09-22_composition-root/`）：装备 `equipment-heart-weapon`+`equipment-armor`、商店 `shop-buy-weapon-to-ring`（兼测装备入戒回落）、丹药 `breakthrough-guarantee`（--fixture-profile breakthrough）、排行域无现成用例→以 `sect-command-entry` 替代并 bd 登记缺口（astrbot_plugin_monixiuxian2_2-tf8）
 - [x] 4.4 按 AGENTS.md §7 版本 checklist 评估（纯工程重构无玩法变化，通常无需升版本号）；`openspec validate --change composition-root` 通过；本地 conventional commit（不 push）
 - [x] 4.5 用 `bd` 登记 D6 推迟项（`bd create "migrate __new__+attribute-attachment handler test stubs to constructor injection" -t task`）：存量 `Handler.__new__(Handler)`+属性挂载测试桩迁移为构造注入——非本 change 义务，仅登记跟进
