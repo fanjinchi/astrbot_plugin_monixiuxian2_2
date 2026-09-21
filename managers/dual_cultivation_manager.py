@@ -21,18 +21,27 @@ DUAL_CULT_MAX_EXP_RATIO = 3.0  # 双修双方修为差距最大3倍
 class DualCultivationManager:
     """双修管理器"""
 
-    def __init__(self, db: DataBase, config: Any, config_manager: Any):
+    def __init__(
+        self,
+        db: DataBase,
+        config: Any,
+        config_manager: Any,
+        *,
+        cultivation_manager: CultivationManager,
+    ):
         """Initialize the dual-cultivation manager.
 
         Args:
             db: The plugin database instance.
             config: AstrBot-style configuration object (used for base EXP/min).
             config_manager: Plugin ConfigManager for game_config access.
+            cultivation_manager: Shared CultivationManager instance for spiritual-root
+                speed lookups (assembly-injected; not constructed here).
         """
         self.db = db
         self.config = config
         self.config_manager = config_manager
-        self._cultivation_manager = CultivationManager(config, config_manager, None)
+        self._cultivation_manager = cultivation_manager
 
     def _get_k_hours(self) -> int:
         """Return the fixed dual-cultivation duration in hours."""

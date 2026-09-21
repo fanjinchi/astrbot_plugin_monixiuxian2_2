@@ -3,13 +3,16 @@
 排行榜系统管理器 - 处理各种排行榜逻辑
 """
 
-from typing import TYPE_CHECKING, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from ..data.data_manager import DataBase
-from ..managers.combat_manager import CombatManager
 
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
+    from ..core import EquipmentManager
+    from ..managers.combat_manager import CombatManager
     from ..models import Player
 
 # 宗门职位映射（安全映射，防止索引越界）
@@ -32,7 +35,7 @@ def _short_id(user_id) -> str:
     return str(user_id)[:6]
 
 
-def _safe_name(player: Optional["Player"], fallback_id) -> str:
+def _safe_name(player: Player | None, fallback_id) -> str:
     """安全获取玩家名称，带长度截断和特殊字符过滤"""
     if player and player.user_name:
         name = player.user_name
@@ -51,16 +54,17 @@ class RankingManager:
     """排行榜系统管理器"""
 
     def __init__(
-        self, db: DataBase, combat_mgr: CombatManager, config_manager: "ConfigManager"
+        self,
+        db: DataBase,
+        combat_mgr: CombatManager,
+        config_manager: ConfigManager,
+        *,
+        equipment_manager: EquipmentManager,
     ):
         self.db = db
         self.combat_mgr = combat_mgr
         self.config_manager = config_manager
-
-        # 延迟导入，避免循环依赖，只初始化一次
-        from ..core import EquipmentManager
-
-        self.equipment_manager = EquipmentManager(self.db, self.config_manager)
+        self.equipment_manager = equipment_manager
 
     async def get_level_ranking(self, limit: int = 10) -> tuple[bool, str]:
         """

@@ -221,158 +221,10 @@ class XiuXianPlugin(Star):
         db_path = plugin_data_path / db_filename
         self.db = DataBase(str(db_path))
 
-        # 初始化核心管理器（需在业务处理器之前）
-        from .core import (
-            EquipmentManager,
-            GMManager,
-            SkillManager,
-            StorageRingManager,
-        )
-        from .core.encounter_store import EncounterStore
-
-        self.skill_manager = SkillManager(self.config_manager, self.db)
-        self.storage_ring_mgr = StorageRingManager(self.db, self.config_manager)
-        self.equipment_mgr = EquipmentManager(
-            self.db, self.config_manager, self.storage_ring_mgr
-        )
-        # 宗门管理器提前初始化（player_handler 弃道重修路径依赖其回收钩子）
-        self.sect_mgr = SectManager(self.db, self.config_manager)
-
-        self.misc_handler = MiscHandler(self.db)
-        self.player_handler = PlayerHandler(
-            self.db,
-            self.config,
-            self.config_manager,
-            self.skill_manager,
-            sect_mgr=self.sect_mgr,
-        )
-        self.equipment_handler = EquipmentHandler(
-            self.db, self.config_manager, self.skill_manager
-        )
-        self.breakthrough_handler = BreakthroughHandler(
-            self.db,
-            self.config_manager,
-            self.config,
-            self.skill_manager,
-            sect_manager=self.sect_mgr,
-        )
-        self.pill_handler = PillHandler(self.db, self.config_manager)
-        self.shop_handler = ShopHandler(self.db, self.config, self.config_manager)
-        self.storage_ring_handler = StorageRingHandler(self.db, self.config_manager)
-
-        # Phase 2: 灵石银行和悬赏令（GMManager 依赖 bounty_mgr，需提前初始化）
-        self.bank_mgr = BankManager(self.db, self.config)
-        self.bounty_mgr = BountyManager(self.db, self.storage_ring_mgr)
-
-        self.combat_mgr = CombatManager(self.config_manager, self.skill_manager)
-        self.enemy_mgr = EnemyManager(config_manager=self.config_manager)
-        self.impart_mgr = ImpartManager(self.db, self.config_manager)
-        # 出关结算需要传承管理器（init 顺序在 player_handler 之后，此处注入）
-        self.player_handler.impart_mgr = self.impart_mgr
-        self.pve_combat_mgr = PVECombatManager(
-            self.combat_mgr,
-            self.enemy_mgr,
-            self.config_manager,
-        )
-        # 宗门传承领取/回收需要传承与PvE管理器（init 顺序在其后，此处注入）
-        self.sect_mgr.impart_mgr = self.impart_mgr
-        self.sect_mgr.pve_combat_mgr = self.pve_combat_mgr
-        self.boss_mgr = BossManager(
-            self.db,
-            self.combat_mgr,
-            self.config_manager,
-            self.storage_ring_mgr,
-        )
-        # 遭遇存储单例：秘境/历练共享（add-rift-encounters design D8）；内存态，
-        # 热重载即清空——零惩罚设计下玩家无损失（design D1）。
-        # store 默认 TTL 取 rift_config 的 encounter_ttl_seconds（缺键回落
-        # RIFT_CONFIG 默认，D4 存量兼容）：历练侧 pend 不显式传 ttl（用 store
-        # 默认值），在此处注入配置值才能保证两条路径时限语义一致
-        from .data.default_configs import RIFT_CONFIG
-
-        _rift_cfg = self.config_manager.rift_config if self.config_manager else {}
-        _encounter_ttl = int(
-            _rift_cfg.get(
-                "encounter_ttl_seconds", RIFT_CONFIG.get("encounter_ttl_seconds", 600)
-            )
-        )
-        self.encounter_store = EncounterStore(ttl_seconds=_encounter_ttl)
-        self.rift_mgr = RiftManager(
-            self.db,
-            self.config_manager,
-            self.storage_ring_mgr,
-            self.pve_combat_mgr,
-            encounter_store=self.encounter_store,
-        )
-        # 秘境传承机缘需要传承管理器（init 顺序在其后，此处注入）
-        self.rift_mgr.impart_mgr = self.impart_mgr
-        self.rank_mgr = RankingManager(self.db, self.combat_mgr, self.config_manager)
-        self.adventure_mgr = AdventureManager(
-            self.db,
-            self.storage_ring_mgr,
-            self.pve_combat_mgr,
-            config_manager=self.config_manager,
-            encounter_store=self.encounter_store,
-        )
-        # 历练传承机缘需要传承管理器（init 顺序在其后，此处注入）
-        self.adventure_mgr.impart_mgr = self.impart_mgr
-        self.alchemy_mgr = AlchemyManager(
-            self.db, self.config_manager, self.storage_ring_mgr
-        )
-
-        # 初始化 GM 管理器（依赖前面创建的管理器）
-        self.gm_manager = GMManager(
-            self.db,
-            self.config_manager,
-            self.storage_ring_mgr,
-            self.equipment_mgr,
-            self.adventure_mgr,
-            self.rift_mgr,
-            self.boss_mgr,
-            bounty_manager=self.bounty_mgr,
-            plugin_data_path=plugin_data_path,
-            broadcast_callback=self._broadcast_boss_spawn,
-            sect_manager=self.sect_mgr,
-            impart_manager=self.impart_mgr,
-        )
-
-        # 初始化新功能处理器
-        # ranking_handlers 在其后构造，统一入口分发器需要排行路由，故构造后回填
-        self.sect_handlers = SectHandlers(self.db, self.sect_mgr, self.bounty_mgr)
-        self.boss_handlers = BossHandlers(self.db, self.boss_mgr)
-        self.combat_handlers = CombatHandlers(
-            self.db, self.combat_mgr, self.config_manager
-        )
-        self.technique_handler = TechniqueHandler(
-            self.db, self.config_manager, self.skill_manager, self.storage_ring_mgr
-        )
-        self.ranking_handlers = RankingHandlers(self.db, self.rank_mgr)
-        self.sect_handlers.ranking_handlers = self.ranking_handlers
-        self.rift_handlers = RiftHandlers(self.db, self.rift_mgr)
-        self.adventure_handlers = AdventureHandlers(self.db, self.adventure_mgr)
-        self.alchemy_handlers = AlchemyHandlers(self.db, self.alchemy_mgr)
-        self.impart_handlers = ImpartHandlers(self.db, self.impart_mgr)
-        self.nickname_handler = NicknameHandler(self.db)  # Phase 1
-        self.gm_handler = GMHandler(self.db, self.gm_manager)
-
-        self.bank_handlers = BankHandlers(self.db, self.bank_mgr)
-        self.bounty_handlers = BountyHandlers(self.db, self.bounty_mgr)
-
-        # Phase 3: 传承PK
-        self.impart_pk_mgr = ImpartPkManager(self.db, self.combat_mgr, self.impart_mgr)
-        self.impart_pk_handlers = ImpartPkHandlers(self.db, self.impart_pk_mgr)
-
-        # Phase 4: 扩展功能
-        self.blessed_land_mgr = BlessedLandManager(self.db)
-        self.blessed_land_handlers = BlessedLandHandlers(self.db, self.blessed_land_mgr)
-        self.spirit_farm_mgr = SpiritFarmManager(self.db, self.storage_ring_mgr)
-        self.spirit_farm_handlers = SpiritFarmHandlers(self.db, self.spirit_farm_mgr)
-        self.dual_cult_mgr = DualCultivationManager(
-            self.db, self.config, self.config_manager
-        )
-        self.dual_cult_handlers = DualCultivationHandlers(self.db, self.dual_cult_mgr)
-        self.spirit_eye_mgr = SpiritEyeManager(self.db)
-        self.spirit_eye_handlers = SpiritEyeHandlers(self.db, self.spirit_eye_mgr)
+        # 统一装配核心服务与处理器（assembly point，design D1）：
+        # 全部构造集中在 _wire_core_services，此处只做属性挂载
+        for _attr, _service in self._wire_core_services(plugin_data_path).items():
+            setattr(self, _attr, _service)
 
         self.boss_task = None  # Boss生成任务
         self.loan_check_task = None  # 贷款逾期检查任务
@@ -389,6 +241,253 @@ class XiuXianPlugin(Star):
         self.gm_admins = [str(a) for a in access_control_config.get("GM_ADMINS", [])]
 
         logger.info(f"【修仙插件】XiuXianPlugin 初始化完成，数据库路径: {db_path}")
+
+    def _wire_core_services(self, plugin_data_path: Path) -> dict:
+        """Construct and wire the plugin's entire service graph.
+
+        Single assembly point for the object graph (composition-root design D1
+        in openspec/changes/composition-root). The ordering is normative: every
+        construction below lists all collaborators it needs, and entries are
+        ordered so each service's dependencies are already built. Core imports
+        stay function-scoped here so the runtime smoke tests (which module-mock
+        ``.core``/``.handlers``) keep loading this module standalone.
+
+        Args:
+            plugin_data_path: Plugin data directory (stored on GMManager).
+
+        Returns:
+            Mapping of instance attribute name to the constructed service or
+            handler, in assembly order.
+        """
+        from .core import (
+            CultivationManager,
+            EquipmentManager,
+            GMManager,
+            PillManager,
+            ShopManager,
+            SkillManager,
+            StorageRingManager,
+        )
+        from .core.encounter_store import EncounterStore
+        from .data.default_configs import RIFT_CONFIG
+
+        # Phase 1: 核心管理器（无相互依赖，仅依赖 db/config）
+        skill_manager = SkillManager(self.config_manager, self.db)
+        storage_ring_mgr = StorageRingManager(self.db, self.config_manager)
+        equipment_mgr = EquipmentManager(self.db, self.config_manager, storage_ring_mgr)
+        cultivation_mgr = CultivationManager(
+            self.config, self.config_manager, skill_manager
+        )
+        pill_mgr = PillManager(self.db, self.config_manager)
+        shop_mgr = ShopManager(self.config, self.config_manager)
+
+        # Phase 2: 业务管理器（依赖 Phase 1 实例，按依赖序构造）
+        bank_mgr = BankManager(self.db, self.config)
+        bounty_mgr = BountyManager(self.db, storage_ring_mgr)
+        combat_mgr = CombatManager(self.config_manager, skill_manager)
+        enemy_mgr = EnemyManager(config_manager=self.config_manager)
+        impart_mgr = ImpartManager(self.db, self.config_manager)
+        pve_combat_mgr = PVECombatManager(
+            combat_mgr,
+            enemy_mgr,
+            self.config_manager,
+        )
+        sect_mgr = SectManager(
+            self.db,
+            self.config_manager,
+            impart_mgr=impart_mgr,
+            pve_combat_mgr=pve_combat_mgr,
+        )
+        boss_mgr = BossManager(
+            self.db,
+            combat_mgr,
+            self.config_manager,
+            storage_ring_mgr,
+        )
+        # 遭遇存储单例：秘境/历练共享（add-rift-encounters design D8）；内存态，
+        # 热重载即清空——零惩罚设计下玩家无损失（design D1）。
+        # store 默认 TTL 取 rift_config 的 encounter_ttl_seconds（缺键回落
+        # RIFT_CONFIG 默认，D4 存量兼容）：历练侧 pend 不显式传 ttl（用 store
+        # 默认值），在此处注入配置值才能保证两条路径时限语义一致
+        _rift_cfg = self.config_manager.rift_config if self.config_manager else {}
+        _encounter_ttl = int(
+            _rift_cfg.get(
+                "encounter_ttl_seconds", RIFT_CONFIG.get("encounter_ttl_seconds", 600)
+            )
+        )
+        encounter_store = EncounterStore(ttl_seconds=_encounter_ttl)
+        rift_mgr = RiftManager(
+            self.db,
+            self.config_manager,
+            storage_ring_mgr,
+            pve_combat_mgr,
+            encounter_store=encounter_store,
+            impart_mgr=impart_mgr,
+        )
+        rank_mgr = RankingManager(
+            self.db,
+            combat_mgr,
+            self.config_manager,
+            equipment_manager=equipment_mgr,
+        )
+        adventure_mgr = AdventureManager(
+            self.db,
+            storage_ring_mgr,
+            pve_combat_mgr,
+            impart_mgr=impart_mgr,
+            config_manager=self.config_manager,
+            encounter_store=encounter_store,
+        )
+        alchemy_mgr = AlchemyManager(self.db, self.config_manager, storage_ring_mgr)
+
+        # Phase 2b: GM 管理器（依赖前面创建的管理器）
+        gm_manager = GMManager(
+            self.db,
+            self.config_manager,
+            storage_ring_mgr,
+            equipment_mgr,
+            adventure_mgr,
+            rift_mgr,
+            boss_mgr,
+            bounty_manager=bounty_mgr,
+            plugin_data_path=plugin_data_path,
+            broadcast_callback=self._broadcast_boss_spawn,
+            sect_manager=sect_mgr,
+            impart_manager=impart_mgr,
+        )
+
+        # Phase 3: 业务处理器（依赖前两阶段实例）
+        misc_handler = MiscHandler(self.db)
+        player_handler = PlayerHandler(
+            self.db,
+            self.config,
+            self.config_manager,
+            skill_manager,
+            sect_mgr=sect_mgr,
+            cultivation_manager=cultivation_mgr,
+            pill_manager=pill_mgr,
+            equipment_manager=equipment_mgr,
+            impart_mgr=impart_mgr,
+        )
+        equipment_handler = EquipmentHandler(
+            self.db,
+            self.config_manager,
+            skill_manager,
+            storage_ring_manager=storage_ring_mgr,
+            equipment_manager=equipment_mgr,
+            pill_manager=pill_mgr,
+        )
+        breakthrough_handler = BreakthroughHandler(
+            self.db,
+            self.config_manager,
+            self.config,
+            skill_manager,
+            sect_manager=sect_mgr,
+            pill_manager=pill_mgr,
+            storage_ring_manager=storage_ring_mgr,
+        )
+        pill_handler = PillHandler(self.db, self.config_manager, pill_manager=pill_mgr)
+        shop_handler = ShopHandler(
+            self.db,
+            self.config,
+            self.config_manager,
+            shop_manager=shop_mgr,
+            storage_ring_manager=storage_ring_mgr,
+            equipment_manager=equipment_mgr,
+            pill_manager=pill_mgr,
+        )
+        storage_ring_handler = StorageRingHandler(
+            self.db, self.config_manager, storage_ring_manager=storage_ring_mgr
+        )
+        ranking_handlers = RankingHandlers(self.db, rank_mgr)
+        sect_handlers = SectHandlers(
+            self.db, sect_mgr, bounty_mgr, ranking_handlers=ranking_handlers
+        )
+        boss_handlers = BossHandlers(self.db, boss_mgr)
+        combat_handlers = CombatHandlers(self.db, combat_mgr, self.config_manager)
+        technique_handler = TechniqueHandler(
+            self.db, self.config_manager, skill_manager, storage_ring_mgr
+        )
+        rift_handlers = RiftHandlers(self.db, rift_mgr)
+        adventure_handlers = AdventureHandlers(self.db, adventure_mgr)
+        alchemy_handlers = AlchemyHandlers(self.db, alchemy_mgr)
+        impart_handlers = ImpartHandlers(self.db, impart_mgr)
+        nickname_handler = NicknameHandler(self.db)  # Phase 1
+        gm_handler = GMHandler(self.db, gm_manager)
+        bank_handlers = BankHandlers(self.db, bank_mgr)
+        bounty_handlers = BountyHandlers(self.db, bounty_mgr)
+
+        # Phase 3b: 传承PK
+        impart_pk_mgr = ImpartPkManager(self.db, combat_mgr, impart_mgr)
+        impart_pk_handlers = ImpartPkHandlers(self.db, impart_pk_mgr)
+
+        # Phase 4: 扩展功能
+        blessed_land_mgr = BlessedLandManager(self.db)
+        blessed_land_handlers = BlessedLandHandlers(self.db, blessed_land_mgr)
+        spirit_farm_mgr = SpiritFarmManager(self.db, storage_ring_mgr)
+        spirit_farm_handlers = SpiritFarmHandlers(self.db, spirit_farm_mgr)
+        dual_cult_mgr = DualCultivationManager(
+            self.db,
+            self.config,
+            self.config_manager,
+            cultivation_manager=cultivation_mgr,
+        )
+        dual_cult_handlers = DualCultivationHandlers(self.db, dual_cult_mgr)
+        spirit_eye_mgr = SpiritEyeManager(self.db)
+        spirit_eye_handlers = SpiritEyeHandlers(self.db, spirit_eye_mgr)
+
+        return {
+            "skill_manager": skill_manager,
+            "storage_ring_mgr": storage_ring_mgr,
+            "equipment_mgr": equipment_mgr,
+            "cultivation_mgr": cultivation_mgr,
+            "pill_mgr": pill_mgr,
+            "shop_mgr": shop_mgr,
+            "bank_mgr": bank_mgr,
+            "bounty_mgr": bounty_mgr,
+            "combat_mgr": combat_mgr,
+            "enemy_mgr": enemy_mgr,
+            "impart_mgr": impart_mgr,
+            "pve_combat_mgr": pve_combat_mgr,
+            "sect_mgr": sect_mgr,
+            "boss_mgr": boss_mgr,
+            "encounter_store": encounter_store,
+            "rift_mgr": rift_mgr,
+            "rank_mgr": rank_mgr,
+            "adventure_mgr": adventure_mgr,
+            "alchemy_mgr": alchemy_mgr,
+            "gm_manager": gm_manager,
+            "misc_handler": misc_handler,
+            "player_handler": player_handler,
+            "equipment_handler": equipment_handler,
+            "breakthrough_handler": breakthrough_handler,
+            "pill_handler": pill_handler,
+            "shop_handler": shop_handler,
+            "storage_ring_handler": storage_ring_handler,
+            "ranking_handlers": ranking_handlers,
+            "sect_handlers": sect_handlers,
+            "boss_handlers": boss_handlers,
+            "combat_handlers": combat_handlers,
+            "technique_handler": technique_handler,
+            "rift_handlers": rift_handlers,
+            "adventure_handlers": adventure_handlers,
+            "alchemy_handlers": alchemy_handlers,
+            "impart_handlers": impart_handlers,
+            "nickname_handler": nickname_handler,
+            "gm_handler": gm_handler,
+            "bank_handlers": bank_handlers,
+            "bounty_handlers": bounty_handlers,
+            "impart_pk_mgr": impart_pk_mgr,
+            "impart_pk_handlers": impart_pk_handlers,
+            "blessed_land_mgr": blessed_land_mgr,
+            "blessed_land_handlers": blessed_land_handlers,
+            "spirit_farm_mgr": spirit_farm_mgr,
+            "spirit_farm_handlers": spirit_farm_handlers,
+            "dual_cult_mgr": dual_cult_mgr,
+            "dual_cult_handlers": dual_cult_handlers,
+            "spirit_eye_mgr": spirit_eye_mgr,
+            "spirit_eye_handlers": spirit_eye_handlers,
+        }
 
     def _check_access(self, event: AstrMessageEvent) -> bool:
         """检查访问权限，支持群聊白名单控制"""

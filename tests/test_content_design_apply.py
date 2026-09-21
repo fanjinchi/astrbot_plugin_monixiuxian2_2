@@ -577,7 +577,18 @@ def _make_equip_handler(config_manager, player_kwargs=None):
     db.ext = FakeDbExt()
     db.update_player = AsyncMock()
     db.get_player_by_id = AsyncMock(return_value=FakePlayer(**(player_kwargs or {})))
-    return EquipmentHandler(db, config_manager), db
+    return (
+        EquipmentHandler(
+            db,
+            config_manager,
+            storage_ring_manager=_core_pkg.StorageRingManager(db, config_manager),
+            equipment_manager=_core_pkg.EquipmentManager(
+                db, config_manager, _core_pkg.StorageRingManager(db, config_manager)
+            ),
+            pill_manager=_core_pkg.PillManager(db, config_manager),
+        ),
+        db,
+    )
 
 
 async def _equip_result(handler, item_name):

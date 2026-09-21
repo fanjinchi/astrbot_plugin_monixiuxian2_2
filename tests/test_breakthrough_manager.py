@@ -95,7 +95,12 @@ async def test_breakthrough_info_panel_level_one(config_manager):
         experience=config_manager.get_exp_needed(1),
     )
     handler = BreakthroughHandler(
-        MagicMock(), config_manager, {"VALUES": {}}, skill_manager=None
+        MagicMock(),
+        config_manager,
+        {"VALUES": {}},
+        skill_manager=None,
+        pill_manager=MagicMock(),
+        storage_ring_manager=MagicMock(),
     )
     handler.pill_manager = MagicMock()
     handler.pill_manager.update_temporary_effects = AsyncMock()
@@ -127,7 +132,12 @@ async def test_breakthrough_info_max_level(config_manager):
         experience=10**12,
     )
     handler = BreakthroughHandler(
-        MagicMock(), config_manager, {"VALUES": {}}, skill_manager=None
+        MagicMock(),
+        config_manager,
+        {"VALUES": {}},
+        skill_manager=None,
+        pill_manager=MagicMock(),
+        storage_ring_manager=MagicMock(),
     )
     handler.pill_manager = MagicMock()
     handler.pill_manager.update_temporary_effects = AsyncMock()

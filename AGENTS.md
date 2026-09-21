@@ -23,7 +23,7 @@ AstrBot 插件（文字修仙游戏），Python 插件，无独立构建系统�
 ## 架构速览
 
 ```
-main.py              # 插件入口：命令路由、定时任务初始化（文件名必须为 main.py）
+main.py              # 插件入口：命令路由、定时任务初始化；core 服务由 _wire_core_services() 装配段统一注入（文件名必须为 main.py）
 handlers/            # 指令处理器（按系统分类）
 managers/            # 业务逻辑管理器（战斗、宗门、Boss 等）
 core/                # 通用工具管理器（修炼、丹药、装备、储物戒）
@@ -159,7 +159,7 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 2. `managers/beast_manager.py` — 业务封装（如需）
 3. `handlers/beast_handlers.py` — 指令处理
 4. `handlers/__init__.py` — 导出 Handler
-5. `main.py` — 初始化 Manager/Handler、注册命令
+5. `main.py` — 在 `_wire_core_services()` 装配段实例化服务/Manager 并注入 Handler，注册命令；**禁止在 handler/manager 内自构造核心服务**（core 单例一律由装配段注入）
 6. 如有数据库表 → `data/migration.py` 添加迁移
 
 ### 14. 玩法变更必须同步 design_docs（必做）

@@ -47,7 +47,7 @@ SectHandlers = _sect_handlers_mod.SectHandlers
 
 # player_handler does ``from ..core import ...``; load the real core package
 # __init__ first so the names resolve under the synthetic package tree.
-load_package_module("core/__init__.py", "astrbot_plugin_monixiuxian2_2.core")
+_core_pkg = load_package_module("core/__init__.py", "astrbot_plugin_monixiuxian2_2.core")
 
 _player_handler_mod = load_package_module(
     "handlers/player_handler.py",
@@ -200,6 +200,24 @@ async def test_busy_player_can_view_but_not_mutate_sect_panels():
     await db.close()
 
 
+def _make_player_handler(db) -> PlayerHandler:
+    """PlayerHandler with real core collaborators (assembly-injected)."""
+    config_manager = FakeConfigManager()
+    return PlayerHandler(
+        db,
+        {"VALUES": {}},
+        config_manager,
+        cultivation_manager=_core_pkg.CultivationManager(
+            {"VALUES": {}}, config_manager, None
+        ),
+        pill_manager=_core_pkg.PillManager(db, config_manager),
+        equipment_manager=_core_pkg.EquipmentManager(
+            db, config_manager, _core_pkg.StorageRingManager(db, config_manager)
+        ),
+        impart_mgr=None,
+    )
+
+
 # ===== H3+M8 签到宗门日重置 =====
 
 
@@ -209,7 +227,7 @@ async def test_check_in_daily_reset_runs_once_per_day(monkeypatch):
     check-ins on the same day do not reset again."""
     monkeypatch.setattr(_player_handler_mod, "datetime", _FrozenDateTime)
     db = await _make_db()
-    handler = PlayerHandler(db, {"VALUES": {}}, FakeConfigManager())
+    handler = _make_player_handler(db)
     today = FROZEN_TODAY
 
     await _make_player(db, "u1", check_in_date="2000-01-01")
@@ -248,7 +266,7 @@ async def test_check_in_daily_reset_failure_does_not_break_check_in(monkeypatch)
     """A failing sect daily reset is logged and swallowed; check-in succeeds."""
     monkeypatch.setattr(_player_handler_mod, "datetime", _FrozenDateTime)
     db = await _make_db()
-    handler = PlayerHandler(db, {"VALUES": {}}, FakeConfigManager())
+    handler = _make_player_handler(db)
 
     await _make_player(db, "u1", check_in_date="2000-01-01")
 
@@ -436,7 +454,7 @@ async def test_end_cultivation_hints_when_legacy_unactivated(monkeypatch):
     激活实例存在时正常累积累提示；无实例时不提示。
     """
     db = await _make_db()
-    handler = PlayerHandler(db, {"VALUES": {}}, FakeConfigManager())
+    handler = _make_player_handler(db)
 
     await _make_player(db, "u1")
 

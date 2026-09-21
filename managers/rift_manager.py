@@ -137,13 +137,14 @@ class RiftManager:
         storage_ring_manager: "StorageRingManager" = None,
         pve_combat_mgr: PVECombatManager = None,
         encounter_store: "EncounterStore | None" = None,
+        impart_mgr=None,
     ):
         self.db = db
         self.config_manager = config_manager
         self.storage_ring_manager = storage_ring_manager
         self.pve_combat_mgr = pve_combat_mgr
-        # 传承管理器：可选注入（main.py 装配后），用于秘境触发传承机缘
-        self.impart_mgr = None
+        # 传承管理器：可选注入（main.py 装配传入），用于秘境触发传承机缘
+        self.impart_mgr = impart_mgr
         # 遭遇存储：可选注入共享单例（main.py 装配，与 AdventureManager 共用，
         # design D8）；默认自建，保证既有测试/独立使用不炸
         self.encounter_store = (

@@ -15,9 +15,8 @@ from .breakthrough_fortune import format_fortune_message, roll_breakthrough_fort
 
 if TYPE_CHECKING:
     from ..core.skill_manager import SkillManager
-
-from .pill_manager import PillManager
-from .storage_ring_manager import StorageRingManager
+    from .pill_manager import PillManager
+    from .storage_ring_manager import StorageRingManager
 
 
 class BreakthroughManager:
@@ -32,14 +31,17 @@ class BreakthroughManager:
         storage_ring_manager: StorageRingManager | None = None,
         pill_manager: PillManager | None = None,
     ):
+        if storage_ring_manager is None or pill_manager is None:
+            raise ValueError(
+                "storage_ring_manager and pill_manager are required "
+                "(assembly-injected, see openspec/changes/composition-root)"
+            )
         self.db = db
         self.config_manager = config_manager
         self.config = config
         self.skill_manager = skill_manager
-        self.storage_ring_manager = storage_ring_manager or StorageRingManager(
-            db, config_manager
-        )
-        self.pill_manager = pill_manager or PillManager(db, config_manager)
+        self.storage_ring_manager = storage_ring_manager
+        self.pill_manager = pill_manager
 
     def _get_growth_params(
         self, cultivation_type: str, level_index: int
@@ -420,9 +422,7 @@ class BreakthroughManager:
                 await self.db.update_player(player)
 
                 # 检查是否有回生丹效果
-                from .pill_manager import PillManager
-
-                pill_manager = PillManager(self.db, self.config_manager)
+                pill_manager = self.pill_manager
                 resurrected = await pill_manager.handle_resurrection(player)
 
                 if resurrected:

@@ -7,8 +7,9 @@ from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent
 
 from ..config_manager import ConfigManager
-from ..core import CultivationManager, PillManager, SkillManager
+from ..core import CultivationManager, EquipmentManager, PillManager, SkillManager
 from ..data import DataBase
+from ..managers.impart_manager import ImpartManager
 from ..models import Player
 from ..models_extended import UserStatus
 from ..utils.narrative_text import render_narrative
@@ -34,18 +35,21 @@ class PlayerHandler:
         config_manager: ConfigManager,
         skill_manager: SkillManager | None = None,
         sect_mgr=None,
+        *,
+        cultivation_manager: CultivationManager,
+        pill_manager: PillManager,
+        equipment_manager: EquipmentManager,
+        impart_mgr: ImpartManager,
     ):
         self.db = db
         self.config = config
         self.config_manager = config_manager
         self.skill_manager = skill_manager
         self.sect_mgr = sect_mgr
-        # 传承管理器：init 顺序在 player_handler 之后，由 main.py 装配后注入
-        self.impart_mgr = None
-        self.cultivation_manager = CultivationManager(
-            config, config_manager, skill_manager
-        )
-        self.pill_manager = PillManager(self.db, self.config_manager)
+        self.impart_mgr = impart_mgr
+        self.cultivation_manager = cultivation_manager
+        self.pill_manager = pill_manager
+        self.equipment_manager = equipment_manager
 
     def _render_narrative(
         self,
@@ -176,9 +180,7 @@ class PlayerHandler:
         pill_multipliers = self.pill_manager.calculate_pill_attribute_effects(player)
 
         # 获取装备加成后的属性
-        from ..core import EquipmentManager
-
-        equipment_manager = EquipmentManager(self.db, self.config_manager)
+        equipment_manager = self.equipment_manager
         equipped_items = equipment_manager.get_equipped_items(
             player, self.config_manager.items_data, self.config_manager.weapons_data
         )
@@ -378,9 +380,7 @@ class PlayerHandler:
         # 获取主修心法的修为加成
         technique_bonus = 0.0
         if player.main_technique:
-            from ..core import EquipmentManager
-
-            equipment_manager = EquipmentManager(self.db, self.config_manager)
+            equipment_manager = self.equipment_manager
             equipped_items = equipment_manager.get_equipped_items(
                 player, self.config_manager.items_data, self.config_manager.weapons_data
             )

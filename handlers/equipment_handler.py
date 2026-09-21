@@ -24,15 +24,17 @@ class EquipmentHandler:
         db: DataBase,
         config_manager: ConfigManager,
         skill_manager: SkillManager | None = None,
+        *,
+        storage_ring_manager: StorageRingManager,
+        equipment_manager: EquipmentManager,
+        pill_manager: PillManager,
     ):
         self.db = db
         self.config_manager = config_manager
         self.skill_manager = skill_manager
-        self.storage_ring_manager = StorageRingManager(db, config_manager)
-        self.equipment_manager = EquipmentManager(
-            db, config_manager, self.storage_ring_manager
-        )
-        self.pill_manager = PillManager(db, config_manager)
+        self.storage_ring_manager = storage_ring_manager
+        self.equipment_manager = equipment_manager
+        self.pill_manager = pill_manager
 
     @player_required
     async def handle_show_equipment(self, player: Player, event: AstrMessageEvent):

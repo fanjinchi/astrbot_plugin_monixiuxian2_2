@@ -15,6 +15,12 @@ _dual_mod = load_package_module(
 )
 DualCultivationManager = _dual_mod.DualCultivationManager
 
+_cult_mod = load_package_module(
+    "core/cultivation_manager.py",
+    "astrbot_plugin_monixiuxian2_2.core.cultivation_manager",
+)
+CultivationManager = _cult_mod.CultivationManager
+
 
 @pytest.fixture
 def fake_db():
@@ -44,7 +50,14 @@ def fake_config_manager():
 @pytest.fixture
 def manager(fake_db, fake_config, fake_config_manager):
     """DualCultivationManager using default linear realm factor."""
-    return DualCultivationManager(fake_db, fake_config, fake_config_manager)
+    return DualCultivationManager(
+        fake_db,
+        fake_config,
+        fake_config_manager,
+        cultivation_manager=CultivationManager(
+            fake_config, fake_config_manager, None
+        ),
+    )
 
 
 @pytest.fixture

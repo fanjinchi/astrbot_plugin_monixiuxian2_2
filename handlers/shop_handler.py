@@ -32,17 +32,23 @@ class ShopHandler:
     }
 
     def __init__(
-        self, db: DataBase, config: AstrBotConfig, config_manager: ConfigManager
+        self,
+        db: DataBase,
+        config: AstrBotConfig,
+        config_manager: ConfigManager,
+        *,
+        shop_manager: ShopManager,
+        storage_ring_manager: StorageRingManager,
+        equipment_manager: EquipmentManager,
+        pill_manager: PillManager,
     ):
         self.db = db
         self.config = config
         self.config_manager = config_manager
-        self.shop_manager = ShopManager(config, config_manager)
-        self.storage_ring_manager = StorageRingManager(db, config_manager)
-        self.equipment_manager = EquipmentManager(
-            db, config_manager, self.storage_ring_manager
-        )
-        self.pill_manager = PillManager(db, config_manager)
+        self.shop_manager = shop_manager
+        self.storage_ring_manager = storage_ring_manager
+        self.equipment_manager = equipment_manager
+        self.pill_manager = pill_manager
         access_control = self.config.get("ACCESS_CONTROL", {})
         self.shop_manager_ids = {
             str(user_id) for user_id in access_control.get("SHOP_MANAGERS", [])

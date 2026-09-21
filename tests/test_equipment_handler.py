@@ -115,7 +115,16 @@ def handler():
     db.get_player_by_id = AsyncMock()
     cfg = FakeConfigManager()
     skill_mgr = FakeSkillManager()
-    return EquipmentHandler(db, cfg, skill_mgr)
+    return EquipmentHandler(
+        db,
+        cfg,
+        skill_mgr,
+        storage_ring_manager=_core_pkg.StorageRingManager(db, cfg),
+        equipment_manager=_core_pkg.EquipmentManager(
+            db, cfg, _core_pkg.StorageRingManager(db, cfg)
+        ),
+        pill_manager=_core_pkg.PillManager(db, cfg),
+    )
 
 
 class TestCollectOwnedSkillIds:

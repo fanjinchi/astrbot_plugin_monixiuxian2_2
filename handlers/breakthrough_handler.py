@@ -4,7 +4,12 @@ from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 
 from ..config_manager import ConfigManager
-from ..core import BreakthroughManager, PillManager, SkillManager
+from ..core import (
+    BreakthroughManager,
+    PillManager,
+    SkillManager,
+    StorageRingManager,
+)
 from ..data import DataBase
 from ..models import Player
 from .utils import player_required
@@ -25,14 +30,22 @@ class BreakthroughHandler:
         config: dict,
         skill_manager: SkillManager | None = None,
         sect_manager=None,
+        *,
+        pill_manager: PillManager,
+        storage_ring_manager: StorageRingManager,
     ):
         self.db = db
         self.config_manager = config_manager
         self.config = config
         self.breakthrough_manager = BreakthroughManager(
-            db, config_manager, config, skill_manager
+            db,
+            config_manager,
+            config,
+            skill_manager,
+            storage_ring_manager=storage_ring_manager,
+            pill_manager=pill_manager,
         )
-        self.pill_manager = PillManager(db, config_manager)
+        self.pill_manager = pill_manager
         # 可选：师承任务链进度推进（突破成功挂钩点）
         self.sect_manager = sect_manager
 

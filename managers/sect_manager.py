@@ -26,15 +26,17 @@ SYSTEM_SECT_OWNER = ""
 class SectManager:
     """宗门系统管理器"""
 
-    def __init__(self, db: DataBase, config_manager=None):
+    def __init__(
+        self, db: DataBase, config_manager=None, *, impart_mgr=None, pve_combat_mgr=None
+    ):
         self.db = db
         self.config_manager = config_manager
         self.config = getattr(config_manager, "sect_config", None) or {}
         self.sect_factions = getattr(config_manager, "sect_factions", None) or {}
         self.sect_tasks = getattr(config_manager, "sect_tasks", None) or {}
-        # 传承/PvE 管理器：可选注入（main.py 装配后），用于宗门传承领取
-        self.impart_mgr = None
-        self.pve_combat_mgr = None
+        # 传承/PvE 管理器：可选注入，用于宗门传承领取/回收与 PvE 切磋（main.py 装配传入）
+        self.impart_mgr = impart_mgr
+        self.pve_combat_mgr = pve_combat_mgr
 
     # ===== 职位配置辅助（唯一事实源：sect_config.json 的 positions） =====
 

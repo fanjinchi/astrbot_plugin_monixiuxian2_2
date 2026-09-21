@@ -18,10 +18,12 @@ __all__ = ["PillHandler"]
 class PillHandler:
     """丹药系统处理器 - 处理丹药使用和查看"""
 
-    def __init__(self, db: DataBase, config_manager: ConfigManager):
+    def __init__(
+        self, db: DataBase, config_manager: ConfigManager, *, pill_manager: PillManager
+    ):
         self.db = db
         self.config_manager = config_manager
-        self.pill_manager = PillManager(db, config_manager)
+        self.pill_manager = pill_manager
 
     def _format_required_level(self, level_index: int) -> str:
         """展示灵修/体修的需求境界名称"""

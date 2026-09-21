@@ -52,10 +52,16 @@ __all__ = ["StorageRingHandler"]
 class StorageRingHandler:
     """储物戒系统处理器"""
 
-    def __init__(self, db: DataBase, config_manager: ConfigManager):
+    def __init__(
+        self,
+        db: DataBase,
+        config_manager: ConfigManager,
+        *,
+        storage_ring_manager: StorageRingManager,
+    ):
         self.db = db
         self.config_manager = config_manager
-        self.storage_ring_manager = StorageRingManager(db, config_manager)
+        self.storage_ring_manager = storage_ring_manager
 
     @player_required
     async def handle_storage_ring(self, player: Player, event: AstrMessageEvent):

@@ -848,6 +848,11 @@ _dual_mod = load_package_module(
     "astrbot_plugin_monixiuxian2_2.managers.dual_cultivation_manager",
 )
 DualCultivationManager = _dual_mod.DualCultivationManager
+
+_cultivation_mod = load_package_module(
+    "core/cultivation_manager.py",
+    "astrbot_plugin_monixiuxian2_2.core.cultivation_manager",
+)
 _bounty_mod = load_package_module(
     "managers/bounty_manager.py",
     "astrbot_plugin_monixiuxian2_2.managers.bounty_manager",
@@ -904,7 +909,12 @@ def _make_dual_manager(db: DataBase) -> DualCultivationManager:
         "dual_cultivation": {"k_hours": 2, "realm_factor": "linear"}
     }
     return DualCultivationManager(
-        db, {"VALUES": {"BASE_EXP_PER_MINUTE": 100}}, config_manager
+        db,
+        {"VALUES": {"BASE_EXP_PER_MINUTE": 100}},
+        config_manager,
+        cultivation_manager=_cultivation_mod.CultivationManager(
+            {"VALUES": {"BASE_EXP_PER_MINUTE": 100}}, config_manager, None
+        ),
     )
 
 
