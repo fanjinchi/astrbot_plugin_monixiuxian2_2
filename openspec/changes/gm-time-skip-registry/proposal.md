@@ -28,7 +28,7 @@
 
 - **代码**：新增 `core/time_skip_registry.py`；`core/gm_manager.py`（删 :62-122 清单与 :1200 循环数据源，改消费注册表；`cmd_help` :428-429 追加生成域列表）；~8 个属主模块各增 `TIME_SKIP_ENTRIES` 模块常量（SQL 原样迁移）。
 - **Spec**：`openspec/specs/gm-commands/spec.md`「GM 时间快进」需求经本 change 的 delta 更新（`skip_specs` 不设——需求正文内嵌了被替换的机制描述）。
-- **文档**：AGENTS.md §2（:77）改写；`design_docs/api-overview.md:106` 的「按 `_TIME_SKIP_RULES` 枚举」表述改指注册表；`scripts/test_suite_ctl.py:1255` 注释提及 `_TIME_SKIP_RULES` 处核对（描述快进幽灵数据语义，改不改名以注释是否失真为准）。
+- **文档**：AGENTS.md §2（:77）改写；`design_docs/api-overview.md:107` 的「按 `_TIME_SKIP_RULES` 枚举」表述改指注册表；`scripts/test_suite_ctl.py:1255` 注释提及 `_TIME_SKIP_RULES` 处核对（描述快进幽灵数据语义，改不改名以注释是否失真为准）。
 - **软依赖已兑现**：`add-transaction-unit-of-work`（2026-09-19 已归档）的 tasks 3.3 已把 `core/gm_manager.py:1199` 的 `BEGIN IMMEDIATE` 改为事务 CM（同一循环块）——本 change 直接落在 CM 形态上实施即可。
 - **同文件并发**：`busy-state-owner` 触碰 gm_manager 的清除路径（`:908-910` / `:1246-1252`），与本 change 区域（:62-122 / :381-437 / :1170-1213）不相交；实施前各自重新锚定行号。
 - **无**数据库迁移、无配置变更、无 GM 命令行为变化（覆盖域、回复格式、帮助既有文案逐字保持）。

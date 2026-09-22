@@ -27,10 +27,12 @@ class BreakthroughManager:
         db: DataBase,
         config_manager: ConfigManager,
         config: dict,
-        skill_manager: SkillManager | None = None,
-        storage_ring_manager: StorageRingManager | None = None,
-        pill_manager: PillManager | None = None,
+        skill_manager: SkillManager | None,
+        storage_ring_manager: StorageRingManager,
+        pill_manager: PillManager,
     ):
+        # Runtime guard for call sites that bypass the type signature (the
+        # annotation already makes both required).
         if storage_ring_manager is None or pill_manager is None:
             raise ValueError(
                 "storage_ring_manager and pill_manager are required "

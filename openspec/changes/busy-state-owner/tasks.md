@@ -12,17 +12,17 @@
 
 ## 2. 写侧改道（5 文件）
 
-- [ ] 2.1 `handlers/player_handler.py:328-331`（闭关）/`:447-458`（出关）改道 `BusyState.set_busy/clear`——R2 双写并入单事务。**机制明确**：调用方（handler）整体包在 `async with self.db.transaction():` 里，owner 内部 CM no-op join；`update_player`（含 `cultivation_start_time` 等同行字段）也在**同一事务内**调用——owner 方法签名需支持传入待持久化的 player 变更（或文档约定调用方在 owner 调用后、事务内自行 `update_player`），不得留在事务外形成第二次提交；**更新 `:431-434` 的时序注释**（两次 commit 窗口已消失，clear 与传承结算的先后关系保持）
-- [ ] 2.2 `managers/adventure_manager.py:222-224/:314`、`managers/rift_manager.py:304-306/:400/:464` 改道（顺带收编两 manager 的手抄守卫 :198/:280 到 assert_idle）
-- [ ] 2.3 `managers/sect_manager.py:917-919` 改道 `set_cooldown`（SECT_TASK 冷却语义）；`:856-862` 到期判定逻辑不动
+- [ ] 2.1 `handlers/player_handler.py:330-333`（闭关）/`:447-458`（出关）改道 `BusyState.set_busy/clear`——R2 双写并入单事务。**机制明确**：调用方（handler）整体包在 `async with self.db.transaction():` 里，owner 内部 CM no-op join；`update_player`（含 `cultivation_start_time` 等同行字段）也在**同一事务内**调用——owner 方法签名需支持传入待持久化的 player 变更（或文档约定调用方在 owner 调用后、事务内自行 `update_player`），不得留在事务外形成第二次提交；**更新 `:431-434` 的时序注释**（两次 commit 窗口已消失，clear 与传承结算的先后关系保持）
+- [ ] 2.2 `managers/adventure_manager.py:222-224/:314`、`managers/rift_manager.py:305-307/:401/:465` 改道（顺带收编两 manager 的手抄守卫 :198/:281 到 assert_idle）
+- [ ] 2.3 `managers/sect_manager.py:919-921` 改道 `set_cooldown`（SECT_TASK 冷却语义）；`:858-862` 到期判定逻辑不动
 - [ ] 2.4 `core/gm_manager.py:912-914` / `:1249-1251` 手动双重置改 `clear(player)`；`:997/:1071` force-settle 的 `update_user_cd`（仅 bump `scheduled_time`，非常态忙碌写入）保持直连，在 owner docstring 里注明此例外。⚠ `:1249-1251` 已在 `fix-two-stage-commit-atomicity`（S9）的 CM 内（`core/gm_manager.py:1245`）：`clear(player)` 必须留在该 CM 块内，否则该处退回两段提交
-- [ ] 2.5 残留核对：grep 确认运行时代码不再直接赋值 `player.state`；**显式排除** `scripts/test_suite_ctl.py:1134`（fixture SQL 直写，测试工具性质）、`tests/test_gm_manager.py:377`、`tests/test_sect_handlers.py:445`（测试桩写入）；用 `bd` 登记预存问题：`scripts/test_suite_ctl.py:1148` 注释 "set_user_busy 只 UPDATE 不 INSERT" 已过时（bd qv9 起为 upsert）
+- [ ] 2.5 残留核对：grep 确认运行时代码不再直接赋值 `player.state`；**显式排除** `scripts/test_suite_ctl.py:1134`（fixture SQL 直写，测试工具性质）、`tests/test_gm_manager.py:377`、`tests/test_sect_handlers.py:463`（测试桩写入）；用 `bd` 登记预存问题：`scripts/test_suite_ctl.py:1148` 注释 "set_user_busy 只 UPDATE 不 INSERT" 已过时（bd qv9 起为 upsert）
 
 ## 3. 读侧收编（R3-ii）
 
 - [ ] 3.1 `handlers/utils.py:116-123`：删除 `player_required` 的 `player.state == "修炼中"` 第二层检查（user_cd 成为唯一真相；两层共用同一 `BUSY_STATE_ALLOWED_COMMANDS`，白名单语义不变）；docstring 更新
-- [ ] 3.2 16 处手抄守卫改 `assert_idle`，**文案逐字保留**：sect ×9——5 入口经共享 helper `_get_busy_message`（调用点 :433,448,459,469,481，helper :421-427，收编 helper 即覆盖这 5 点）+ 4 处直连守卫需逐站收编（:292 建宗、:303 入宗、:314 退宗、:336 捐献，文案同 helper 体）、combat ×4、alchemy ×1、player_handler ×2（`:316-318` 死代码复查直接删除——装饰器已守；弃道重修 `:601-611` 保留 :604 的 user_cd 基专属文案，删除 :607 state 基冗余检查）
-- [ ] 3.3 `handlers/player_handler.py:346`（出关 idle 应答）保留流程分支，实现改为查 user_cd（user_cd 语义等价改写，顺手去掉最后一个镜像读取）；manager 层 6 处重复守卫（adventure:198、rift:280、alchemy:154、dual_cultivation:194,215、boss:403）同法收编
+- [ ] 3.2 16 处手抄守卫改 `assert_idle`，**文案逐字保留**：sect ×9——5 入口经共享 helper `_get_busy_message`（调用点 :433,448,459,469,481，helper :421-427，收编 helper 即覆盖这 5 点）+ 4 处直连守卫需逐站收编（:292 建宗、:303 入宗、:314 退宗、:336 捐献，文案同 helper 体）、combat ×4、alchemy ×1、player_handler ×2（`:318-320` 死代码复查直接删除——装饰器已守；弃道重修 `:601-611` 保留 :604 的 user_cd 基专属文案，删除 :607 state 基冗余检查）
+- [ ] 3.3 `handlers/player_handler.py:348`（出关 idle 应答）保留流程分支，实现改为查 user_cd（user_cd 语义等价改写，顺手去掉最后一个镜像读取）；manager 层 6 处重复守卫（adventure:198、rift:281、alchemy:154、dual_cultivation:203,224、boss:403）同法收编
 - [ ] 3.4 测试更新：`test_gm_manager.py`(:377-389 双重置断言）、装饰器相关测试；全量 pytest 绿
 
 ## 4. 文档与收尾

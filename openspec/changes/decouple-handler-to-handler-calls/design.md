@@ -4,7 +4,7 @@
 
 `SectHandlers` 是「宗门」单入口分发器（`handlers/sect_handlers.py:55-102` 的 dispatch table），其中排行与悬赏两个子命令组的知识不在本文件：
 
-- `_sub_rank` / `_sub_rank_contribution`（`:191-203`）把事件生成器原样转发给 `RankingHandlers` 的两个方法（`handlers/ranking_handlers.py:30-56`）。这两个方法无顶层路由（`main.py:1154-1179` 仅注册境界/战力/灵石/存款），唯一调用方就是宗门分发器；依赖靠 `main.py:349-350` 构造后属性回填建立，`SectHandlers.__init__`（`:26-36`）为此携带可变默认参 `ranking_handlers=None`。`handle_rank_sect_contribution` 内的「未踏入仙途」分支（`ranking_handlers.py:45-49`）经由 `/宗门` 入口实际不可达——`handle_sect_entry` 已被 `@player_required` 兜底（玩家不存在时先行拒绝），是死代码。
+- `_sub_rank` / `_sub_rank_contribution`（`:191-203`）把事件生成器原样转发给 `RankingHandlers` 的两个方法（`handlers/ranking_handlers.py:30-56`）。这两个方法无顶层路由（`main.py:1253-1279` 仅注册境界/战力/灵石/存款），唯一调用方就是宗门分发器；依赖现经装配段构造注入建立——`_wire_core_services()` 在 `main.py:402-405` 构造 `RankingHandlers` 后于 `:404` 以 `ranking_handlers=ranking_handlers` 入参传入 `SectHandlers`（原 `main.py:349-350` 属性回填已随 composition-root 删除），`SectHandlers.__init__`（`:26-36`）为此携带可变默认参 `ranking_handlers=None`。`handle_rank_sect_contribution` 内的「未踏入仙途」分支（`ranking_handlers.py:45-49`）经由 `/宗门` 入口实际不可达——`handle_sect_entry` 已被 `@player_required` 兜底（玩家不存在时先行拒绝），是死代码。
 - `_sub_bounty`（`:207-263`）与 `BountyHandlers`（`handlers/bounty_handlers.py:21-74`）各自实现同一套五动作编排：接取（编号解析+校验提示）、进度、完成、放弃、列表（条目排版 `_format` 逐字重复，仅标题/footer/空态文案因入口而异）。业务方法 `BountyManager.accept_bounty/check_bounty_status/complete_bounty/abandon_bounty/get_bounty_list` 已全部接收 `scope` 参数，编排层的重复没有任何业务理由。
 
 `openspec/specs/sect-commands/spec.md:42-45`（排行子命令并入）与 `:56-66`（宗门悬赏独立入口与生命周期）约束的是行为（入口唯一、输出内容、全局/宗门分流），本变更保持其全部 Scenario 逐字成立，故 `skip_specs: true`。
@@ -12,7 +12,7 @@
 ## Goals / Non-Goals
 
 **Goals:**
-- 消除 handler→handler 调用与构造后属性回填：`SectHandlers` 排行子命令直调 `RankingManager`，`main.py` 删除回填语句，初始化顺序约束随之消失。
+- 消除 handler→handler 调用与构造后属性回填：`SectHandlers` 排行子命令直调 `RankingManager`；属性回填已由 composition-root 删除（改建为装配段构造注入 `ranking_handlers=ranking_handlers`，`main.py:404`），本变更再把该注入参数换成 `rank_mgr`，初始化顺序约束随之消失。
 - 悬赏五动作编排收敛为一份实现：全局路由与宗门子命令共用同一模块级文本函数，差异化文案（标题/footer/空态/编号用法示例）集中在该函数内按 `scope` 分支。
 - 行为逐字保持：所有用户可见输出与现状一致（包括全局入口对接取/完成/放弃加 `✅/❌` 前缀而宗门入口不加、全局列表无空态早退而宗门列表有空态文案等差异）。
 
@@ -30,7 +30,7 @@
 - 备选 B：把两方法下沉为 `RankingManager` 的文本方法。—— 拒绝：超出纯重构切面，触碰 Non-Goal；manager 返回 `(success, msg)` 的现状签名已够用。
 
 **D2 · `SectHandlers.__init__` 用 `rank_mgr=None` 替换 `rank_handlers=None` 回填参，保留「排行功能不可用」降级。**
-`main.py` 在 `:309` 已先构造 `self.rank_mgr`，`:341` 构造 `SectHandlers` 时直接传入即可，`:349-350` 回填与 `:340` 注释一并删除。`rank_mgr=None` 时 `_sub_rank*` 输出与现状相同的「❌ 排行功能不可用！」（现有测试 `:168,:282,:307,:331,:355` 等构造点不传该参，保持通过）。
+`main.py` 装配段已先构造 `rank_mgr`（`_wire_core_services()` 内 `main.py:327-332`，经返回字典挂载为 `self.rank_mgr`），`:403-405` 构造 `SectHandlers` 时把现有入参 `ranking_handlers=ranking_handlers`（`:404`，composition-root 由旧回填改建）替换为 `rank_mgr=rank_mgr` 即可。`rank_mgr=None` 时 `_sub_rank*` 输出与现状相同的「❌ 排行功能不可用！」（现有测试 `:168,:300,:325,:349,:373` 等构造点不传该参，保持通过）。
 
 **D3 · 悬赏共享入口落为 `bounty_handlers.py` 模块级无状态函数，而非 `BountyHandlers` 实例方法或 `BountyManager` 方法。**
 三函数形态：
@@ -47,7 +47,7 @@
 
 - [共享函数 `scope` 分支漏改导致一侧文案变化] → tasks 显式列出三处差异化清单（标题/footer/空态/编号示例/✅❌ 前缀），review checklist 逐条核对；宗门侧跑 `--tag sect` 功能用例回归。
 - [`handle_rank_sect_contribution` 迁移时误保留不可达的「未踏入仙途」分支] → tasks 注明该分支为死代码（`@player_required` 已兜底），迁移时删除并在 review 中确认无其他调用方。
-- [`RankingHandlers` 删除两方法后文档/帮助文本引用漂移] → `api-overview.md:68` 与 `misc_handler.py:120` 的表述本来就指向宗门入口，仅需收敛 RankingHandlers 职责描述；无用户可见文本变化。
+- [`RankingHandlers` 删除两方法后文档/帮助文本引用漂移] → `api-overview.md:69` 与 `misc_handler.py:120` 的表述本来就指向宗门入口，仅需收敛 RankingHandlers 职责描述；无用户可见文本变化。
 - [与 `busy-state-owner` 变更同文件冲突] → `sect_handlers.py` 是该变更的守卫收编触碰面；两者逻辑无交集但 diff 会交叠，按 proposal Impact 约定错开落地顺序。
 - [模块级函数被后续误加状态] → 三函数 docstring 明确无状态约定（只编排调用 bounty_mgr 并排版）；未来需要在 `openspec` 评审中拦。
 

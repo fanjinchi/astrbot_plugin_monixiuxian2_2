@@ -3,7 +3,7 @@
 ## Context
 
 现状的三份事实：
-1. `_TIME_SKIP_RULES`（`core/gm_manager.py:68-122`）是 10 条 `(域标签, 参数化 UPDATE SQL)` 的手工元组，`:62-67` 注释自认设计出处（archive `2026-09-01-gm-test-time-and-rng-controls` design D2 显式枚举）并自带维护约束（「新增等待类冷却域时必须同步补充本清单与 GM 帮助文本」，与 AGENTS.md §2 :78 互为手抄）。
+1. `_TIME_SKIP_RULES`（`core/gm_manager.py:68-122`）是 10 条 `(域标签, 参数化 UPDATE SQL)` 的手工元组，`:62-67` 注释自认设计出处（archive `2026-09-01-gm-test-time-and-rng-controls` design D2 显式枚举）并自带维护约束（「新增等待类冷却域时必须同步补充本清单与 GM 帮助文本」，与 AGENTS.md §2 :77 互为手抄）。
 2. 消费方仅两处：`cmd_time_skip` 循环（:1200-1203，秒数按 `?` 计数填充，逐域 `rowcount` 进回复）与间接的 GM 帮助文案（:428-429 人工概述，无域枚举——帮助从未列出域清单，漂移面是「概述与清单语义脱节」而非文本副本）。
 3. spec 已把枚举清单写成契约：`openspec/specs/gm-commands/spec.md`「GM 时间快进」需求「覆盖清单**至少包含**」10 项域——枚举是需求级保证，不能随机制一并删去。
 

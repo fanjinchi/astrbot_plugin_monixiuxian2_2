@@ -2,14 +2,14 @@
 
 ## 0. 前置检查
 
-- [ ] 0.1 **行号重新锚定**：进行中的 `composition-root`（main.py 装配段重构为 `_wire_core_services()`、`SectHandlers` 签名补参数、删 main.py:350 回填）与 `busy-state-owner`（sect_handlers.py 守卫收编）合入后，本 change 引用的行号（main.py:340-350、sect_handlers.py 构造区与 `:191-263` 等）会漂移。若二者中任一已先合入，实施前按当时代码重新锚定所有行号引用（镜像 busy-state-owner tasks 0.1 的约定）；两者都未合入则按现状锚点直接实施，但合并顺序仍按 proposal Impact 的冲突提示错开。**已定序（2026-09-21）：`composition-root` → `busy-state-owner` → 本 change**——busy-state 先合入时，`SectHandlers.__init__` 已带 `busy_state` 参数，本 change 的 1.4 步在其上**叠加** `rank_mgr`（不得改名/删除 `busy_state`），构造调用点同步传两者。
+- [ ] 0.1 **行号重新锚定（composition-root 已合入）**：`composition-root`（main.py 装配段重构为 `_wire_core_services()`、`SectHandlers` 改经构造注入 `ranking_handlers`、删原 main.py:350 回填）已于 2026-09-22 合入归档，本 change 的 main.py 引用已按其装配结构重锚（构造点现位于 `_wire_core_services()` 内 `:402-405`，`rank_mgr` 在 `:327-332`）。进行中的 `busy-state-owner`（sect_handlers.py 守卫收编）合入后会再移动 sect_handlers.py 行号——若其实施前已合入，按当时代码重新锚定所有行号引用（镜像 busy-state-owner tasks 0.1 的约定）。**已定序（2026-09-21）：`composition-root` → `busy-state-owner` → 本 change**——busy-state 先合入时，`SectHandlers.__init__` 已带 `busy_state` 参数，本 change 的 1.4 步在其上**叠加** `rank_mgr`（不得改名/删除 `busy_state`），构造调用点同步传两者。
 
 ## 1. 排行子命令收编（消除 handler→handler 调用）
 
-- [ ] 1.1 `handlers/ranking_handlers.py`：删除 `handle_rank_sect`（:30-33）与 `handle_rank_sect_contribution`（:40-56）两方法；类 docstring（:9）「sect, and sect-contribution」表述同步收敛；`main.py:1154-1179` 的四个全局排行路由不受影响
+- [ ] 1.1 `handlers/ranking_handlers.py`：删除 `handle_rank_sect`（:30-33）与 `handle_rank_sect_contribution`（:40-56）两方法；类 docstring（:9）「sect, and sect-contribution」表述同步收敛；`main.py:1253-1279` 的四个全局排行路由不受影响
 - [ ] 1.2 `handlers/sect_handlers.py`：新增 `handle_sect_rank`（原 `handle_rank_sect` 实现体，直调 `self.rank_mgr.get_sect_ranking()`，返回 `(success, msg)`）与 `handle_sect_contribution_rank`（仅保留「❌ 你尚未加入任何宗门，无法查看宗门贡献排行。」拒绝分支；**删除原 `:45-49`「未踏入仙途」分支——经 `handle_sect_entry` 的 `@player_required` 兜底该分支不可达，属死代码**）。**形态定案：两新方法为普通 async 方法，返回 `(success, msg)`（非生成器）**；`_sub_rank*` 调用后 `yield event.plain_result(msg)` 转发。docstring 用英文 Google 风格（AGENTS.md：新代码一律英文 docstring），保留原方法的中文一行 docstring 语义（"宗门排行" / "宗门贡献排行（当前所在宗门）"）翻译即可
 - [ ] 1.3 `handlers/sect_handlers.py:26-36`：`__init__` 签名 `ranking_handlers=None` 参数替换为 `rank_mgr=None`（`self.rank_mgr = rank_mgr`）；`_sub_rank` / `_sub_rank_contribution`（:191-203）改为直调新方法与 `rank_mgr`，`rank_mgr=None` 时保留输出「❌ 排行功能不可用！」（与现状逐字一致）
-- [ ] 1.4 `main.py`：**仅删除 `:350` 回填语句**（`self.sect_handlers.ranking_handlers = self.ranking_handlers`）与 `:340` 构造注释；**`:349`（`self.ranking_handlers = RankingHandlers(self.db, self.rank_mgr)`）必须保留**——四个全局排行路由（:1154-1179）仍依赖该实例。`:341` 构造点改为 `SectHandlers(self.db, self.sect_mgr, self.bounty_mgr, rank_mgr=self.rank_mgr)`（`self.rank_mgr` 在 :309 已构造，顺序约束解除）
+- [ ] 1.4 `main.py`（`_wire_core_services()` 装配段，`:245-491`）：原 `:350` 回填语句与 `:340` 构造注释已随 composition-root 删除，现为构造注入 `sect_handlers = SectHandlers(self.db, sect_mgr, bounty_mgr, ranking_handlers=ranking_handlers)`（`:403-405`，注入点 `:404`）——本步把该入参改为 `rank_mgr=rank_mgr`。**`ranking_handlers = RankingHandlers(self.db, rank_mgr)`（`:402`）必须保留**——四个全局排行路由（:1253-1279）仍依赖该实例。`rank_mgr` 在装配段 `:327-332` 已先构造，顺序约束已解除
 
 ## 2. 悬赏编排共享化（消除 _sub_bounty 复制）
 
@@ -20,12 +20,12 @@
 
 ## 3. 测试与质量门
 
-- [ ] 3.1 `tests/test_sect_handlers.py` 既有用例（`:168,:282,:307,:331,:355` 等构造点不传排行依赖）原样全绿；新增最小断言：(a) `rank_mgr=None` 时 `/宗门 排行` 输出「排行功能不可用」；(b) MagicMock `bounty_mgr` 场景下 `/宗门 悬赏` 列表经共享函数渲染（标题「宗门悬赏 · 本宗委托」）；如需复用全局悬赏断言，确认 `tests/` 现有 bounty 用例覆盖不受薄委托改造影响
+- [ ] 3.1 `tests/test_sect_handlers.py` 既有用例（`:168,:300,:325,:349,:373` 等构造点不传排行依赖）原样全绿；新增最小断言：(a) `rank_mgr=None` 时 `/宗门 排行` 输出「排行功能不可用」；(b) MagicMock `bounty_mgr` 场景下 `/宗门 悬赏` 列表经共享函数渲染（标题「宗门悬赏 · 本宗委托」）；如需复用全局悬赏断言，确认 `tests/` 现有 bounty 用例覆盖不受薄委托改造影响
 - [ ] 3.2 `uv run python -m pytest tests/ -v` 全绿；`uv run ruff format . && uv run ruff check .` 通过
 - [ ] 3.3 宗门域功能用例回归：`uv run python scripts/test_suite_ctl.py run --tag sect`（按 AGENTS.md 约定由用户发起，AI 只保证 pytest/ruff 质量门）
 
 ## 4. 文档同步与收尾
 
-- [ ] 4.1 `design_docs/api-overview.md`：`:55` SectHandlers 行补「排行/贡献排行 → `RankingManager` 直调（原 RankingHandlers 两方法已收编）」；`:68` RankingHandlers 行收敛为「境界/战力/灵石/存款排行」（移除宗门/贡献）
+- [ ] 4.1 `design_docs/api-overview.md`：`:56` SectHandlers 行补「排行/贡献排行 → `RankingManager` 直调（原 RankingHandlers 两方法已收编）」；`:69` RankingHandlers 行收敛为「境界/战力/灵石/存款排行」（移除宗门/贡献）
 - [ ] 4.2 检查 `handlers/misc_handler.py:100,:120` 帮助文本无需改动（本就指向「宗门 排行」「宗门 贡献排行」入口）；核对 `AGENTS.md` 与 `README.md` 无「SectHandlers 持有 ranking_handlers」类实现描述需要同步（本次纯重构无玩法变化，按 §7 checklist 通常无需升版本号，核对后定论）
 - [ ] 4.3 `openspec validate --changes decouple-handler-to-handler-calls` 通过；本地 conventional commit（不 push）

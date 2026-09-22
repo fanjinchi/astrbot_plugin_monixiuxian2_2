@@ -3,7 +3,7 @@
 ## 0. 前置检查
 
 - [ ] 0.1 核实在飞变更状态并重新锚定行号：`add-transaction-unit-of-work`（其 tasks 3.3 改 `core/gm_manager.py:1199` 时间快进块为事务 CM——**建议其先合入**，本 change 直接落在 CM 形态上）、`busy-state-owner`（触碰 `:908-910`/`:1246-1252` 清除路径，与本 change 区域不相交）；确认 `_TIME_SKIP_RULES`（:68-122）、`cmd_help`（:381-437）、`cmd_time_skip`（:1170-1213）行号仍有效
-- [ ] 0.2 grep 基线：`_TIME_SKIP_RULES` 全部引用（运行时代码/文档/脚本）与本 tasks 清单一致——已知三处文档：`AGENTS.md:77`、`design_docs/api-overview.md:106`、`scripts/test_suite_ctl.py:1255`（注释）
+- [ ] 0.2 grep 基线：`_TIME_SKIP_RULES` 全部引用（运行时代码/文档/脚本）与本 tasks 清单一致——已知三处文档：`AGENTS.md:77`、`design_docs/api-overview.md:107`、`scripts/test_suite_ctl.py:1255`（注释）
 
 ## 1. 注册表与迁移（core + 属主模块）
 
@@ -28,7 +28,7 @@
 
 - [ ] 4.1 本 change 的 `specs/gm-commands/spec.md` delta（## MODIFIED Requirements ·「GM 时间快进」）：机制句「明确枚举」改为「字段属主声明 `TIME_SKIP_ENTRIES`、注册表装配覆盖」；枚举清单保留并改写为「注册表 MUST 至少覆盖以下清单」（保证语义）；新增场景「新冷却域自动覆盖」；实施核对 `openspec validate` 与主 spec 的 apply 语义
 - [ ] 4.2 `AGENTS.md:77` 改写：人工义务（「必须同步补充 _TIME_SKIP_RULES 与 GM 帮助文本」）改为「在字段属主模块声明 `TIME_SKIP_ENTRIES` 常量并登记 provider——登记即自动被时间快进覆盖与帮助列出；注册表最小清单测试会钉住漏登记」
-- [ ] 4.3 `design_docs/api-overview.md:106`「按 `_TIME_SKIP_RULES` 枚举」改指注册表（`core/time_skip_registry.py`）；`scripts/test_suite_ctl.py:1255` 注释核对（名称改注册表或泛化，语义保持）
+- [ ] 4.3 `design_docs/api-overview.md:107`「按 `_TIME_SKIP_RULES` 枚举」改指注册表（`core/time_skip_registry.py`）；`scripts/test_suite_ctl.py:1255` 注释核对（名称改注册表或泛化，语义保持）
 
 ## 5. 验证与收尾
 

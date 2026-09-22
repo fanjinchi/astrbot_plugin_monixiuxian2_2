@@ -4,9 +4,9 @@
 
 `CombatEngine.resolve_combat`（`managers/combat_manager.py:259`）返回 `CombatResult`（:168-177），其 `winner` 是裸 user_id 字符串（或 `"draw"`）。身份编码的分配方是 `EnemyManager.spawn_enemy/spawn_enemy_from_group`（`enemy_`/`guardian_` 前缀），但解析责任落在每个调用方：`pve_combat_manager` 两处 `isinstance(winner, str) and winner.startswith("enemy_")`（:236,:274）、`boss_manager` 的 `winner == "draw"` 分支（:480）、`impart_pk_manager` 的 `== "draw"` / `== attacker.user_id`（:115,:119）。`isinstance` 防御的存在本身说明非字符串 winner 曾泄漏过。
 
-引擎在 :341-363 的四个结算分支里**已经知道**哪一侧获胜（`winner = fighter2.user_id` 等），把侧信息直接带出即可让全部调用方免于解析。 shipped bug 与两次 archive 设计文档（add-rift-encounters design :11,:72）的「禁止前缀判定」补丁约定证明：只要解析责任在调用方，新敌人类型（新前缀）就会再次制造误判。
+引擎在 :341-363 的五个结算分支里**已经知道**哪一侧获胜（`winner = fighter2.user_id` 等），把侧信息直接带出即可让全部调用方免于解析。 shipped bug 与两次 archive 设计文档（add-rift-encounters design :11,:72）的「禁止前缀判定」补丁约定证明：只要解析责任在调用方，新敌人类型（新前缀）就会再次制造误判。
 
-全仓消费者清单（实施前重新核实）：运行时 4 文件 12 处；`design_docs/attribute-growth/` 模拟脚本 4 个（直接 `load_module` 引擎，属引擎接口的直接消费者；`rebalance_equipment.py` 调用引擎但不读 winner，见 D5）；测试 6 文件 + `test_combat_handlers.py:45`（fake legacy dict，键保留故无需改，见 tasks 3.1）。`CombatManager.player_vs_player` 的 legacy dict `"winner"` 键（:1518）的运行时消费者为空（`handlers/combat_handlers.py:152,211` 只取 hp/log），仅测试断言其值（`test_trigger_effect_extensions.py:739`）；而 boss legacy dict（`boss_manager.py:513`）的 `"winner"` 键有运行时消费者 `main.py:1126`（见 D4）。
+全仓消费者清单（实施前重新核实）：运行时 4 文件 12 处；`design_docs/attribute-growth/` 模拟脚本 4 个（直接 `load_module` 引擎，属引擎接口的直接消费者；`rebalance_equipment.py` 调用引擎但不读 winner，见 D5）；测试 6 文件 + `test_combat_handlers.py:45`（fake legacy dict，键保留故无需改，见 tasks 3.1）。`CombatManager.player_vs_player` 的 legacy dict `"winner"` 键（:1518）的运行时消费者为空（`handlers/combat_handlers.py:152,211` 只取 hp/log），仅测试断言其值（`test_trigger_effect_extensions.py:739`）；而 boss legacy dict（`boss_manager.py:513`）的 `"winner"` 键有运行时消费者 `main.py:1225`（见 D4）。
 
 ## Goals / Non-Goals
 
@@ -33,7 +33,7 @@
 `winner = fighter2.user_id` → `winner_side = "fighter2"; winner_id = fighter2.user_id`；三个平局分支 → `winner_side = "draw"; winner_id = None`。逐分支机械替换，战报文本生成路径一行不碰。
 
 **D4 · legacy dict `"winner"` 键保留，值 = `result.winner_id or "draw"`（行为不变）。**
-PvP dict（`player_vs_player` :1518）是 handler 的历史接口，运行时无 winner 消费者；保持键与值域（user_id 或 `"draw"`）不变，避免无收益的级联改动，测试断言（`test_trigger_effect_extensions.py:739` 的 `in ("p1","p2","draw")`）原样通过。注意区分：boss dict（`boss_manager.py:513`）的 `"winner"` 键**有**运行时消费者——`main.py:1126` `battle_result.get("winner") == user_id`（击败广播门槛）。该消费点本次**不动**：值域不变（胜利时仍为用户本人 id、平局为 `"draw"`、Boss 获胜为 `str(boss_id)`），等值比较语义逐位保持。收尾 grep 必须能命中此类 dict 键读取（`.get("winner"`），不能只查 `result.winner` 属性读取。
+PvP dict（`player_vs_player` :1518）是 handler 的历史接口，运行时无 winner 消费者；保持键与值域（user_id 或 `"draw"`）不变，避免无收益的级联改动，测试断言（`test_trigger_effect_extensions.py:739` 的 `in ("p1","p2","draw")`）原样通过。注意区分：boss dict（`boss_manager.py:513`）的 `"winner"` 键**有**运行时消费者——`main.py:1225` `battle_result.get("winner") == user_id`（击败广播门槛）。该消费点本次**不动**：值域不变（胜利时仍为用户本人 id、平局为 `"draw"`、Boss 获胜为 `str(boss_id)`），等值比较语义逐位保持。收尾 grep 必须能命中此类 dict 键读取（`.get("winner"`），不能只查 `result.winner` 属性读取。
 
 **D5 · `design_docs/attribute-growth/` 模拟脚本随引擎接口同步更新。**
 4 个脚本（`sim_route_matchup.py:154-160,413-419`、`sweep_route_growth.py:124-129`、`sim_balance_regression.py:317`、`sim_xiuxian_turns.py:275`）用 `result.winner == "draw"` / `== "体修"`（按名字判定）读取胜负，改为 `winner_side`（`== "fighter1"/"fighter2"` 视脚本站位而定）——这些脚本直接加载引擎模块，是接口变更的正当消费者；改动只触碰胜负读取行，模拟数值输出必须逐位不变（校准留档可复现，bd 9j1 的约束）。`rebalance_equipment.py:517` 虽调用 `resolve_combat`，但只读 `result.rounds`、不读 `result.winner`，字段改名对其无影响，不在本次改动范围。

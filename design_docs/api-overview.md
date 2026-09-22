@@ -28,6 +28,7 @@
 | `require_whitelist(func)` | 群聊白名单装饰器，非白名单群直接拒绝 |
 | `XiuXianPlugin.initialize()` | 启动钩子：连库 → `MigrationManager.migrate_or_reset()` → `sect_mgr.ensure_system_sects()`（默认宗门幂等播种）→ 启动 4 个定时任务（Boss 生成/贷款逾期/灵眼生成/悬赏过期，Boss 可配置关闭） |
 | `XiuXianPlugin.terminate()` | 关闭钩子：取消全部后台任务 |
+| `XiuXianPlugin.__init__` → `_wire_core_services()` | 构造期装配段：core 服务单例（skill/storage_ring/equipment/cultivation/pill/shop 等）统一构造、按依赖序注入全部 manager/handler；**禁止在 handler/manager 内自构造核心服务** |
 | `handle_xxx(self, event, ...)` ×109 | 绝大多数为纯路由壳：docstring 标注指令名与下游 handler。例外（含少量逻辑）：`handle_boss_fight`/`handle_spawn_boss`（开关+权限检查、悬赏联动）、`handle_rift_complete`/`handle_adventure_complete`（悬赏进度联动）、`handle_gm`（管理员门槛） |
 
 ## 2. 横切工具（handlers/utils.py）
