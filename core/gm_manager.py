@@ -711,7 +711,9 @@ class GMManager:
             return False, f"❌ 师承推进失败：{e}"
 
         if master_msg:
-            return True, f"✅ 已推进师承任务：{master_msg}"
+            # 片段自带 📜/⚠️ 内容符号与「师承任务」语境，直接裸渲染，
+            # 避免与包装头冲突（如发放失败时出现 "✅ 已推进…\n\n⚠️ 发放失败"）
+            return True, master_msg.strip()
         return (
             True,
             "✅ 已推进师承任务：当前阶段与该事件不匹配（查看 /师承任务 了解阶段）。",
@@ -1007,7 +1009,8 @@ class GMManager:
             target_id
         )
         if not success:
-            return False, f"❌ 历练结算失败：{msg}"
+            # manager 失败消息自带 ❌（如路线配置缺失），嵌入包装头前先去重，避免 "❌ ❌"
+            return False, f"❌ 历练结算失败：{msg.removeprefix('❌ ')}"
 
         # 强制结算即"立即完成"：同时清除该玩家的历练路线休整冷却，
         # 允许测试脚本连续开启同一路线（正常流程仍按配置冷却）。
@@ -1083,7 +1086,7 @@ class GMManager:
             target_id
         )
         if not success:
-            return False, f"❌ 秘境结算失败：{msg}"
+            return False, f"❌ 秘境结算失败：{msg.removeprefix('❌ ')}"
 
         # 更新悬赏进度（与正常 /完成探索 保持一致）
         if reward_data and self.bounty_manager:
@@ -1164,7 +1167,7 @@ class GMManager:
 
         success, msg, boss = await self.boss_manager.auto_spawn_boss()
         if not success:
-            return False, f"❌ 生成Boss失败：{msg}"
+            return False, f"❌ 生成Boss失败：{msg.removeprefix('❌ ')}"
 
         if self.broadcast_callback:
             try:

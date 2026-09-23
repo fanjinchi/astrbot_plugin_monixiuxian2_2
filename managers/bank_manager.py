@@ -104,7 +104,7 @@ class BankManager:
     async def deposit(self, player: Player, amount: int) -> tuple[bool, str]:
         """存入灵石"""
         if amount <= 0:
-            return False, "存款金额必须大于0。"
+            return False, "❌ 存款金额必须大于0。"
 
         # CM 拿写锁后重读 player 复核余额（并发扣款场景下快照不足为凭），
         # 校验失败 abort 标记后部随 owner 退出回滚，成功路径一次落地
@@ -112,7 +112,7 @@ class BankManager:
             player = await self.db.get_player_by_id(player.user_id)
             if player.gold < amount:
                 txn.abort()
-                return False, f"灵石不足！你只有 {player.gold:,} 灵石。"
+                return False, f"❌ 灵石不足！你只有 {player.gold:,} 灵石。"
 
             bank_data = await self.db.ext.get_bank_account(player.user_id)
             current_balance = bank_data["balance"] if bank_data else 0
@@ -121,7 +121,7 @@ class BankManager:
                 txn.abort()
                 return (
                     False,
-                    f"存款上限为 {self.max_deposit:,} 灵石，当前余额 {current_balance:,}。",
+                    f"❌ 存款上限为 {self.max_deposit:,} 灵石，当前余额 {current_balance:,}。",
                 )
 
             player.gold -= amount
@@ -139,12 +139,15 @@ class BankManager:
                 player.user_id, "deposit", amount, new_balance, "存入灵石"
             )
 
-            return True, f"成功存入 {amount:,} 灵石！\n当前余额：{new_balance:,} 灵石"
+            return (
+                True,
+                f"✅ 成功存入 {amount:,} 灵石！\n当前余额：{new_balance:,} 灵石",
+            )
 
     async def withdraw(self, player: Player, amount: int) -> tuple[bool, str]:
         """取出灵石"""
         if amount <= 0:
-            return False, "取款金额必须大于0。"
+            return False, "❌ 取款金额必须大于0。"
 
         async with self.db.transaction() as txn:
             player = await self.db.get_player_by_id(player.user_id)
@@ -152,7 +155,7 @@ class BankManager:
             if not bank_data or bank_data["balance"] < amount:
                 txn.abort()
                 current = bank_data["balance"] if bank_data else 0
-                return False, f"余额不足！当前余额：{current:,} 灵石。"
+                return False, f"❌ 余额不足！当前余额：{current:,} 灵石。"
 
             new_balance = bank_data["balance"] - amount
             await self.db.ext.update_bank_account(
@@ -174,7 +177,7 @@ class BankManager:
 
             return (
                 True,
-                f"成功取出 {amount:,} 灵石！\n当前余额：{new_balance:,} 灵石\n当前持有：{player.gold:,} 灵石",
+                f"✅ 成功取出 {amount:,} 灵石！\n当前余额：{new_balance:,} 灵石\n当前持有：{player.gold:,} 灵石",
             )
 
     async def claim_interest(self, player: Player) -> tuple[bool, str]:
@@ -185,7 +188,7 @@ class BankManager:
             bank_data = await self.db.ext.get_bank_account(player.user_id)
             if not bank_data or bank_data["balance"] <= 0:
                 txn.abort()
-                return False, "你还没有存款，无法领取利息。"
+                return False, "❌ 你还没有存款，无法领取利息。"
 
             interest = self._calculate_interest(
                 bank_data["balance"], bank_data["last_interest_time"]
@@ -193,7 +196,7 @@ class BankManager:
 
             if interest <= 0:
                 txn.abort()
-                return False, "利息不足1灵石，请明日再来。"
+                return False, "❌ 利息不足1灵石，请明日再来。"
 
             # 利息转入本金
             new_balance = bank_data["balance"] + interest
@@ -211,7 +214,7 @@ class BankManager:
 
             return (
                 True,
-                f"成功领取利息 {interest:,} 灵石！\n当前余额：{new_balance:,} 灵石",
+                f"✅ 成功领取利息 {interest:,} 灵石！\n当前余额：{new_balance:,} 灵石",
             )
 
     # ===== 贷款相关 =====
@@ -254,17 +257,17 @@ class BankManager:
             loan_type: 贷款类型 (normal/breakthrough)
         """
         if amount < self.min_loan_amount:
-            return False, f"最小贷款金额为 {self.min_loan_amount:,} 灵石。"
+            return False, f"❌ 最小贷款金额为 {self.min_loan_amount:,} 灵石。"
 
         if amount > self.max_loan_amount:
-            return False, f"最大贷款金额为 {self.max_loan_amount:,} 灵石。"
+            return False, f"❌ 最大贷款金额为 {self.max_loan_amount:,} 灵石。"
 
         async with self.db.transaction() as txn:
             player = await self.db.get_player_by_id(player.user_id)
             existing_loan = await self.db.ext.get_active_loan(player.user_id)
             if existing_loan:
                 txn.abort()
-                return False, "你已有未还清的贷款，请先还款后再申请新贷款。"
+                return False, "❌ 你已有未还清的贷款，请先还款后再申请新贷款。"
 
             if loan_type == "breakthrough":
                 interest_rate = self.breakthrough_loan_rate
@@ -322,14 +325,14 @@ class BankManager:
             loan_info = await self.get_loan_info(player)
             if not loan_info:
                 txn.abort()
-                return False, "你当前没有需要偿还的贷款。"
+                return False, "❌ 你当前没有需要偿还的贷款。"
 
             total_due = loan_info["total_due"]
 
             if player.gold < total_due:
                 txn.abort()
                 return False, (
-                    f"灵石不足！\n"
+                    f"❌ 灵石不足！\n"
                     f"应还金额：{total_due:,} 灵石\n"
                     f"（本金 {loan_info['principal']:,} + 利息 {loan_info['current_interest']:,}）\n"
                     f"当前持有：{player.gold:,} 灵石\n"

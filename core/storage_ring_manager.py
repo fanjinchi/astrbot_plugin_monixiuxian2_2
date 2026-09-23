@@ -251,10 +251,10 @@ class StorageRingManager:
         # 检查是否为储物戒类型
         ring_config = self.get_storage_ring_config(new_ring_name)
         if not ring_config:
-            return False, f"【{new_ring_name}】不是储物戒类型的物品"
+            return False, f"❌ 【{new_ring_name}】不是储物戒类型的物品"
 
         if ring_config.get("type") != "storage_ring":
-            return False, f"【{new_ring_name}】不是储物戒类型的物品"
+            return False, f"❌ 【{new_ring_name}】不是储物戒类型的物品"
 
         # 检查境界要求
         required_level = ring_config.get("required_level_index", 0)
@@ -262,7 +262,7 @@ class StorageRingManager:
             level_name = self._format_required_level(required_level)
             return (
                 False,
-                f"境界不足！【{new_ring_name}】（{ring_config.get('rank', '')}）需要达到【{level_name}】以上",
+                f"❌ 境界不足！【{new_ring_name}】（{ring_config.get('rank', '')}）需要达到【{level_name}】以上",
             )
 
         # 检查是否为升级（容量必须更大）
@@ -271,7 +271,7 @@ class StorageRingManager:
         if new_capacity <= current_capacity:
             return (
                 False,
-                f"【{new_ring_name}】容量（{new_capacity}格）不高于当前储物戒（{current_capacity}格），无法替换",
+                f"❌ 【{new_ring_name}】容量（{new_capacity}格）不高于当前储物戒（{current_capacity}格），无法替换",
             )
 
         return True, ""
@@ -319,7 +319,7 @@ class StorageRingManager:
 
         cost_msg = f"\n消耗灵石：{price:,}" if price > 0 else ""
         return True, (
-            f"储物戒升级成功！\n"
+            f"✅ 储物戒升级成功！\n"
             f"【{old_ring}】({old_capacity}格) → 【{new_ring_name}】({new_capacity}格)\n"
             f"品级：{ring_config.get('rank', '未知')}{cost_msg}"
         )

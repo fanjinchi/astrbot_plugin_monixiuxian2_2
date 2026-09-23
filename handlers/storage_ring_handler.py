@@ -446,14 +446,8 @@ class StorageRingHandler:
             return
 
         # 升级储物戒
-        success, message = await self.storage_ring_manager.upgrade_ring(
-            player, ring_name
-        )
-
-        if success:
-            yield event.plain_result(f"✅ {message}")
-        else:
-            yield event.plain_result(f"❌ {message}")
+        _, message = await self.storage_ring_manager.upgrade_ring(player, ring_name)
+        yield event.plain_result(message)
 
     def _categorize_items(self, items: dict) -> dict:
         """将物品按分类整理"""

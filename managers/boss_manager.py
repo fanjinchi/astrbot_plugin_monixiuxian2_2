@@ -570,7 +570,7 @@ HP：{boss.hp}/{boss.max_hp} ({hp_percent:.1f}%)
         # 检查是否已有Boss
         existing_boss = await self.db.ext.get_active_boss()
         if existing_boss:
-            return False, "当前已有Boss存在", None
+            return False, "❌ 当前已有Boss存在", None
 
         # 获取所有玩家的平均境界
         all_players = await self.db.get_all_players()

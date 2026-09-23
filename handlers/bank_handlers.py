@@ -84,9 +84,9 @@ class BankHandlers:
             yield event.plain_result("❌ 请输入存款金额，例如：/存灵石 10000")
             return
 
-        success, msg = await self.bank_mgr.deposit(player, amount)
-        prefix = "✅" if success else "❌"
-        yield event.plain_result(f"{prefix} {msg}")
+        # manager 消息自带 ✅/❌ 状态符，此处直接渲染（约定见 AGENTS.md §8）
+        _, msg = await self.bank_mgr.deposit(player, amount)
+        yield event.plain_result(msg)
 
     @player_required
     async def handle_withdraw(
@@ -97,16 +97,14 @@ class BankHandlers:
             yield event.plain_result("❌ 请输入取款金额，例如：/取灵石 10000")
             return
 
-        success, msg = await self.bank_mgr.withdraw(player, amount)
-        prefix = "✅" if success else "❌"
-        yield event.plain_result(f"{prefix} {msg}")
+        _, msg = await self.bank_mgr.withdraw(player, amount)
+        yield event.plain_result(msg)
 
     @player_required
     async def handle_claim_interest(self, player: Player, event: AstrMessageEvent):
         """领取利息"""
-        success, msg = await self.bank_mgr.claim_interest(player)
-        prefix = "✅" if success else "❌"
-        yield event.plain_result(f"{prefix} {msg}")
+        _, msg = await self.bank_mgr.claim_interest(player)
+        yield event.plain_result(msg)
 
     @player_required
     async def handle_loan(
