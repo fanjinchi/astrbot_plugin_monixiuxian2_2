@@ -12,7 +12,12 @@ __all__ = ["BountyHandlers"]
 
 
 class BountyHandlers:
-    """悬赏令处理器"""
+    """悬赏令处理器。
+
+    约定：manager 消息自带 ❌/✅/⚠️/🎯 状态符，handler 一律裸渲染 msg、
+    不加前缀——同一 manager 方法被全局/宗门两个入口消费，只有 manager 侧
+    自带 emoji 才能保证各入口输出一致（见 AGENTS.md §8）。
+    """
 
     def __init__(self, db: DataBase, bounty_mgr: BountyManager):
         self.db = db
@@ -49,26 +54,23 @@ class BountyHandlers:
             yield event.plain_result("❌ 请指定悬赏编号，例如：/接取悬赏 1")
             return
 
-        # manager 消息自带 ❌/✅/⚠️ 状态符（宗门入口直接渲染同一份消息），此处不再加前缀
         _, msg = await self.bounty_mgr.accept_bounty(player, bounty_id)
         yield event.plain_result(msg)
 
     @player_required
     async def handle_bounty_status(self, player: Player, event: AstrMessageEvent):
         """查看悬赏状态"""
-        success, msg = await self.bounty_mgr.check_bounty_status(player)
+        _, msg = await self.bounty_mgr.check_bounty_status(player)
         yield event.plain_result(msg)
 
     @player_required
     async def handle_complete_bounty(self, player: Player, event: AstrMessageEvent):
         """完成悬赏"""
-        # manager 消息自带 ❌/✅ 状态符，此处直接渲染，避免 "❌ ❌"/"✅ ✅"
         _, msg = await self.bounty_mgr.complete_bounty(player)
         yield event.plain_result(msg)
 
     @player_required
     async def handle_abandon_bounty(self, player: Player, event: AstrMessageEvent):
         """放弃悬赏"""
-        # manager 消息自带 ❌/✅ 状态符，此处直接渲染，避免与宗门入口表现不一致
         _, msg = await self.bounty_mgr.abandon_bounty(player)
         yield event.plain_result(msg)

@@ -125,6 +125,7 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 
 - 所有用户可见输出用中文
 - 命令字符串用中文（如 "闭关"、"突破"）
+- 消息状态符（❌/✅/⚠️/🎯 等）一律由 manager 层自带完整文案，handler 裸渲染 `msg`、禁止再包 `✅/❌` 前缀：同一 manager 方法常被多个入口（全局指令/宗门子命令）消费，只有 manager 侧自带 emoji 才能保证各入口输出一致；handler 仅对自身的参数/入口校验文案负责（参考实现 `handlers/bounty_handlers.py` + `managers/bounty_manager.py`）
 - 战力公式单一实现在 `Player.combat_power`（models.py）；设计权威与公式文本见 `design_docs/current-design-report.md`；改公式须同步 design_docs（§14）
 
 ### 9. 消息发送注意事项
