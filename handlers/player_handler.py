@@ -480,8 +480,11 @@ class PlayerHandler:
             except Exception as exc:
                 logger.exception("出关状态收尾失败: %s", exc)
                 settle_error = "⚠️ 出关状态更新失败，请稍后再试（本次闭关未消耗）。"
-        # 消息在事务块外发送：写锁不跨 yield（「CM 块内不跨 yield」约束），
-        # 块内异常已由 __aexit__ 回滚后传播到上面的 except，事务不会半提交。
+        # 消息在事务块外发送：写锁不跨 yield（「CM 块内不跨 yield」约束）。
+        # 注意 try/except 在 with 块内部：被捕获的异常到达 __aexit__ 时 exc_type
+        # 为 None，走提交分支——clear 的写入会提交、update_player 的字段丢失，
+        # 属可接受的小窗（与改前逐行等价且漂移更小：user_cd 已 IDLE，下次闭关
+        # 覆盖 cultivation_start_time 自愈；旧版两笔独立提交时失败即双层漂移）。
         if settle_error:
             yield event.plain_result(settle_error)
             return
