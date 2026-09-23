@@ -7,7 +7,6 @@ import random
 from typing import TYPE_CHECKING
 
 from ..data.data_manager import DataBase
-from ..models_extended import UserStatus
 
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
@@ -22,10 +21,12 @@ class AlchemyManager:
         db: DataBase,
         config_manager: "ConfigManager" = None,
         storage_ring_manager: "StorageRingManager" = None,
+        busy_state=None,
     ):
         self.db = db
         self.config_manager = config_manager
         self.storage_ring_manager = storage_ring_manager
+        self.busy_state = busy_state
         self.config = config_manager.alchemy_config if config_manager else {}
 
         raw_recipes = {}
@@ -149,11 +150,12 @@ class AlchemyManager:
         if not player:
             return False, "❌ 你还未踏入修仙之路！", None
 
-        # 2. 检查用户状态（状态互斥）
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if user_cd and user_cd.type != UserStatus.IDLE:
-            current_status = UserStatus.get_name(user_cd.type)
-            return False, f"❌ 你当前正{current_status}，无法炼丹！", None
+        # 2. 检查用户状态（状态互斥，统一走 BusyState 守卫）
+        busy_msg = await self.busy_state.assert_idle(
+            user_id, template="❌ 你当前正{status}，无法炼丹！"
+        )
+        if busy_msg:
+            return False, busy_msg, None
 
         # 3. 检查配方
         if pill_id not in self.recipes:

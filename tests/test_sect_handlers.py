@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from tests.helpers import load_module, load_package_module
+from tests.helpers import load_module, load_package_module, make_busy_state
 
 _migration_mod = load_module("migration_sect_handlers_test", "data/migration.py")
 MigrationManager = _migration_mod.MigrationManager
@@ -159,13 +159,13 @@ async def test_busy_player_can_view_but_not_mutate_sect_panels():
     """Busy players may view elixir/construction/treasury panels; the claim
     and upgrade branches still reject them."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _make_player(db, "u1")
     success, msg = await mgr.join_sect("u1", "青云门")
     assert success, msg
 
-    handlers = SectHandlers(db, mgr)
+    handlers = SectHandlers(db, mgr, busy_state=make_busy_state(db))
     await db.ext.set_user_busy("u1", UserStatus.EXPLORING, 9999999999)
 
     # 查看分支放行
@@ -215,6 +215,7 @@ def _make_player_handler(db) -> PlayerHandler:
             db, config_manager, _core_pkg.StorageRingManager(db, config_manager)
         ),
         impart_mgr=None,
+        busy_state=make_busy_state(db),
     )
 
 
@@ -296,7 +297,7 @@ async def test_check_in_daily_reset_failure_does_not_break_check_in(monkeypatch)
 async def test_sect_entry_navigation_and_unknown_subcommand():
     """无参数与未知子命令均输出导航帮助；带唤醒前缀也能正确解析。"""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     handlers = SectHandlers(db, mgr, bounty_mgr=MagicMock())
     await _make_player(db, "n1")
 
@@ -321,7 +322,7 @@ async def test_sect_entry_navigation_and_unknown_subcommand():
 async def test_sect_entry_missing_arg_usage_hints():
     """缺参子命令输出各自用法示例。"""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     handlers = SectHandlers(db, mgr, bounty_mgr=MagicMock())
     await _make_player(db, "n2")
 
@@ -344,7 +345,7 @@ async def test_sect_entry_missing_arg_usage_hints():
 async def test_sect_entry_membership_gates():
     """悬赏/商店/信息子命令对无宗门玩家的拒绝提示。"""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     handlers = SectHandlers(db, mgr, bounty_mgr=MagicMock())
     await _make_player(db, "n3")
@@ -368,7 +369,7 @@ async def test_sect_entry_membership_gates():
 async def test_sect_entry_busy_player_blocked():
     """「宗门」不在忙碌白名单：忙碌时所有子命令（含查看类）被拒，与旧独立指令行为一致。"""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     handlers = SectHandlers(db, mgr, bounty_mgr=MagicMock())
     await _make_player(db, "n4")
@@ -390,7 +391,7 @@ async def test_sect_entry_busy_player_blocked():
 async def test_sect_shop_list_and_position_gate():
     """商店列表展示贡献价与职阶锁定标注。"""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _make_player(db, "s1")
     success, msg = await mgr.join_sect("s1", "青云门")
@@ -411,7 +412,7 @@ async def test_sect_shop_list_and_position_gate():
 async def test_sect_shop_buy_flow():
     """购买成功扣贡献并发货；贡献不足与职阶不足分别拒绝。"""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _make_player(db, "s2")
     success, msg = await mgr.join_sect("s2", "青云门")

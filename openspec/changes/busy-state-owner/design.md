@@ -27,7 +27,7 @@
 db 层保持模型无关（`database_extended` 只依赖 `UserStatus` 枚举）；owner 是业务不变量的编排者，符合 core/ 既有 `(db, cfg)` 构造惯例。持久化仍由 `db.ext.set_user_busy/set_user_free` 承担（其 upsert 语义与回归测试不动）。
 
 **D2 · 双语义 API（Q4 决策 = a）：`set_busy` 与 `set_cooldown` 分设。**
-`set_busy` = 活动状态（闭关/历练/秘境），写 user_cd + 维护 state 镜像（CULTIVATING → "修炼中"，其余活动 → 镜像"空闲"——镜像只认 CULTIVATING 是现状语义，忠实保留）；配对 `clear`。`set_cooldown` = 时间戳冷却（SECT_TASK），只写 user_cd 不配镜像，不提供 clear 入口——**注意预存怪癖**：现状无任何逻辑在到期时自动把 `type` 复位（到期判定 `:858-862` 只用于放行，不清状态），玩家完成宗门任务后实际靠接下一个任务或 GM 清除才脱离 SECT_TASK——本 change 忠实保留该行为，登记 bd 跟进而非顺手修改（超范围）。
+`set_busy` = 活动状态（闭关/历练/秘境），写 user_cd + 维护 state 镜像（CULTIVATING → "修炼中"，其余活动 → 镜像"空闲"——镜像只认 CULTIVATING 是现状语义，忠实保留）；配对 `clear`。**实施补充（阶段A偏离）**：实际签名带第 4 参 `extra_data: dict | None = None`——adventure 透传 `{"route_key": ...}`、rift 透传 `{"rift_id": ..., "rift_level": ...}` 给 `set_user_busy`（现状第 4 位置参数），不加则改道丢秘境/路线上下文（设计场景账目失配，实施时补记）。`set_cooldown` = 时间戳冷却（SECT_TASK），只写 user_cd 不配镜像，不提供 clear 入口——**注意预存怪癖**：现状无任何逻辑在到期时自动把 `type` 复位（到期判定 `:858-862` 只用于放行，不清状态），玩家完成宗门任务后实际靠接下一个任务或 GM 清除才脱离 SECT_TASK——本 change 忠实保留该行为，登记 bd 跟进而非顺手修改（超范围）。
 
 **D3 · R1/R2 实现：锁内复查 + `db.transaction()`。**
 `set_busy`/`clear` 内部 `async with self.db.transaction():`（前置 change 提供，其 design D1 已钉死 abort 契约：abort 只置标记；标记后 clean exit = rollback 不 re-raise）：锁内复查当前 `type == IDLE`（或目标活动态），不满足则 `txn.abort()` 返回失败文案；满足则 `set_user_busy` + 镜像赋值 + 单次提交。race loser 得到"正在X中"报错而非静默覆盖。**注意**：`set_user_busy` 的 SQL upsert 本身不改（`test_user_busy_upsert.py` 保持有效），竞争控制在 owner 侧事务内完成。**行为说明**：R1 改变了并发竞争的结果（修复向），需在更新日志按 bug 修复记录。

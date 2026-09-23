@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.helpers import load_module, load_package_module
+from tests.helpers import load_module, load_package_module, make_busy_state
 
 _migration_mod = load_module("migration_sect_growth_test", "data/migration.py")
 MigrationManager = _migration_mod.MigrationManager
@@ -217,7 +217,7 @@ async def _join_qingyun(db, mgr, user_id: str, level_index: int = 2, gold: int =
 async def test_fairyland_exp_bonus_scales_with_level():
     """Fairyland bonus equals exp_bonus_per_level * level for sect members."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await _join_qingyun(db, mgr, "u1")
 
@@ -244,7 +244,7 @@ async def test_fairyland_exp_bonus_scales_with_level():
 async def test_elixir_room_claim_and_daily_reset():
     """Elixir room grants the level-unlocked pill once per day."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await _join_qingyun(db, mgr, "u1")
 
@@ -287,7 +287,7 @@ async def test_elixir_room_claim_and_daily_reset():
 async def test_upgrade_building_consumes_materials():
     """Upgrading the fairyland consumes configured materials (system sect: any member)."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await _join_qingyun(db, mgr, "u1")
 
@@ -313,7 +313,7 @@ async def test_upgrade_building_consumes_materials():
 async def test_upgrade_building_player_sect_requires_elder_permission():
     """Player-built sects require elder-and-above permission to upgrade."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await _make_player(db, "owner", level_index=5, gold=20000)
     success, _ = await mgr.create_sect("owner", "太一宗")
     assert success
@@ -345,7 +345,7 @@ async def test_upgrade_building_player_sect_requires_elder_permission():
 async def test_perform_sect_task_settles_by_task_config():
     """Construction tasks settle cost/reward and use the task cooldown."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await _join_qingyun(db, mgr, "u1", gold=1000)
 
@@ -385,7 +385,7 @@ async def test_perform_sect_task_materials_task_grants_sect_materials():
         ]
     )
     db = await _make_db(config)
-    mgr = SectManager(db, config)
+    mgr = SectManager(db, config, busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await _join_qingyun(db, mgr, "u1")
 
@@ -403,7 +403,7 @@ async def test_perform_sect_task_materials_task_grants_sect_materials():
 async def test_perform_sect_task_insufficient_stones_rejected():
     """Stone-donation tasks are rejected when the player cannot afford them."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join_qingyun(db, mgr, "u1", gold=100)
 
@@ -420,7 +420,7 @@ async def test_perform_sect_task_insufficient_stones_rejected():
 async def test_ensure_system_sects_seeds_mainbuff_from_faction():
     """Seeding initializes the mainbuff slot from the faction config."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await db.ext.get_sect_by_faction_id("qingyun")
     assert sect.get_mainbuff_list() == ["qy_001"]
@@ -432,7 +432,7 @@ async def test_manage_sect_buff_player_sect_owner_only():
     """Only the owner of a player-built sect can enshrine a valid skill."""
     db = await _make_db()
     config = FakeConfigManager()
-    mgr = SectManager(db, config)
+    mgr = SectManager(db, config, busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
 
     # 默认宗门不可更改
@@ -468,7 +468,7 @@ async def test_sect_mainbuff_trigger_injected_into_battle_loadout():
     """Sect mainbuff trigger skills enter the member's battle trigger pool."""
     db = await _make_db()
     config = FakeConfigManager()
-    mgr = SectManager(db, config)
+    mgr = SectManager(db, config, busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join_qingyun(db, mgr, "u1")
 
@@ -496,7 +496,7 @@ async def test_sect_mainbuff_trigger_injected_into_battle_loadout():
 async def test_promote_position_dual_gates():
     """Promotion requires both contribution and level gates of the target rank."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join_qingyun(db, mgr, "u1", level_index=2)
 
@@ -529,7 +529,7 @@ async def test_promote_position_dual_gates():
 async def test_promote_position_no_owner_channel():
     """Position 0 (宗主) has promotion=null, so elders cannot self-promote to it."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await _join_qingyun(db, mgr, "u1", level_index=2)
     await db.ext.update_player_sect_info("u1", sect.sect_id, 1)
@@ -554,7 +554,7 @@ async def test_promote_position_no_owner_channel():
 async def test_get_position_benefits_reads_config():
     """Benefits lookup returns configured salary/discount/unlocks with defaults."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     benefits = mgr.get_position_benefits(3)
     assert benefits["daily_stones"] == 100
     assert benefits["shop_discount"] == 0.95
@@ -585,7 +585,7 @@ async def test_sect_shop_discount():
 async def test_treasury_view_and_claim():
     """Treasury lists faction items; claims enforce position/unlocks and limits."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await _join_qingyun(db, mgr, "u1", level_index=2)
 
@@ -634,7 +634,7 @@ async def test_treasury_view_and_claim():
 async def test_leave_sect_reclaims_equipped_treasure():
     """Treasures equipped in the weapon slot are unequipped and reclaimed on leave."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join_qingyun(db, mgr, "u1", level_index=2)
 
@@ -662,7 +662,7 @@ async def test_mainbuff_trigger_dedup_when_player_learned_same_skill():
     same-named trigger in the loadout (learned + equipped the sect skill)."""
     db = await _make_db()
     config = FakeConfigManager()
-    mgr = SectManager(db, config)
+    mgr = SectManager(db, config, busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join_qingyun(db, mgr, "u1")
 
@@ -684,7 +684,7 @@ async def test_mainbuff_trigger_dedup_when_player_learned_same_skill():
 async def test_claim_treasure_rolls_back_when_update_fails(monkeypatch):
     """H2: a mid-claim write failure persists neither the item nor the claim."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await _join_qingyun(db, mgr, "u1", level_index=2)
     await db.ext.update_player_sect_info("u1", sect.sect_id, 3)
@@ -709,7 +709,7 @@ async def test_perform_sect_task_rolls_back_on_first_write_failure(monkeypatch):
     """M6: failure at the first settlement write leaves gold, contribution,
     sect stores and cooldown untouched."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await _join_qingyun(db, mgr, "u1", level_index=2, gold=1000)
     scale_before = sect.sect_scale
@@ -738,7 +738,7 @@ async def test_perform_sect_task_rolls_back_on_cooldown_write_failure(monkeypatc
     """Failure at the last settlement write (set_user_busy) also rolls back
     gold, contribution, sect stores and task count — nothing half-settled."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await _join_qingyun(db, mgr, "u1", level_index=2, gold=1000)
     scale_before = sect.sect_scale
@@ -767,7 +767,7 @@ async def test_perform_sect_task_rolls_back_on_cooldown_write_failure(monkeypatc
 async def test_claim_elixir_rolls_back_when_update_fails(monkeypatch):
     """A failed claim write persists neither the pill nor the daily flag."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await _join_qingyun(db, mgr, "u1")
     sect.elixir_room_level = 1
@@ -792,7 +792,7 @@ async def test_claim_elixir_rolls_back_when_update_fails(monkeypatch):
 async def test_upgrade_building_rolls_back_when_update_sect_fails(monkeypatch):
     """A failed building write keeps sect materials and level unchanged."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await _join_qingyun(db, mgr, "u1")
     sect.sect_materials = 1000
@@ -832,7 +832,7 @@ async def test_treasury_min_position_zero_is_honored():
         {"type": "weapon", "id": "wpn_qy_001", "min_position": 0}
     ]
     config.heart_methods_data["青云心典"]["min_position"] = 0
-    mgr = SectManager(db, config)
+    mgr = SectManager(db, config, busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
 
     sect = await db.ext.get_sect_by_faction_id("qingyun")

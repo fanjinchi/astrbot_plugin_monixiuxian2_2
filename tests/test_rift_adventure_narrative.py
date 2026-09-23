@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.helpers import load_module, load_package_module
+from tests.helpers import load_module, load_package_module, make_busy_state
 
 _rift_mod = load_module("rift_manager_ran", "managers/rift_manager.py")
 RiftManager = _rift_mod.RiftManager
@@ -118,7 +118,7 @@ async def test_rift_list_shows_description_when_configured():
     }
     db = MagicMock()
     db.ext.get_all_rifts = AsyncMock(return_value=[_fake_db_rift(1)])
-    mgr = RiftManager(db, FakeRiftConfigManager(cfg))
+    mgr = RiftManager(db, FakeRiftConfigManager(cfg), busy_state=make_busy_state(db))
 
     success, msg = await mgr.list_rifts()
 
@@ -142,7 +142,7 @@ async def test_rift_list_omits_description_for_legacy_entries():
     }
     db = MagicMock()
     db.ext.get_all_rifts = AsyncMock(return_value=[_fake_db_rift(1)])
-    mgr = RiftManager(db, FakeRiftConfigManager(cfg))
+    mgr = RiftManager(db, FakeRiftConfigManager(cfg), busy_state=make_busy_state(db))
 
     success, msg = await mgr.list_rifts()
 
@@ -173,7 +173,8 @@ async def test_rift_settlement_renders_settlement_desc():
         "puzzle_rate": 0.0,
         "beast_rate": 0.0,
     }
-    mgr = RiftManager(_make_finished_rift_db(1), FakeRiftConfigManager(cfg))
+    db = _make_finished_rift_db(1)
+    mgr = RiftManager(db, FakeRiftConfigManager(cfg), busy_state=make_busy_state(db))
 
     success, msg, _ = await mgr.finish_exploration("u1")
 
@@ -198,7 +199,8 @@ async def test_rift_settlement_unchanged_without_settlement_desc():
         "puzzle_rate": 0.0,
         "beast_rate": 0.0,
     }
-    mgr = RiftManager(_make_finished_rift_db(1), FakeRiftConfigManager(cfg))
+    db = _make_finished_rift_db(1)
+    mgr = RiftManager(db, FakeRiftConfigManager(cfg), busy_state=make_busy_state(db))
 
     success, msg, _ = await mgr.finish_exploration("u1")
 
@@ -218,7 +220,8 @@ async def test_explore_events_come_from_config():
         "puzzle_rate": 0.0,
         "beast_rate": 0.0,
     }
-    mgr = RiftManager(_make_finished_rift_db(1), FakeRiftConfigManager(cfg))
+    db = _make_finished_rift_db(1)
+    mgr = RiftManager(db, FakeRiftConfigManager(cfg), busy_state=make_busy_state(db))
 
     success, msg, reward_data = await mgr.finish_exploration("u1")
 
@@ -235,7 +238,8 @@ async def test_explore_events_fall_back_to_rift_default_pool():
         "puzzle_rate": 0.0,
         "beast_rate": 0.0,
     }  # legacy shape: no explore_events key
-    mgr = RiftManager(_make_finished_rift_db(1), FakeRiftConfigManager(cfg))
+    db = _make_finished_rift_db(1)
+    mgr = RiftManager(db, FakeRiftConfigManager(cfg), busy_state=make_busy_state(db))
 
     with patch.object(mgr, "_roll_rift_drops", new=AsyncMock(return_value=[])):
         success, _msg, reward_data = await mgr.finish_exploration("u1")
@@ -322,7 +326,7 @@ def test_repo_config_legacy_encounter_mirrors_defaults_and_line_break_contract()
 async def test_adventure_legacy_pends_encounter_with_invite_hint():
     """Adventure 命中 legacy_chance → 挂起来源 adventure 的传承遭遇并提示应邀方式
     （add-rift-encounters D8 应邀制，不再内联挑战守护者）。"""
-    adv = AdventureManager(MagicMock())
+    adv = AdventureManager(MagicMock(), busy_state=make_busy_state(MagicMock()))
     adv.legacy_chance = 1.0
     adv.impart_mgr = _StubImpart("历练传承", 7)
     pve_probe = MagicMock()
@@ -353,7 +357,8 @@ async def test_rift_legacy_pends_encounter_with_invite_hint():
         "rifts": [],
         "explore_events": [{"desc": "固定事件", "item_chance": 0}],
     }
-    mgr = RiftManager(_make_finished_rift_db(1), FakeRiftConfigManager(cfg))
+    db = _make_finished_rift_db(1)
+    mgr = RiftManager(db, FakeRiftConfigManager(cfg), busy_state=make_busy_state(db))
     pve_probe = MagicMock()
     mgr.pve_combat_mgr = pve_probe
     mgr.impart_mgr = _StubImpart("秘境传承", 42)
@@ -379,7 +384,7 @@ async def test_rift_legacy_pends_encounter_with_invite_hint():
 
 def _adv():
     """AdventureManager instance (config file loads from the repo)."""
-    return AdventureManager(MagicMock())
+    return AdventureManager(MagicMock(), busy_state=make_busy_state(MagicMock()))
 
 
 def test_select_event_desc_falls_back_to_desc_without_variants():

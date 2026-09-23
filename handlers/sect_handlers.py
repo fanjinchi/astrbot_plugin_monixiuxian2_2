@@ -6,7 +6,6 @@ from ..data.data_manager import DataBase
 from ..managers.bounty_manager import BountyManager
 from ..managers.sect_manager import SectManager
 from ..models import Player
-from ..models_extended import UserStatus
 from .utils import player_required
 
 
@@ -29,11 +28,13 @@ class SectHandlers:
         sect_mgr: SectManager,
         bounty_mgr: BountyManager | None = None,
         ranking_handlers=None,
+        busy_state=None,
     ):
         self.db = db
         self.sect_mgr = sect_mgr
         self.bounty_mgr = bounty_mgr
         self.ranking_handlers = ranking_handlers
+        self.busy_state = busy_state
 
     # ===== 统一入口分发器 =====
 
@@ -288,10 +289,9 @@ class SectHandlers:
     async def handle_create_sect(self, event: AstrMessageEvent, name: str):
         """创建宗门"""
         user_id = event.get_sender_id()
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if user_cd and user_cd.type != UserStatus.IDLE:
-            current_status = UserStatus.get_name(user_cd.type)
-            yield event.plain_result(f"❌ 你当前正{current_status}，无法进行此操作！")
+        busy_msg = await self.busy_state.assert_idle(user_id)
+        if busy_msg:
+            yield event.plain_result(busy_msg)
             return
         success, msg = await self.sect_mgr.create_sect(user_id, name)
         yield event.plain_result(msg)
@@ -299,10 +299,9 @@ class SectHandlers:
     async def handle_join_sect(self, event: AstrMessageEvent, name: str):
         """加入宗门"""
         user_id = event.get_sender_id()
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if user_cd and user_cd.type != UserStatus.IDLE:
-            current_status = UserStatus.get_name(user_cd.type)
-            yield event.plain_result(f"❌ 你当前正{current_status}，无法进行此操作！")
+        busy_msg = await self.busy_state.assert_idle(user_id)
+        if busy_msg:
+            yield event.plain_result(busy_msg)
             return
         success, msg = await self.sect_mgr.join_sect(user_id, name)
         yield event.plain_result(msg)
@@ -310,10 +309,9 @@ class SectHandlers:
     async def handle_leave_sect(self, event: AstrMessageEvent):
         """退出宗门"""
         user_id = event.get_sender_id()
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if user_cd and user_cd.type != UserStatus.IDLE:
-            current_status = UserStatus.get_name(user_cd.type)
-            yield event.plain_result(f"❌ 你当前正{current_status}，无法进行此操作！")
+        busy_msg = await self.busy_state.assert_idle(user_id)
+        if busy_msg:
+            yield event.plain_result(busy_msg)
             return
         success, msg = await self.sect_mgr.leave_sect(user_id)
         yield event.plain_result(msg)
@@ -332,10 +330,9 @@ class SectHandlers:
     async def handle_donate(self, event: AstrMessageEvent, amount: int):
         """宗门捐献"""
         user_id = event.get_sender_id()
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if user_cd and user_cd.type != UserStatus.IDLE:
-            current_status = UserStatus.get_name(user_cd.type)
-            yield event.plain_result(f"❌ 你当前正{current_status}，无法进行此操作！")
+        busy_msg = await self.busy_state.assert_idle(user_id)
+        if busy_msg:
+            yield event.plain_result(busy_msg)
             return
         success, msg = await self.sect_mgr.donate_to_sect(user_id, amount)
         yield event.plain_result(msg)
@@ -420,11 +417,7 @@ class SectHandlers:
 
     async def _get_busy_message(self, user_id: str) -> str | None:
         """Return a busy-state notice for the sender, or None when idle."""
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if user_cd and user_cd.type != UserStatus.IDLE:
-            current_status = UserStatus.get_name(user_cd.type)
-            return f"❌ 你当前正{current_status}，无法进行此操作！"
-        return None
+        return await self.busy_state.assert_idle(user_id)
 
     async def handle_sect_elixir(self, event: AstrMessageEvent, action: str = ""):
         """宗门丹房（查看状态/领取丹药，仅领取分支做忙碌拦截）"""

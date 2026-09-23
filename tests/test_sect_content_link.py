@@ -12,7 +12,7 @@ import time
 import pytest
 import pytest_asyncio
 
-from tests.helpers import load_module, load_package_module
+from tests.helpers import load_module, load_package_module, make_busy_state
 
 _migration_mod = load_module("migration_content_link_test", "data/migration.py")
 MigrationManager = _migration_mod.MigrationManager
@@ -145,7 +145,7 @@ async def _make_player(db: DataBase, user_id: str, level_index: int = 1) -> Play
 
 
 async def _make_sect_mgr(db: DataBase) -> SectManager:
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     return mgr
 
@@ -356,7 +356,7 @@ async def test_bounty_scope_mismatch_on_status_complete_abandon(db, bounty_manag
 async def test_rift_access_rejects_non_member(db):
     """Sect-member-only rifts reject sectless and other-sect players."""
     sect_mgr = await _make_sect_mgr(db)
-    rift_mgr = RiftManager(db, FakeConfigManager())
+    rift_mgr = RiftManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
 
     await _make_player(db, "r1")
     success, msg = await rift_mgr.enter_rift("r1", 1)
@@ -373,7 +373,7 @@ async def test_rift_access_rejects_non_member(db):
 async def test_rift_access_allows_member_and_normal_rift(db):
     """The owning sect's member can enter; rifts without sect config are unaffected."""
     sect_mgr = await _make_sect_mgr(db)
-    rift_mgr = RiftManager(db, FakeConfigManager())
+    rift_mgr = RiftManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
 
     await _join(db, sect_mgr, "r3", "青云门")
     success, msg = await rift_mgr.enter_rift("r3", 1)
@@ -389,7 +389,7 @@ async def test_rift_access_allows_member_and_normal_rift(db):
 async def test_rift_list_hides_sect_rift_for_non_member(db):
     """Sect-exclusive rifts are hidden from non-members; members see the 🏯 mark."""
     sect_mgr = await _make_sect_mgr(db)
-    rift_mgr = RiftManager(db, FakeConfigManager())
+    rift_mgr = RiftManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
 
     await _make_player(db, "r5")
     success, msg = await rift_mgr.list_rifts("r5")
@@ -410,7 +410,7 @@ async def test_rift_list_hides_sect_rift_for_non_member(db):
 @pytest.mark.asyncio
 async def test_adventure_weight_pool_appends_sect_group_for_member(db):
     """The inert sect_qingyun group joins the pool only for qingyun members."""
-    adv_mgr = AdventureManager(db)
+    adv_mgr = AdventureManager(db, busy_state=make_busy_state(db))
     route = adv_mgr.routes["scout"]
 
     pool = adv_mgr._build_event_weight_pool(route, None)
@@ -428,7 +428,7 @@ async def test_adventure_weight_pool_appends_sect_group_for_member(db):
 @pytest.mark.asyncio
 async def test_adventure_sect_events_filtered_within_group(db):
     """Events carrying a mismatched sect_id are excluded from the draw."""
-    adv_mgr = AdventureManager(db)
+    adv_mgr = AdventureManager(db, busy_state=make_busy_state(db))
     adv_mgr.event_groups["mixed"] = [
         {"key": "common", "name": "通用", "desc": "x", "exp_mult": 1.0},
         {
@@ -454,7 +454,7 @@ async def test_adventure_sect_events_filtered_within_group(db):
 @pytest.mark.asyncio
 async def test_adventure_referenced_sect_group_dropped_for_non_member(db):
     """A route-referenced sect group falls back to standard for non-members."""
-    adv_mgr = AdventureManager(db)
+    adv_mgr = AdventureManager(db, busy_state=make_busy_state(db))
     route = {"key": "t", "event_weights": {"sect_qingyun": 100}}
 
     event = adv_mgr._trigger_route_event(route, None)
@@ -469,7 +469,7 @@ async def test_adventure_referenced_sect_group_dropped_for_non_member(db):
 async def test_adventure_faction_resolution_from_player_sect(db):
     """_get_player_faction_id maps player.sect_id through the sects table."""
     sect_mgr = await _make_sect_mgr(db)
-    adv_mgr = AdventureManager(db)
+    adv_mgr = AdventureManager(db, busy_state=make_busy_state(db))
 
     player = await _join(db, sect_mgr, "a1", "青云门")
     assert await adv_mgr._get_player_faction_id(player) == "qingyun"
@@ -481,7 +481,7 @@ async def test_adventure_faction_resolution_from_player_sect(db):
 @pytest.mark.asyncio
 async def test_adventure_settlement_marks_sect_event(db, monkeypatch):
     """Settlement prefixes 「🏯 宗门际遇 · 事件名」 for sect events; normal events unchanged."""
-    adv_mgr = AdventureManager(db)
+    adv_mgr = AdventureManager(db, busy_state=make_busy_state(db))
 
     async def _finish_with_event(user_id: str, event: dict) -> str:
         monkeypatch.setattr(

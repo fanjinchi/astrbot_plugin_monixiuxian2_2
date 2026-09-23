@@ -8,7 +8,6 @@ from astrbot.api.event import AstrMessageEvent
 from ..data.data_manager import DataBase
 from ..managers.combat_manager import CombatManager
 from ..models import Player
-from ..models_extended import UserStatus
 
 # 战斗冷却配置（秒）
 DUEL_COOLDOWN = 300  # 决斗冷却5分钟
@@ -18,10 +17,17 @@ SPAR_COOLDOWN = 60  # 切磋冷却1分钟
 class CombatHandlers:
     """Handlers for PvP commands: spar (切磋) and duel (决斗) with per-user cooldowns."""
 
-    def __init__(self, db: DataBase, combat_mgr: CombatManager, config_manager=None):
+    def __init__(
+        self,
+        db: DataBase,
+        combat_mgr: CombatManager,
+        config_manager=None,
+        busy_state=None,
+    ):
         self.db = db
         self.combat_mgr = combat_mgr
         self.config_manager = config_manager
+        self.busy_state = busy_state
 
     async def _get_combat_cooldown(self, user_id: str) -> dict:
         """获取战斗冷却信息"""
@@ -114,17 +120,19 @@ class CombatHandlers:
             return
 
         # 检查发起者状态
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if user_cd and user_cd.type != UserStatus.IDLE:
-            current_status = UserStatus.get_name(user_cd.type)
-            yield event.plain_result(f"❌ 你当前正在{current_status}，无法进行战斗！")
+        busy_msg = await self.busy_state.assert_idle(
+            user_id, template="❌ 你当前正在{status}，无法进行战斗！"
+        )
+        if busy_msg:
+            yield event.plain_result(busy_msg)
             return
 
         # 检查目标状态
-        target_cd = await self.db.ext.get_user_cd(target_id)
-        if target_cd and target_cd.type != UserStatus.IDLE:
-            target_status = UserStatus.get_name(target_cd.type)
-            yield event.plain_result(f"❌ 对方当前正在{target_status}，无法进行战斗！")
+        target_msg = await self.busy_state.assert_idle(
+            target_id, template="❌ 对方当前正在{status}，无法进行战斗！"
+        )
+        if target_msg:
+            yield event.plain_result(target_msg)
             return
 
         # 检查冷却
@@ -178,17 +186,19 @@ class CombatHandlers:
             return
 
         # 检查发起者状态
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if user_cd and user_cd.type != UserStatus.IDLE:
-            current_status = UserStatus.get_name(user_cd.type)
-            yield event.plain_result(f"❌ 你当前正在{current_status}，无法进行战斗！")
+        busy_msg = await self.busy_state.assert_idle(
+            user_id, template="❌ 你当前正在{status}，无法进行战斗！"
+        )
+        if busy_msg:
+            yield event.plain_result(busy_msg)
             return
 
         # 检查目标状态
-        target_cd = await self.db.ext.get_user_cd(target_id)
-        if target_cd and target_cd.type != UserStatus.IDLE:
-            target_status = UserStatus.get_name(target_cd.type)
-            yield event.plain_result(f"❌ 对方当前正在{target_status}，无法进行战斗！")
+        target_msg = await self.busy_state.assert_idle(
+            target_id, template="❌ 对方当前正在{status}，无法进行战斗！"
+        )
+        if target_msg:
+            yield event.plain_result(target_msg)
             return
 
         # 检查冷却

@@ -138,6 +138,7 @@ class RiftManager:
         pve_combat_mgr: PVECombatManager = None,
         encounter_store: "EncounterStore | None" = None,
         impart_mgr=None,
+        busy_state=None,
     ):
         self.db = db
         self.config_manager = config_manager
@@ -145,6 +146,7 @@ class RiftManager:
         self.pve_combat_mgr = pve_combat_mgr
         # 传承管理器：可选注入（main.py 装配传入），用于秘境触发传承机缘
         self.impart_mgr = impart_mgr
+        self.busy_state = busy_state
         # 遭遇存储：可选注入共享单例（main.py 装配，与 AdventureManager 共用，
         # design D8）；默认自建，保证既有测试/独立使用不炸
         self.encounter_store = (
@@ -272,17 +274,12 @@ class RiftManager:
         if not player:
             return False, "❌ 你还未踏入修仙之路！"
 
-        # 2. 检查用户状态
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if not user_cd:
-            await self.db.ext.create_user_cd(user_id)
-            user_cd = await self.db.ext.get_user_cd(user_id)
-
-        if user_cd.type != UserStatus.IDLE:
-            return (
-                False,
-                f"❌ 你当前正{UserStatus.get_name(user_cd.type)}，无法探索秘境！",
-            )
+        # 2. 检查用户状态（统一走 BusyState 守卫；无 user_cd 行视为空闲）
+        busy_msg = await self.busy_state.assert_idle(
+            user_id, template="❌ 你当前正{status}，无法探索秘境！"
+        )
+        if busy_msg:
+            return False, busy_msg
 
         # 3. 检查秘境
         rift = await self.db.ext.get_rift_by_id(rift_id)
@@ -299,12 +296,15 @@ class RiftManager:
             level_name = self._get_level_name(rift.required_level)
             return False, f"❌ 探索【{rift.rift_name}】需要达到【{level_name}】！"
 
-        # 5. 设置探索状态，存储秘境ID
+        # 5. 设置探索状态（owner 统一入口：user_cd upsert + 镜像 + extra_data 透传）
         scheduled_time = int(time.time()) + self.explore_duration
         extra_data = {"rift_id": rift_id, "rift_level": rift.rift_level}
-        await self.db.ext.set_user_busy(
-            user_id, UserStatus.EXPLORING, scheduled_time, extra_data
+        ok, race_msg = await self.busy_state.set_busy(
+            player, UserStatus.EXPLORING, scheduled_time, extra_data=extra_data
         )
+        if not ok:
+            # 仅预检-写入间并发插入时可达（race loser）
+            return False, race_msg
 
         return (
             True,
@@ -397,8 +397,8 @@ class RiftManager:
         player.gold += gold_reward
         await self.db.update_player(player)
 
-        # 8. 清除CD
-        await self.db.ext.set_user_free(user_id)
+        # 8. 清除CD（owner 统一入口；player 已加载，其 state 本就为"空闲"）
+        await self.busy_state.clear(player)
 
         # 8.5 结算后遭遇判定（design D4）：谜题/妖兽独立判定、不互斥，
         # 触发则挂起 pending 并把题面/提示拼进结算消息。
@@ -461,8 +461,8 @@ class RiftManager:
         if not user_cd or user_cd.type != UserStatus.EXPLORING:
             return False, "❌ 你当前不在探索秘境！"
 
-        # 3. 清除CD状态
-        await self.db.ext.set_user_free(user_id)
+        # 3. 清除CD状态（owner 统一入口）
+        await self.busy_state.clear(player)
 
         return True, "✅ 你已退出秘境，本次探索未获得任何奖励。"
 

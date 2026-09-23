@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from tests.helpers import load_module
+from tests.helpers import load_module, make_busy_state
 
 _boss_mod = load_module("boss_manager", "managers/boss_manager.py")
 BossManager = _boss_mod.BossManager
@@ -135,7 +135,7 @@ def mock_storage_ring_manager():
 @pytest.fixture
 def boss_manager(mock_db, mock_combat_manager, mock_config_manager):
     """BossManager with mocked dependencies and deterministic HP variance."""
-    mgr = BossManager(mock_db, mock_combat_manager, mock_config_manager, None)
+    mgr = BossManager(mock_db, mock_combat_manager, mock_config_manager, None, busy_state=make_busy_state(mock_db))
     mgr._resolve_boss_stats = lambda level_config: mgr._generate_boss_stats(
         level_config
     )
@@ -209,7 +209,7 @@ class TestBossStatGeneration:
         ]
         config.game_config = {"pve": {"difficulty_multiplier": 2.0}}
         config.boss_config = {}
-        mgr = BossManager(mock_db, mock_combat_manager, config, None)
+        mgr = BossManager(mock_db, mock_combat_manager, config, None, busy_state=make_busy_state(mock_db))
         level_config = {
             "name": "筑基",
             "level_index": 10,
@@ -237,7 +237,7 @@ class TestBossStatGeneration:
         ]
         config.game_config = {"pve": {"difficulty_multiplier": 1.0}}
         config.boss_config = {}
-        mgr = BossManager(mock_db, mock_combat_manager, config, None)
+        mgr = BossManager(mock_db, mock_combat_manager, config, None, busy_state=make_busy_state(mock_db))
         level_config = {
             "name": "筑基",
             "level_index": 10,
@@ -279,7 +279,7 @@ class TestBossStatGeneration:
                 }
             ]
         }
-        mgr = BossManager(mock_db, mock_combat_manager, config, None)
+        mgr = BossManager(mock_db, mock_combat_manager, config, None, busy_state=make_busy_state(mock_db))
         assert mgr.levels[0]["level_index"] == 1
 
 

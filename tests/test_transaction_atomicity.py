@@ -28,7 +28,7 @@ from unittest.mock import MagicMock
 import pytest
 import pytest_asyncio
 
-from tests.helpers import load_package_module
+from tests.helpers import load_package_module, make_busy_state
 
 # Load-order note: shop_handler uses package-attribute imports
 # (``from ..core import ...`` / ``from ..data import ...``). Loading it FIRST lets
@@ -1396,6 +1396,7 @@ async def test_clear_all_cooldowns_rolls_back_and_keeps_route_cooldowns(db, monk
         storage_ring_manager=MagicMock(),
         equipment_manager=MagicMock(),
         adventure_manager=adventure,
+        busy_state=make_busy_state(db),
     )
     event = _make_event(f"{uid} 确认")
     event.message_obj = None
@@ -1434,6 +1435,7 @@ async def test_clear_all_cooldowns_commits_everything_then_pops_memory(db, monke
         storage_ring_manager=MagicMock(),
         equipment_manager=MagicMock(),
         adventure_manager=adventure,
+        busy_state=make_busy_state(db),
     )
     event = _make_event(f"{uid} 确认")
     event.message_obj = None
@@ -1610,6 +1612,7 @@ def _make_gm(db: DataBase) -> GMManager:
         equipment_manager=MagicMock(),
         adventure_manager=MagicMock(),
         impart_manager=MagicMock(),
+        busy_state=make_busy_state(db),
     )
 
 
@@ -1786,7 +1789,8 @@ async def test_rebirth_rolls_back_delete_when_cooldown_write_fails(db, monkeypat
     await _seed_sect_treasure_state(db, uid)
     handler = PlayerHandler.__new__(PlayerHandler)
     handler.db = db
-    handler.sect_mgr = SectManager(db, _SectFakeConfig())
+    handler.sect_mgr = SectManager(db, _SectFakeConfig(), busy_state=make_busy_state(db))
+    handler.busy_state = make_busy_state(db)
     event = _make_event("弃道重修 确认", sender_id=uid)
 
     await _raise_on_leaf(monkeypatch, db.ext, "set_system_config")
@@ -1811,7 +1815,8 @@ async def test_rebirth_commits_reclaim_delete_and_cooldown(db):
     await _seed_sect_treasure_state(db, uid)
     handler = PlayerHandler.__new__(PlayerHandler)
     handler.db = db
-    handler.sect_mgr = SectManager(db, _SectFakeConfig())
+    handler.sect_mgr = SectManager(db, _SectFakeConfig(), busy_state=make_busy_state(db))
+    handler.busy_state = make_busy_state(db)
     event = _make_event("弃道重修 确认", sender_id=uid)
 
     outputs = [item async for item in handler.handle_rebirth(event, "确认")]

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.helpers import load_module
+from tests.helpers import load_module, make_busy_state
 
 # Load modules via importlib.util, bypassing managers/__init__.py
 _pve_mod = load_module("pve_combat_manager", "managers/pve_combat_manager.py")
@@ -587,13 +587,13 @@ def mock_pve_combat_mgr():
 @pytest.fixture
 def adventure_manager(mock_db, mock_storage_ring_manager, mock_pve_combat_mgr):
     """AdventureManager with mocked dependencies."""
-    return AdventureManager(mock_db, mock_storage_ring_manager, mock_pve_combat_mgr)
+    return AdventureManager(mock_db, mock_storage_ring_manager, mock_pve_combat_mgr, busy_state=make_busy_state(mock_db))
 
 
 @pytest.fixture
 def rift_manager(mock_db, mock_storage_ring_manager, mock_pve_combat_mgr):
     """RiftManager with mocked dependencies."""
-    return RiftManager(mock_db, None, mock_storage_ring_manager, mock_pve_combat_mgr)
+    return RiftManager(mock_db, None, mock_storage_ring_manager, mock_pve_combat_mgr, busy_state=make_busy_state(mock_db))
 
 
 @pytest.fixture

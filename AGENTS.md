@@ -60,20 +60,20 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 - **指令名不能带空格**，否则 AstrBot 会将空格后内容解析为参数。本项目使用纯中文指令（如 "闭关"）
 - **装饰器顺序**：`@filter.command(...)` 在外层，`@require_whitelist` 在内层
 
-### 2. 状态检查是双层的（极易踩坑）
+### 2. 状态检查是双层的（由 BusyState 统一承接，勿手动同步）
 
-玩家忙碌状态由两个独立系统维护，修改时必须同步：
+玩家忙碌状态由两个独立存储维护，**读写义务由 `BusyState`（`core/busy_state.py`）统一承接**，禁止绕过它手动写任意一层：
 
-- `player.state` 字段（字符串）："空闲"、"修炼中"、"历练中" 等
-- `user_cd` 表（数据库）：`type` 字段对应 `UserStatus` 枚举
+- `player.state` 字段（字符串）："空闲"、"修炼中"、"历练中" 等 —— **内存镜像**（仅展示/快进选择器用）
+- `user_cd` 表（数据库）：`type` 字段对应 `UserStatus` 枚举 —— **唯一真相**（busy 判定一律以 user_cd 为准）
 
-- 处理器方法应使用 **`@player_required`** 装饰器（在 `handlers/utils.py`），它会同时检查两者
-- 白名单命令在 `BUSY_STATE_ALLOWED_COMMANDS`（`handlers/utils.py`），忙碌时只允许查看类指令
-- 若新增"进行中"的状态（如新的活动系统），必须：
+- 忙碌判定：处理器方法应使用 **`@player_required`** 装饰器（在 `handlers/utils.py`，白名单命令在 `BUSY_STATE_ALLOWED_COMMANDS`）；自定义守卫用 `BusyState.assert_idle(user_id, template=...)` 读侧单点，**不要手写 user_cd/state 判断**
+- 若新增"进行中"的活动系统，必须：
   1. 在 `models_extended.py` 的 `UserStatus` 添加枚举值
   2. 更新 `BUSY_STATE_ALLOWED_COMMANDS`（如需要）
-  3. 在操作开始时写入 `user_cd` 表，结束时清除
-  4. 同步更新 `player.state`
+  3. 开始/结束走 `BusyState.set_busy(player, status, scheduled_time, extra_data=...)` / `clear(player)`
+  4. 双写（user_cd + 待落库 player 字段）包在调用方同一 `async with db.transaction():` 内（owner 内部 CM 同任务 no-op join，tasks 2.1 机制定案）
+- 例外：GM force-settle（`core/gm_manager.py` 的 `update_user_cd` 直写）仅 bump `scheduled_time`、非常态忙碌写入，保留直连
 - 若新增**等待类冷却域**（任何参与到期/冷却判定的时间戳字段，如新的周期活动、冷却表、system_config 到期键），必须同步 GM「时间快进」的字段覆盖清单（`core/gm_manager.py` 的 `_TIME_SKIP_RULES`）与 GM 帮助文本——否则新冷却不被快进覆盖，冷却类功能测试会隐性失败
 
 ### 3. 数据库操作规范

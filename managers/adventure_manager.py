@@ -98,10 +98,12 @@ class AdventureManager:
         impart_mgr=None,
         config_manager=None,
         encounter_store=None,
+        busy_state=None,
     ):
         self.db = db
         self.storage_ring_manager = storage_ring_manager
         self.pve_combat_mgr = pve_combat_mgr
+        self.busy_state = busy_state
         # 传承管理器：可选注入（main.py 装配后），用于历练触发传承机缘
         self.impart_mgr = impart_mgr
         # 配置管理器：可选注入（当前仅保留接口位；叙事选择走模块级 select_narrative_pool）
@@ -186,20 +188,16 @@ class AdventureManager:
         self, user_id: str, route_token: str = ""
     ) -> tuple[bool, str]:
         """开始指定路线的历练"""
+        # 忙碌守卫（统一走 BusyState；无 user_cd 行视为空闲，无需懒创建）
         player = await self.db.get_player_by_id(user_id)
         if not player:
             return False, "❌ 你还未踏入修仙之路！"
 
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if not user_cd:
-            await self.db.ext.create_user_cd(user_id)
-            user_cd = await self.db.ext.get_user_cd(user_id)
-
-        if user_cd.type != UserStatus.IDLE:
-            return (
-                False,
-                f"❌ 你当前正{UserStatus.get_name(user_cd.type)}，无法开始历练！",
-            )
+        busy_msg = await self.busy_state.assert_idle(
+            user_id, template="❌ 你当前正{status}，无法开始历练！"
+        )
+        if busy_msg:
+            return False, busy_msg
 
         route_key = self._resolve_route(route_token)
         route = self.routes.get(route_key)
@@ -219,9 +217,13 @@ class AdventureManager:
         duration = route.get("duration", 3600)
         scheduled_time = now + duration
         extra = {"route_key": route_key}
-        await self.db.ext.set_user_busy(
-            user_id, UserStatus.ADVENTURING, scheduled_time, extra_data=extra
+        # 状态写统一走 owner：user_cd upsert + 镜像（ADVENTURING → "空闲"）
+        ok, race_msg = await self.busy_state.set_busy(
+            player, UserStatus.ADVENTURING, scheduled_time, extra_data=extra
         )
+        if not ok:
+            # 仅预检-写入间并发插入时可达（race loser）
+            return False, race_msg
 
         fatigue = route.get("fatigue_cooldown", 0)
         hint = [
@@ -311,7 +313,8 @@ class AdventureManager:
             player.experience += rewards["bonus_exp"]
         player.gold += rewards.get("gold", 0)
         await self.db.update_player(player)
-        await self.db.ext.set_user_free(user_id)
+        # 结算完成：权威 user_cd 复位 + 镜像；player 已加载、其 state 本就为"空闲"
+        await self.busy_state.clear(player)
 
         fatigue = route.get("fatigue_cooldown", 0)
         if event.get("injury"):

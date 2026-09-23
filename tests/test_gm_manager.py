@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import pytest_asyncio
 
-from tests.helpers import load_module, load_package_module
+from tests.helpers import load_module, load_package_module, make_busy_state
 
 # Load gm_manager without triggering the plugin's __init__.py chain
 _mod = load_module("gm_manager", "core/gm_manager.py")
@@ -142,6 +142,7 @@ def gm_manager(mock_db, mock_config_manager, mock_managers, plugin_data_dir):
         boss_manager=mock_managers["boss_manager"],
         bounty_manager=mock_managers["bounty_manager"],
         plugin_data_path=plugin_data_dir,
+        busy_state=make_busy_state(mock_db),
     )
     return mgr
 
@@ -914,6 +915,7 @@ async def gm_real_db(real_db, mock_config_manager, plugin_data_dir):
         boss_manager=None,
         bounty_manager=None,
         plugin_data_path=plugin_data_dir,
+        busy_state=make_busy_state(real_db),
     )
 
 

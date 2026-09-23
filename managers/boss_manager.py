@@ -179,11 +179,13 @@ class BossManager:
         combat_mgr: CombatManager,
         config_manager: ConfigManager | None = None,
         storage_ring_manager: StorageRingManager | None = None,
+        busy_state=None,
     ):
         self.db = db
         self.engine = getattr(combat_mgr, "engine", combat_mgr)
         self.storage_ring_manager = storage_ring_manager
         self.config_manager = config_manager
+        self.busy_state = busy_state
         self.config = config_manager.boss_config if config_manager else {}
         raw_levels = self.config.get("levels", self.BOSS_LEVELS)
         self.levels = [self._normalize_level_config(cfg) for cfg in raw_levels]
@@ -394,14 +396,12 @@ HP：{max_hp}
         if not boss:
             return False, "❌ 当前没有Boss！", None
 
-        # 3. 检查玩家状态
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if not user_cd:
-            await self.db.ext.create_user_cd(user_id)
-            user_cd = await self.db.ext.get_user_cd(user_id)
-
-        if user_cd.type != UserStatus.IDLE:
-            return False, "❌ 你当前正忙，无法挑战Boss！", None
+        # 3. 检查玩家状态（统一走 BusyState 守卫；无行视为空闲）
+        busy_msg = await self.busy_state.assert_idle(
+            user_id, template="❌ 你当前正忙，无法挑战Boss！"
+        )
+        if busy_msg:
+            return False, busy_msg, None
 
         # 4. 构建玩家战斗状态
         player_fighter = await self.engine.build_fighter_from_player(player)

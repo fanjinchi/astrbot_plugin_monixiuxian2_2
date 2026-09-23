@@ -112,16 +112,6 @@ def player_required(
                 )
                 return
 
-        # 状态检查：如果处于修炼中（闭关），只允许出关、查看信息和签到
-        if player.state == "修炼中":
-            is_allowed = _is_command_allowed(message_text, BUSY_STATE_ALLOWED_COMMANDS)
-
-            if not is_allowed:
-                yield event.plain_result(
-                    f"道友当前正在「{player.state}」中，无法分心他顾。\n💡 可使用「出关」「我的信息」「签到」「银行」等基础指令。"
-                )
-                return
-
         # 将 player 对象作为第一个参数传递给原始函数
         async for result in func(self, player, event, *args, **kwargs):
             yield result

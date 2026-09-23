@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.helpers import load_module, load_package_module
+from tests.helpers import load_module, load_package_module, make_busy_state
 
 _migration_mod = load_module("migration_sect_test", "data/migration.py")
 MigrationManager = _migration_mod.MigrationManager
@@ -103,7 +103,7 @@ async def _make_player(
 async def test_ensure_system_sects_seeds_and_is_idempotent():
     """Seeding creates configured system sects once; re-runs do not duplicate."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
 
     await mgr.ensure_system_sects()
     sects = await db.ext.get_all_sects()
@@ -127,7 +127,7 @@ async def test_ensure_system_sects_syncs_name_without_touching_operational_data(
     """Re-seeding syncs text fields only; operational data is preserved."""
     db = await _make_db()
     config = FakeConfigManager()
-    mgr = SectManager(db, config)
+    mgr = SectManager(db, config, busy_state=make_busy_state(db))
 
     await mgr.ensure_system_sects()
     sect = await db.ext.get_sect_by_faction_id("qingyun")
@@ -151,7 +151,7 @@ async def test_ensure_system_sects_syncs_name_without_touching_operational_data(
 async def test_create_sect_rejects_system_sect_name():
     """Player-created sects must not reuse a default sect name."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
 
     await _make_player(db, "u1", level_index=5, gold=20000)
@@ -172,7 +172,7 @@ async def test_create_sect_rejects_system_sect_name():
 async def test_join_system_sect_within_level_range():
     """Players inside join_level_range can join a default sect."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
 
     await _make_player(db, "u1", level_index=3)
@@ -191,7 +191,7 @@ async def test_join_system_sect_within_level_range():
 async def test_join_system_sect_out_of_level_range_rejected():
     """Players outside join_level_range are rejected with a clear message."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
 
     await _make_player(db, "u1", level_index=6)
@@ -211,7 +211,7 @@ async def test_join_system_sect_out_of_level_range_rejected():
 async def test_join_player_sect_has_no_level_restriction():
     """Player-created sects keep the existing free-join semantics."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
 
     await _make_player(db, "owner", level_index=5, gold=20000)
@@ -232,7 +232,7 @@ async def test_join_player_sect_has_no_level_restriction():
 async def test_leave_sect_reclaims_treasure_and_keeps_personal_items():
     """Leaving a sect reclaims treasures; personal items and bound skills stay."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
 
     await _make_player(db, "u1", level_index=2)
@@ -280,7 +280,7 @@ async def test_leave_sect_reclaims_treasure_and_keeps_personal_items():
 async def test_kick_member_reclaims_treasure():
     """Kicking a member also reclaims their sect treasures."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     sect = await db.ext.get_sect_by_faction_id("qingyun")
 
@@ -315,7 +315,7 @@ async def test_kick_member_reclaims_treasure():
 async def test_kick_permission_rules_follow_config():
     """Kick permission derives from configured permission levels."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await _make_player(db, "owner", level_index=5, gold=20000)
     await mgr.create_sect("owner", "太一宗")
     sect = await db.ext.get_sect_by_name("太一宗")
@@ -356,7 +356,7 @@ async def test_kick_permission_rules_follow_config():
 async def test_position_names_come_from_config():
     """Position names and the entry position derive from sect_config.json."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     assert mgr.get_position_name(0) == "宗主"
     assert mgr.get_position_name(4) == "外门弟子"
     assert mgr.get_position_name(99) == "未知"
@@ -433,7 +433,7 @@ async def test_rebirth_reclaims_sect_treasures():
     PlayerHandler = _ph_mod.PlayerHandler
 
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
 
     await _make_player(db, "u1", level_index=2)
@@ -446,6 +446,7 @@ async def test_rebirth_reclaims_sect_treasures():
     handler = PlayerHandler.__new__(PlayerHandler)
     handler.db = db
     handler.sect_mgr = mgr
+    handler.busy_state = make_busy_state(db)
 
     event = MagicMock()
     event.get_sender_id.return_value = "u1"
@@ -613,7 +614,7 @@ class _StubPveCombat:
 
 def _make_legacy_mgr(db, config, won=True):
     """SectManager wired with a real ImpartManager and a stub guardian fight."""
-    mgr = SectManager(db, config)
+    mgr = SectManager(db, config, busy_state=make_busy_state(db))
     impart = ImpartManager(db, config)
     mgr.impart_mgr = impart
     mgr.pve_combat_mgr = _StubPveCombat(won)

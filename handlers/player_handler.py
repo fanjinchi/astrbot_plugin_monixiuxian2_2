@@ -40,6 +40,7 @@ class PlayerHandler:
         pill_manager: PillManager,
         equipment_manager: EquipmentManager,
         impart_mgr: ImpartManager,
+        busy_state=None,
     ):
         self.db = db
         self.config = config
@@ -50,6 +51,7 @@ class PlayerHandler:
         self.cultivation_manager = cultivation_manager
         self.pill_manager = pill_manager
         self.equipment_manager = equipment_manager
+        self.busy_state = busy_state
 
     def _render_narrative(
         self,
@@ -314,23 +316,28 @@ class PlayerHandler:
     @player_required
     async def handle_start_cultivation(self, player: Player, event: AstrMessageEvent):
         """处理闭关指令"""
-        # 检查是否已经在闭关
-        if player.state == "修炼中":
-            yield event.plain_result("道友已在闭关中，请勿重复进入。")
+        # 忙碌预检（权威 user_cd；set_busy 锁内复查兜底预检-写入间的并发插入）
+        busy_msg = await self.busy_state.assert_idle(
+            player.user_id, template="❌ 道友当前正{status}，无法闭关修炼！"
+        )
+        if busy_msg:
+            yield event.plain_result(busy_msg)
             return
 
-        # 检查是否在其他活动中（历练、秘境探索等）
-        user_cd = await self.db.ext.get_user_cd(player.user_id)
-        if user_cd and user_cd.type != UserStatus.IDLE:
-            current_status = UserStatus.get_name(user_cd.type)
-            yield event.plain_result(f"❌ 道友当前正{current_status}，无法闭关修炼！")
-            return
-
-        # 记录闭关开始时间
-        player.state = "修炼中"
+        # 记录闭关开始时间：user_cd + player 落库包在同一外层事务（design D2 / tasks 2.1
+        # 机制定案）——set_busy 内部 CM 同任务嵌套为 no-op join，仅本层统一提交/回滚，
+        # 避免两段提交留下半套状态（user_cd 已写而 cultivation_start_time 未落库）。
         player.cultivation_start_time = int(time.time())
-        await self.db.update_player(player)
-        await self.db.ext.set_user_busy(player.user_id, UserStatus.CULTIVATING, 0)
+        async with self.db.transaction():
+            ok, race_msg = await self.busy_state.set_busy(
+                player, UserStatus.CULTIVATING
+            )
+            if not ok:
+                # race loser：锁内复检失败，set_busy 已标记 abort——本层退出时整体
+                # 回滚（无异常再抛出），玩家收到当前状态文案
+                yield event.plain_result(race_msg)
+                return
+            await self.db.update_player(player)
 
         yield event.plain_result(
             self._render_narrative(
@@ -344,8 +351,13 @@ class PlayerHandler:
     @player_required
     async def handle_end_cultivation(self, player: Player, event: AstrMessageEvent):
         """处理出关指令"""
-        # 检查是否在闭关中
-        if player.state != "修炼中":
+        # 检查是否在闭关中：user_cd 是唯一真相；镜像兜底 legacy 玩家
+        # （旧版本仅写 player.state="修炼中"、无 user_cd 行，出关仍需放行，design D3.1）
+        user_cd = await self.db.ext.get_user_cd(player.user_id)
+        in_cultivation = (
+            user_cd is not None and user_cd.type == UserStatus.CULTIVATING
+        ) or player.state == "修炼中"
+        if not in_cultivation:
             yield event.plain_result("道友当前并未闭关，无需出关。")
             return
 
@@ -444,18 +456,21 @@ class PlayerHandler:
         except (TypeError, ValueError):
             logger.warning("出关传承值累积间隔配置非法，回退默认 15 分钟。")
 
-        # 更新玩家状态（先提交：失败则报错返回，传承值尚未写入，无双计）
-        player.state = "空闲"
+        # 更新玩家状态（先提交：失败则报错返回，传承值尚未写入，无双计；
+        # user_cd 复位 + player 落库包在同一外层事务（design D2 / tasks 2.1）——
+        # clear 内部 CM 同任务嵌套 join，本层统一提交；任一写失败整体回滚，
+        # 不会出现 user_cd 已复位而 player 行未落库的半套状态）
         player.cultivation_start_time = 0
-        try:
-            await self.db.update_player(player)
-            await self.db.ext.set_user_free(player.user_id)
-        except Exception as exc:
-            logger.exception("出关状态收尾失败: %s", exc)
-            yield event.plain_result(
-                "⚠️ 出关状态更新失败，请稍后再试（本次闭关未消耗）。"
-            )
-            return
+        async with self.db.transaction():
+            try:
+                await self.busy_state.clear(player)
+                await self.db.update_player(player)
+            except Exception as exc:
+                logger.exception("出关状态收尾失败: %s", exc)
+                yield event.plain_result(
+                    "⚠️ 出关状态更新失败，请稍后再试（本次闭关未消耗）。"
+                )
+                return
 
         # 传承值累积（后结算：失败仅日志，不阻塞出关完成）
         if self.impart_mgr is not None and effective_minutes >= every_minutes:
@@ -598,16 +613,11 @@ class PlayerHandler:
         self, player: Player, event: AstrMessageEvent, confirm_text: str = ""
     ):
         """弃道重修（7天冷却）"""
-        user_cd = await self.db.ext.get_user_cd(player.user_id)
-        if user_cd and user_cd.type != UserStatus.IDLE:
-            status_name = UserStatus.get_name(user_cd.type)
-            yield event.plain_result(f"❌ 你当前正在「{status_name}」，无法弃道重修。")
-            return
-
-        if player.state != "空闲":
-            yield event.plain_result(
-                "❌ 只有处于空闲状态时才能弃道重修。请先结束闭关/历练等活动。"
-            )
+        busy_msg = await self.busy_state.assert_idle(
+            player.user_id, template="❌ 你当前正在「{status}」，无法弃道重修。"
+        )
+        if busy_msg:
+            yield event.plain_result(busy_msg)
             return
 
         loan = await self.db.ext.get_active_loan(player.user_id)

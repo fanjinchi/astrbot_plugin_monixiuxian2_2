@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.17.4
+> **版本:** v3.17.5
 > **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -303,6 +303,20 @@ astrbot_plugin_monixiuxian2_2/
 ---
 
 ## 📝 更新日志
+
+---
+
+### v3.17.5 - 忙碌状态统一 owner（BusyState）
+
+**🔧 修复**
+
+- **闭关并发竞争修复（R1）**：闭关/历练/秘境同时进入的并发场景下，此前后写者会静默覆盖先写者的忙碌状态；现由 `BusyState.set_busy` 在事务锁内复查，竞争失败者收到「当前正{状态}」报错，忙录状态不再被覆盖（busy-state-owner）
+- **闭关/出关/GM 清 CD 双写原子化（R2）**：`user_cd` 表与 `player.state` 双层写此前是两次独立提交，中途失败会留下「清了一半」的半套状态；现统一由 `BusyState` 在单事务内完成双层复位（busy-state-owner）
+- **清理装饰器冗余状态检查**：`@player_required` 移除 `player.state == "修炼中"` 第二层判断（`user_cd` 为唯一真相）；16 处手抄忙碌守卫统一收编 `BusyState.assert_idle`，文案逐字不变
+
+**⚠️ 行为变化**
+
+- 历史遗留脏数据（`state="修炼中"` 且 `user_cd=IDLE`）玩家发「闭关」从「已在闭关中」拦截变为放行并重新闭关（自愈语义，旧脏状态被正确双写覆盖）
 
 ---
 

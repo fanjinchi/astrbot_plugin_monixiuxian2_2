@@ -27,7 +27,13 @@ class SectManager:
     """宗门系统管理器"""
 
     def __init__(
-        self, db: DataBase, config_manager=None, *, impart_mgr=None, pve_combat_mgr=None
+        self,
+        db: DataBase,
+        config_manager=None,
+        *,
+        impart_mgr=None,
+        pve_combat_mgr=None,
+        busy_state=None,
     ):
         self.db = db
         self.config_manager = config_manager
@@ -37,6 +43,7 @@ class SectManager:
         # 传承/PvE 管理器：可选注入，用于宗门传承领取/回收与 PvE 切磋（main.py 装配传入）
         self.impart_mgr = impart_mgr
         self.pve_combat_mgr = pve_combat_mgr
+        self.busy_state = busy_state
 
     # ===== 职位配置辅助（唯一事实源：sect_config.json 的 positions） =====
 
@@ -915,8 +922,9 @@ class SectManager:
             await self.db.update_player(player)
             await self.db.ext.increment_sect_task_count(user_id)
 
-            # 冷却使用任务配置的 cooldown 字段，状态写法保持不变
-            await self.db.ext.set_user_busy(
+            # 冷却走 owner 时间戳冷却通道（SECT_TASK：只写 user_cd、无镜像/无复检）；
+            # 嵌套在 perform_sect_task 的事务内（CM 同任务 no-op join）
+            await self.busy_state.set_cooldown(
                 user_id, UserStatus.SECT_TASK, current_time + cooldown
             )
 

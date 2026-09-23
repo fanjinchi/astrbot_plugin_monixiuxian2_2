@@ -98,3 +98,18 @@ def load_package_module(rel_path: str, full_name: str):
     sys.modules[full_name] = mod
     spec.loader.exec_module(mod)
     return mod
+
+
+def make_busy_state(db):
+    """Build a ``BusyState`` instance against a test DB (real or mock).
+
+    ``BusyState`` is the busy-state owner (openspec change:
+    busy-state-owner); managers/handlers now take it via constructor
+    injection.  Its constructor only retains the db handle, so a plain
+    ``MagicMock`` is fine for read-side guard tests; write-path tests must
+    pass a connected in-memory ``DataBase``.
+    """
+    mod = load_package_module(
+        "core/busy_state.py", "astrbot_plugin_monixiuxian2_2.core.busy_state"
+    )
+    return mod.BusyState(db)

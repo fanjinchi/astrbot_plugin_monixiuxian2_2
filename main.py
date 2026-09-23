@@ -260,6 +260,7 @@ class XiuXianPlugin(Star):
             handler, in assembly order.
         """
         from .core import (
+            BusyState,
             CultivationManager,
             EquipmentManager,
             GMManager,
@@ -280,6 +281,8 @@ class XiuXianPlugin(Star):
         )
         pill_mgr = PillManager(self.db, self.config_manager)
         shop_mgr = ShopManager(self.config, self.config_manager)
+        # 忙碌状态 owner（user_cd + player.state 镜像双层写统一入口，design D1）
+        busy_state = BusyState(self.db)
 
         # Phase 2: 业务管理器（依赖 Phase 1 实例，按依赖序构造）
         bank_mgr = BankManager(self.db, self.config)
@@ -297,12 +300,14 @@ class XiuXianPlugin(Star):
             self.config_manager,
             impart_mgr=impart_mgr,
             pve_combat_mgr=pve_combat_mgr,
+            busy_state=busy_state,
         )
         boss_mgr = BossManager(
             self.db,
             combat_mgr,
             self.config_manager,
             storage_ring_mgr,
+            busy_state=busy_state,
         )
         # 遭遇存储单例：秘境/历练共享（add-rift-encounters design D8）；内存态，
         # 热重载即清空——零惩罚设计下玩家无损失（design D1）。
@@ -323,6 +328,7 @@ class XiuXianPlugin(Star):
             pve_combat_mgr,
             encounter_store=encounter_store,
             impart_mgr=impart_mgr,
+            busy_state=busy_state,
         )
         rank_mgr = RankingManager(
             self.db,
@@ -337,8 +343,11 @@ class XiuXianPlugin(Star):
             impart_mgr=impart_mgr,
             config_manager=self.config_manager,
             encounter_store=encounter_store,
+            busy_state=busy_state,
         )
-        alchemy_mgr = AlchemyManager(self.db, self.config_manager, storage_ring_mgr)
+        alchemy_mgr = AlchemyManager(
+            self.db, self.config_manager, storage_ring_mgr, busy_state=busy_state
+        )
 
         # Phase 2b: GM 管理器（依赖前面创建的管理器）
         gm_manager = GMManager(
@@ -354,6 +363,7 @@ class XiuXianPlugin(Star):
             broadcast_callback=self._broadcast_boss_spawn,
             sect_manager=sect_mgr,
             impart_manager=impart_mgr,
+            busy_state=busy_state,
         )
 
         # Phase 3: 业务处理器（依赖前两阶段实例）
@@ -368,6 +378,7 @@ class XiuXianPlugin(Star):
             pill_manager=pill_mgr,
             equipment_manager=equipment_mgr,
             impart_mgr=impart_mgr,
+            busy_state=busy_state,
         )
         equipment_handler = EquipmentHandler(
             self.db,
@@ -401,16 +412,22 @@ class XiuXianPlugin(Star):
         )
         ranking_handlers = RankingHandlers(self.db, rank_mgr)
         sect_handlers = SectHandlers(
-            self.db, sect_mgr, bounty_mgr, ranking_handlers=ranking_handlers
+            self.db,
+            sect_mgr,
+            bounty_mgr,
+            ranking_handlers=ranking_handlers,
+            busy_state=busy_state,
         )
         boss_handlers = BossHandlers(self.db, boss_mgr)
-        combat_handlers = CombatHandlers(self.db, combat_mgr, self.config_manager)
+        combat_handlers = CombatHandlers(
+            self.db, combat_mgr, self.config_manager, busy_state=busy_state
+        )
         technique_handler = TechniqueHandler(
             self.db, self.config_manager, skill_manager, storage_ring_mgr
         )
         rift_handlers = RiftHandlers(self.db, rift_mgr)
         adventure_handlers = AdventureHandlers(self.db, adventure_mgr)
-        alchemy_handlers = AlchemyHandlers(self.db, alchemy_mgr)
+        alchemy_handlers = AlchemyHandlers(self.db, alchemy_mgr, busy_state=busy_state)
         impart_handlers = ImpartHandlers(self.db, impart_mgr)
         nickname_handler = NicknameHandler(self.db)  # Phase 1
         gm_handler = GMHandler(self.db, gm_manager)
@@ -431,6 +448,7 @@ class XiuXianPlugin(Star):
             self.config,
             self.config_manager,
             cultivation_manager=cultivation_mgr,
+            busy_state=busy_state,
         )
         dual_cult_handlers = DualCultivationHandlers(self.db, dual_cult_mgr)
         spirit_eye_mgr = SpiritEyeManager(self.db)

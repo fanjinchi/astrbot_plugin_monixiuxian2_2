@@ -3,15 +3,15 @@ from astrbot.api.event import AstrMessageEvent
 
 from ..data.data_manager import DataBase
 from ..managers.alchemy_manager import AlchemyManager
-from ..models_extended import UserStatus
 
 
 class AlchemyHandlers:
     """Handlers for alchemy (炼丹) commands: recipe list and pill crafting."""
 
-    def __init__(self, db: DataBase, alchemy_mgr: AlchemyManager):
+    def __init__(self, db: DataBase, alchemy_mgr: AlchemyManager, busy_state=None):
         self.db = db
         self.alchemy_mgr = alchemy_mgr
+        self.busy_state = busy_state
 
     async def handle_recipes(self, event: AstrMessageEvent):
         """丹药配方"""
@@ -30,10 +30,11 @@ class AlchemyHandlers:
             return
 
         # 检查玩家状态
-        user_cd = await self.db.ext.get_user_cd(user_id)
-        if user_cd and user_cd.type != UserStatus.IDLE:
-            current_status = UserStatus.get_name(user_cd.type)
-            yield event.plain_result(f"❌ 你当前正{current_status}，无法炼丹！")
+        busy_msg = await self.busy_state.assert_idle(
+            user_id, template="❌ 你当前正{status}，无法炼丹！"
+        )
+        if busy_msg:
+            yield event.plain_result(busy_msg)
             return
 
         if not pill_id:

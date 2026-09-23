@@ -144,6 +144,7 @@ class GMManager:
         broadcast_callback=None,
         sect_manager=None,
         impart_manager=None,
+        busy_state=None,
     ):
         self.db = db
         self.config_manager = config_manager
@@ -155,6 +156,7 @@ class GMManager:
         self.bounty_manager = bounty_manager
         self.sect_manager = sect_manager
         self.impart_manager = impart_manager
+        self.busy_state = busy_state
         self.plugin_data_path = plugin_data_path
         self.broadcast_callback = broadcast_callback
 
@@ -909,9 +911,11 @@ class GMManager:
         if not user_cd or user_cd.type == UserStatus.IDLE:
             return False, "❌ 目标玩家当前不在任何忙碌状态！"
 
-        await self.db.ext.set_user_free(target_id)
-        player.state = "空闲"
-        await self.db.update_player(player)
+        # 统一走 owner 清除入口（user_cd 复位 + 镜像同步）：与 player 落库包在
+        # 同一外层事务（tasks 2.1 机制定案）——R2 双写单事务，两段提交变原子
+        async with self.db.transaction():
+            await self.busy_state.clear(player)
+            await self.db.update_player(player)
 
         return True, f"✅ 已清除【{player.user_name or target_id}】的忙碌状态"
 
@@ -993,6 +997,8 @@ class GMManager:
             return False, "❌ 历练管理器未初始化！"
 
         # 将计划完成时间提前到当前时间，立即结算
+        # force-settle 例外（design §D3）：仅上移 scheduled_time，保留直写
+        # update_user_cd——BusyState 的断言/镜像语义不适用于 GM 强制结算
         user_cd.scheduled_time = int(time.time())
         await self.db.ext.update_user_cd(user_cd)
 
@@ -1067,6 +1073,8 @@ class GMManager:
             return False, "❌ 秘境管理器未初始化！"
 
         # 将计划完成时间提前到当前时间，立即结算
+        # force-settle 例外（design §D3）：仅上移 scheduled_time，保留直写
+        # update_user_cd——BusyState 的断言/镜像语义不适用于 GM 强制结算
         user_cd.scheduled_time = int(time.time())
         await self.db.ext.update_user_cd(user_cd)
 
@@ -1243,11 +1251,10 @@ class GMManager:
         # bounty_tasks/system_config/impart_*），必须同生共死：中途失败会留下「清了一半」
         # 的混合状态。CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
         async with self.db.transaction():
-            # 1. 忙碌状态（同「清除CD」）：user_cd 与 player.state 双层同步复位
+            # 1. 忙碌状态（同「清除CD」）：统一走 owner 清除入口，保持双层同步复位
             user_cd = await self.db.ext.get_user_cd(target_id)
             if (user_cd and user_cd.type != UserStatus.IDLE) or player.state != "空闲":
-                await self.db.ext.set_user_free(target_id)
-                player.state = "空闲"
+                await self.busy_state.clear(player)
                 await self.db.update_player(player)
                 cleared.append("忙碌状态：1 条")
 

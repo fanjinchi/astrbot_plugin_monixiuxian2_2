@@ -8,7 +8,6 @@ from astrbot.api import logger
 from ..core.cultivation_manager import CultivationManager
 from ..data import DataBase
 from ..models import Player
-from ..models_extended import UserStatus
 
 __all__ = ["DualCultivationManager"]
 
@@ -198,11 +197,12 @@ class DualCultivationManager:
         if initiator.user_id == target_id:
             return False, "❌ 不能与自己双修。"
 
-        # 检查发起者状态（状态互斥）
-        user_cd = await self.db.ext.get_user_cd(initiator.user_id)
-        if user_cd and user_cd.type != UserStatus.IDLE:
-            current_status = UserStatus.get_name(user_cd.type)
-            return False, f"❌ 你当前正{current_status}，无法发起双修！"
+        # 检查发起者状态（状态互斥，统一走 BusyState 守卫）
+        busy_msg = await self.busy_state.assert_idle(
+            initiator.user_id, template="❌ 你当前正{status}，无法发起双修！"
+        )
+        if busy_msg:
+            return False, busy_msg
 
         # 检查目标是否存在
         target = await self.db.get_player_by_id(target_id)
@@ -219,10 +219,12 @@ class DualCultivationManager:
                 f"❌ 双方修为差距过大（最大{DUAL_CULT_MAX_EXP_RATIO}倍），无法双修。",
             )
 
-        # 检查目标状态
-        target_cd = await self.db.ext.get_user_cd(target_id)
-        if target_cd and target_cd.type != UserStatus.IDLE:
-            return False, "❌ 对方正忙，无法接受双修请求。"
+        # 检查目标状态（固定文案无状态占位符）
+        target_msg = await self.busy_state.assert_idle(
+            target_id, template="❌ 对方正忙，无法接受双修请求。"
+        )
+        if target_msg:
+            return False, target_msg
 
         # 检查发起者冷却
         last_dual = await self._get_last_dual_time(initiator.user_id)

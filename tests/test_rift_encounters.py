@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.helpers import load_module
+from tests.helpers import load_module, make_busy_state
 
 _rift_mod = load_module("rift_manager_enc", "managers/rift_manager.py")
 RiftManager = _rift_mod.RiftManager
@@ -114,6 +114,7 @@ def _make_mgr(db, cfg=None, storage=None, pve=None, store=None):
         storage,
         pve,
         encounter_store=store,
+        busy_state=make_busy_state(db),
     )
     return mgr
 

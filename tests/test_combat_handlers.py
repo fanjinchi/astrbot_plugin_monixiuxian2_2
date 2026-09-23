@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from tests.helpers import load_package_module
+from tests.helpers import load_package_module, make_busy_state
 
 _combat_mod = load_package_module(
     "handlers/combat_handlers.py",
@@ -38,6 +38,7 @@ async def test_handle_spar_assigns_engine_result():
     handler.db = MagicMock()
     handler.db.ext = MagicMock()
     handler.db.ext.get_user_cd = AsyncMock(return_value=None)
+    handler.busy_state = make_busy_state(handler.db)
     handler.db.update_player = AsyncMock()
     handler.combat_mgr = MagicMock()
     handler.combat_mgr.player_vs_player = AsyncMock(
