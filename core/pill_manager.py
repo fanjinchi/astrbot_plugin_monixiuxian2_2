@@ -73,12 +73,12 @@ class PillManager:
         # 检查背包是否有该丹药
         inventory = player.get_pills_inventory()
         if pill_name not in inventory or inventory[pill_name] <= 0:
-            return False, f"你的背包中没有【{pill_name}】！"
+            return False, f"❌ 你的背包中没有【{pill_name}】！"
 
         # 获取丹药配置
         pill_data = self.config_manager.get_pill_config(pill_name)
         if not pill_data:
-            return False, f"丹药【{pill_name}】配置不存在！"
+            return False, f"❌ 丹药【{pill_name}】配置不存在！"
 
         # 检查境界需求
         required_level = pill_data.get("required_level_index", 0)
@@ -87,7 +87,7 @@ class PillManager:
             level_name = self.config_manager.get_level_name(
                 required_level, player.cultivation_type
             )
-            return False, (f"境界不足！使用【{pill_name}】需要达到【{level_name}】")
+            return False, (f"❌ 境界不足！使用【{pill_name}】需要达到【{level_name}】")
 
         # 根据丹药类型处理
         effect_type = pill_data.get("effect_type", "instant")
@@ -109,7 +109,7 @@ class PillManager:
             # 瞬间效果丹药
             return await self._use_instant_pill(player, pill_name, pill_data)
         else:
-            return False, f"未知的丹药类型：{effect_type}"
+            return False, f"❌ 未知的丹药类型：{effect_type}"
 
     async def _use_exp_pill(
         self, player: Player, pill_name: str, pill_data: dict
@@ -140,7 +140,7 @@ class PillManager:
     ) -> tuple[bool, str]:
         """使用回生丹"""
         if player.has_resurrection_pill:
-            return False, "你已经拥有回生丹效果，无需重复使用！"
+            return False, "❌ 你已经拥有回生丹效果，无需重复使用！"
 
         player.has_resurrection_pill = True
 
@@ -373,7 +373,7 @@ class PillManager:
             gains_applied["突破死亡概率"] = f"降低{(1 - death_mult) * 100:.0f}%"
 
         if not gains_applied:
-            return False, "该丹药的所有属性增益都已达到上限，无法使用！"
+            return False, "❌ 该丹药的所有属性增益都已达到上限，无法使用！"
 
         # 修正属性下限与能量上限
         self._ensure_non_negative_attributes(player)

@@ -188,14 +188,14 @@ class StorageRingManager:
 
             if item_name not in items:
                 txn.abort()
-                return False, f"储物戒中没有【{item_name}】"
+                return False, f"❌ 储物戒中没有【{item_name}】"
 
             current_count = items[item_name]
             if count > current_count:
                 txn.abort()
                 return (
                     False,
-                    f"储物戒中【{item_name}】数量不足（当前：{current_count}个）",
+                    f"❌ 储物戒中【{item_name}】数量不足（当前：{current_count}个）",
                 )
 
             if count >= current_count:
@@ -208,7 +208,10 @@ class StorageRingManager:
 
             capacity = self.get_ring_capacity(player.storage_ring)
             used = self.get_used_slots(player)
-            return True, f"已从储物戒取出【{item_name}】x{count}（{used}/{capacity}格）"
+            return (
+                True,
+                f"✅ 已从储物戒取出【{item_name}】x{count}（{used}/{capacity}格）",
+            )
 
     async def discard_item(
         self, player: Player, item_name: str, count: int = 1
@@ -220,14 +223,14 @@ class StorageRingManager:
 
             if item_name not in items:
                 txn.abort()
-                return False, f"储物戒中没有【{item_name}】"
+                return False, f"❌ 储物戒中没有【{item_name}】"
 
             current_count = items[item_name]
             if count > current_count:
                 txn.abort()
                 return (
                     False,
-                    f"储物戒中【{item_name}】数量不足（当前：{current_count}个）",
+                    f"❌ 储物戒中【{item_name}】数量不足（当前：{current_count}个）",
                 )
 
             if count >= current_count:
@@ -242,7 +245,10 @@ class StorageRingManager:
 
             capacity = self.get_ring_capacity(player.storage_ring)
             used = self.get_used_slots(player)
-            return True, f"已丢弃【{item_name}】x{discard_count}（{used}/{capacity}格）"
+            return (
+                True,
+                f"🗑️ 已丢弃【{item_name}】x{discard_count}（{used}/{capacity}格）",
+            )
 
     def check_upgrade_requirement(
         self, player: Player, new_ring_name: str

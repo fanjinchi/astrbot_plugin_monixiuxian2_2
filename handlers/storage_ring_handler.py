@@ -156,10 +156,8 @@ class StorageRingHandler:
             player, item_name, count
         )
 
-        if success:
-            yield event.plain_result(f"✅ {message}")
-        else:
-            yield event.plain_result(f"❌ {message}")
+        # 服务层自带状态符，handler 裸渲染
+        yield event.plain_result(message)
 
     @player_required
     async def handle_discard_item(
@@ -195,10 +193,8 @@ class StorageRingHandler:
             player, item_name, count
         )
 
-        if success:
-            yield event.plain_result(f"🗑️ {message}")
-        else:
-            yield event.plain_result(f"❌ {message}")
+        # 服务层自带状态符（成功 🗑️/失败 ❌），handler 裸渲染
+        yield event.plain_result(message)
 
     @player_required
     async def handle_gift_item(
@@ -574,7 +570,8 @@ class StorageRingHandler:
             if success:
                 retrieved.append(f"{item_name}×{count}")
             else:
-                failed.append(f"{item_name}：{msg}")
+                # 服务层失败消息自带 ❌，嵌入列表时去重，避免「❌ 失败：· X：❌ …」叠符
+                failed.append(f"{item_name}：{msg.removeprefix('❌ ')}")
 
         lines = [f"=== 批量取出【{category}】 ===\n"]
         if retrieved:

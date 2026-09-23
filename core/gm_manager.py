@@ -868,7 +868,7 @@ class GMManager:
 
         success, msg = await self.equipment_manager.unequip_item(player, slot_or_name)
         if not success:
-            return False, f"❌ 卸下失败：{msg}"
+            return False, f"❌ 卸下失败：{msg.removeprefix('❌ ')}"
 
         # 将卸下的装备存入储物戒
         store_msg = ""
@@ -885,7 +885,7 @@ class GMManager:
 
         return (
             True,
-            f"✅ 已卸下【{player.user_name or target_id}】的 {slot_or_name}：{msg}{store_msg}",
+            f"✅ 已卸下【{player.user_name or target_id}】的 {slot_or_name}：{msg.removeprefix('✅ ')}{store_msg}",
         )
 
     async def cmd_clear_cd(

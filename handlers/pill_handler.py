@@ -61,10 +61,8 @@ class PillHandler:
         # 使用丹药
         success, message = await self.pill_manager.use_pill(player, pill_name)
 
-        if success:
-            yield event.plain_result(message)
-        else:
-            yield event.plain_result(f"❌ {message}")
+        # 服务层自带状态符，handler 裸渲染
+        yield event.plain_result(message)
 
     @player_required
     async def handle_show_pills(self, player: Player, event: AstrMessageEvent):

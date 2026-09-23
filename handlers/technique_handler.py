@@ -98,9 +98,7 @@ class TechniqueHandler:
         ok, msg = await self.skill_manager.set_study_target(player, skill_id, owned_ids)
         if ok:
             await self.db.update_player(player)
-            yield event.plain_result(f"✅ {msg}")
-        else:
-            yield event.plain_result(f"❌ {msg}")
+        yield event.plain_result(msg)
 
     @player_required
     async def handle_show_study_target(self, player: Player, event: AstrMessageEvent):
@@ -122,9 +120,7 @@ class TechniqueHandler:
         ok, msg = self.skill_manager.clear_study_target(player)
         if ok:
             await self.db.update_player(player)
-            yield event.plain_result(f"✅ {msg}")
-        else:
-            yield event.plain_result(f"❌ {msg}")
+        yield event.plain_result(msg)
 
     @player_required
     async def handle_set_battle_report_count(

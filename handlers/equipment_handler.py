@@ -190,9 +190,7 @@ class EquipmentHandler:
             )
             if ok:
                 await self.db.update_player(player)
-                yield event.plain_result(f"✅ {msg}")
-            else:
-                yield event.plain_result(f"❌ {msg}")
+            yield event.plain_result(msg)
             return
 
         # 检查储物戒中是否有该物品
@@ -207,7 +205,9 @@ class EquipmentHandler:
             player, item_name, 1
         )
         if not success:
-            yield event.plain_result(f"❌ 无法从储物戒取出装备：{retrieve_msg}")
+            yield event.plain_result(
+                f"❌ 无法从储物戒取出装备：{retrieve_msg.removeprefix('❌ ')}"
+            )
             return
 
         # 创建Item对象
@@ -241,14 +241,14 @@ class EquipmentHandler:
         if success:
             # 显示属性加成
             attr_display = item.get_attribute_display()
-            result_msg = f"✅ {message}\n━━━━━━━━━━━━━━━\n属性加成：{attr_display}"
+            result_msg = f"{message}\n━━━━━━━━━━━━━━━\n属性加成：{attr_display}"
             yield event.plain_result(result_msg)
         else:
             # 装备失败，将物品放回储物戒
             await self.storage_ring_manager.store_item(
                 player, item_name, 1, silent=True
             )
-            yield event.plain_result(f"❌ {message}")
+            yield event.plain_result(message)
 
     @player_required
     async def handle_unequip_item(
@@ -294,9 +294,9 @@ class EquipmentHandler:
                 else:
                     storage_msg = f"\n⚠️ 存入储物戒失败：{store_msg}"
 
-            yield event.plain_result(f"✅ {message}{storage_msg}")
+            yield event.plain_result(f"{message}{storage_msg}")
         else:
-            yield event.plain_result(f"❌ {message}")
+            yield event.plain_result(message)
 
     def _collect_owned_skill_ids(
         self, player: Player, current_item_name: str

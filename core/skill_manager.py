@@ -498,21 +498,21 @@ class SkillManager:
         - Must not already be learned.
         """
         if skill_id not in owned_skill_ids:
-            return False, "你尚未拥有该功法，无法设为修习目标"
+            return False, "❌ 你尚未拥有该功法，无法设为修习目标"
 
         if await self._is_skill_learned(player, skill_id):
-            return False, "该功法已领悟，无需再修习"
+            return False, "❌ 该功法已领悟，无需再修习"
 
         player.study_target = skill_id
-        return True, f"已将【{self._get_skill_name(skill_id)}】设为修习目标"
+        return True, f"✅ 已将【{self._get_skill_name(skill_id)}】设为修习目标"
 
     def clear_study_target(self, player: Player) -> tuple[bool, str]:
         """Clear the player's study target."""
         if not player.study_target:
-            return False, "当前没有修习目标"
+            return False, "❌ 当前没有修习目标"
         old = player.study_target
         player.study_target = ""
-        return True, f"已取消修习目标【{self._get_skill_name(old)}】"
+        return True, f"✅ 已取消修习目标【{self._get_skill_name(old)}】"
 
     def get_study_target_info(self, player: Player) -> dict:
         """Get study target display info."""
@@ -575,18 +575,18 @@ class SkillManager:
         # Find skill ID by name
         skill_id = self._find_skill_id_by_name(technique_name)
         if skill_id is None:
-            return False, f"未找到功法【{technique_name}】"
+            return False, f"❌ 未找到功法【{technique_name}】"
 
         if not await self._is_skill_learned(player, skill_id):
-            return False, f"功法【{technique_name}】尚未领悟，无法装备"
+            return False, f"❌ 功法【{technique_name}】尚未领悟，无法装备"
 
         techniques_list = player.get_techniques_list()
         max_slots = self._skill_cfg.get("max_technique_slots", 4)
         if len(techniques_list) >= max_slots:
-            return False, f"功法栏已满（最多{max_slots}个），请先卸下其他功法"
+            return False, f"❌ 功法栏已满（最多{max_slots}个），请先卸下其他功法"
 
         if technique_name in techniques_list:
-            return False, f"功法【{technique_name}】已装备"
+            return False, f"❌ 功法【{technique_name}】已装备"
 
         return True, ""
 
