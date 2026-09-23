@@ -32,7 +32,7 @@ db 层保持模型无关（`database_extended` 只依赖 `UserStatus` 枚举）�
 **D3 · R1/R2 实现：锁内复查 + `db.transaction()`。**
 `set_busy`/`clear` 内部 `async with self.db.transaction():`（前置 change 提供，其 design D1 已钉死 abort 契约：abort 只置标记；标记后 clean exit = rollback 不 re-raise）：锁内复查当前 `type == IDLE`（或目标活动态），不满足则 `txn.abort()` 返回失败文案；满足则 `set_user_busy` + 镜像赋值 + 单次提交。race loser 得到"正在X中"报错而非静默覆盖。**注意**：`set_user_busy` 的 SQL upsert 本身不改（`test_user_busy_upsert.py` 保持有效），竞争控制在 owner 侧事务内完成。**行为说明**：R1 改变了并发竞争的结果（修复向），需在更新日志按 bug 修复记录。
 
-**D3.1 · `player_handler.py:318/:348` 两处残留读取的处置**：`:318`（闭关前的 state 复查）装饰器 user_cd 层已等价拦截，属死代码——删除；`:348`（出关时"并未闭关"的 idle 用户应答）是合法流程分支——保留（注意它仍是镜像读取，user_cd 语义可等价改写，实施时顺手改为查 user_cd 更彻底）。`:431-434` 出关"先 commit state、后结算传承"的时序注释在 R2 单事务化后须更新（clear 与传承结算的先后关系不变，但"两次 commit 窗口"的说法失效）。
+**D3.1 · `player_handler.py` 三处 state 基读取的处置**：`:317-320`（闭关前的 state 重复闭关预检"道友已在闭关中"）——"闭关"不在 `BUSY_STATE_ALLOWED_COMMANDS`，装饰器 user_cd 层必先拦截，属死代码，**删除**；`:348-351`（出关时"并未闭关"的 idle 用户应答）是合法流程分支——保留（注意它仍是镜像读取，user_cd 语义可等价改写，实施时顺手改为查 user_cd 更彻底，见 tasks 3.3）；弃道重修 `:607-610`（state 基"只有处于空闲状态"冗余检查）——user_cd 基守卫收编后属第二层冗余，**删除**（D4）。`:431-434` 出关"先 commit state、后结算传承"的时序注释在 R2 单事务化后须更新（clear 与传承结算的先后关系不变，但"两次 commit 窗口"的说法失效）。**16 处账目的 player_handler 两个名额** = `:321-324`（闭关 user_cd 基预检）+ `:601-604`（弃道重修 user_cd 基守卫）——前者保留为快速路径改 `assert_idle` 传专属模板，race 兜底由 set_busy 锁内复查承担（默认文案仅 race 窗口可见；set_busy 无 template 参数，2026-09-23 评审定案）。
 
 **D4 · R3-(ii) 读侧：装饰器删第二层，守卫保留文案。**
 `player_required`（`utils.py:102-123`）删除 `player.state == "修炼中"` 分支——镜像由 owner 单写后，user_cd 是唯一真相，第二层是纯冗余（它存在的历史意义就是糊漂移）。16 处守卫换成 `BusyState.assert_idle(user_id)`（返回 `str | None`），各站点传入自己的原文案模板或接受默认——**文案逐字不变**，平台用例锚点不受影响。注意 sect 共 9 处：5 个入口（`:433,448,459,469,481`）共享一个 `_get_busy_message`（:421-427），收编 helper 即覆盖这 5 点；另有 4 处直连守卫（:292 建宗、:303 入宗、:314 退宗、:336 捐献）需逐站收编。manager 层 6 处重复守卫同法收编。弃道重修（`:601-611`）有两条守卫消息：user_cd 基（:604）与 state 基（:607）——收编时保留 :604 的专属文案，state 基冗余检查随 D3.1 同法删除。
@@ -47,6 +47,7 @@ db 层保持模型无关（`database_extended` 只依赖 `UserStatus` 枚举）�
 - [R1 的报错时机变化：race loser 从"静默进入活动"变"收到忙碌报错"] → 修复向行为，更新日志记录；functional_tests 相关用例重跑确认。
 - [`update_player` 与 owner 写镜像同块时的字段覆盖] → R2 后双写在同一事务同一内存对象上，无跨对象竞争。
 - [decorator 删第二层的残留假设：某 handler 依赖 state 字符串判断] → 已全量 grep（探索报告 §1），6 处 Python 读取 + 1 处 SQL WHERE，全为忙碌检查，且 :318/:348/弃道重修的处置已在 D3.1/D4 明确；tasks 中逐项核对。
+- [删第二层 + 删 :317-320 后，遗留脏数据的可见行为变化（2026-09-23 评审补）] → 已验证 :317-320 今天是死代码（"闭关"不在白名单，装饰器必先拦截）；删除后，遗留脏数据（`state="修炼中"` 且 `user_cd=IDLE`，历史漂移产物）玩家发「闭关」会从"拦截（道友已在闭关中）"变"放行并重新闭关"（旧脏状态被正确双写覆盖）。**接受该变化**：自愈语义、非破坏——写侧天然联动（adventure/rift 开始路径不 `update_player`，结束路径落库"空闲"，同类漂移本来就靠后续活动自愈），user_cd 是唯一真相后脏镜像不再影响正确性。更新日志注明。
 
 ## Migration Plan
 
