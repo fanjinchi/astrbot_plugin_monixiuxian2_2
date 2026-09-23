@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.17.5
+> **版本:** v3.17.6
 > **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -305,6 +305,13 @@ astrbot_plugin_monixiuxian2_2/
 ## 📝 更新日志
 
 ---
+
+### v3.17.6 - 悬赏消息状态符统一由 manager 负责
+
+**🔧 修复**
+
+- **悬赏失败双 ❌ / 双 ✅**：`/完成悬赏` 进度不足时输出「❌ ❌ 任务尚未完成」、成功时「✅ ✅ 悬赏完成」，因 manager 消息自带状态符又与全局 handler 前缀重叠；现状态符（❌/✅/⚠️/🎯）统一由 `BountyManager` 自带，handler（全局/宗门两个入口）直接渲染，两条入口表现一致
+- **宗门悬赏入口部分提示裸文本**：「没有进行中的悬赏」「任务已超时」「已有进行中悬赏」等失败提示此前在宗门入口无状态符，现补齐 ❌
 
 ### v3.17.5 - 忙碌状态统一 owner（BusyState）
 

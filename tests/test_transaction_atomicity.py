@@ -1504,7 +1504,7 @@ async def test_abandon_bounty_rolls_back_when_cooldown_write_fails(db, monkeypat
 
 @pytest.mark.asyncio
 async def test_abandon_bounty_commits_cancel_and_cooldown_together(db, monkeypatch):
-    """S10 success path: cancel + 30-minute cooldown commit as one unit, text unchanged."""
+    """S10 success path: cancel + 30-minute cooldown commit as one unit (message carries its own ✅)."""
     uid = "u1"
     mgr = BountyManager(db)
     await _make_player(db, gold=0)
@@ -1517,7 +1517,7 @@ async def test_abandon_bounty_commits_cancel_and_cooldown_together(db, monkeypat
     ok, msg = await mgr.abandon_bounty(await db.get_player_by_id(uid))
 
     assert ok
-    assert msg == "已放弃悬赏：后山巡视\n⚠️ 30分钟内无法接取新悬赏"
+    assert msg == "✅ 已放弃悬赏：后山巡视\n⚠️ 30分钟内无法接取新悬赏"
     assert await db.ext.get_active_bounty(uid) is None  # status=0
     cooldown = await db.ext.get_system_config(f"bounty_abandon_cd_{uid}")
     assert cooldown is not None and int(cooldown) > time.time()

@@ -49,9 +49,9 @@ class BountyHandlers:
             yield event.plain_result("❌ 请指定悬赏编号，例如：/接取悬赏 1")
             return
 
-        success, msg = await self.bounty_mgr.accept_bounty(player, bounty_id)
-        prefix = "✅" if success else "❌"
-        yield event.plain_result(f"{prefix} {msg}")
+        # manager 消息自带 ❌/✅/⚠️ 状态符（宗门入口直接渲染同一份消息），此处不再加前缀
+        _, msg = await self.bounty_mgr.accept_bounty(player, bounty_id)
+        yield event.plain_result(msg)
 
     @player_required
     async def handle_bounty_status(self, player: Player, event: AstrMessageEvent):
@@ -62,13 +62,13 @@ class BountyHandlers:
     @player_required
     async def handle_complete_bounty(self, player: Player, event: AstrMessageEvent):
         """完成悬赏"""
-        success, msg = await self.bounty_mgr.complete_bounty(player)
-        prefix = "✅" if success else "❌"
-        yield event.plain_result(f"{prefix} {msg}")
+        # manager 消息自带 ❌/✅ 状态符，此处直接渲染，避免 "❌ ❌"/"✅ ✅"
+        _, msg = await self.bounty_mgr.complete_bounty(player)
+        yield event.plain_result(msg)
 
     @player_required
     async def handle_abandon_bounty(self, player: Player, event: AstrMessageEvent):
         """放弃悬赏"""
-        success, msg = await self.bounty_mgr.abandon_bounty(player)
-        prefix = "✅" if success else "❌"
-        yield event.plain_result(f"{prefix} {msg}")
+        # manager 消息自带 ❌/✅ 状态符，此处直接渲染，避免与宗门入口表现不一致
+        _, msg = await self.bounty_mgr.abandon_bounty(player)
+        yield event.plain_result(msg)

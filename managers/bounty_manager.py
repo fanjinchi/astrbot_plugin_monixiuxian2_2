@@ -276,13 +276,11 @@ class BountyManager:
         if is_sect is None:
             # 模板已从配置移除时不阻断，避免玩家悬赏卡死
             return None
+        # 两个入口的 handler 都直接渲染 manager 消息、不补前缀，❌ 一律由本方法自带
         if scope == "sect" and not is_sect:
-            # 宗门入口直接渲染消息（自带 ❌），全局入口由 handler 统一加 ❌ 前缀，勿重复
             return f"❌ 你当前进行中的悬赏为公共悬赏，请使用 /{global_action} 操作。"
         if scope == "global" and is_sect:
-            return (
-                f"你当前进行中的悬赏为宗门悬赏，请使用 /宗门 悬赏 {sect_action} 操作。"
-            )
+            return f"❌ 你当前进行中的悬赏为宗门悬赏，请使用 /宗门 悬赏 {sect_action} 操作。"
         return None
 
     # -------- 接取与状态 --------
@@ -296,11 +294,11 @@ class BountyManager:
         类型/归属校验先于缓存与冷却检查，保证两个入口的分流提示确定可见。
         """
         if bounty_id <= 0:
-            return False, "无效的悬赏编号。"
+            return False, "❌ 无效的悬赏编号。"
 
         template = self.templates_by_id.get(bounty_id)
         if not template:
-            return False, "该悬赏已失效，请刷新列表。"
+            return False, "❌ 该悬赏已失效，请刷新列表。"
 
         # 入口分流校验（先于缓存/冷却检查，确保提示确定）
         template_sect = template.get("sect_id")
@@ -311,8 +309,7 @@ class BountyManager:
             if faction_id != template_sect:
                 return False, "❌ 该悬赏为其他宗门的专属委托，仅面向其门下弟子发布。"
         elif template_sect:
-            # 全局 handler 失败时统一加 ❌ 前缀，此处不内联，避免出现 "❌ ❌"
-            return False, "该悬赏为宗门专属委托，请发送 /宗门 悬赏 查看与接取。"
+            return False, "❌ 该悬赏为宗门专属委托，请发送 /宗门 悬赏 查看与接取。"
 
         diff_key = template.get("difficulty", "easy")
         self.difficulties.get(diff_key, {})
@@ -334,7 +331,7 @@ class BountyManager:
                 txn.abort()
                 return (
                     False,
-                    f"你已有进行中的悬赏：{active['bounty_name']}，请先完成或放弃。",
+                    f"❌ 你已有进行中的悬赏：{active['bounty_name']}，请先完成或放弃。",
                 )
 
             cd_key = f"bounty_abandon_cd_{player.user_id}"
@@ -346,7 +343,7 @@ class BountyManager:
                     remaining = (cd_time - now) // 60 or 1
                     return (
                         False,
-                        f"你刚放弃过悬赏，还需等待 {remaining} 分钟才能再次接取。",
+                        f"❌ 你刚放弃过悬赏，还需等待 {remaining} 分钟才能再次接取。",
                     )
 
             expire_time = now + time_limit
@@ -442,7 +439,7 @@ class BountyManager:
             active = await self.db.ext.get_active_bounty(player.user_id)
             if not active:
                 txn.abort()
-                return False, "你当前没有进行中的悬赏任务。"
+                return False, "❌ 你当前没有进行中的悬赏任务。"
 
             mismatch = self._scope_mismatch_message(
                 self._active_bounty_is_sect(active),
@@ -460,7 +457,7 @@ class BountyManager:
                     "UPDATE bounty_tasks SET status = 0 WHERE user_id = ? AND status = 1",
                     (player.user_id,),
                 )
-                return False, "悬赏任务已超时，自动取消。"
+                return False, "❌ 悬赏任务已超时，自动取消。"
 
             progress = active.get("current_progress", 0)
             target = active.get("target_count", 1)
@@ -533,7 +530,7 @@ class BountyManager:
         """Cancel the active bounty and set a 30-minute re-accept cooldown in system_config (scope 分流：跨类型引导到对方入口)。"""
         active = await self.db.ext.get_active_bounty(player.user_id)
         if not active:
-            return False, "你当前没有进行中的悬赏任务。"
+            return False, "❌ 你当前没有进行中的悬赏任务。"
 
         mismatch = self._scope_mismatch_message(
             self._active_bounty_is_sect(active),
@@ -552,7 +549,7 @@ class BountyManager:
             await self.db.ext.set_system_config(
                 f"bounty_abandon_cd_{player.user_id}", str(abandon_cooldown)
             )
-        return True, f"已放弃悬赏：{active['bounty_name']}\n⚠️ 30分钟内无法接取新悬赏"
+        return True, f"✅ 已放弃悬赏：{active['bounty_name']}\n⚠️ 30分钟内无法接取新悬赏"
 
     # -------- 进度与奖励 --------
 
