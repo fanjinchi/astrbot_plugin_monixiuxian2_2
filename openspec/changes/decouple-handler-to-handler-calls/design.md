@@ -29,7 +29,7 @@
 - 备选 A：保留方法于 `RankingHandlers`，`SectHandlers` 注入 `rank_mgr` 直调 manager。—— 拒绝：方法的唯一调用语境就是宗门分发器，留在 `RankingHandlers` 会让「宗门排行」知识继续跨文件，且 `RankingHandlers` 文档/帮助文本（`handlers/misc_handler.py:120`「宗门排行与贡献排行见『宗门 排行』」）已视其为宗门功能。
 - 备选 B：把两方法下沉为 `RankingManager` 的文本方法。—— 拒绝：超出纯重构切面，触碰 Non-Goal；manager 返回 `(success, msg)` 的现状签名已够用。
 
-**D2 · `SectHandlers.__init__` 用 `rank_mgr=None` 替换 `rank_handlers=None` 回填参，保留「排行功能不可用」降级。**
+**D2 · `SectHandlers.__init__` 用 `rank_mgr=None` 替换 `ranking_handlers=None` 注入参，保留「排行功能不可用」降级。**
 `main.py` 装配段已先构造 `rank_mgr`（`_wire_core_services()` 内 `main.py:333-338`，经返回字典挂载为 `self.rank_mgr`），`:414-420` 构造 `SectHandlers` 时把现有入参 `ranking_handlers=ranking_handlers`（`:418`，composition-root 由旧回填改建）替换为 `rank_mgr=rank_mgr` 即可（busy-state 已合入的 `busy_state=busy_state` 入参并存不动）。`rank_mgr=None` 时 `_sub_rank*` 输出与现状相同的「❌ 排行功能不可用！」（现有测试 `:168,:301,:328,:354,:380` 等构造点不传该参，保持通过）。
 
 **D3 · 悬赏共享入口落为 `bounty_handlers.py` 模块级无状态函数，而非 `BountyHandlers` 实例方法或 `BountyManager` 方法。**

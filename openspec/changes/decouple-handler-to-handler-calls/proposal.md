@@ -10,7 +10,7 @@
 ## What Changes
 
 - 确立规则：**handlers 永不调 handlers**（生成器转发或实例注入均不允许）；跨 handler 的复用一律下沉为「manager 直调」或「handler 模块级无状态函数」。
-- 把 `handle_rank_sect` / `handle_rank_sect_contribution` 从 `RankingHandlers` 移入 `SectHandlers`（其唯一调用者），内部直调 `RankingManager.get_sect_ranking()` / `get_contribution_ranking()`；`SectHandlers.__init__` 的 `ranking_handlers=None` 回填参数替换为 `rank_mgr=None`（保留「❌ 排行功能不可用！」降级文案，行为与现状一致），装配段构造调用点（`main.py:414-420`）的 `ranking_handlers=ranking_handlers` 入参（`:418`）同步改为 `rank_mgr=rank_mgr`（原 `main.py:349-350` 回填语句及其注释 `:340` 已随 composition-root 删除）。
+- 把 `handle_rank_sect` / `handle_rank_sect_contribution` 从 `RankingHandlers` 移入 `SectHandlers`（其唯一调用者），内部直调 `RankingManager.get_sect_ranking()` / `get_contribution_ranking()`；`SectHandlers.__init__` 的 `ranking_handlers=None` 注入参数替换为 `rank_mgr=None`（保留「❌ 排行功能不可用！」降级文案，行为与现状一致），装配段构造调用点（`main.py:414-420`）的 `ranking_handlers=ranking_handlers` 入参（`:418`）同步改为 `rank_mgr=rank_mgr`（原 `main.py:349-350` 回填语句及其注释 `:340` 已随 composition-root 删除）。
 - `handlers/bounty_handlers.py` 暴露模块级文本型复用入口（`format_bounty_entry(b)` / `render_bounty_list(bounty_mgr, player, scope)` / `render_bounty_action(bounty_mgr, player, action, args, scope)`），全局路由方法与宗门 `_sub_bounty` 共用同一份解析/排版实现；各自入口的差异化文案（标题/footer/空态提示/编号用法示例）由 `scope` 参数在共享函数内部分支，保证逐字不变。
 - 纯行为保持重构：所有用户可见文案、输出文本、成功/失败语义与现状逐字一致；不触碰 `BountyManager` / `RankingManager` 业务方法。
 
