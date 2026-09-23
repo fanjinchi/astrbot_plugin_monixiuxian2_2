@@ -34,9 +34,9 @@
 
 **D3 · 悬赏共享入口落为 `bounty_handlers.py` 模块级无状态函数，而非 `BountyHandlers` 实例方法或 `BountyManager` 方法。**
 三函数形态：
-- `format_bounty_entry(b: dict) -> str`：条目多行排版（两入口逐字相同的 `_format` 块）。
+- `format_bounty_entry(b: dict) -> str`：条目多行排版（两入口逐字相同的 `_format` 块）。**独立成函数的理由**：去重后虽仅 `render_bounty_list` 一个调用点，但条目渲染是高复杂度展示块（多行拼装），且未来入口（如 GM 查看）可能复用；内联会让 list 编排函数混两种抽象层级——按 AGENTS.md「无必要不抽 helper」的**复杂度例外**成立。
 - `render_bounty_list(bounty_mgr, player, scope) -> str`：列表编排，按 `scope` 分支标题（`📜 悬赏令 · 今日委托` / `🏯 宗门悬赏 · 本宗委托`）、footer（`/接取悬赏 <编号>` / `/宗门 悬赏 接取 <编号>` 用法行）与空态行为（全局无空态早退、宗门空列表输出「本宗当前无可接取的宗门悬赏」块）。
-- `render_bounty_action(bounty_mgr, player, action, args, scope) -> str | None`：接取（含编号解析；编号缺失提示按 `scope` 给「/接取悬赏 1」或「/宗门 悬赏 接取 307」示例）/进度/完成/放弃；返回 `None` 表示 `action` 非以上四值，由宗门调用点输出其特有的「未识别的悬赏操作」提示（全局无此路径，不新增）。`✅/❌` 前缀差异不进共享函数：全局薄委托方法保留前缀包装，宗门调用点保持无前缀，逐字保持现状。
+- `render_bounty_action(bounty_mgr, player, action, args: list[str], scope) -> tuple[bool, str] | None`：接取（含编号解析与防御——编号缺失/非数字/<=0 统一回 `scope` 分支编号提示，与现状逐字一致；`args` 收**字符串列表**）/进度/完成/放弃；返回 `None` 表示 `action` 未识别（全局无此路径，不新增；宗门调用点输出其特有「未识别的悬赏操作」提示）。**返回 `(success, msg)` 元组**（2026-09-23 评审修正，原 `str | None` 与下条前缀约定矛盾）：`✅/❌` 前缀差异不进共享函数——全局薄委托方法按 `success` 自行加前缀（`f"{'✅' if success else '❌'} {msg}"`），宗门调用点保持无前缀只输出 `msg`，逐字保持现状。
 - 备选 A：挂在 `BountyHandlers` 实例上由 `SectHandlers` 注入调用。—— 拒绝：会以另一种形式重建本变更要消除的 handler→handler 实例依赖。
 - 备选 B：下沉到 `BountyManager`。—— 拒绝：manager 已按 Non-Goal 冻结；且排版（帮助性 header/footer）属 handler 层呈现职责，与既有「manager 返回业务 msg、handler 负责版面」的分工一致。
 
