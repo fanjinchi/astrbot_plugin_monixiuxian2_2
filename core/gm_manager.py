@@ -53,7 +53,7 @@ except ImportError:
 if TYPE_CHECKING:
     from astrbot.api.event import AstrMessageEvent
 
-    from ..core import EquipmentManager, StorageRingManager
+    from ..core import BusyState, EquipmentManager, StorageRingManager
 
 
 # 日志文件大小阈值：500 MB
@@ -144,7 +144,8 @@ class GMManager:
         broadcast_callback=None,
         sect_manager=None,
         impart_manager=None,
-        busy_state=None,
+        *,
+        busy_state: "BusyState",
     ):
         self.db = db
         self.config_manager = config_manager

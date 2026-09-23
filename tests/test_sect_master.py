@@ -3,7 +3,7 @@
 import pytest
 import pytest_asyncio
 
-from tests.helpers import load_module, load_package_module
+from tests.helpers import load_module, load_package_module, make_busy_state
 
 _migration_mod = load_module("migration_sect_master_test", "data/migration.py")
 MigrationManager = _migration_mod.MigrationManager
@@ -173,7 +173,7 @@ async def _join(db, mgr, user_id: str, sect_name: str, level_index: int = 1, gol
 @pytest.mark.asyncio
 async def test_chain_matched_by_level_range(db):
     """A member sees the chain matching their level range; others see none."""
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
 
     await _join(db, mgr, "u1", "青云门", level_index=1)
@@ -200,7 +200,7 @@ async def test_chain_matched_by_level_range(db):
 @pytest.mark.asyncio
 async def test_player_sect_has_no_master_chain(db):
     """Player-built sects (no faction) have no master tasks."""
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _make_player(db, "owner", level_index=5, gold=20000)
     success, _ = await mgr.create_sect("owner", "太一宗")
@@ -218,7 +218,7 @@ async def test_player_sect_has_no_master_chain(db):
 @pytest.mark.asyncio
 async def test_win_pve_progress_and_stage_settlement(db):
     """win_pve events advance the stage; reaching count settles it."""
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "青云门", level_index=1)
 
@@ -259,7 +259,7 @@ async def test_win_pve_progress_and_stage_settlement(db):
 @pytest.mark.asyncio
 async def test_breakthrough_stage_survives_level_range_exit(db):
     """An in-progress chain still settles after breakthrough leaves its range."""
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "青云门", level_index=2)
 
@@ -298,7 +298,7 @@ async def test_breakthrough_stage_survives_level_range_exit(db):
 async def test_donate_progress_counts_stone_amount(db):
     """The donate stage advances by the donated stone amount, then the chain
     continues with the win_pve stage (mirrors the two-stage chain_hx_01)."""
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "合欢宗", level_index=3, gold=2000)
 
@@ -357,7 +357,7 @@ async def test_donate_progress_counts_stone_amount(db):
 @pytest.mark.asyncio
 async def test_skill_learn_chance_grants_sect_skill(db):
     """skill_learn_chance draws a pool skill with sect attribution."""
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "青云门", level_index=1)
 
@@ -385,7 +385,7 @@ async def test_skill_learn_chance_grants_sect_skill(db):
 @pytest.mark.asyncio
 async def test_skill_learn_chance_star_up_and_max_star_compensation(db):
     """Duplicate draws star up; max-star duplicates convert to exp."""
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "青云门", level_index=1)
 
@@ -429,7 +429,7 @@ async def test_skill_grant_failure_keeps_stage_unsettled_and_retryable(db, monke
     """M7: when the skill grant fails, the stage is NOT settled — no
     contribution/exp is granted, stored progress is kept, and the next
     matching event retries the settlement."""
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "青云门", level_index=1)
 
@@ -475,7 +475,7 @@ async def test_skill_grant_failure_keeps_stage_unsettled_and_retryable(db, monke
 async def test_max_star_compensation_not_overwritten_by_stage_settlement(db):
     """M7: stage settlement after a max-star duplicate draw keeps the atomic
     exp compensation granted by learn_or_star_up (player is re-read first)."""
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "青云门", level_index=1)
 
@@ -506,7 +506,7 @@ async def test_master_settlement_rolls_back_skill_when_progress_write_fails(
     """Settlement is one transaction: when the final progress write fails,
     the skill grant and rewards roll back too (no split state), and the
     retry grants the skill exactly once."""
-    mgr = SectManager(db, FakeConfigManager())
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
     await _join(db, mgr, "u1", "青云门", level_index=1)
 

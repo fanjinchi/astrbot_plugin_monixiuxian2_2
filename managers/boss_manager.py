@@ -18,7 +18,7 @@ from astrbot.api import logger
 
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
-    from ..core import StorageRingManager
+    from ..core import BusyState, StorageRingManager
     from ..data.data_manager import DataBase
 
 
@@ -179,7 +179,8 @@ class BossManager:
         combat_mgr: CombatManager,
         config_manager: ConfigManager | None = None,
         storage_ring_manager: StorageRingManager | None = None,
-        busy_state=None,
+        *,
+        busy_state: BusyState,
     ):
         self.db = db
         self.engine = getattr(combat_mgr, "engine", combat_mgr)

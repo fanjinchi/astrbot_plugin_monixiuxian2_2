@@ -22,7 +22,7 @@
 
 - [x] 3.1 `handlers/utils.py:116-123`：删除 `player_required` 的 `player.state == "修炼中"` 第二层检查（user_cd 成为唯一真相；两层共用同一 `BUSY_STATE_ALLOWED_COMMANDS`，白名单语义不变）；docstring 更新
 - [x] 3.2 16 处手抄守卫改 `assert_idle`，**文案逐字保留**：sect ×9——5 入口经共享 helper `_get_busy_message`（调用点 :433,448,459,469,481，helper :421-427，收编 helper 即覆盖这 5 点）+ 4 处直连守卫需逐站收编（:292 建宗、:303 入宗、:314 退宗、:336 捐献，文案同 helper 体）、combat ×4、alchemy ×1、player_handler ×2 = **:321-324（闭关 user_cd 基预检"❌ 道友当前正{status}，无法闭关修炼！"，保留为快速路径，改 `assert_idle` 传专属模板）+ :601-604（弃道重修 user_cd 基"❌ 你当前正在「{status}」，无法弃道重修。"，同法收编）**——race 兜底由 set_busy 锁内复查承担（其失败文案为默认模板，仅 race 窗口可见，可接受；set_busy 不加 template 参数）。**清单外处置项（不计入 16，勿混入）**：:317-320（state 基"已在闭关中"重复预检，死代码——"闭关"不在 `BUSY_STATE_ALLOWED_COMMANDS`，装饰器 user_cd 层必先拦截，直接删除）、:607-610（弃道重修 state 基冗余检查，随 D3.1 同法删除）、:348-351（出关 state 基预检，tasks 3.3 已列改写为 user_cd 基）
-- [x] 3.3 `handlers/player_handler.py:348`（出关 idle 应答）保留流程分支，实现改为查 user_cd（user_cd 语义等价改写，顺手去掉最后一个镜像读取）；manager 层 6 处重复守卫（adventure:198、rift:281、alchemy:154、dual_cultivation:203,224、boss:403）同法收编
+- [x] 3.3 `handlers/player_handler.py:348`（出关 idle 应答）保留流程分支，实现改为查 user_cd（user_cd 语义等价改写，顺手去掉最后一个镜像读取）；manager 层 6 处重复守卫（adventure:198、rift:281、alchemy:154、dual_cultivation:203,224、boss:403）同法收编。**落地偏离补记（2026-09-23 实施评审定案）**：出关预检最终保留 `or player.state == "修炼中"` 镜像兜底，未去掉镜像读取——理由是改前该预检就是 state 基，兜底使漂移数据玩家（state=修炼中 且 user_cd=IDLE/无行）保持改前行为（可出关结算=自愈，与 design Risks 脏数据条目的自愈口径一致）；纯 user_cd 判定反而对这类玩家造成"正在闭关却说无需出关"的新可见回归。读侧其余位置仍只信 user_cd（本兜底是唯一的镜像读取保留点）
 - [x] 3.4 测试更新：`test_gm_manager.py`——`:377-389` 双重置断言形状变化（从"set_user_free/update_player 各调一次"变为断言 `busy_state.clear` 被调用，**fixture 需注入 busy_state** 桩）；装饰器相关测试；全量 pytest 绿
 
 ## 4. 文档与收尾

@@ -374,6 +374,12 @@ class TestClearCD:
 
     @pytest.mark.asyncio
     async def test_clear_cd_success(self, gm_manager, mock_db):
+        """清除成功：断言形状 = busy_state.clear 为唯一清除入口（tasks 3.4）。
+
+        fixture 注入真 BusyState 包 mock db；对 clear 打 spy（wraps 保留真实
+        行为），并保留 set_user_free/update_player 的落库断言验证 owner 内部
+        确实完成了双层复位。
+        """
         player = make_player()
         player.state = "历练中"
         mock_db.get_player_by_id.return_value = player
@@ -382,13 +388,63 @@ class TestClearCD:
         user_cd.type = 2  # ADVENTURING
         mock_db.ext.get_user_cd.return_value = user_cd
 
+        clear_spy = AsyncMock(wraps=gm_manager.busy_state.clear)
+        gm_manager.busy_state.clear = clear_spy
+
         event = make_event(sender_id="gm_001")
         success, msg = await gm_manager.cmd_clear_cd(event, "12345 确认")
 
         assert success is True
         assert player.state == "空闲"
+        clear_spy.assert_awaited_once()
         mock_db.ext.set_user_free.assert_awaited_once()
         mock_db.update_player.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_clear_cd_dual_write_in_single_transaction(
+        self, gm_real_db, real_db
+    ):
+        """R2：set_user_free 与 update_player 必须落在同一次 CM 事务内。
+
+        参考 test_transaction_atomicity 的 _txn_depth 口径：写执行瞬间
+        depth > 0 证明写被 CM 拥有（裸 DML 本身 in_transaction 也为真，
+        depth 才是所有权信号）；调用结束后事务须干净退出、无残留。
+        """
+        await real_db.conn.execute(
+            "INSERT INTO players (user_id, user_name, state, cultivation_start_time) "
+            "VALUES ('54321', '忙碌道友', '历练中', 0)"
+        )
+        await real_db.conn.commit()
+        await real_db.ext.set_user_busy("54321", 2, 3600)  # ADVENTURING
+
+        depths: list[tuple[str, int]] = []
+        original_free = real_db.ext.set_user_free
+        original_update = real_db.update_player
+
+        async def spy_free(user_id):
+            await original_free(user_id)
+            depths.append(("set_user_free", real_db.conn._txn_depth))
+
+        async def spy_update(player):
+            await original_update(player)
+            depths.append(("update_player", real_db.conn._txn_depth))
+
+        real_db.ext.set_user_free = spy_free
+        real_db.update_player = spy_update
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_real_db.cmd_clear_cd(event, "54321 确认")
+
+        assert success is True
+        assert sorted(name for name, _ in depths) == [
+            "set_user_free",
+            "update_player",
+        ]
+        assert all(depth > 0 for _, depth in depths)
+        assert real_db.conn._txn_depth == 0
+        assert real_db.conn.in_transaction is False
+        cd = await real_db.ext.get_user_cd("54321")
+        assert cd.type == 0  # IDLE
 
 
 class TestAuditLog:

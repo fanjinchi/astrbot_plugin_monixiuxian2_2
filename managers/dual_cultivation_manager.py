@@ -1,13 +1,18 @@
 """双修系统管理器"""
 
+from __future__ import annotations
+
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from astrbot.api import logger
 
 from ..core.cultivation_manager import CultivationManager
 from ..data import DataBase
 from ..models import Player
+
+if TYPE_CHECKING:
+    from ..core.busy_state import BusyState
 
 __all__ = ["DualCultivationManager"]
 
@@ -27,6 +32,7 @@ class DualCultivationManager:
         config_manager: Any,
         *,
         cultivation_manager: CultivationManager,
+        busy_state: BusyState,
     ):
         """Initialize the dual-cultivation manager.
 
@@ -36,11 +42,14 @@ class DualCultivationManager:
             config_manager: Plugin ConfigManager for game_config access.
             cultivation_manager: Shared CultivationManager instance for spiritual-root
                 speed lookups (assembly-injected; not constructed here).
+            busy_state: Busy-state owner for read-side guards (assembly-injected;
+                mandatory — a missing collaborator must fail at construction).
         """
         self.db = db
         self.config = config
         self.config_manager = config_manager
         self._cultivation_manager = cultivation_manager
+        self.busy_state = busy_state
 
     def _get_k_hours(self) -> int:
         """Return the fixed dual-cultivation duration in hours."""

@@ -915,6 +915,7 @@ def _make_dual_manager(db: DataBase) -> DualCultivationManager:
         cultivation_manager=_cultivation_mod.CultivationManager(
             {"VALUES": {"BASE_EXP_PER_MINUTE": 100}}, config_manager, None
         ),
+        busy_state=make_busy_state(db),
     )
 
 

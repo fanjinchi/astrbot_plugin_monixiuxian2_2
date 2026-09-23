@@ -385,7 +385,9 @@ def test_is_sect_bound_item():
 async def test_donate_uses_configured_scale_ratio():
     """Donation converts stones to sect scale via configured scale_ratio."""
     db = await _make_db()
-    mgr = SectManager(db, FakeConfigManager(scale_ratio=20))
+    mgr = SectManager(
+        db, FakeConfigManager(scale_ratio=20), busy_state=make_busy_state(db)
+    )
     await mgr.ensure_system_sects()
 
     await _make_player(db, "u1", level_index=2, gold=1000)

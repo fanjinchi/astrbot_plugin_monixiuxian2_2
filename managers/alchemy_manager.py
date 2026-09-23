@@ -10,7 +10,7 @@ from ..data.data_manager import DataBase
 
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
-    from ..core import StorageRingManager
+    from ..core import BusyState, StorageRingManager
 
 
 class AlchemyManager:
@@ -21,7 +21,8 @@ class AlchemyManager:
         db: DataBase,
         config_manager: "ConfigManager" = None,
         storage_ring_manager: "StorageRingManager" = None,
-        busy_state=None,
+        *,
+        busy_state: "BusyState",
     ):
         self.db = db
         self.config_manager = config_manager

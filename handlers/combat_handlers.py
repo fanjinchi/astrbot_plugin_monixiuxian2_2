@@ -1,6 +1,7 @@
 # handlers/combat_handlers.py
 import re
 import time
+from typing import TYPE_CHECKING
 
 from astrbot.api.all import *
 from astrbot.api.event import AstrMessageEvent
@@ -8,6 +9,9 @@ from astrbot.api.event import AstrMessageEvent
 from ..data.data_manager import DataBase
 from ..managers.combat_manager import CombatManager
 from ..models import Player
+
+if TYPE_CHECKING:
+    from ..core.busy_state import BusyState
 
 # 战斗冷却配置（秒）
 DUEL_COOLDOWN = 300  # 决斗冷却5分钟
@@ -22,7 +26,8 @@ class CombatHandlers:
         db: DataBase,
         combat_mgr: CombatManager,
         config_manager=None,
-        busy_state=None,
+        *,
+        busy_state: "BusyState",
     ):
         self.db = db
         self.combat_mgr = combat_mgr

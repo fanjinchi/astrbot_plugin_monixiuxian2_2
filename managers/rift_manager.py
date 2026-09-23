@@ -87,7 +87,7 @@ except ImportError:
     CheckResult = _rpm.CheckResult
 
 if TYPE_CHECKING:
-    from ..core import StorageRingManager
+    from ..core import BusyState, StorageRingManager
 
 # 谜题作答形式提示（按谜题族；invalid 输入不耗次数，design D3）
 _PUZZLE_ANSWER_FORM_HINTS = {
@@ -138,7 +138,8 @@ class RiftManager:
         pve_combat_mgr: PVECombatManager = None,
         encounter_store: "EncounterStore | None" = None,
         impart_mgr=None,
-        busy_state=None,
+        *,
+        busy_state: "BusyState",
     ):
         self.db = db
         self.config_manager = config_manager

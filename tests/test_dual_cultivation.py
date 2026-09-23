@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from tests.helpers import load_package_module
+from tests.helpers import load_package_module, make_busy_state
 
 _models_mod = load_package_module("models.py", "astrbot_plugin_monixiuxian2_2.models")
 Player = _models_mod.Player
@@ -57,6 +57,7 @@ def manager(fake_db, fake_config, fake_config_manager):
         cultivation_manager=CultivationManager(
             fake_config, fake_config_manager, None
         ),
+        busy_state=make_busy_state(fake_db),
     )
 
 

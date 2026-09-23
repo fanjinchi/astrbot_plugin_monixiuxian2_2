@@ -298,7 +298,9 @@ async def test_sect_entry_navigation_and_unknown_subcommand():
     """无参数与未知子命令均输出导航帮助；带唤醒前缀也能正确解析。"""
     db = await _make_db()
     mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
-    handlers = SectHandlers(db, mgr, bounty_mgr=MagicMock())
+    handlers = SectHandlers(
+        db, mgr, bounty_mgr=MagicMock(), busy_state=make_busy_state(db)
+    )
     await _make_player(db, "n1")
 
     event = _make_event("n1", "宗门")
@@ -323,7 +325,9 @@ async def test_sect_entry_missing_arg_usage_hints():
     """缺参子命令输出各自用法示例。"""
     db = await _make_db()
     mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
-    handlers = SectHandlers(db, mgr, bounty_mgr=MagicMock())
+    handlers = SectHandlers(
+        db, mgr, bounty_mgr=MagicMock(), busy_state=make_busy_state(db)
+    )
     await _make_player(db, "n2")
 
     event = _make_event("n2", "宗门 捐献")
@@ -347,7 +351,9 @@ async def test_sect_entry_membership_gates():
     db = await _make_db()
     mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
-    handlers = SectHandlers(db, mgr, bounty_mgr=MagicMock())
+    handlers = SectHandlers(
+        db, mgr, bounty_mgr=MagicMock(), busy_state=make_busy_state(db)
+    )
     await _make_player(db, "n3")
 
     event = _make_event("n3", "宗门 悬赏")
@@ -371,7 +377,9 @@ async def test_sect_entry_busy_player_blocked():
     db = await _make_db()
     mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
     await mgr.ensure_system_sects()
-    handlers = SectHandlers(db, mgr, bounty_mgr=MagicMock())
+    handlers = SectHandlers(
+        db, mgr, bounty_mgr=MagicMock(), busy_state=make_busy_state(db)
+    )
     await _make_player(db, "n4")
     success, msg = await mgr.join_sect("n4", "青云门")
     assert success, msg

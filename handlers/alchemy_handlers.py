@@ -1,14 +1,24 @@
 # handlers/alchemy_handlers.py
+from typing import TYPE_CHECKING
+
 from astrbot.api.event import AstrMessageEvent
 
 from ..data.data_manager import DataBase
 from ..managers.alchemy_manager import AlchemyManager
 
+if TYPE_CHECKING:
+    from ..core.busy_state import BusyState
+
 
 class AlchemyHandlers:
     """Handlers for alchemy (炼丹) commands: recipe list and pill crafting."""
 
-    def __init__(self, db: DataBase, alchemy_mgr: AlchemyManager, busy_state=None):
+    def __init__(
+        self,
+        db: DataBase,
+        alchemy_mgr: AlchemyManager,
+        busy_state: "BusyState",
+    ):
         self.db = db
         self.alchemy_mgr = alchemy_mgr
         self.busy_state = busy_state

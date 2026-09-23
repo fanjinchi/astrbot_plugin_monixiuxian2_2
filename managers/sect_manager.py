@@ -7,6 +7,7 @@
 import json
 import random
 import time
+from typing import TYPE_CHECKING
 
 from astrbot.api import logger
 
@@ -14,6 +15,9 @@ from ..data.data_manager import DataBase
 from ..models import Player
 from ..models_extended import Sect, UserStatus
 from ..utils.narrative_text import render_narrative
+
+if TYPE_CHECKING:
+    from ..core.busy_state import BusyState
 
 SECT_NAME_MIN_LENGTH = 2
 SECT_NAME_MAX_LENGTH = 12
@@ -33,7 +37,7 @@ class SectManager:
         *,
         impart_mgr=None,
         pve_combat_mgr=None,
-        busy_state=None,
+        busy_state: "BusyState",
     ):
         self.db = db
         self.config_manager = config_manager

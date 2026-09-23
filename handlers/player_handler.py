@@ -7,7 +7,13 @@ from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent
 
 from ..config_manager import ConfigManager
-from ..core import CultivationManager, EquipmentManager, PillManager, SkillManager
+from ..core import (
+    BusyState,
+    CultivationManager,
+    EquipmentManager,
+    PillManager,
+    SkillManager,
+)
 from ..data import DataBase
 from ..managers.impart_manager import ImpartManager
 from ..models import Player
@@ -40,7 +46,7 @@ class PlayerHandler:
         pill_manager: PillManager,
         equipment_manager: EquipmentManager,
         impart_mgr: ImpartManager,
-        busy_state=None,
+        busy_state: BusyState,
     ):
         self.db = db
         self.config = config
@@ -332,12 +338,14 @@ class PlayerHandler:
             ok, race_msg = await self.busy_state.set_busy(
                 player, UserStatus.CULTIVATING
             )
-            if not ok:
-                # race loser：锁内复检失败，set_busy 已标记 abort——本层退出时整体
-                # 回滚（无异常再抛出），玩家收到当前状态文案
-                yield event.plain_result(race_msg)
-                return
-            await self.db.update_player(player)
+            if ok:
+                await self.db.update_player(player)
+        # race loser：锁内复检失败，set_busy 已标记 abort——退出时整体回滚
+        # （无异常再抛出）。消息在事务块外发送：BEGIN IMMEDIATE 写锁不跨 yield
+        # （项目约束「CM 块内不跨 yield」，锁窗口最小化）。
+        if not ok:
+            yield event.plain_result(race_msg)
+            return
 
         yield event.plain_result(
             self._render_narrative(
@@ -351,8 +359,11 @@ class PlayerHandler:
     @player_required
     async def handle_end_cultivation(self, player: Player, event: AstrMessageEvent):
         """处理出关指令"""
-        # 检查是否在闭关中：user_cd 是唯一真相；镜像兜底 legacy 玩家
-        # （旧版本仅写 player.state="修炼中"、无 user_cd 行，出关仍需放行，design D3.1）
+        # 检查是否在闭关中：user_cd 是唯一真相；另保留 state=="修炼中" 镜像兜底——
+        # 有意为之的 legacy 兼容（依据 design Risks 脏数据条目：改前本预检就是
+        # state 基，兜底对漂移数据（state=修炼中 且无/闲 user_cd 行）保持改前行为，
+        # 出关结算即自愈；纯 user_cd 判定反而会对这类玩家造成"正在闭关却说无需
+        # 出关"的新回归）。读侧其余位置仍只信 user_cd。
         user_cd = await self.db.ext.get_user_cd(player.user_id)
         in_cultivation = (
             user_cd is not None and user_cd.type == UserStatus.CULTIVATING
@@ -461,16 +472,19 @@ class PlayerHandler:
         # clear 内部 CM 同任务嵌套 join，本层统一提交；任一写失败整体回滚，
         # 不会出现 user_cd 已复位而 player 行未落库的半套状态）
         player.cultivation_start_time = 0
+        settle_error = None
         async with self.db.transaction():
             try:
                 await self.busy_state.clear(player)
                 await self.db.update_player(player)
             except Exception as exc:
                 logger.exception("出关状态收尾失败: %s", exc)
-                yield event.plain_result(
-                    "⚠️ 出关状态更新失败，请稍后再试（本次闭关未消耗）。"
-                )
-                return
+                settle_error = "⚠️ 出关状态更新失败，请稍后再试（本次闭关未消耗）。"
+        # 消息在事务块外发送：写锁不跨 yield（「CM 块内不跨 yield」约束），
+        # 块内异常已由 __aexit__ 回滚后传播到上面的 except，事务不会半提交。
+        if settle_error:
+            yield event.plain_result(settle_error)
+            return
 
         # 传承值累积（后结算：失败仅日志，不阻塞出关完成）
         if self.impart_mgr is not None and effective_minutes >= every_minutes:

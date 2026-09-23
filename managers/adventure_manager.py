@@ -74,7 +74,7 @@ except ImportError:
     KIND_LEGACY = _es.KIND_LEGACY
 
 if TYPE_CHECKING:
-    from ..core import StorageRingManager
+    from ..core import BusyState, StorageRingManager
 
 
 class AdventureManager:
@@ -98,7 +98,8 @@ class AdventureManager:
         impart_mgr=None,
         config_manager=None,
         encounter_store=None,
-        busy_state=None,
+        *,
+        busy_state: "BusyState",
     ):
         self.db = db
         self.storage_ring_manager = storage_ring_manager

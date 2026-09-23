@@ -1,4 +1,6 @@
 # handlers/sect_handlers.py
+from typing import TYPE_CHECKING
+
 from astrbot.api.all import *
 from astrbot.api.event import AstrMessageEvent
 
@@ -7,6 +9,9 @@ from ..managers.bounty_manager import BountyManager
 from ..managers.sect_manager import SectManager
 from ..models import Player
 from .utils import player_required
+
+if TYPE_CHECKING:
+    from ..core.busy_state import BusyState
 
 
 class SectHandlers:
@@ -28,7 +33,8 @@ class SectHandlers:
         sect_mgr: SectManager,
         bounty_mgr: BountyManager | None = None,
         ranking_handlers=None,
-        busy_state=None,
+        *,
+        busy_state: "BusyState",
     ):
         self.db = db
         self.sect_mgr = sect_mgr
