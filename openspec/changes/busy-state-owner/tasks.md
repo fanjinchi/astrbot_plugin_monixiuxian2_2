@@ -2,7 +2,7 @@
 
 ## 0. 前置检查
 
-- [ ] 0.1 确认 `add-transaction-unit-of-work` 已合入（`DataBase.transaction()` 可用，abort 契约按其 design D1）；未合入则本 change 挂起。**契约核对**：合入后 diff 实际落地的 `transaction()`/`txn.abort()` 语义与提案 D1 契约（幂等标记、clean exit 走 rollback 不 re-raise、TxnState 随 owner 退出丢弃）是否一致，如有偏差以代码为准并同步修正本 change 的引用——不能照提案文本读。**注意：其合入会移动本 change 引用的行号（尤其 sect_manager 块），实施前按当时代码重新锚定所有行号引用**
+- [x] 0.1 确认 `add-transaction-unit-of-work` 已合入（`DataBase.transaction()` 可用，abort 契约按其 design D1）；未合入则本 change 挂起。**契约核对**：合入后 diff 实际落地的 `transaction()`/`txn.abort()` 语义与提案 D1 契约（幂等标记、clean exit 走 rollback 不 re-raise、TxnState 随 owner 退出丢弃）是否一致，如有偏差以代码为准并同步修正本 change 的引用——不能照提案文本读。**注意：其合入会移动本 change 引用的行号（尤其 sect_manager 块），实施前按当时代码重新锚定所有行号引用**
 
 ## 1. owner 核心（core/busy_state.py）
 
@@ -12,7 +12,7 @@
 
 ## 2. 写侧改道（5 文件）
 
-- [ ] 2.1 `handlers/player_handler.py:330-333`（闭关）/`:447-458`（出关）改道 `BusyState.set_busy/clear`——R2 双写并入单事务。**机制定案（2026-09-23，原"或"二选一已定）**：**owner 只改内存对象（player.state 镜像 + user_cd），不落库；调用方把待持久化的 player 字段（`cultivation_start_time` 等）与 owner 调用排在**同一个** `async with self.db.transaction():` 内，owner 内部 CM no-op join，调用方在 owner 调用后、同一事务内 `update_player(player)`**——不得留在事务外形成第二次提交。调用形态示例：①闭关——`async with db.transaction(): ok, msg = busy.set_busy(player, CULTIVATING); player.cultivation_start_time = now; await db.update_player(player)`；②出关——`async with db.transaction(): busy.clear(player); player.cultivation_start_time = 0; await db.update_player(player)`（传承结算保持在事务外、clear 之后，先后关系不变）；③GM `cmd_clear_cd`——预检保持原样，写段 `async with db.transaction(): busy.clear(player); await db.update_player(player)`；**更新 `:431-434` 的时序注释**（两次 commit 窗口已消失，clear 与传承结算的先后关系保持）
+- [ ] 2.1 `handlers/player_handler.py:330-333`（闭关）/`:447-458`（出关）改道 `BusyState.set_busy/clear`——R2 双写并入单事务。**机制定案（2026-09-23，原"或"二选一已定）**：**owner 只改内存对象（player.state 镜像 + user_cd），不落库；调用方把待持久化的 player 字段（`cultivation_start_time` 等）与 owner 调用排在**同一个** `async with self.db.transaction():` 内，owner 内部 CM no-op join，调用方在 owner 调用后、同一事务内 `update_player(player)`**——不得留在事务外形成第二次提交。调用形态示例：①闭关——`async with db.transaction(): ok, msg = busy.set_busy(player, CULTIVATING); if not ok: yield event.plain_result(msg); return; player.cultivation_start_time = now; await db.update_player(player)`——**失败分支必须在任何后续写之前 return**：owner 内部 `txn.abort()` 置标记后，同一事务块内的后续写会在 clean exit 被静默回滚（abort 契约），`if not ok` 放 `update_player` 之前即为防此坑；②出关——`async with db.transaction(): busy.clear(player); player.cultivation_start_time = 0; await db.update_player(player)`（传承结算保持在事务外、clear 之后，先后关系不变）；③GM `cmd_clear_cd`——预检保持原样，写段 `async with db.transaction(): busy.clear(player); await db.update_player(player)`；**更新 `:431-434` 的时序注释**（两次 commit 窗口已消失，clear 与传承结算的先后关系保持）
 - [ ] 2.2 `managers/adventure_manager.py:222-224/:314`、`managers/rift_manager.py:305-307/:401/:465` 改道（顺带收编两 manager 的手抄守卫 :198/:281 到 assert_idle）
 - [ ] 2.3 `managers/sect_manager.py:919-921` 改道 `set_cooldown`（SECT_TASK 冷却语义）；`:858-862` 到期判定逻辑不动
 - [ ] 2.4 `core/gm_manager.py:912-914` / `:1249-1251` 手动双重置改 `clear(player)`；`:997/:1071` force-settle 的 `update_user_cd`（仅 bump `scheduled_time`，非常态忙碌写入）保持直连，在 owner docstring 里注明此例外。⚠ `:1249-1251` 已在 `fix-two-stage-commit-atomicity`（S9）的 CM 内（`core/gm_manager.py:1245`）：`clear(player)` 必须留在该 CM 块内，否则该处退回两段提交。**附带升级（2026-09-23 评审补）**：`:912-914` 的 `cmd_clear_cd` 现状是裸两段写（不在任何事务内，仅 clear-all 在 CM 内），改道后自动从非原子变原子（R2 隐性收益，非行为回归）；更新日志按 bug 修复记录
@@ -29,5 +29,5 @@
 
 - [ ] 4.1 `CONTEXT.md` **替换/落实** `BusyState` 预留条目（文件由 add-transaction-unit-of-work 创建时已含预留占位）：定义、双语义 API、seam 位置
 - [ ] 4.2 AGENTS.md §2 双层检查条目改写：义务由 BusyState 承接（新增活动系统 = 调 `set_busy`），不再要求"两处手动同步"
-- [ ] 4.3 functional_tests 守卫相关用例重跑（R1 报错时机变化；文案未动预期全过）；更新日志按 bug 修复记录 R1/R2
+- [ ] 4.3 functional_tests 守卫相关用例重跑（R1 报错时机变化；文案未动预期全过）；更新日志按 bug 修复记录 R1/R2 **以及遗留脏数据放行变化**（删装饰器第二层后，`state="修炼中"` 且 `user_cd=IDLE` 的历史漂移玩家发「闭关」从拦截变放行——design Risks 新条目，2026-09-23 评审补）
 - [ ] 4.4 用 `bd` 登记：后续 (b) 阶段 spike（外部消费者审计：webtest 平台/fixture/用例 JSON 对 `players.state` 的读取——含 `scripts/test_suite_ctl.py` fixture 直写点）、文案统一内容任务、**SECT_TASK 到期不自动复位的预存怪癖**（design D2 脚注）；`openspec validate --changes busy-state-owner` 通过；conventional commit
