@@ -7,7 +7,7 @@
 ## What Changes
 
 - `CombatResult` 重构：删除 `winner: str`，新增 `winner_side: Literal["fighter1", "fighter2", "draw"]`（权威判定）与 `winner_id: str | None`（便捷字段，平局为 `None`；引擎持有 FighterState，成本为零）。纯重构，**战斗行为、战报文本、胜负口径逐位不变**。
-- 运行时调用点全部改查询/显式比较，删除前缀解析与 isinstance 防御：`managers/pve_combat_manager.py`（`_calculate_rewards` :236、`_format_combat_result` :274、`trigger_pve_combat` legacy dict :357、`challenge_rift_beast` :412-413、`challenge_legacy_guardian` :467-468）、`managers/boss_manager.py:432,480,513`、`managers/impart_pk_manager.py:115,119`、`CombatManager.player_vs_player` legacy dict（`combat_manager.py:1518`）。
+- 运行时调用点全部改查询/显式比较，删除前缀解析与 isinstance 防御：`managers/pve_combat_manager.py`（`_calculate_rewards` :236、`_format_combat_result` :274、`trigger_pve_combat` legacy dict :357、`challenge_rift_beast` :412-413、`challenge_legacy_guardian` :467-468）、`managers/boss_manager.py:433,481,514`、`managers/impart_pk_manager.py:115,119`、`CombatManager.player_vs_player` legacy dict（`combat_manager.py:1518`）。
 - `design_docs/attribute-growth/` 下 4 个直接加载引擎且读取 `result.winner` 的模拟脚本（`sim_route_matchup.py`、`sweep_route_growth.py`、`sim_balance_regression.py`、`sim_xiuxian_turns.py`；`rebalance_equipment.py` 调用引擎但不读 winner，不受影响）的 `result.winner` 读取同步改 `winner_side`（数值输出不变，保证校准留档可复现）。
 - 构造 `CombatResult(...)` 或断言 `result.winner` 的测试（`test_combat_engine.py`、`test_combat_report_structure.py`、`test_trigger_effect_extensions.py`、`test_rift_encounters.py:486` 桩、`test_boss.py`、`test_pve_combat.py`）随字段改名更新。
 

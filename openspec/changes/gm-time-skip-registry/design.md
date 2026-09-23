@@ -4,7 +4,7 @@
 
 现状的三份事实：
 1. `_TIME_SKIP_RULES`（`core/gm_manager.py:68-122`）是 10 条 `(域标签, 参数化 UPDATE SQL)` 的手工元组，`:62-67` 注释自认设计出处（archive `2026-09-01-gm-test-time-and-rng-controls` design D2 显式枚举）并自带维护约束（「新增等待类冷却域时必须同步补充本清单与 GM 帮助文本」，与 AGENTS.md §2 :77 互为手抄）。
-2. 消费方仅两处：`cmd_time_skip` 循环（:1200-1203，秒数按 `?` 计数填充，逐域 `rowcount` 进回复）与间接的 GM 帮助文案（:428-429 人工概述，无域枚举——帮助从未列出域清单，漂移面是「概述与清单语义脱节」而非文本副本）。
+2. 消费方仅两处：`cmd_time_skip` 循环（:1209-1212，秒数按 `?` 计数填充，逐域 `rowcount` 进回复）与间接的 GM 帮助文案（:431-432 人工概述，无域枚举——帮助从未列出域清单，漂移面是「概述与清单语义脱节」而非文本副本）。
 3. spec 已把枚举清单写成契约：`openspec/specs/gm-commands/spec.md`「GM 时间快进」需求「覆盖清单**至少包含**」10 项域——枚举是需求级保证，不能随机制一并删去。
 
 字段归属：10 条 SQL 横跨 user_cd/players（player_handler 闭关、user_cd 忙碌）、combat_cooldowns（切磋决斗）、dual_cultivation、bounty_tasks + system_config 放弃冷却键（BountyManager）、bank_loans（BankManager）、boss/spirit_eye 刷新键（boss_manager/spirit_eye_manager）、impart_pk_cooldown / impart_snatch_protection（impart 域）。知识今天全部背井离乡。
@@ -13,7 +13,7 @@
 
 **Goals:**
 - 覆盖清单从「gm_manager 内手工元组 + 文档义务」反转为「字段属主模块声明 + 装配期汇总」：新增冷却域 = 在属主模块加一个常量，自动获得快进覆盖；忘记声明被 registry 测试钉住的最小清单断言 fail fast 捕获（而非冷却类测试隐性超时）。
-- `cmd_time_skip` 语义逐行保持：事务全有或全无（现为 :1199 的 `db.transaction()` CM，原手写 `BEGIN IMMEDIATE` 已收编）、逐域计数、回复格式、确认约定、秒数校验、sleep 边界声明。
+- `cmd_time_skip` 语义逐行保持：事务全有或全无（现为 :1208 的 `db.transaction()` CM，原手写 `BEGIN IMMEDIATE` 已收编）、逐域计数、回复格式、确认约定、秒数校验、sleep 边界声明。
 - GM 帮助的时间快进条目列出实际覆盖域（生成自注册表），既有警示文案保持代码所有、逐字不变。
 - spec 契约升级：枚举清单由「机制描述」转为「注册表 MUST 覆盖的保证」。
 
@@ -35,13 +35,13 @@ SQL 已是 `table.column + WHERE 条件` 的精确编码（含 `system_config` T
 零新增构造参数（装配器 import 属主模块读常量），与 `composition-root` 的注入惯例不冲突——provider 列表是声明式数据而非服务依赖；composition-root 落地后无需返工。
 
 **D4 · GM 帮助自动化的边界：域列表生成，警示文案代码所有。**
-`cmd_help` 时间快进条目（:428-429）拆为「代码持有警示句（不可逆/不唤醒睡眠任务/贷款逾期警告，逐字不变）+ 生成段（覆盖域：标签 joined）」。帮助场景契约（「GM 测试命令安全边界」之「帮助文本列出测试命令」）要求列出用法说明——生成段是加法，不触碰该场景断言。
+`cmd_help` 时间快进条目（:431-432）拆为「代码持有警示句（不可逆/不唤醒睡眠任务/贷款逾期警告，逐字不变）+ 生成段（覆盖域：标签 joined）」。帮助场景契约（「GM 测试命令安全边界」之「帮助文本列出测试命令」）要求列出用法说明——生成段是加法，不触碰该场景断言。
 
 **D5 · spec 采用 Modified Capability（不设 skip_specs）。**
 「GM 时间快进」需求正文内嵌了被替换的机制（「明确枚举」），且枚举清单本身是需求级保证——两者都要在 delta 中处理：机制句改为注册表描述，枚举清单保留并升级为「注册表 MUST 覆盖以下最小清单」。其余需求（帮助/审计/清除全部冷却等）行为不受影响，不修改。
 
 **D6 · 实施顺序：建议后于 `add-transaction-unit-of-work`（软依赖）。**
-其 tasks 3.3 已把 `core/gm_manager.py:1199` 的手写 `BEGIN IMMEDIATE` 改为事务 CM（`add-transaction-unit-of-work`，2026-09-19 归档）——与本 change 的循环块同一区域。本 change 直接在 CM 形态上改数据源即可，无 rebase 负担。
+其 tasks 3.3 已把 `core/gm_manager.py:1208` 的手写 `BEGIN IMMEDIATE` 改为事务 CM（`add-transaction-unit-of-work`，2026-09-19 归档）——与本 change 的循环块同一区域。本 change 直接在 CM 形态上改数据源即可，无 rebase 负担。
 
 ## Risks / Trade-offs
 
