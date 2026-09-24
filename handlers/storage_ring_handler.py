@@ -152,7 +152,7 @@ class StorageRingHandler:
             return
 
         # 取出物品
-        success, message = await self.storage_ring_manager.retrieve_item(
+        message = await self.storage_ring_manager.retrieve_item(
             player, item_name, count
         )
 
@@ -189,9 +189,7 @@ class StorageRingHandler:
             return
 
         # 丢弃物品
-        success, message = await self.storage_ring_manager.discard_item(
-            player, item_name, count
-        )
+        message = await self.storage_ring_manager.discard_item(player, item_name, count)
 
         # 服务层自带状态符（成功 🗑️/失败 ❌），handler 裸渲染
         yield event.plain_result(message)

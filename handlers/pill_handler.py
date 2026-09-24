@@ -59,7 +59,7 @@ class PillHandler:
         await self.pill_manager.update_temporary_effects(player)
 
         # 使用丹药
-        success, message = await self.pill_manager.use_pill(player, pill_name)
+        message = await self.pill_manager.use_pill(player, pill_name)
 
         # 服务层自带状态符，handler 裸渲染
         yield event.plain_result(message)

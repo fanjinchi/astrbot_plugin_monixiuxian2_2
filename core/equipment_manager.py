@@ -223,10 +223,11 @@ class EquipmentManager:
         Returns:
             (是否成功, 消息)
         """
-        # 检查境界要求
+        # 检查境界要求（返回裸文本，无状态符）
         can_equip, error_msg = self.check_equipment_level_requirement(player, item)
         if not can_equip:
-            return False, f"❌ {error_msg}"
+            # check_equipment_level_requirement 目前返回裸文本，removeprefix 为防御性去重
+            return False, f"❌ {error_msg.removeprefix('❌ ')}"
 
         # 根据物品类型装备到相应位置
         if item.item_type == "weapon":
