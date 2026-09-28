@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.17.8
+> **版本:** v3.17.9
 > **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -305,6 +305,12 @@ astrbot_plugin_monixiuxian2_2/
 ## 📝 更新日志
 
 ---
+
+### v3.17.9 - 修复服用丹药/取出/丢弃物品消息渲染为元组的回归
+
+**🔧 修复**
+
+- **消息元组直渲染**：v3.17.8 收尾清理误删三处 handler 的 `(success, msg)` 解包，导致 `/服用丹药`、`/取出物品`、`/丢弃物品` 把 `(True, '✅ …')` 形态的元组字符串直接发给玩家；已恢复解包（`_, message = ...`），并新增 `tests/test_handler_tuple_rendering.py` 三条精确渲染断言锁住契约，防止同类回归穿透质量门
 
 ### v3.17.8 - 状态符归属收敛：装备/功法/丹药/储物戒域迁移至服务层自带状态符
 

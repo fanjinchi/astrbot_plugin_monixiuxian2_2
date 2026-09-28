@@ -58,8 +58,8 @@ class PillHandler:
         # 先更新临时效果（移除过期的）
         await self.pill_manager.update_temporary_effects(player)
 
-        # 使用丹药
-        message = await self.pill_manager.use_pill(player, pill_name)
+        # 使用丹药（返回 (success, msg) 元组，handler 只渲染 msg）
+        _, message = await self.pill_manager.use_pill(player, pill_name)
 
         # 服务层自带状态符，handler 裸渲染
         yield event.plain_result(message)

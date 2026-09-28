@@ -151,8 +151,8 @@ class StorageRingHandler:
             yield event.plain_result("数量必须大于0")
             return
 
-        # 取出物品
-        message = await self.storage_ring_manager.retrieve_item(
+        # 取出物品（返回 (success, msg) 元组，handler 只渲染 msg）
+        _, message = await self.storage_ring_manager.retrieve_item(
             player, item_name, count
         )
 
@@ -188,8 +188,10 @@ class StorageRingHandler:
             yield event.plain_result("数量必须大于0")
             return
 
-        # 丢弃物品
-        message = await self.storage_ring_manager.discard_item(player, item_name, count)
+        # 丢弃物品（返回 (success, msg) 元组，handler 只渲染 msg）
+        _, message = await self.storage_ring_manager.discard_item(
+            player, item_name, count
+        )
 
         # 服务层自带状态符（成功 🗑️/失败 ❌），handler 裸渲染
         yield event.plain_result(message)
