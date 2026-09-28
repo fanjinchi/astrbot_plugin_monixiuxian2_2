@@ -1,0 +1,151 @@
+{
+  "total": 17,
+  "passed": 17,
+  "failed": [],
+  "errors": [],
+  "runs": [
+    {
+      "case_name": "sect-adventure-event-marker",
+      "run_id": 782,
+      "status": "passed",
+      "started_at": 1790595223.7862399,
+      "finished_at": 1790595226.4235659,
+      "evidence": {
+        "round_header": 24
+      }
+    },
+    {
+      "case_name": "sect-bounty-lifecycle",
+      "run_id": 783,
+      "status": "passed",
+      "started_at": 1790595226.822721,
+      "finished_at": 1790595231.3758633,
+      "evidence": {
+        "round_header": 66
+      }
+    },
+    {
+      "case_name": "sect-bounty-split",
+      "run_id": 784,
+      "status": "passed",
+      "started_at": 1790595231.8771484,
+      "finished_at": 1790595235.7577343,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-command-entry",
+      "run_id": 785,
+      "status": "passed",
+      "started_at": 1790595235.9194312,
+      "finished_at": 1790595237.270779,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-construction",
+      "run_id": 786,
+      "status": "passed",
+      "started_at": 1790595237.4562314,
+      "finished_at": 1790595239.765114,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-content-filter",
+      "run_id": 787,
+      "status": "passed",
+      "started_at": 1790595239.9973605,
+      "finished_at": 1790595251.9473963,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-default-visible",
+      "run_id": 788,
+      "status": "passed",
+      "started_at": 1790595252.0669384,
+      "finished_at": 1790595255.0767474,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-gm-set-contribution",
+      "run_id": 789,
+      "status": "passed",
+      "started_at": 1790595255.326145,
+      "finished_at": 1790595257.327267,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-gm-set-position",
+      "run_id": 790,
+      "status": "passed",
+      "started_at": 1790595257.3598278,
+      "finished_at": 1790595259.6496155,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-join-level-gate",
+      "run_id": 791,
+      "status": "passed",
+      "started_at": 1790595259.8936622,
+      "finished_at": 1790595261.8752885,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-leave-reclaim",
+      "run_id": 792,
+      "status": "passed",
+      "started_at": 1790595261.9274135,
+      "finished_at": 1790595263.580815,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-master-chain-gm",
+      "run_id": 793,
+      "status": "passed",
+      "started_at": 1790595263.9538207,
+      "finished_at": 1790595267.517055,
+      "evidence": {
+        "lifesteal_prose": 2,
+        "round_header": 16
+      }
+    },
+    {
+      "case_name": "sect-master-task-chain",
+      "run_id": 794,
+      "status": "passed",
+      "started_at": 1790595267.9914565,
+      "finished_at": 1790595271.2413056,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-promotion",
+      "run_id": 795,
+      "status": "passed",
+      "started_at": 1790595271.5293412,
+      "finished_at": 1790595273.2002473,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-rejoin-retain",
+      "run_id": 796,
+      "status": "passed",
+      "started_at": 1790595273.5646768,
+      "finished_at": 1790595275.2373712,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-shop-discount",
+      "run_id": 797,
+      "status": "passed",
+      "started_at": 1790595275.5993228,
+      "finished_at": 1790595277.2685535,
+      "evidence": {}
+    },
+    {
+      "case_name": "sect-shop",
+      "run_id": 798,
+      "status": "passed",
+      "started_at": 1790595277.6320658,
+      "finished_at": 1790595279.939899,
+      "evidence": {}
+    }
+  ]
+}
