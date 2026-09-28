@@ -53,12 +53,12 @@
 | `PillHandler` | 服用丹药/丹药背包/丹药信息 | → `core/PillManager` |
 | `ShopHandler` | 丹阁/器阁/百宝阁/购买/物品信息 | 含 `parse_qty` 数量解析；购买结算读宗门职阶折扣 |
 | `StorageRingHandler` | 储物戒/取出/丢弃/赠予/接收/拒绝/更换储物戒/搜索物品/取出所有 | → `core/StorageRingManager`；手动存入已禁用；赠予拦截宗门绑定物 |
-| `SectHandlers` | 「宗门」单入口 `handle_sect_entry` 子命令分发（信息/列表/创建/加入/退出/捐献/任务/丹房/建设/镇派功法/晋升/宝库/师承/商店/悬赏/排行/贡献排行 + 管理类 踢出/传位/职位） | 原 18 个宗门顶层指令已删除，子命令自行解析消息文本；悬赏子命令组经 core/bounty_render 共享函数委托 BountyManager（排行/贡献排行直调 RankingManager，构造注入 `rank_mgr`）；商店子命令组委托 SectManager |
+| `SectHandlers` | 「宗门」单入口 `handle_sect_entry` 子命令分发（信息/列表/创建/加入/退出/捐献/任务/丹房/建设/镇派功法/晋升/宝库/师承/商店/悬赏/排行/贡献排行 + 管理类 踢出/传位/职位） | 原 18 个宗门顶层指令已删除，子命令自行解析消息文本；悬赏子命令组经 handlers/bounty_handlers 模块级共享函数委托 BountyManager（排行/贡献排行直调 RankingManager，构造注入 `rank_mgr`）；商店子命令组委托 SectManager |
 | `CombatHandlers` | 切磋/决斗 | `_get_target_id` 解析 @提及/数字目标；各自冷却 |
 | `BossHandlers` | 世界Boss/挑战Boss/生成Boss | 挑战走 `BossManager.challenge_boss` |
 | `RiftHandlers` | 秘境列表/探索秘境（子命令分发：数字ID进入/破阵 <答案>/传承；迎战由 main.py 拦截直调 manager）/完成探索/退出秘境 | |
 | `AdventureHandlers` | 历练信息/开始历练/完成历练/历练状态 | |
-| `BountyHandlers` | 悬赏令/接取/状态/完成/放弃悬赏 | 全部薄委托，渲染与编号防御统一走 core/bounty_render 共享函数（`scope='global'`）；宗门专属悬赏走「宗门 悬赏」子命令组（scope='sect'）；两路行为由共享函数保持同位素一致） |
+| `BountyHandlers` | 悬赏令/接取/状态/完成/放弃悬赏 | 全部薄委托，渲染与编号防御统一走 handlers/bounty_handlers 模块级共享函数（`scope='global'`）；宗门专属悬赏走「宗门 悬赏」子命令组（scope='sect'）；两路行为由共享函数保持同位素一致 |
 | `AlchemyHandlers` | 丹药配方/炼丹 | |
 | `BankHandlers` | 银行/存取/利息/贷款/还款/流水/突破贷款 | |
 | `BlessedLandHandlers` | 我的洞天/购买/升级/洞天收取 | |
@@ -66,7 +66,7 @@
 | `SpiritEyeHandlers` | 灵眼信息/抢占/收取/释放 | |
 | `DualCultivationHandlers` | 双修/接受双修/拒绝双修 | |
 | `ImpartHandlers` / `ImpartPkHandlers` | 传承信息 / 激活传承 / 传承挑战/传承排行 | |
-| `RankingHandlers` | 境界/战力/灵石/宗门/存款/贡献排行 | |
+| `RankingHandlers` | 境界/战力/灵石/存款排行 | |
 | `NicknameHandler` | 改道号 | |
 | `GMHandler` | 修仙GM/修仙GM帮助 | 统一入口 → `core/GMManager.dispatch` |
 | `MiscHandler` | 修仙帮助 | 帮助文本也在此处维护 |
@@ -105,7 +105,6 @@
 | `StorageRingManager` | `store_item` / `retrieve_item` / `discard_item` / `upgrade_ring` / `has_item` / `is_sect_bound_item` | 储物戒存取（事务保护，每物品占 1 格）；**所有物品发放的统一入口**；`is_sect_bound_item` 识别宗门绑定物（treasure/sect_bound/sect_id）供赠予拦截 |
 | `ShopManager` | `generate_shop_items` / `should_refresh_shop` / `get_item_details` / `get_sect_shop_discount` / 三阁展示方法 | 商店刷新（库存+折扣）、丹阁/器阁/百宝阁展示；`get_sect_shop_discount` 读宗门职阶 benefits.shop_discount |
 | `GMManager` | `dispatch` / `cmd_set_*` / `cmd_give_*` / `cmd_force_adventure|rift` / `cmd_force_rift_puzzle|beast|legacy` / `cmd_advance_master` / `cmd_clear_cd` / `cmd_clear_bounty` / `cmd_clear_all_cooldowns` / `cmd_time_skip` / `cmd_seed` / `cmd_spawn_boss` | GM 子命令分发（目标解析 @提及→数字id→发送者；触发秘境谜题/妖兽/传承用 `single_token_is_target=True` 使单数字 token 视为目标）；全操作写审计日志（500MB 滚动）；`cmd_set_mp/atk/mental_power` 为废弃属性别名；`设置贡献/设置职位` 写宗门字段；`师承推进`（战斗/历练/突破/捐献）确定性推进师承链；`清除悬赏` 清进行中悬赏+放弃冷却（供测试环境重置悬赏状态）；强制结算与正常流程一致追加师承链推进并清除历练休整冷却；测试工具三件套：`时间快进` 按 `_TIME_SKIP_RULES` 枚举全库前移到期判定时间戳（不可逆，需「确认」）、`清除全部冷却` 按玩家归零全部冷却（既有清除命令并集）、`随机种子` 注入/重置全局 `random.seed`（进程级、不持久化） |
-| `bounty_render.py` | `format_bounty_entry` / `render_bounty_list(bounty_mgr, player, scope)` / `render_bounty_action(bounty_mgr, player, action, args: list[str], scope)` | 悬赏渲染共享函数三件套：条目格式化、列表渲染、操作委托（编号缺失/非数字/<=0 按 scope 两套防御文案；action 未识别返回 None，调用方自行提示）——全局「悬赏令」与宗门「悬赏」子命令组共用，行为同位素（decouple-handler-to-handler-calls） |
 | `EncounterStore`（encounter_store.py） | `pend` / `get_active` / `consume` | 秘境/历练遭遇的内存 pending 表（每玩家 puzzle/beast/legacy 各一，惰性过期、同类覆盖刷新；热重载丢失零惩罚）；main.py 装配单例注入 RiftManager/AdventureManager |
 | `RiftPuzzleManager`（rift_puzzle_manager.py） | `generate` / `RiftPuzzle.check` | 古阵谜题纯逻辑引擎：谜题族注册表随机抽取（五行破阵/洛书数阵/灵龟辨窟），三态校验（正确/错误/非法形式不耗次），无 IO 可单测 |
 | （`breakthrough_fortune.py`） | 模块级函数 | 突破运势文案 |

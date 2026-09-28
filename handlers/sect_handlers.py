@@ -35,7 +35,7 @@ class SectHandlers:
         bounty_mgr: BountyManager | None = None,
         *,
         busy_state: "BusyState",
-        rank_mgr=None,
+        rank_mgr: "RankingManager | None" = None,
     ):
         self.db = db
         self.sect_mgr = sect_mgr

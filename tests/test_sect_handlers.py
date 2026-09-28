@@ -52,7 +52,9 @@ SectHandlers = _sect_handlers_mod.SectHandlers
 
 # player_handler does ``from ..core import ...``; load the real core package
 # __init__ first so the names resolve under the synthetic package tree.
-_core_pkg = load_package_module("core/__init__.py", "astrbot_plugin_monixiuxian2_2.core")
+_core_pkg = load_package_module(
+    "core/__init__.py", "astrbot_plugin_monixiuxian2_2.core"
+)
 
 _player_handler_mod = load_package_module(
     "handlers/player_handler.py",
@@ -519,6 +521,33 @@ async def test_sect_bounty_list_rendered_via_shared_function():
     assert "🏯 宗门悬赏 · 本宗委托" in msg
     assert "剿灭山贼" in msg and "完成 5 次" in msg
     player = await db.get_player_by_id("b1")
+    bounty_mgr.get_bounty_list.assert_awaited_once_with(player, scope="sect")
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_sect_bounty_list_empty_state_via_shared_function():
+    """宗门空悬赏列表输出专用空态块（无 footer），经共享函数渲染。"""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
+    await mgr.ensure_system_sects()
+    await _make_player(db, "b2")
+    success, msg = await mgr.join_sect("b2", "青云门")
+    assert success, msg
+
+    bounty_mgr = MagicMock()
+    bounty_mgr.get_bounty_list = AsyncMock(return_value=[])
+    handlers = SectHandlers(
+        db, mgr, bounty_mgr=bounty_mgr, busy_state=make_busy_state(db)
+    )
+
+    event = _make_event("b2", "宗门 悬赏")
+    await _collect(handlers.handle_sect_entry(event))
+    assert (
+        _last_msg(event) == "🏯 宗门悬赏\n━━━━━━━━━━━━━━━\n本宗当前无可接取的宗门悬赏。"
+    )
+    player = await db.get_player_by_id("b2")
     bounty_mgr.get_bounty_list.assert_awaited_once_with(player, scope="sect")
 
     await db.close()
