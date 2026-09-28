@@ -6,7 +6,7 @@
 
 ## What Changes
 
-- 新增 `core/time_skip_registry.py` 的 `TimeSkipRegistry`：**声明式注册表**，装配时从「字段属主模块各自声明的 `TIME_SKIP_ENTRIES` 常量」汇总（provider 列表一次声明、只存模块名字符串、惰性 import，逐域常量与字段知识同文件）；删 `_TIME_SKIP_RULES` 元组，11 条 SQL 原样迁移到属主模块（Boss/灵眼单条双键拆为两条、各归写点属主，同 label 按聚合计数——回复行数与计数锚点不变，见 design D2a）。
+- 新增 `core/time_skip_registry.py` 的 `TimeSkipRegistry`：**声明式注册表**，装配时从「字段属主模块各自声明的 `TIME_SKIP_ENTRIES` 常量」汇总（provider 列表一次声明、只存模块名字符串、惰性 import，逐域常量与字段知识同文件）；删 `_TIME_SKIP_RULES` 元组，11 条 SQL 原样迁移到属主模块（Boss/灵眼单条双键拆为两条、各归域属主，同 label 按聚合计数——回复行数与计数锚点不变，见 design D2a）。
 - `cmd_time_skip`（:1179-1222）消费注册表：循环语义、逐域计数回复、事务全有或全无语义**逐行不变**（`add-transaction-unit-of-work` 已把原手写 `BEGIN IMMEDIATE` 收编为 :1208 的 `db.transaction()` CM，本 change 直接落在 CM 形态上；仍为多 `?` 参数以前移秒数填充）。
 - `cmd_help` 时间快进条目**自动列出覆盖域**（域标签从注册表生成）；既有代码持有的警示文案（不可逆/不唤醒睡眠定时任务/贷款逾期警告，:431-432）保持代码所有、逐字不变——帮助文本不再手抄清单。
 - 新增不变量测试：注册表覆盖 = `openspec/specs/gm-commands`「GM 时间快进」需求枚举的最小域清单（spec 保留枚举作为保证）；帮助文本含各域标签 + 时间快进用法行。
@@ -26,7 +26,7 @@
 
 ## Impact
 
-- **代码**：新增 `core/time_skip_registry.py`；`core/gm_manager.py`（删 :62-122 清单与 :1209 循环数据源，改消费注册表；`cmd_help` :431-432 追加生成域列表）；~8 个属主模块各增 `TIME_SKIP_ENTRIES` 模块常量（SQL 原样迁移）。
+- **代码**：新增 `core/time_skip_registry.py`；`core/gm_manager.py`（删 :62-122 清单与 :1209 循环数据源，改消费注册表；`cmd_help` :431-432 追加生成域列表）；9 个属主模块各增 `TIME_SKIP_ENTRIES` 模块常量（SQL 原样迁移；含 core 的 busy_state/cultivation_manager 与 managers 的 6-7 个域模块）。
 - **Spec**：`openspec/specs/gm-commands/spec.md`「GM 时间快进」需求经本 change 的 delta 更新（`skip_specs` 不设——需求正文内嵌了被替换的机制描述）。
 - **文档**：AGENTS.md §2（:77）改写；`design_docs/api-overview.md:107` 的「按 `_TIME_SKIP_RULES` 枚举」表述改指注册表；`scripts/test_suite_ctl.py:1255` 注释提及 `_TIME_SKIP_RULES` 处核对（描述快进幽灵数据语义，改不改名以注释是否失真为准）。
 - **软依赖已兑现**：`add-transaction-unit-of-work`（2026-09-19 已归档）的 tasks 3.3 已把 `core/gm_manager.py:1208` 的 `BEGIN IMMEDIATE` 改为事务 CM（同一循环块）——本 change 直接落在 CM 形态上实施即可。
