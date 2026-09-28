@@ -55,71 +55,16 @@ if TYPE_CHECKING:
 
     from ..core import BusyState, EquipmentManager, StorageRingManager
 
+try:
+    from .time_skip_registry import TimeSkipRegistry
+except ImportError:
+    # 独立运行（测试）时降级加载
+    _tsr = _load_module("time_skip_registry", "core/time_skip_registry.py")
+    TimeSkipRegistry = _tsr.TimeSkipRegistry
+
 
 # 日志文件大小阈值：500 MB
 LOG_MAX_SIZE_BYTES = 500 * 1024 * 1024
-
-# 「时间快进」字段覆盖清单（OpenSpec gm-test-time-and-rng-controls design D2
-# 显式枚举）。每条 = (回复域名, UPDATE 语句)，语句中的每个 ? 都以前移秒数填充。
-# 原则：只前移参与到期/冷却判定的时间戳；历史记录类时间戳（交易流水、日志、
-# 创建时间）一律不动。首版不覆盖的已知域见 design D2（丹药 buff、商店刷新、
-# 灵田、洞天/灵眼收取、双修请求过期等），均不阻碍冷却类测试主链路。
-# 约束：新增等待类冷却域时必须同步补充本清单与 GM 帮助文本（AGENTS.md §2）。
-_TIME_SKIP_RULES: tuple[tuple[str, str], ...] = (
-    (
-        "历练/秘境/宗门任务计划完成时间",
-        "UPDATE user_cd SET scheduled_time = scheduled_time - ? "
-        "WHERE type != 0 AND scheduled_time > 0",
-    ),
-    (
-        "闭关开始时间",
-        "UPDATE players SET cultivation_start_time = cultivation_start_time - ? "
-        "WHERE state = '修炼中' AND cultivation_start_time > 0",
-    ),
-    (
-        "决斗/切磋冷却",
-        "UPDATE combat_cooldowns SET last_duel_time = last_duel_time - ?, "
-        "last_spar_time = last_spar_time - ? "
-        "WHERE last_duel_time > 0 OR last_spar_time > 0",
-    ),
-    (
-        "双修冷却",
-        "UPDATE dual_cultivation SET last_dual_time = last_dual_time - ? "
-        "WHERE last_dual_time > 0",
-    ),
-    (
-        "进行中悬赏过期时间",
-        "UPDATE bounty_tasks SET expire_time = expire_time - ? WHERE status = 1",
-    ),
-    (
-        "贷款到期时间",
-        "UPDATE bank_loans SET due_at = due_at - ? WHERE status = 'active'",
-    ),
-    # system_config 的 value 为 TEXT：CAST 守卫只前移正整数时间戳，
-    # 非数值/已归零配置项不受影响（TEXT 列亲和性会把算回的结果存回文本）
-    (
-        "悬赏放弃冷却",
-        "UPDATE system_config "
-        "SET value = CAST(CAST(value AS INTEGER) - ? AS TEXT) "
-        "WHERE key LIKE 'bounty_abandon_cd_%' AND CAST(value AS INTEGER) > 0",
-    ),
-    (
-        "Boss/灵眼下次刷新时间",
-        "UPDATE system_config "
-        "SET value = CAST(CAST(value AS INTEGER) - ? AS TEXT) "
-        "WHERE key IN ('boss_next_spawn_time', 'spirit_eye_next_spawn_time') "
-        "AND CAST(value AS INTEGER) > 0",
-    ),
-    (
-        "传承挑战冷却",
-        "UPDATE impart_pk_cooldown SET failed_at = failed_at - ? WHERE failed_at > 0",
-    ),
-    (
-        "传承被夺保护期",
-        "UPDATE impart_snatch_protection SET snatched_at = snatched_at - ? "
-        "WHERE snatched_at > 0",
-    ),
-)
 
 
 def _is_at_component(component) -> bool:
@@ -160,6 +105,11 @@ class GMManager:
         self.busy_state = busy_state
         self.plugin_data_path = plugin_data_path
         self.broadcast_callback = broadcast_callback
+
+        # 时间快进覆盖清单注册表（openspec change: gm-time-skip-registry）：
+        # 从各字段属主模块的 TIME_SKIP_ENTRIES 常量装配汇总（provider 列表与
+        # 惰性 import 见 core/time_skip_registry.py design D3）。
+        self._time_skip = TimeSkipRegistry.from_providers()
 
         # 子命令路由表
         self._commands = {
@@ -383,6 +333,11 @@ class GMManager:
 
     async def cmd_help(self, event: "AstrMessageEvent", args: str) -> tuple[bool, str]:
         """GM 帮助命令。"""
+        # 时间快进覆盖域清单：生成自注册表（openspec change: gm-time-skip-registry），
+        # 新增冷却域声明即自动列出，帮助不再手抄清单；同 label 条目去重。
+        covered = "、".join(
+            dict.fromkeys(label for label, _ in self._time_skip.entries())
+        )
         help_text = (
             "🔧 修仙GM 指令大全\n"
             "━━━━━━━━━━━━━━━\n"
@@ -430,6 +385,7 @@ class GMManager:
             "🧪 测试工具（⚠️ 仅限测试实例）\n"
             "  时间快进 <秒> 确认 （全库到期类时间戳前移，不可逆；不唤醒睡眠中的定时任务，\n"
             "    Boss/灵眼下轮醒来即触发，需要立即生成请用「生成Boss」；前移贷款到期会真实触发逾期追杀）\n"
+            f"    覆盖域：{covered}\n"
             "  清除全部冷却 [@玩家/ID] 确认 （忙碌/决斗切磋/双修/悬赏/传承/历练路线休整一键清零）\n"
             "  随机种子 <整数> / 随机种子 重置 （进程级固定全局随机序列，同进程其他插件亦受影响；\n"
             "    重置或重启进程恢复；与测试平台 deterministic+seed 同机制，后执行者生效）\n"
@@ -1182,12 +1138,14 @@ class GMManager:
     async def cmd_time_skip(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
-        """时间快进：将枚举清单内的到期判定时间戳统一前移 N 秒（design D1/D2）。
+        """时间快进：将注册表覆盖清单内的到期判定时间戳统一前移 N 秒。
 
         直接改写数据库字段（与 cmd_force_adventure 改 scheduled_time 同一先例），
         让业务逻辑在「时间已到」的真实状态下运行——不是绕过结算逻辑。
         不承诺唤醒 asyncio.sleep 中的定时任务（Boss/灵眼循环下次醒来读到
         已前移的刷新时间即触发）。前移不可逆，故沿用「确认」约定。
+        覆盖清单来自 time_skip_registry 注册表（openspec change:
+        gm-time-skip-registry），同一 label 的多条条目按聚合计数。
         """
         confirmed, remaining = self._pop_confirmation(args)
         if not confirmed:
@@ -1207,16 +1165,18 @@ class GMManager:
 
         # 多表改写包在一个事务里，避免快进一半留下混合时间态
         # （CM 单事务：正常退出整体提交，任何失败整体回滚——全有或全无）
-        counts: list[tuple[str, int]] = []
+        merged: dict[str, int] = {}
+        order: list[str] = []
         async with self.db.transaction():
-            for label, sql in _TIME_SKIP_RULES:
+            for label, sql in self._time_skip.entries():
                 params = (seconds,) * sql.count("?")
                 async with self.db.conn.execute(sql, params) as cursor:
-                    counts.append((label, max(cursor.rowcount, 0)))
-        # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
+                    if label not in merged:
+                        order.append(label)
+                    merged[label] = merged.get(label, 0) + max(cursor.rowcount, 0)
 
-        detail = "\n".join(f"  {label}：{count} 条" for label, count in counts)
-        total = sum(count for _, count in counts)
+        detail = "\n".join(f"  {label}：{merged[label]} 条" for label in order)
+        total = sum(merged.values())
         return True, (
             f"✅ 时间已快进 {seconds} 秒（共前移 {total} 条记录）：\n"
             f"{detail}\n"

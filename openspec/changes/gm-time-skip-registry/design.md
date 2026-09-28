@@ -49,7 +49,7 @@ SQL 已是 `table.column + WHERE 条件` 的精确编码（含 `system_config` T
 
 ## Risks / Trade-offs
 
-- [注册表条目顺序与现状不同 → 时间快进回复中各域排列顺序变化，功能测试锚点失配] → `from_providers` 按 provider 列表顺序展开、各模块内按常量声明序，迁移时保持现状 10 条的原序（任务显式列出顺序；Boss/灵眼拆条后两同 label 条目相邻，顺序 boss→spirit_eye）；按 label 聚合计数保证明细行序 = 现状域序；补一条回复文本快照测试。
+- [注册表条目顺序与现状不同 → 时间快进回复中各域排列顺序变化，功能测试锚点失配] → `from_providers` 按 provider 列表顺序展开、各模块内按常量声明序，域序按 provider 列表序块连续聚合；悬赏两条（5,7）与 bank（6）存在跨模块交错，块连续聚合后为 5,7,6——系原 5,6,7 的 6↔7 单次相邻互换，是既有域序与块连续聚合不可兼得的唯一最小偏离（回复明细行序非契约：spec 无顺序保证，既有测试为 fragment 无序断言）；Boss/灵眼拆条后两同 label 条目相邻、boss→spirit_eye；补一条回复文本快照测试。
 - [属主模块拆分后有人只加字段、忘加 `TIME_SKIP_ENTRIES`；或声明了常量、忘登记 provider] → 三层防漏（Goals）：最小清单断言钉既有域 fail fast；静态扫描测试遍历 core/managers/handlers 源码、凡含 `TIME_SKIP_ENTRIES =` 声明的模块必须 ∈ provider 列表（抓「声明了但漏登记」）；「全新域模块未声明」仍靠 review checklist 对新增时间戳字段 grep `TIME_SKIP_ENTRIES` + AGENTS.md §2 义务——残余风险与现状持平，但手抄面从三处减到一处。
 - [`scripts/test_suite_ctl.py:1255` 注释引用 `_TIME_SKIP_RULES` 名称] → 该注释描述快进幽灵数据对「闭关开始时间」计数的影响，与机制无关；实施时改为指向注册表或泛化表述，语义不得失真。
 - [与 `add-transaction-unit-of-work` 的顺序倒置] → tasks 0.1 要求核对其合入状态；若本 change 先落地，其 tasks 3.3 rebase 时以本 change 的循环为准（机制改动优先归并）。

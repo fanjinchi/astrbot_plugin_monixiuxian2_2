@@ -70,6 +70,17 @@ _BANNER_MUTUAL_DESTRUCTION = "☆━━━━ 同归于尽！平局！━━━�
 # Versus line (half-width ``VS`` with one space on each side, verbatim).
 _VERSUS_LINE = "{name1} VS {name2}"
 
+# GM「时间快进」覆盖条目（openspec change: gm-time-skip-registry）：声明即覆盖，
+# 只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py 装配汇总。
+TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
+    (
+        "决斗/切磋冷却",
+        "UPDATE combat_cooldowns SET last_duel_time = last_duel_time - ?, "
+        "last_spar_time = last_spar_time - ? "
+        "WHERE last_duel_time > 0 OR last_spar_time > 0",
+    ),
+)
+
 
 @dataclass
 class CombatStats:

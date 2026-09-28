@@ -1250,9 +1250,10 @@ def cmd_fixture(args: argparse.Namespace) -> int:
     conn.row_factory = sqlite3.Row
     try:
         # Purge webtest virtual players (`case_<case>_<n>_player<k>`, derived by
-        # the platform per conversation) that an earlier run left busy. GM
-        # 时间快进 counts 闭关/修炼 rows GLOBALLY (core/gm_manager.py
-        # _TIME_SKIP_RULES), so every ghost inflates 「闭关开始时间：N 条」 by 1 and
+        # the platform per conversation) that an earlier run left busy. GM 时间快进 counts
+        # 闭关/修炼 rows GLOBALLY (time-skip registry aggregates domain providers,
+        # core/time_skip_registry.py), so every ghost inflates
+        # 「闭关开始时间：N 条」 by 1 and
         # breaks any assertion on that count (bd -777). Fixed numeric test ids
         # are pinned identities reused across cases, hence reset per run; these
         # ghosts are throwaway sender ids and are dropped outright.

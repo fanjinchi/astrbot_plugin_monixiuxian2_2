@@ -21,6 +21,16 @@ DUAL_CULT_COOLDOWN = 3600  # 1小时冷却
 DUAL_CULT_REQUEST_EXPIRE = 300  # 请求过期时间（5分钟）
 DUAL_CULT_MAX_EXP_RATIO = 3.0  # 双修双方修为差距最大3倍
 
+# GM「时间快进」覆盖条目（openspec change: gm-time-skip-registry）：声明即覆盖，
+# 只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py 装配汇总。
+TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
+    (
+        "双修冷却",
+        "UPDATE dual_cultivation SET last_dual_time = last_dual_time - ? "
+        "WHERE last_dual_time > 0",
+    ),
+)
+
 
 class DualCultivationManager:
     """双修管理器"""

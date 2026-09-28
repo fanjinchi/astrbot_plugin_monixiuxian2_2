@@ -12,6 +12,16 @@ from ..models import Player
 if TYPE_CHECKING:
     from ..core.skill_manager import SkillManager
 
+# GM「时间快进」覆盖条目（openspec change: gm-time-skip-registry）：声明即覆盖，
+# 只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py 装配汇总。
+TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
+    (
+        "闭关开始时间",
+        "UPDATE players SET cultivation_start_time = cultivation_start_time - ? "
+        "WHERE state = '修炼中' AND cultivation_start_time > 0",
+    ),
+)
+
 
 class CultivationManager:
     """修炼管理器，包含角色生成和闭关修炼功能"""

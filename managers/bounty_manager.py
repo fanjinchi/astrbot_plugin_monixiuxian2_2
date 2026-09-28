@@ -18,6 +18,24 @@ if TYPE_CHECKING:
 
 __all__ = ["BountyManager"]
 
+# GM「时间快进」覆盖条目（openspec change: gm-time-skip-registry）：声明即覆盖，
+# 只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py 装配汇总。
+# 两条目保持本模块声明序（悬赏任务 → 放弃冷却），聚合后相邻且先于 bank_loans。
+TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
+    (
+        "进行中悬赏过期时间",
+        "UPDATE bounty_tasks SET expire_time = expire_time - ? WHERE status = 1",
+    ),
+    # system_config 的 value 为 TEXT：CAST 守卫只前移正整数时间戳，
+    # 非数值/已归零配置项不受影响（TEXT 列亲和性会把算回的结果存回文本）
+    (
+        "悬赏放弃冷却",
+        "UPDATE system_config "
+        "SET value = CAST(CAST(value AS INTEGER) - ? AS TEXT) "
+        "WHERE key LIKE 'bounty_abandon_cd_%' AND CAST(value AS INTEGER) > 0",
+    ),
+)
+
 
 class BountyManager:
     """悬赏令管理器"""

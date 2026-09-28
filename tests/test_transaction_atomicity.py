@@ -1402,8 +1402,8 @@ async def test_clear_all_cooldowns_rolls_back_and_keeps_route_cooldowns(db, monk
     event = _make_event(f"{uid} 确认")
     event.message_obj = None
 
-    # marker 必须取到 "= 0"：与 _TIME_SKIP_RULES 的时间快进 SQL（core/gm_manager.py:87，
-    # "... last_dual_time - ?"）只差运算符，前缀重名会误伤/漏检
+    # marker 必须取到 "= 0"：与 GM 时间快进注册表（core/time_skip_registry.py
+    # 双修条目，"... last_dual_time - ?"）只差运算符，前缀重名会误伤/漏检
     _boom_on_sql(db, monkeypatch, "UPDATE dual_cultivation SET last_dual_time = 0")
 
     with pytest.raises(RuntimeError):

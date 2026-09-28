@@ -34,6 +34,20 @@ LEGACY_TYPE_NAMES = {
     "rift": "秘境传承",
 }
 
+# GM「时间快进」覆盖条目（openspec change: gm-time-skip-registry）：声明即覆盖，
+# 只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py 装配汇总。
+TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
+    (
+        "传承挑战冷却",
+        "UPDATE impart_pk_cooldown SET failed_at = failed_at - ? WHERE failed_at > 0",
+    ),
+    (
+        "传承被夺保护期",
+        "UPDATE impart_snatch_protection SET snatched_at = snatched_at - ? "
+        "WHERE snatched_at > 0",
+    ),
+)
+
 
 class ImpartManager:
     """Manager for legacy instances, activation, tier rewards, cooldowns."""

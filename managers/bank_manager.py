@@ -19,6 +19,15 @@ DEFAULT_MIN_LOAN_AMOUNT = 1000  # 最小贷款额度 1000
 DEFAULT_BREAKTHROUGH_LOAN_RATE = 0.008  # 突破贷款日利率 0.8%（更高风险）
 DEFAULT_BREAKTHROUGH_LOAN_DURATION = 3  # 突破贷款期限 3天
 
+# GM「时间快进」覆盖条目（openspec change: gm-time-skip-registry）：声明即覆盖，
+# 只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py 装配汇总。
+TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
+    (
+        "贷款到期时间",
+        "UPDATE bank_loans SET due_at = due_at - ? WHERE status = 'active'",
+    ),
+)
+
 
 class BankManager:
     """灵石银行管理器"""

@@ -40,6 +40,16 @@ except ImportError:
     _models_extended = _load_module("models_extended", "models_extended.py")
     UserStatus = _models_extended.UserStatus
 
+# GM「时间快进」覆盖条目（openspec change: gm-time-skip-registry）：声明即覆盖，
+# 只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py 装配汇总。
+TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
+    (
+        "历练/秘境/宗门任务计划完成时间",
+        "UPDATE user_cd SET scheduled_time = scheduled_time - ? "
+        "WHERE type != 0 AND scheduled_time > 0",
+    ),
+)
+
 # 默认忙碌报错模板（sect 系守卫的支配文案，10+ 站点的原文；"你当前正{status}"）。
 # assert_idle 的 template 形参默认值；战斗/炼丹/双修等站点在调用处传专属模板。
 DEFAULT = "❌ 你当前正{status}，无法进行此操作！"

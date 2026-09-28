@@ -47,6 +47,19 @@ except ImportError:
     CombatManager = _cm.CombatManager
     FighterState = _cm.FighterState
 
+# GM「时间快进」覆盖条目（openspec change: gm-time-skip-registry）：声明即覆盖，
+# 只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py 装配汇总。
+# 与 spirit_eye_manager 的条目共享标签「Boss/灵眼下次刷新时间」，按 D2a 拆条后
+# 聚合时 boss 在前、spirit_eye 相邻在后。
+TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
+    (
+        "Boss/灵眼下次刷新时间",
+        "UPDATE system_config "
+        "SET value = CAST(CAST(value AS INTEGER) - ? AS TEXT) "
+        "WHERE key = 'boss_next_spawn_time' AND CAST(value AS INTEGER) > 0",
+    ),
+)
+
 
 class BossManager:
     """Boss系统管理器 - 处理Boss生成、战斗、奖励等逻辑"""
