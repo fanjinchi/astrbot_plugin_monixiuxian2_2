@@ -415,8 +415,8 @@ class XiuXianPlugin(Star):
             self.db,
             sect_mgr,
             bounty_mgr,
-            ranking_handlers=ranking_handlers,
             busy_state=busy_state,
+            rank_mgr=rank_mgr,
         )
         boss_handlers = BossHandlers(self.db, boss_mgr)
         combat_handlers = CombatHandlers(

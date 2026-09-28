@@ -1,0 +1,10 @@
+# 快照: bounty_accept | 命令: 接取悬赏 301 | 玩家: 900000002
+# 抓取日期: 2026-09-25（重抓） | 来源: webtest 模拟会话（注入走真实 AstrBot 管线）
+# 用途: openspec change decouple-handler-to-handler-calls tasks 0.2/2.4 逐字比对基线
+# 基线代码: decouple 重构前（含 unify-status-emoji-ownership 9fafc0c 合入后的现状行为）
+
+🎯 接取悬赏成功！
+任务：巡山情报（F级）
+目标：完成 5 次
+奖励：433 灵石 + 3,666 修为
+时限：192 分钟

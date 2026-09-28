@@ -1,0 +1,16 @@
+# 快照: sect_rank | 命令: 宗门 排行 | 玩家: 900000001
+# 抓取日期: 2026-09-25（重抓） | 来源: webtest 模拟会话（注入走真实 AstrBot 管线）
+# 用途: openspec change decouple-handler-to-handler-calls tasks 0.2/2.4 逐字比对基线
+# 基线代码: decouple 重构前（含 unify-status-emoji-ownership 9fafc0c 合入后的现状行为）
+
+📊 宗门排行榜
+━━━━━━━━━━━━━━━
+1. 【青云门】
+   宗主：道友
+   建设度：100 | 成员：1人
+
+2. 【合欢宗】
+   宗主：道友
+   建设度：100 | 成员：0人
+
+

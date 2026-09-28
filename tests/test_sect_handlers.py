@@ -39,6 +39,11 @@ SectManager = _sect_mod.SectManager
 # handlers import the same modules through the same synthetic tree.
 sys.modules["astrbot_plugin_monixiuxian2_2.data"].DataBase = DataBase
 
+_bounty_handlers_mod = load_package_module(
+    "handlers/bounty_handlers.py",
+    "astrbot_plugin_monixiuxian2_2.handlers.bounty_handlers",
+)
+
 _sect_handlers_mod = load_package_module(
     "handlers/sect_handlers.py",
     "astrbot_plugin_monixiuxian2_2.handlers.sect_handlers",
@@ -454,6 +459,129 @@ async def test_sect_shop_buy_flow():
     assert not success and "没有" in msg
 
     await db.close()
+
+
+# ===== decouple-handler-to-handler-calls 重构断言 =====
+
+
+@pytest.mark.asyncio
+async def test_sect_rank_degraded_without_rank_mgr():
+    """rank_mgr=None（构造点不传排行依赖）时 /宗门 排行 输出降级文案。"""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
+    await mgr.ensure_system_sects()
+    handlers = SectHandlers(db, mgr, busy_state=make_busy_state(db))
+    await _make_player(db, "r1")
+
+    event = _make_event("r1", "宗门 排行")
+    await _collect(handlers.handle_sect_entry(event))
+    assert _last_msg(event) == "❌ 排行功能不可用！"
+
+    event = _make_event("r1", "宗门 贡献排行")
+    await _collect(handlers.handle_sect_entry(event))
+    assert _last_msg(event) == "❌ 排行功能不可用！"
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_sect_bounty_list_rendered_via_shared_function():
+    """宗门悬赏列表经共享函数渲染（标题「宗门悬赏 · 本宗委托」、scope 显式传递）。"""
+    db = await _make_db()
+    mgr = SectManager(db, FakeConfigManager(), busy_state=make_busy_state(db))
+    await mgr.ensure_system_sects()
+    await _make_player(db, "b1")
+    success, msg = await mgr.join_sect("b1", "青云门")
+    assert success, msg
+
+    bounty_mgr = MagicMock()
+    bounty_mgr.get_bounty_list = AsyncMock(
+        return_value=[
+            {
+                "id": 307,
+                "name": "剿灭山贼",
+                "category": "任务",
+                "difficulty_name": "普通",
+                "description": "测试说明",
+                "count": 5,
+                "time_limit": 3600,
+                "reward": {"stone": 1000, "exp": 5000},
+            }
+        ]
+    )
+    handlers = SectHandlers(
+        db, mgr, bounty_mgr=bounty_mgr, busy_state=make_busy_state(db)
+    )
+
+    event = _make_event("b1", "宗门 悬赏")
+    await _collect(handlers.handle_sect_entry(event))
+    msg = _last_msg(event)
+    assert "🏯 宗门悬赏 · 本宗委托" in msg
+    assert "剿灭山贼" in msg and "完成 5 次" in msg
+    player = await db.get_player_by_id("b1")
+    bounty_mgr.get_bounty_list.assert_awaited_once_with(player, scope="sect")
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_render_bounty_action_numbering_defense():
+    """编号防御：缺参/非数字/<=0 三态 × global/sect 两侧文案逐字（共享函数直调）。"""
+    _render = _bounty_handlers_mod.render_bounty_action
+    bounty_mgr = MagicMock()
+    bounty_mgr.accept_bounty = AsyncMock()
+    player = MagicMock()
+    cases = [
+        ([], "global", "❌ 请指定悬赏编号，例如：/接取悬赏 1"),
+        (["abc"], "global", "❌ 请指定悬赏编号，例如：/接取悬赏 1"),
+        (["0"], "global", "❌ 请指定悬赏编号，例如：/接取悬赏 1"),
+        (["-1"], "global", "❌ 请指定悬赏编号，例如：/接取悬赏 1"),
+        ([], "sect", "❌ 请指定悬赏编号，例如：/宗门 悬赏 接取 307"),
+        (["abc"], "sect", "❌ 请指定悬赏编号，例如：/宗门 悬赏 接取 307"),
+        (["0"], "sect", "❌ 请指定悬赏编号，例如：/宗门 悬赏 接取 307"),
+        (["-1"], "sect", "❌ 请指定悬赏编号，例如：/宗门 悬赏 接取 307"),
+    ]
+    for args, scope, expected in cases:
+        success, msg = await _render(bounty_mgr, player, "接取", args, scope)
+        assert success is False and msg == expected
+    # 英文别名 accept（全局委托侧形态）走同一防御，不调用 manager
+    success, msg = await _render(bounty_mgr, player, "accept", ["-2"], "global")
+    assert success is False and msg == "❌ 请指定悬赏编号，例如：/接取悬赏 1"
+    bounty_mgr.accept_bounty.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_render_bounty_action_passthrough_and_unrecognized():
+    """(success, msg) 原样透传、manager 显式传 scope；未识别 action 返回 None。"""
+    _render = _bounty_handlers_mod.render_bounty_action
+    bounty_mgr = MagicMock()
+    bounty_mgr.check_bounty_status = AsyncMock(
+        return_value=(
+            False,
+            "你当前没有进行中的悬赏任务。\n使用 /悬赏令 查看可接取的任务。",
+        )
+    )
+    player = MagicMock()
+
+    # global 失败分支（英文别名 status）
+    success, msg = await _render(bounty_mgr, player, "status", [], "global")
+    assert success is False and msg.startswith("你当前没有进行中的悬赏任务。")
+    bounty_mgr.check_bounty_status.assert_awaited_once_with(player, scope="global")
+
+    # sect 成功分支（中文「进度」）
+    bounty_mgr.check_bounty_status = AsyncMock(return_value=(True, "📜 当前悬赏"))
+    success, msg = await _render(bounty_mgr, player, "进度", [], "sect")
+    assert success is True and msg == "📜 当前悬赏"
+    bounty_mgr.check_bounty_status.assert_awaited_once_with(player, scope="sect")
+
+    # 未识别 action → None
+    assert await _render(bounty_mgr, player, "不存在", [], "sect") is None
+
+    # 合法编号 → accept_bounty 透传且 scope 显式
+    bounty_mgr.accept_bounty = AsyncMock(return_value=(True, "🎯 接取悬赏成功！"))
+    success, msg = await _render(bounty_mgr, player, "accept", ["42"], "global")
+    assert success is True and msg == "🎯 接取悬赏成功！"
+    bounty_mgr.accept_bounty.assert_awaited_once_with(player, 42, scope="global")
 
 
 @pytest.mark.asyncio

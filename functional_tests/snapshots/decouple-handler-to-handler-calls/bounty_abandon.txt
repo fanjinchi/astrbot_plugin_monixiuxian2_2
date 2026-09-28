@@ -1,0 +1,7 @@
+# 快照: bounty_abandon | 命令: 放弃悬赏 | 玩家: 900000003
+# 抓取日期: 2026-09-25（重抓） | 来源: webtest 模拟会话（注入走真实 AstrBot 管线）
+# 用途: openspec change decouple-handler-to-handler-calls tasks 0.2/2.4 逐字比对基线
+# 基线代码: decouple 重构前（含 unify-status-emoji-ownership 9fafc0c 合入后的现状行为）
+
+✅ 已放弃悬赏：巡山情报
+⚠️ 30分钟内无法接取新悬赏

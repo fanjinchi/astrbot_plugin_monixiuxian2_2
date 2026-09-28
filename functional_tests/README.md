@@ -22,6 +22,9 @@ functional_tests/
         ├── summary.md            # 运行概览：通过/失败/跳过/遗留问题
         ├── cases/                # 每用例结果 JSON（含步骤结果）
         └── messages/             # 每用例运行期消息轨迹导出（可选）
+└── snapshots/                    # 行为基线快照（golden output，逐字比对基准）
+    └── <change名|目标名>/        # 按 change/目标分子目录（见「行为基线快照」节）
+        └── <命令>_<分支>.txt     # 单条命令输出的逐字原文（文件头带元信息注释）
 ```
 
 ### 目录命名规则
@@ -41,6 +44,16 @@ functional_tests/
   - 示例：`results/2026-08-17_core-smoke/`。
 - `export` 若目标目录已存在，会自动生成 `_2`/时间戳后缀，**不覆盖历史结果**。
 - one-shot `run --export <dir>` 直接落盘机器可读 `summary.json`（`total`/`passed`/`failed`/`errors`/`runs`），供 CI 或脚本消费。
+
+## 行为基线快照（snapshots/）
+
+`snapshots/` 存放**重构前代码的行为基线快照**（golden output）：为「纯行为保持重构」类变更（文本收敛、handler 收编等）提供重构前后的逐字比对基准。
+
+- 子目录按 change 名（或目标名）划分，如 `snapshots/decouple-handler-to-handler-calls/`；文件名 `<命令>_<分支>.txt`（snake_case），如 `bounty_accept.txt`。
+- 文件头为元信息注释行（命令/玩家/抓取日期/来源），正文为命令输出的**逐字原文**（不含任何改写）。
+- 抓取方式：webtest 平台模拟会话（注入走真实 AstrBot 管线，渲染层与真实 bot 会话一致；AI 在用户授权后代抓）或真实 bot 会话。
+- 变更实施完成后，用同名命令重跑并与基线逐字 diff 复核（change 的 tasks 里引用对应路径）。
+- 基线是长期资产，未来同类变更复用同一位置——**不放进 `openspec/changes/`**（change 归档时会随其沉没，失去复用价值）。
 
 ## 用例 JSON 编写约定
 

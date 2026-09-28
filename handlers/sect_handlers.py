@@ -8,6 +8,7 @@ from ..data.data_manager import DataBase
 from ..managers.bounty_manager import BountyManager
 from ..managers.sect_manager import SectManager
 from ..models import Player
+from .bounty_handlers import render_bounty_action, render_bounty_list
 from .utils import player_required
 
 if TYPE_CHECKING:
@@ -32,15 +33,15 @@ class SectHandlers:
         db: DataBase,
         sect_mgr: SectManager,
         bounty_mgr: BountyManager | None = None,
-        ranking_handlers=None,
         *,
         busy_state: "BusyState",
+        rank_mgr=None,
     ):
         self.db = db
         self.sect_mgr = sect_mgr
         self.bounty_mgr = bounty_mgr
-        self.ranking_handlers = ranking_handlers
         self.busy_state = busy_state
+        self.rank_mgr = rank_mgr
 
     # ===== 统一入口分发器 =====
 
@@ -196,18 +197,50 @@ class SectHandlers:
             yield r
 
     async def _sub_rank(self, player, event, args):
-        if not self.ranking_handlers:
+        if not self.rank_mgr:
             yield event.plain_result("❌ 排行功能不可用！")
             return
-        async for r in self.ranking_handlers.handle_rank_sect(event):
-            yield r
+        _, msg = await self.handle_sect_rank(player)
+        yield event.plain_result(msg)
 
     async def _sub_rank_contribution(self, player, event, args):
-        if not self.ranking_handlers:
+        if not self.rank_mgr:
             yield event.plain_result("❌ 排行功能不可用！")
             return
-        async for r in self.ranking_handlers.handle_rank_sect_contribution(event):
-            yield r
+        _, msg = await self.handle_sect_contribution_rank(player)
+        yield event.plain_result(msg)
+
+    async def handle_sect_rank(self, player: Player) -> tuple[bool, str]:
+        """Sect ranking (by construction scale), delegated to RankingManager.
+
+        Called by ``_sub_rank`` with the player already injected (the
+        dispatcher entry is guarded by @player_required).
+
+        Args:
+            player: The requesting player.
+
+        Returns:
+            (success, msg) from ``RankingManager.get_sect_ranking``.
+        """
+        return await self.rank_mgr.get_sect_ranking()
+
+    async def handle_sect_contribution_rank(self, player: Player) -> tuple[bool, str]:
+        """Sect contribution ranking for the player's current sect.
+
+        Called by ``_sub_rank_contribution`` with the player already injected;
+        the player-existence branch is unreachable here (@player_required
+        guards the dispatcher), so only the sect-membership rejection stays.
+
+        Args:
+            player: The requesting player; ``sect_id`` decides the ranking
+                scope.
+
+        Returns:
+            (success, msg); players without a sect get a rejection message.
+        """
+        if not player.sect_id or player.sect_id == 0:
+            return False, "❌ 你尚未加入任何宗门，无法查看宗门贡献排行。"
+        return await self.rank_mgr.get_contribution_ranking(player.sect_id)
 
     # ===== 悬赏子命令组（宗门悬赏独立入口，scope="sect"） =====
 
@@ -223,51 +256,20 @@ class SectHandlers:
             return
 
         action = args[0] if args else ""
-        if action == "接取":
-            bounty_id = int(args[1]) if len(args) > 1 and args[1].isdecimal() else 0
-            if bounty_id <= 0:
-                yield event.plain_result("❌ 请指定悬赏编号，例如：/宗门 悬赏 接取 307")
-                return
-            success, msg = await self.bounty_mgr.accept_bounty(
-                player, bounty_id, scope="sect"
+        if action:
+            result = await render_bounty_action(
+                self.bounty_mgr, player, action, args[1:], "sect"
             )
-            yield event.plain_result(msg)
-        elif action == "进度":
-            _, msg = await self.bounty_mgr.check_bounty_status(player, scope="sect")
-            yield event.plain_result(msg)
-        elif action == "完成":
-            success, msg = await self.bounty_mgr.complete_bounty(player, scope="sect")
-            yield event.plain_result(msg)
-        elif action == "放弃":
-            success, msg = await self.bounty_mgr.abandon_bounty(player, scope="sect")
-            yield event.plain_result(msg)
-        elif action:
-            yield event.plain_result(
-                f"❌ 未识别的悬赏操作「{action}」。可用：接取 <编号>｜进度｜完成｜放弃"
-            )
-        else:
-            bounties = await self.bounty_mgr.get_bounty_list(player, scope="sect")
-            if not bounties:
+            if result is None:
                 yield event.plain_result(
-                    "🏯 宗门悬赏\n━━━━━━━━━━━━━━━\n本宗当前无可接取的宗门悬赏。"
+                    f"❌ 未识别的悬赏操作「{action}」。可用：接取 <编号>｜进度｜完成｜放弃"
                 )
                 return
-
-            def _format(b: dict) -> str:
-                """Render one sect bounty entry as a multi-line display block."""
-                reward = b.get("reward", {})
-                return (
-                    f"[{b['id']}] {b['name']}（{b.get('difficulty_name', '未知')}·{b.get('category', '任务')}）\n"
-                    f"  - 目标：完成 {b.get('count')} 次 | 时限：{b.get('time_limit', 0) // 60} 分钟\n"
-                    f"  - 奖励：{reward.get('stone', 0):,} 灵石 + {reward.get('exp', 0):,} 修为\n"
-                    f"  - 说明：{b.get('description', '')}"
-                )
-
-            lines = ["🏯 宗门悬赏 · 本宗委托", "━━━━━━━━━━━━━━━"]
-            lines.extend(_format(b) for b in bounties)
-            lines.append("━━━━━━━━━━━━━━━")
-            lines.append("💡 使用 /宗门 悬赏 接取 <编号> 接取任务")
-            yield event.plain_result("\n".join(lines))
+            _, msg = result
+            yield event.plain_result(msg)
+        else:
+            msg = await render_bounty_list(self.bounty_mgr, player, "sect")
+            yield event.plain_result(msg)
 
     # ===== 商店子命令组（宗门藏宝阁，贡献点结算） =====
 
