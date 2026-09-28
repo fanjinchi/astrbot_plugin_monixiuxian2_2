@@ -13,6 +13,7 @@ from .utils import player_required
 
 if TYPE_CHECKING:
     from ..core.busy_state import BusyState
+    from ..managers.ranking_manager import RankingManager
 
 
 class SectHandlers:
