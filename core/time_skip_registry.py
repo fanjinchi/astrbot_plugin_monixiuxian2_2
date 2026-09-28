@@ -11,6 +11,14 @@ expiry-relevant timestamp fields declares a module-level ``TIME_SKIP_ENTRIES``
 constant, and the registry aggregates those declarations at assembly time
 ("declare-and-be-covered"). A new cooling domain is covered by adding an entry
 in its owner module AND registering the module name in ``_PROVIDER_MODULES``.
+
+Provider order is a core contract: aggregation is a block-continuous fold over
+``_PROVIDER_MODULES`` — module N's entries always precede module N+1's, and
+within a module the declared order is kept. Registry entry order IS the
+time-skip reply detail order (first-seen dict order in ``cmd_time_skip``), so
+the provider tuple is the single ordering control; the reply detail row order
+itself is non-contractual (the spec gives no order guarantee, and existing
+tests assert unordered fragments).
 """
 
 from __future__ import annotations
@@ -20,6 +28,8 @@ import importlib.util
 import os
 import sys
 import types
+
+from astrbot.api import logger
 
 # 新增等待类冷却域 = 在字段属主模块声明 `TIME_SKIP_ENTRIES` 常量 + 把模块点号名登记进
 # 本列表（AGENTS.md §2 人工义务的登记点）。列表顺序 = 时间快进回复的域明细顺序：
@@ -61,8 +71,15 @@ def _import_provider(module_name: str) -> types.ModuleType:
     dotted = f"{_PLUGIN_PACKAGE}.{module_name}"
     try:
         return importlib.import_module(dotted)
-    except Exception:
-        pass
+    except Exception as exc:
+        # 包导入失败（独立测试/命名空间布局变化）时降级到文件路径加载；
+        # fail-loud：记录失败原因，防止静默 miss 掉某个属主模块。
+        logger.warning(
+            "time_skip_registry: package import failed for %s (%r), "
+            "falling back to file-path load",
+            dotted,
+            exc,
+        )
     path = (
         os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

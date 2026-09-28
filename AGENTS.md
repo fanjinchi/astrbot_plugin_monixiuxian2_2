@@ -74,7 +74,7 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
   3. 开始/结束走 `BusyState.set_busy(player, status, scheduled_time, extra_data=...)` / `clear(player)`
   4. 双写（user_cd + 待落库 player 字段）包在调用方同一 `async with db.transaction():` 内（owner 内部 CM 同任务 no-op join，tasks 2.1 机制定案）
 - 例外：GM force-settle（`core/gm_manager.py` 的 `update_user_cd` 直写）仅 bump `scheduled_time`、非常态忙碌写入，保留直连
-- 若新增**等待类冷却域**（任何参与到期/冷却判定的时间戳字段，如新的周期活动、冷却表、system_config 到期键），必须同步 GM「时间快进」的字段覆盖清单（`core/time_skip_registry.py` 注册表：属主模块声明 `TIME_SKIP_ENTRIES` 并在 `_PROVIDER_MODULES` 登记 —— 见 openspec change gm-time-skip-registry）与 GM 帮助文本——否则新冷却不被快进覆盖，冷却类功能测试会隐性失败
+- 若新增**等待类冷却域**（任何参与到期/冷却判定的时间戳字段，如新的周期活动、冷却表、system_config 到期键），必须同步 GM「时间快进」的字段覆盖清单（`core/time_skip_registry.py` 注册表：属主模块声明 `TIME_SKIP_ENTRIES` 并在 `_PROVIDER_MODULES` 登记 —— 见 openspec change gm-time-skip-registry）——否则新冷却不被快进覆盖，冷却类功能测试会隐性失败。覆盖域字符串由注册表 label 去重自动生成（GM 帮助「覆盖域：」行），新增域无需手改帮助；Boss/灵眼合并为一域，回复明细 10 行 vs 覆盖域 9 项为设计使然
 
 ### 3. 数据库操作规范
 

@@ -1145,7 +1145,9 @@ class GMManager:
         不承诺唤醒 asyncio.sleep 中的定时任务（Boss/灵眼循环下次醒来读到
         已前移的刷新时间即触发）。前移不可逆，故沿用「确认」约定。
         覆盖清单来自 time_skip_registry 注册表（openspec change:
-        gm-time-skip-registry），同一 label 的多条条目按聚合计数。
+        gm-time-skip-registry），同一 label 的多条条目按聚合计数。回复明细
+        10 行（label 聚合）vs 共前移 11 条（Boss/灵眼为两条单键行）是有意
+        设计：前者是面向玩家的域粒度可读行，后者是实际行数。
         """
         confirmed, remaining = self._pop_confirmation(args)
         if not confirmed:
