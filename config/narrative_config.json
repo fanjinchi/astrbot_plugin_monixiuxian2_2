@@ -1,4 +1,8 @@
 {
+  "_meta": {
+    "generated_by": "scripts/sync_copy_variants_to_config.py",
+    "hand_edit": "同步域场景（CSV 有行）以 design_docs/content-design/copy_variants.csv 为准（§15 流程），手改 FORBIDDEN；非同步域场景（legacy_encounter 等）手改保留现值"
+  },
   "breakthrough": {
     "success": {
       "panel": "✨ 突破成功！✨{streak_bonus_msg}\n━━━━━━━━━━━━━━━\n{rate_info}\n━━━━━━━━━━━━━━━\n恭喜你从【{current_level_name}】突破至【{next_level_name}】！\n\n【属性增长】\n气血 +{hp_growth}\n伤害 +{damage_growth}\n身法 +{agility_growth}\n迅捷 +{speed_growth}\n\n【当前属性】\n伤害：{damage}\n身法：{agility}\n迅捷：{speed}\n气血：{hp}\n护甲：{armor_value}",

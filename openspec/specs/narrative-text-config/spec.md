@@ -32,6 +32,8 @@
 - **WHEN** 运营/策划修改 `narrative_config.json` 中某场景的模板文本（不动插值变量名）
 - **THEN** 重载后新文案生效，无需修改任何 Python 文件
 
+> 流程指向（`_meta` 手改政策，见变更 narrative-contract-module）：非同步域场景（config 中 CSV 无行的键，如 `legacy_encounter`）手改 config 仍是运营路径，保留现值；同步域场景（CSV 有行）以 `design_docs/content-design/copy_variants.csv` 为准，经 `scripts/sync_copy_variants_to_config.py` 导入入库（§15 流程），手改会被导入覆盖。
+
 #### Scenario: 双槽形态拼装渲染
 
 - **WHEN** 某场景配置为双槽形态（含字符串 `panel` 键与 flavor 分桶池），且调用点提供玩家 route 与 level_index

@@ -100,7 +100,7 @@ logo.png             # 插件 Logo（可选，推荐 256x256）
 
 ### 5. 配置系统
 
-- **静态配置**：放在 `config/*.json`（境界、物品、武器、丹药、配方等），修改后需 **重启 AstrBot** 生效
+- **静态配置**：放在 `config/*.json`（境界、物品、武器、丹药、配方等），修改后需 **重启 AstrBot** 生效。`config/narrative_config.json` 是同步脚本生成物，带 `_meta` 手改政策段：同步域场景（CSV 有行）以 `design_docs/content-design/copy_variants.csv` 为准，手改 FORBIDDEN（会被导入覆盖）；非同步域场景（如 `legacy_encounter`）手改保留现值
 - `config_manager.py` 会自动加载 JSON；若文件不存在，会从 `data/default_configs.py` 创建默认值
 - **动态配置**：通过 `_conf_schema.json` 暴露给 AstrBot WebUI，运行时通过 `AstrBotConfig` 传入 `__init__`
 - `_conf_schema.json` 支持高级字段：`type: "dict"` + `template_schema`、`type: "template_list"`、`type: "file"` 等

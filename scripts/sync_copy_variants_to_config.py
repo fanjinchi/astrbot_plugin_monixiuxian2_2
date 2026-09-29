@@ -42,6 +42,11 @@ level_band 映射：单段直达同名桶；``练气-筑基`` / ``金丹-元婴`
 
 Usage:
     uv run python scripts/sync_copy_variants_to_config.py [--dry-run]
+
+``config/narrative_config.json`` 是生成物：同步域场景（CSV 有行）以
+design_docs/content-design/copy_variants.csv 为准（§15 流程），手改 FORBIDDEN；
+非同步域场景（legacy_encounter 等）手改保留现值。写盘时脚本幂等注入/保留顶层
+``_meta`` 段标注此政策（仅 narrative_config.json；adventure_config.json 不加）。
 """
 
 from __future__ import annotations
@@ -90,6 +95,14 @@ LEVEL_BAND_TO_BUCKETS = {
     "金丹-元婴": ("金丹", "元婴"),
 }
 
+# narrative_config.json 顶层生成物标注（仅写盘 narrative 分支注入）：同步域场景
+# （CSV 有行）以 design_docs/content-design/copy_variants.csv 为准（§15 流程），
+# 手改 FORBIDDEN；非同步域场景（legacy_encounter 等）手改保留现值。
+NARRATIVE_META = {
+    "generated_by": "scripts/sync_copy_variants_to_config.py",
+    "hand_edit": "同步域场景（CSV 有行）以 design_docs/content-design/copy_variants.csv 为准（§15 流程），手改 FORBIDDEN；非同步域场景（legacy_encounter 等）手改保留现值",
+}
+
 ROUTE_TAGS = ("灵修", "体修")
 
 
@@ -114,16 +127,49 @@ def _load_narrative_defaults():
     return mod
 
 
+def _load_narrative_contract():
+    """Load ``utils/narrative_contract`` by file path (same standalone trick as
+    :func:`_load_narrative_defaults`) so the script does not depend on the
+    plugin package import chain."""
+    import importlib.util
+
+    init_path = PLUGIN_ROOT / "utils" / "narrative_contract.py"
+    spec = importlib.util.spec_from_file_location("narrative_contract_sync", init_path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# Contract parsing is the single source for template variable extraction; the
+# old local regex (\{(\w+)) is gone so the import gates and the runtime
+# validation agree on one parser.
+_NARRATIVE_CONTRACT = _load_narrative_contract()
+
+
 def _default_scene_vars() -> dict[tuple[str, str], set[str]]:
-    """Load embedded default templates' variable sets, keyed by (domain, scene)."""
+    """Load embedded default templates' variable sets, keyed by (domain, scene).
+
+    Walks every pool entry of each default scene value via
+    ``narrative_contract.iter_scene_entries`` and unions ``used_vars`` across
+    entries, so a future dict-shaped default (e.g. dual-slot) contributes its
+    variables instead of silently disappearing. Deliberately NO try/except
+    around the leaf parsing: a malformed embedded default is a dev-time error
+    that the admission tests surface on CI, and failing loudly beats silently
+    importing a wrong default.
+    """
     mod = _load_narrative_defaults()
     result: dict[tuple[str, str], set[str]] = {}
     for domain, scenes in mod.DEFAULT_NARRATIVE_CONFIG.items():
         if not isinstance(scenes, dict):
             continue
         for scene, value in scenes.items():
-            if isinstance(value, str):
-                result[(domain, scene)] = set(re.findall(r"\{(\w+)", value))
+            used: set[str] = set()
+            for _location, entry in _NARRATIVE_CONTRACT.iter_scene_entries(value):
+                template = entry if isinstance(entry, str) else entry.get("text", "")
+                if isinstance(template, str):
+                    used |= _NARRATIVE_CONTRACT.used_vars(template)
+            result[(domain, scene)] = used
     return result
 
 
@@ -136,11 +182,6 @@ def _declared_scene_vars() -> dict[tuple[str, str], set[str]]:
         for domain, scenes in mod.NARRATIVE_SCENE_VARS.items()
         for scene, vars_ in scenes.items()
     }
-
-
-def _template_vars(text: str) -> set[str]:
-    """Extract ``{var}`` names from one template (mirror of the lint rule)."""
-    return set(re.findall(r"\{(\w+)", text))
 
 
 def _strip_separator(text: str) -> str:
@@ -241,13 +282,22 @@ def _migrate_dual_slot(
         print(f"  WARN {label} 现有值既不是字符串也不是双槽 dict，整场景跳过")
         return None
     if declared is not None:
-        bad = [
-            e
-            for entries in buckets.values()
-            for e in entries
-            if not _template_vars(e if isinstance(e, str) else e.get("text", ""))
-            <= declared
-        ]
+        try:
+            bad = [
+                e
+                for entries in buckets.values()
+                for e in entries
+                if not _NARRATIVE_CONTRACT.used_vars(
+                    e if isinstance(e, str) else e.get("text", "")
+                )
+                <= declared
+            ]
+        except ValueError:
+            # Malformed braces: the variable set cannot be computed, so the
+            # scene violates the contract and is skipped wholesale. Must
+            # return immediately -- ``bad`` is assigned by the comprehension
+            # and would be unbound after the except.
+            return None
         if bad:
             print(
                 f"  WARN {label} 有 {len(bad)} 条 flavor 变量越出声明集 "
@@ -314,11 +364,20 @@ def _apply_short_text(
             written += 1
             continue
         required = default_vars.get((domain, scene), set())
-        ok = all(
-            _template_vars(e if isinstance(e, str) else e.get("text", "")) >= required
-            for entries in buckets.values()
-            for e in entries
-        )
+        try:
+            ok = all(
+                _NARRATIVE_CONTRACT.used_vars(
+                    e if isinstance(e, str) else e.get("text", "")
+                )
+                >= required
+                for entries in buckets.values()
+                for e in entries
+            )
+        except ValueError:
+            # Malformed braces count as contract violation: the whole scene is
+            # skipped. all() aborting mid-comprehension gives the same outcome
+            # as per-entry checking, so no finer-grained handling is needed.
+            ok = False
         if not ok:
             skipped.append(f"{domain}.{scene}")
             continue
@@ -417,9 +476,17 @@ def main() -> int:
 
     if args.dry_run:
         print("\nDry run: no files written.")
+        print(
+            "注意：正式写盘会向 narrative_config.json 幂等注入/保留顶层 _meta "
+            "（生成物手改政策标注，见脚本 Usage）。"
+        )
         return 0
 
     for path, cfg in ((ncfg_path, ncfg), (acfg_path, acfg)):
+        if path == ncfg_path:
+            # 生成物标注仅限 narrative_config.json（adventure_config.json 无
+            # 叙事域 _meta）。覆盖 materialize 新文件与手工删除两种缺失场景。
+            cfg.setdefault("_meta", NARRATIVE_META)
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(
             json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

@@ -17,15 +17,10 @@ from .data.default_configs import (
     SECT_TASKS,
 )
 
-# 叙事文案辅助函数单源在 utils/narrative_text.py（可独立加载，供 managers 的
-# try/except 测试加载分支使用）；渲染入口 render_narrative 等由调用方直接从该
-# 模块引入，此处仅引入校验逻辑所需符号。
-from .utils.narrative_text import (
-    _NARRATIVE_ROUTES,
-    NARRATIVE_BUCKET_KEYS,
-    _iter_scene_entries,
-    extract_template_vars,
-)
+# 叙事文案契约解析/校验单源在 utils/narrative_contract.py（顶层零依赖，包内与
+# standalone 均可加载）；渲染入口 render_narrative 等由调用方直接从
+# utils/narrative_text.py 引入，此处只需引入校验服务。
+from .utils.narrative_contract import validate_scene
 
 _CHINESE_DIGITS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
 
@@ -560,14 +555,22 @@ class ConfigManager:
         may pre-fill buckets for segments the code does not select yet. The
         embedded defaults themselves are validated too, as a dev-time safety
         net (a broken default has nothing left to fall back to).
+        Validation itself lives in ``utils/narrative_contract.validate_scene``
+        (single source); this method owns only the disposition: logging the
+        diagnostics verbatim and replacing rejected scenes with the embedded
+        default.
         """
         for section, scenes in NARRATIVE_SCENE_VARS.items():
             for scene, declared in scenes.items():
                 default_value = DEFAULT_NARRATIVE_CONFIG.get(section, {}).get(scene)
                 if default_value is not None:
-                    self._check_narrative_scene(
+                    for severity, message in validate_scene(
                         section, scene, default_value, declared, source="内嵌默认"
-                    )
+                    )[1]:
+                        if severity == "warning":
+                            logger.warning(message)
+                        else:
+                            logger.error(message)
 
             section_cfg = self.narrative_config.get(section)
             if not isinstance(section_cfg, dict):
@@ -575,88 +578,18 @@ class ConfigManager:
             for scene, declared in scenes.items():
                 if scene not in section_cfg:
                     continue
-                if not self._check_narrative_scene(
+                usable, diagnostics = validate_scene(
                     section, scene, section_cfg[scene], declared, source="配置"
-                ):
+                )
+                for severity, message in diagnostics:
+                    if severity == "warning":
+                        logger.warning(message)
+                    else:
+                        logger.error(message)
+                if not usable:
                     section_cfg[scene] = DEFAULT_NARRATIVE_CONFIG.get(section, {}).get(
                         scene
                     )
-
-    def _check_narrative_scene(
-        self, section: str, scene: str, value: Any, declared: set[str], source: str
-    ) -> bool:
-        """Check one scene value against its declared variable contract.
-
-        Returns True when the scene is usable. Violations are logged with the
-        scene key, entry location, and offending variable names.
-
-        Dual-slot shape (dict with a string ``panel`` key, no ``text`` key):
-        the panel string is validated as a ``[panel]#0`` entry by the shared
-        entry loop, and the ``panel`` key is exempt from bucket-key warnings.
-        A non-string ``panel`` value, or a dict carrying both ``text`` and
-        ``panel``, is a malformed half-shape — warn and reject the whole
-        scene so it falls back to the embedded default.
-        """
-        if isinstance(value, dict) and "panel" in value:
-            # 短路特判必须先于 _iter_scene_entries 遍历：非字符串 panel 会被
-            # 当 flavor 桶条目校验，掩盖"双槽形态非法"的真实诊断。
-            if not isinstance(value.get("panel"), str) or isinstance(
-                value.get("text"), str
-            ):
-                logger.warning(
-                    f"叙事配置[{source}] {section}.{scene} 双槽形态非法："
-                    "panel 键必须为字符串模板，且场景值不得同含 text 键；"
-                    "整场景回退内嵌默认。"
-                )
-                return False
-        ok = True
-        if isinstance(value, dict) and not isinstance(value.get("text"), str):
-            for bucket in value:
-                # 双槽形态的 panel 键是机械面板模板，不是分桶键——豁免桶键
-                # 告警（其字符串值仍经 _iter_scene_entries 作为 [panel]#0 条目
-                # 接受变量子集校验）。
-                if bucket == "panel":
-                    continue
-                if bucket not in NARRATIVE_BUCKET_KEYS:
-                    logger.warning(
-                        f"叙事配置[{source}] {section}.{scene} 存在未知分桶键 "
-                        f"{bucket!r}，该桶不会被取用（合法桶键: {NARRATIVE_BUCKET_KEYS}）。"
-                    )
-
-        for location, entry in _iter_scene_entries(value):
-            if isinstance(entry, dict):
-                tagged_route = entry.get("route")
-                if tagged_route and tagged_route not in _NARRATIVE_ROUTES:
-                    logger.warning(
-                        f"叙事配置[{source}] {section}.{scene}{location} 存在未知路线标注 "
-                        f"{tagged_route!r}（合法值: {_NARRATIVE_ROUTES}）。"
-                    )
-                template = entry.get("text")
-                if not isinstance(template, str):
-                    logger.error(
-                        f"叙事配置[{source}] {section}.{scene}{location} 条目缺少 text 字段。"
-                    )
-                    ok = False
-                    continue
-            else:
-                template = entry
-            try:
-                used = extract_template_vars(template)
-            except ValueError as exc:
-                logger.error(
-                    f"叙事文案契约违例[{source}] {section}.{scene}{location}: "
-                    f"模板花括号不配对（{exc}）。"
-                )
-                ok = False
-                continue
-            unknown = used - declared
-            if unknown:
-                logger.error(
-                    f"叙事文案契约违例[{source}] {section}.{scene}{location}: "
-                    f"未知变量 {sorted(unknown)}，该场景已声明变量 {sorted(declared)}。"
-                )
-                ok = False
-        return ok
 
     def _validate_sect_configs(self):
         """Validate sect_factions/sect_tasks structure and cross-references.

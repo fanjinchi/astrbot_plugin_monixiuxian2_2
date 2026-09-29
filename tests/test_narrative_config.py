@@ -24,6 +24,12 @@ level_to_narrative_bucket = _nt_mod.level_to_narrative_bucket
 render_narrative = _nt_mod.render_narrative
 select_narrative_pool = _nt_mod.select_narrative_pool
 
+_contract_mod = load_package_module(
+    "utils/narrative_contract.py",
+    "astrbot_plugin_monixiuxian2_2.utils.narrative_contract",
+)
+contract = _contract_mod
+
 _cult_mod = load_package_module(
     "core/cultivation_manager.py",
     "astrbot_plugin_monixiuxian2_2.core.cultivation_manager",
@@ -209,7 +215,7 @@ def test_declared_scenes_all_have_defaults_and_satisfy_contract():
         for scene, declared in scenes.items():
             value = DEFAULT_NARRATIVE_CONFIG.get(section, {}).get(scene)
             assert value is not None, f"{section}.{scene} 缺内嵌默认文案"
-            entries = list(_config_mod._iter_scene_entries(value))
+            entries = list(contract.iter_scene_entries(value))
             assert entries, f"{section}.{scene} 内嵌默认文案为空"
             for location, entry in entries:
                 template = entry if isinstance(entry, str) else entry.get("text", "")
@@ -533,3 +539,167 @@ def test_embedded_defaults_obey_the_line_break_contract():
                 )
     # 内嵌默认是「每场景一条」的兜底文案（多 variant 池只存在于导入后的 config）。
     assert checked >= 50, f"扫描条目过少（{checked}），契约测试可能已失效"
+
+
+# --- 契约深模块（utils/narrative_contract.py） --------------------------------
+
+
+def test_used_vars_boundaries():
+    """used_vars matches Formatter semantics: escaped braces, format specs,
+    dotted/indexed roots, and ValueError on malformed braces."""
+    assert contract.used_vars("妙哉{name}") == {"name"}
+    assert contract.used_vars("{{literal}} 不产生变量") == set()
+    assert contract.used_vars("成功率 {next_bonus:.0%}") == {"next_bonus"}
+    assert contract.used_vars("{player.name} 的 {x[0]}") == {"player", "x"}
+    with pytest.raises(ValueError):
+        contract.used_vars("未配对 {name")
+
+
+def test_validate_scene_dual_slot_malformed_warns_and_rejects():
+    """Non-string panel / text+panel half-shape: warning + whole-scene reject,
+    with the 叙事配置 prefix (row :607 assignment)."""
+    usable, diagnostics = contract.validate_scene(
+        "breakthrough",
+        "success",
+        {"panel": 123, "通用": ["好{name}"]},
+        {"name"},
+        source="配置",
+    )
+    assert usable is False
+    assert [sev for sev, _ in diagnostics] == ["warning"]
+    assert diagnostics[0][1] == (
+        "叙事配置[配置] breakthrough.success 双槽形态非法："
+        "panel 键必须为字符串模板，且场景值不得同含 text 键；整场景回退内嵌默认。"
+    )
+    usable2, diag2 = contract.validate_scene(
+        "breakthrough",
+        "success",
+        {"panel": "面板{name}", "text": "x"},
+        {"name"},
+        source="内嵌默认",
+    )
+    assert usable2 is False
+    assert diag2[0][1].startswith(
+        "叙事配置[内嵌默认] breakthrough.success 双槽形态非法："
+    )
+
+
+def test_validate_scene_unknown_bucket_warns_only():
+    """Unknown bucket key: warning only, scene stays usable (:622 叙事配置)."""
+    usable, diagnostics = contract.validate_scene(
+        "breakthrough", "success", {"化神": ["好{name}"]}, {"name"}, source="配置"
+    )
+    assert usable is True
+    assert diagnostics == [
+        (
+            "warning",
+            "叙事配置[配置] breakthrough.success 存在未知分桶键 '化神'，"
+            "该桶不会被取用（合法桶键: ('通用', '练气', '筑基', '金丹', '元婴')）。",
+        )
+    ]
+
+
+def test_validate_scene_unknown_route_warns_only():
+    """Unknown route tag: warning only, scene stays usable (:631 叙事配置)."""
+    value = {"通用": [{"text": "好{name}", "route": "魔法"}]}
+    usable, diagnostics = contract.validate_scene(
+        "breakthrough", "success", value, {"name"}, source="配置"
+    )
+    assert usable is True
+    assert diagnostics[0] == (
+        "warning",
+        "叙事配置[配置] breakthrough.success[通用]#0 存在未知路线标注 '魔法'"
+        "（合法值: ('灵修', '体修')）。",
+    )
+
+
+def test_validate_scene_missing_text_error():
+    """Entry without a text field: error, scene rejected — but 叙事配置 prefix
+    (:637 assignment; error level does not imply the 违例 prefix)."""
+    value = {"通用": [{"route": "灵修"}]}
+    usable, diagnostics = contract.validate_scene(
+        "breakthrough", "success", value, {"name"}, source="配置"
+    )
+    assert usable is False
+    assert diagnostics[0] == (
+        "error",
+        "叙事配置[配置] breakthrough.success[通用]#0 条目缺少 text 字段。",
+    )
+
+
+def test_validate_scene_unbalanced_braces_error():
+    """Unbalanced braces: error with the 违例 prefix (:647); the exception text
+    is Python-version dependent, so only prefix/suffix are pinned."""
+    usable, diagnostics = contract.validate_scene(
+        "breakthrough", "success", "好的{name", {"name"}, source="配置"
+    )
+    assert usable is False
+    assert diagnostics[0][0] == "error"
+    assert diagnostics[0][1].startswith(
+        "叙事文案契约违例[配置] breakthrough.success#0: 模板花括号不配对（"
+    )
+    assert diagnostics[0][1].endswith("）。")
+
+
+def test_validate_scene_panel_location_for_unknown_var():
+    """Dual-slot panel string is validated as a [panel]#0 entry; an unknown
+    variable there rejects the scene with the 违例 prefix (:655)."""
+    value = {"panel": "面板{wrong}", "通用": ["好{name}"]}
+    usable, diagnostics = contract.validate_scene(
+        "breakthrough", "success", value, {"name"}, source="配置"
+    )
+    assert usable is False
+    assert diagnostics[-1] == (
+        "error",
+        "叙事文案契约违例[配置] breakthrough.success[panel]#0: "
+        "未知变量 ['wrong']，该场景已声明变量 ['name']。",
+    )
+
+
+def test_validate_scene_multi_diagnostic_order():
+    """Order contract: dual-slot shape check → bucket-key loop → per-entry loop
+    (route → missing text → braces → unknown variables), matching
+    config_manager.py:600-658 execution order."""
+    value = {
+        "化神": "好的{name",
+        "通用": [{"text": "好{wrong}", "route": "魔法"}],
+    }
+    usable, diagnostics = contract.validate_scene(
+        "breakthrough", "success", value, {"name"}, source="配置"
+    )
+    assert usable is False
+    assert [sev for sev, _ in diagnostics] == ["warning", "error", "warning", "error"]
+    assert diagnostics[0][1].startswith(
+        "叙事配置[配置] breakthrough.success 存在未知分桶键 '化神'"
+    )
+    assert diagnostics[1][1].startswith(
+        "叙事文案契约违例[配置] breakthrough.success[化神]#0: 模板花括号不配对（"
+    )
+    assert diagnostics[2][1] == (
+        "叙事配置[配置] breakthrough.success[通用]#0 存在未知路线标注 '魔法'"
+        "（合法值: ('灵修', '体修')）。"
+    )
+    assert diagnostics[3][1] == (
+        "叙事文案契约违例[配置] breakthrough.success[通用]#0: "
+        "未知变量 ['wrong']，该场景已声明变量 ['name']。"
+    )
+
+
+def test_iter_scene_entries_locations():
+    """Flat vs bucketed location markers, including the dual-slot panel as
+    [panel]#0, and non-pool items being skipped."""
+    assert list(contract.iter_scene_entries("单条")) == [("#0", "单条")]
+    assert list(contract.iter_scene_entries(["甲", "乙"])) == [
+        ("#0", "甲"),
+        ("#1", "乙"),
+    ]
+    assert list(contract.iter_scene_entries({"通用": ["通"], "练气": ["气"]})) == [
+        ("[通用]#0", "通"),
+        ("[练气]#0", "气"),
+    ]
+    dual = {"panel": "面板{name}", "通用": ["好{name}"]}
+    assert list(contract.iter_scene_entries(dual)) == [
+        ("[panel]#0", "面板{name}"),
+        ("[通用]#0", "好{name}"),
+    ]
+    assert list(contract.iter_scene_entries([123, "甲"])) == [("#0", "甲")]

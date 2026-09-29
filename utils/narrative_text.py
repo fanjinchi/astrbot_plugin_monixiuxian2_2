@@ -36,7 +36,6 @@ Panel templates (the dual-slot ``panel`` key) are excluded from stripping: they
 """
 
 import random
-import string
 from typing import Any
 
 from astrbot.api import logger
@@ -70,10 +69,37 @@ except ImportError:
     DEFAULT_NARRATIVE_CONFIG = _nd.DEFAULT_NARRATIVE_CONFIG
     NARRATIVE_SCENE_VARS = _nd.NARRATIVE_SCENE_VARS
 
-# Bucket keys for realm-segment copy pools, shared by narrative scenes and
-# adventure event desc_variants. 通用 always participates in the merged pool;
-# the other four keys map to the season-1 幕表 level segments.
-NARRATIVE_BUCKET_KEYS = ("通用", "练气", "筑基", "金丹", "元婴")
+# Contract parsing/validation lives in utils/narrative_contract.py (single
+# source); this module re-exports the shared symbols so hot-path pool
+# selection and existing consumers keep working unchanged. The try/except
+# mirrors the defaults block above: standalone loading under tests cannot
+# use the package-relative import.
+try:
+    from ..utils import narrative_contract as _narrative_contract
+except ImportError:
+    # Standalone loading under tests: load the contract module by file path.
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    _contract_path = (
+        Path(__file__).resolve().parents[1] / "utils" / "narrative_contract.py"
+    )
+    _spec = importlib.util.spec_from_file_location(
+        "narrative_contract_standalone", _contract_path
+    )
+    _narrative_contract = importlib.util.module_from_spec(_spec)
+    sys.modules[_spec.name] = _narrative_contract
+    _spec.loader.exec_module(_narrative_contract)
+
+# Re-export the shared symbols (hot-path pool selection and existing consumers
+# keep working unchanged). Module-level rebinding after the dual-path load so
+# both branches yield identical names.
+NARRATIVE_BUCKET_KEYS = _narrative_contract.NARRATIVE_BUCKET_KEYS
+_NARRATIVE_ROUTES = _narrative_contract.NARRATIVE_ROUTES
+_iter_pool_entries = _narrative_contract._iter_pool_entries
+_iter_scene_entries = _narrative_contract.iter_scene_entries
+used_vars = _narrative_contract.used_vars
 
 # 1-based level ranges per bucket (season-1 幕表: Lv1-9/10-19/20-29/30-39).
 _NARRATIVE_BUCKET_RANGES = (
@@ -82,11 +108,6 @@ _NARRATIVE_BUCKET_RANGES = (
     (20, 29, "金丹"),
     (30, 39, "元婴"),
 )
-
-# Valid values for the optional per-entry route tag.
-_NARRATIVE_ROUTES = ("灵修", "体修")
-
-_TEMPLATE_FORMATTER = string.Formatter()
 
 
 def level_to_narrative_bucket(level_index: int | None) -> str | None:
@@ -111,28 +132,13 @@ def level_to_narrative_bucket(level_index: int | None) -> str | None:
 def extract_template_vars(template: str) -> set[str]:
     """Extract the ``{var}`` placeholder names referenced by a template.
 
-    Only the root of each field is returned (``{player.name}`` -> ``player``).
-    Raises ``ValueError`` on malformed brace usage so callers can report a
-    contract violation instead of rendering garbage.
+    Legacy public name; delegates to ``narrative_contract.used_vars`` (the
+    single source). Only the root of each field is returned
+    (``{player.name}`` -> ``player``). Raises ``ValueError`` on malformed
+    brace usage so callers can report a contract violation instead of
+    rendering garbage.
     """
-    variables: set[str] = set()
-    for _, field_name, _, _ in _TEMPLATE_FORMATTER.parse(template):
-        if field_name:
-            root = field_name.split(".")[0].split("[")[0]
-            if root:
-                variables.add(root)
-    return variables
-
-
-def _iter_pool_entries(value: Any) -> list:
-    """Flatten a non-bucket scene value into raw pool entries (str or dict)."""
-    if isinstance(value, str):
-        return [value]
-    if isinstance(value, dict) and isinstance(value.get("text"), str):
-        return [value]
-    if isinstance(value, list):
-        return [e for e in value if isinstance(e, (str, dict))]
-    return []
+    return used_vars(template)
 
 
 def _sanitize_entry_text(text: str, scene_label: str) -> str:
@@ -341,18 +347,3 @@ def render_narrative(
         # the raw template rather than crashing the command pipeline.
         logger.error(f"叙事模板渲染失败 {section}.{scene}: {exc}")
         return template
-
-
-def _iter_scene_entries(value: Any):
-    """Yield ``(location, entry)`` for every pool entry in a scene value.
-
-    ``location`` is a human-readable marker (bucket/index) used in validation
-    error messages. Entries are raw (str or ``{"text", "route"}`` dicts).
-    """
-    if isinstance(value, dict) and not isinstance(value.get("text"), str):
-        for bucket, bucket_value in value.items():
-            for index, entry in enumerate(_iter_pool_entries(bucket_value)):
-                yield f"[{bucket}]#{index}", entry
-    else:
-        for index, entry in enumerate(_iter_pool_entries(value)):
-            yield f"#{index}", entry
