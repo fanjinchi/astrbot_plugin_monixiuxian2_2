@@ -53,13 +53,34 @@ _PROVIDER_MODULES: tuple[str, ...] = (
 _PLUGIN_PACKAGE = "astrbot_plugin_monixiuxian2_2"
 
 
+def _plugin_package() -> str:
+    """Return this plugin's import package name for provider imports.
+
+    AstrBot loads plugins as ``data.plugins.<dir_name>`` (an implicit
+    namespace package, no ``__init__.py``), while the test harness
+    (tests/helpers.load_package_module) registers the same modules under the
+    bare directory name. Deriving from this module's own ``__package__``
+    covers both layouts; the constant is only a last-resort fallback when
+    this module itself was loaded without a package (explicit file-path
+    load), in which case provider imports fall back too.
+
+    Returns:
+        The import package prefix for the plugin, e.g.
+        ``"data.plugins.astrbot_plugin_monixiuxian2_2"``.
+    """
+    if __package__:
+        return __package__.rpartition(".")[0]
+    return _PLUGIN_PACKAGE
+
+
 def _import_provider(module_name: str) -> types.ModuleType:
     """Import a provider module by its dotted name within the plugin package.
 
-    The plugin is loaded by AstrBot under its directory name; tests may also
-    register modules under that package (tests/helpers.load_package_module).
-    Falling back to a file-path load keeps the registry usable when the
-    package is not importable (standalone test scripts).
+    The plugin is loaded by AstrBot under ``data.plugins.<dir_name>``; tests
+    register modules under the bare package name
+    (tests/helpers.load_package_module). Falling back to a file-path load
+    keeps the registry usable when the package is not importable (standalone
+    test scripts).
 
     Args:
         module_name: Dotted module path relative to the plugin root, e.g.
@@ -68,7 +89,7 @@ def _import_provider(module_name: str) -> types.ModuleType:
     Returns:
         The loaded module object.
     """
-    dotted = f"{_PLUGIN_PACKAGE}.{module_name}"
+    dotted = f"{_plugin_package()}.{module_name}"
     try:
         return importlib.import_module(dotted)
     except Exception as exc:
