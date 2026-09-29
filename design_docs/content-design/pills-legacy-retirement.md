@@ -11,7 +11,7 @@
 1. **删除** items.json 全部 33 个丹药条目（含血煞丹 items 侧冗余——现行解析走 utility 表）。
 2. **移除** `rift_manager.py` 整套秘境丹药掉落机制（`RIFT_PILL_DROP_TABLE` / `RIFT_PILL_DROP_CHANCE` / `_roll_pill_drops` / 调用点）——掉落的本来就是不可用丹药。
 3. **`get_pill_config` 删除 items 兜底分支**：「丹药 = 三表名域」成为结构保证，items 表不再承载丹药类型。
-4. 测试断言②恢复为「items 零丹药条目」；断言③（表内无重名）保持 xfail 等 bd `-czl`（混元血容丹双 tier 共名）。
+4. 测试断言②恢复为「items 零丹药条目」；断言③（表内无重名）曾保持 xfail 等 bd `-czl`（混元血容丹双 tier 共名）——2026-09-29 用户确认内容重设计未启动，直接删除被覆盖的皇品条目（util_128，保留生效中的混元先天条目 util_142），xfail 已移除转绿，bd `-czl` 关闭。
 
 ## 对丹药内容管线的约束
 

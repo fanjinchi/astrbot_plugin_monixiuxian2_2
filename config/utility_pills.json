@@ -1687,18 +1687,6 @@
         "shop_weight": 100
     },
     {
-        "id": "util_128",
-        "name": "混元血容丹",
-        "description": "永久增加最大气血+10000（体修专用）",
-        "rank": "皇品",
-        "subtype": "permanent_attribute",
-        "required_level_index": 16,
-        "price": 15000,
-        "effect_type": "permanent",
-        "max_blood_qi_gain": 10000,
-        "shop_weight": 50
-    },
-    {
         "id": "util_129",
         "name": "凝血丹",
         "description": "临时每分钟恢复气血+100，持续30分钟（体修专用）",

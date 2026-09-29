@@ -223,11 +223,6 @@ class TestGetPillConfig:
         names = self._raw_names("exp_pills.json")
         assert len(names) == len(set(names)), "exp_pills.json 表内重名"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="blocked by bd -czl: utility_pills.json 混元血容丹两个不同 tier 共名（raw 143 → unique 142），"
-        "内容管线修复后移除本标记即转绿",
-    )
     def test_no_duplicates_in_utility_pills_table(self):
         """Gate ③ for utility_pills.json: raw count equals dedup name count."""
         names = self._raw_names("utility_pills.json")
