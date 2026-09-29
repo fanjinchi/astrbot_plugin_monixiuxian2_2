@@ -44,8 +44,8 @@ EXPECTED_LABELS: tuple[str, ...] = (
     "传承被夺保护期",  # 11 impart_snatch
 )
 
-# 覆盖域行 = label 去重（Boss/灵眼同 label 合并为一域 → 9 项；
-# 明细 10 行 vs 覆盖域 9 项为设计使然，见 design.md D4 隐性耦合注记）
+# 覆盖域行 = label 去重（11 条目仅 Boss/灵眼同 label 合并 → 10 项；
+# 明细 10 行 = 覆盖域 10 项，见 design.md D4 隐性耦合注记）
 EXPECTED_COVERED = "、".join(dict.fromkeys(EXPECTED_LABELS))
 
 # field → label 映射（field 契约面 → label 实现面搭桥，抄自
@@ -67,8 +67,8 @@ FIELD_TO_LABEL: dict[str, str] = {
     "impart_snatch_protection.snatched_at": EXPECTED_LABELS[10],
 }
 
-# data/migration.py 等不参与本域；仅 core/managers/handlers 是容忍的属主位置
-# （design D3）。
+# 扫描目录 = 全部可能落声明的位置（core/managers/handlers）；合法属主 =
+# 仅 core/managers（tasks 1.2 禁止 handlers 作属主），handlers 命中即分层违例被抓。
 _SCAN_DIRS = ("core", "managers", "handlers")
 
 
@@ -136,12 +136,11 @@ class TestCoverageContract:
     def test_every_declared_constant_is_registered(self):
         """静态扫描：含 TIME_SKIP_ENTRIES 声明的模块必须 ∈ provider 列表。
 
-        抓「声明了但漏登记 provider」——声明后登记是自动被覆盖的前提。
-        扫描范围限定 core/managers/handlers：handlers/ 不参与扫描，因为处理器
-        只做命令路由、架构上不得声明玩法条目（design D3 属主模块=业务 manager/core）；
-        若未来有人在 handlers 里误写声明，未登记即不被覆盖、但也不会漏检——
-        反向扫描只对 provider 列表内模块检查声明存在，对 provider 之外的文件
-        fail-closed（不产生假阳性），代价是该误写不会被正向抓出，靠 review 兜底。
+        抓「声明了但漏登记 provider」——登记是声明自动被覆盖的前提。扫描
+        core/managers/handlers 三个目录：handlers/ 在扫描范围内正是为了抓
+        「常量误落 handlers/」的分层违例（tasks 1.2 禁止 handlers 作属主，
+        handler 只做命令路由）；任何目录声明了 TIME_SKIP_ENTRIES 的模块
+        若未登记 provider，本测试即 fail（fail-closed，无假阳性方向）。
         """
         declared = []
         for dirname in _SCAN_DIRS:
