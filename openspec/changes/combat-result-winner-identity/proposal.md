@@ -23,7 +23,7 @@
 
 ## Impact
 
-- **代码**：`managers/combat_manager.py`（CombatResult 字段 + `resolve_combat` :352-388 赋值 + legacy dict :1529）；`managers/pve_combat_manager.py`（5 处）；`managers/boss_manager.py`（3 处）；`managers/impart_pk_manager.py`（2 处）。
+- **代码**：`managers/combat_manager.py`（CombatResult 字段 + `resolve_combat` :352-388 赋值 + legacy dict :1529）；`managers/pve_combat_manager.py`（5 处）；`managers/boss_manager.py`（4 处：读 :446/:452/:494 + legacy dict :527）；`managers/impart_pk_manager.py`（2 处）。
 - **design_docs 脚本**：`attribute-growth/` 4 个模拟脚本的胜者读取（`rebalance_equipment.py` 不读 winner，除外；输出数值不变，仅判定读取改写）。
 - **测试**：6 个测试文件的 CombatResult 构造/断言；全量 pytest 须绿。
 - **无**数据库迁移、无配置变更、无用户可见行为变化；前缀约定（`enemy_`/`guardian_`）保留在 `EnemyManager` 内部，只是不再跨 seam 泄漏。

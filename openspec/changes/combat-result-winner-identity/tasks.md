@@ -2,8 +2,8 @@
 
 ## 0. 前置检查
 
-- [x] ] 重新锚定行号：确认在途变更未改动 `managers/combat_manager.py` 结算段与 `pve_combat_manager.py` 的消费者行；若其它 change 先合入，按当时代码更新本文件全部行号引用
-- [x] ] 全仓 grep 基线：`result.winner`（属性读取）与 `"winner"` / `.get("winner"`（dict 键读取，覆盖 `main.py:1243` 这类非属性消费点）/ `startswith("enemy_")` / `isinstance(winner` 的消费者清单与 design.md Context 枚举一致
+- [x] 0.1 重新锚定行号：确认在途变更未改动 `managers/combat_manager.py` 结算段与 `pve_combat_manager.py` 的消费者行；若其它 change 先合入，按当时代码更新本文件全部行号引用
+- [x] 0.2 全仓 grep 基线：`result.winner`（属性读取）与 `"winner"` / `.get("winner"`（dict 键读取，覆盖 `main.py:1243` 这类非属性消费点）/ `startswith("enemy_")` / `isinstance(winner` 的消费者清单与 design.md Context 枚举一致
 
 ## 1. 引擎接口重构（combat_manager.py）
 
@@ -27,8 +27,8 @@
 
 - [x] 3.1 测试更新（构造 `CombatResult(winner=...)` → `winner_side=/winner_id=`；断言 `result.winner` → `result.winner_side`/`winner_id`）：`tests/test_combat_engine.py`（:456,:503,:515,:546 等多处）、`tests/test_combat_report_structure.py`（:177,:195,:219）、`tests/test_trigger_effect_extensions.py`（:358-382,:704,:739）、`tests/test_rift_encounters.py`（:486-494 桩与 :498,:514,:529 用例）、`tests/test_boss.py`（:91,:359,:401,:443）、`tests/test_pve_combat.py`（:69,:471 两个 `CombatResult` 桩）；注意 **`CombatResult` 桩的** `winner="draw"` 构造点改 `winner_side="draw", winner_id=None`。**非 draw 桩的 side 映射逐桩钉死**（side 搞反会静默翻转测试语义，现有断言只覆盖 draw 与速胜，抓不到）：`test_pve_combat.py:69` `player_001` → `winner_side="fighter1", winner_id="player_001"`；`:471` `enemy_wolf` → `winner_side="fighter2", winner_id="enemy_wolf"`；`test_rift_encounters.py` 桩 `_combat_result("player_001")` → `winner_side="fighter1"`、`_combat_result(guardian.user_id)` → `winner_side="fighter2"`（依据 `challenge_rift_beast` :405-407 玩家 fighter 在先），`fighter1_final_hp`/`fighter2_final_hp` 数值不动；`test_boss.py` 四桩按 `resolve_combat(player_fighter, boss_fighter)` 站位（`boss_manager.py:441-443`）：玩家 id → `winner_side="fighter1"`、boss id → `winner_side="fighter2"`。**无需改动**：`test_pve_combat.py` 的裸 dict 用例（:340-399、:517-552，含 :380、:545——dict 接口按 D6 保留，喂 `_calculate_rewards`/`_format_combat_result` 的 `{"winner": ...}` 原样有效）与 `tests/test_combat_handlers.py:46`（fake `player_vs_player` legacy dict，`"winner"` 键按 D4 保留）、`tests/test_boss.py:383`（boss legacy dict 保留键 `result["winner"]` 等值断言，按 D4 值域不变原样通过）
 - [x] 3.2 `design_docs/attribute-growth/` 脚本胜负读取改 `winner_side`：`sim_route_matchup.py`（:154-160,:413-419——:388 镜像格循环只读 `result.rounds`，不在范围内）、`sweep_route_growth.py`（:124-129）、`sim_balance_regression.py`(:317)、`sim_xiuxian_turns.py`(:275)；按各脚本 fighter1 归属选 `"fighter1"/"fighter2"` 比较（脚本里 `== "体修"` 按名字判定的点改按侧判定，站位以脚本内 FighterState 构建为准）；`rebalance_equipment.py` 不读 winner，**不在范围内**
-- [x] 3.3 校准复现验证：改造前后同种子逐局比对（bd 9j1 播种基础设施）——`sim_route_matchup.py` 为主，另覆盖 `sim_balance_regression.py:317` 与 `sim_xiuxian_turns.py:275`（返回元组均含 `result.winner == "draw"` 布尔，是校准数据消费字段）与 `sweep_route_growth.py:124-129`（胜率统计），四脚本输出数值逐位一致
-- [x] ] `uv run python -m pytest tests/ -v` 全绿；`uv run ruff format . && uv run ruff check .` 通过
+- [x] 3.3 校准复现验证（按脚本逐项口径）：`sim_route_matchup.py` 改造前后（2d470f0 vs 40f33de）同种子输出**逐位一致**（已实测 byte-identical）；`sim_balance_regression.py:317` 与 `sweep_route_growth.py:124-129` 无固定种子——改造前后 diff 完全落在「同代码重跑」噪声包络内（rounds_mean ±0.01–0.03 量级），胜负读取为纯读、不扰动随机流，等价性成立；`sim_xiuxian_turns.py:275` **预存故障无法验证**（b722262 后 `level_config` 键形状变化，:236 AttributeError），改造前后同样失败，记为已知限制
+- [x] 3.4 `uv run python -m pytest tests/ -v` 全绿；`uv run ruff format . && uv run ruff check .` 通过
 
 ## 4. 收尾
 

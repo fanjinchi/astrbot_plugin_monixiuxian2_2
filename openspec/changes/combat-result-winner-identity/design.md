@@ -6,7 +6,7 @@
 
 引擎在 :352-374 的五个结算分支里**已经知道**哪一侧获胜（`winner = fighter2.user_id` 等），把侧信息直接带出即可让全部调用方免于解析。 shipped bug 与两次 archive 设计文档（add-rift-encounters design :11,:72）的「禁止前缀判定」补丁约定证明：只要解析责任在调用方，新敌人类型（新前缀）就会再次制造误判。
 
-全仓消费者清单（实施前重新核实）：运行时 4 文件 13 个读写点（pve 7 + boss 3 + impart 2 + combat_manager 1）；`design_docs/attribute-growth/` 模拟脚本 4 个（直接 `load_module` 引擎，属引擎接口的直接消费者；`rebalance_equipment.py` 调用引擎但不读 winner，见 D5）；测试 6 文件 + `test_combat_handlers.py:46`（fake legacy dict，键保留故无需改，见 tasks 3.1）。`CombatManager.player_vs_player` 的 legacy dict `"winner"` 键（:1529）的运行时消费者为空（`handlers/combat_handlers.py:165,226` 只取 hp/log），仅测试断言其值（`test_trigger_effect_extensions.py:739`）；而 boss legacy dict（`boss_manager.py:527`）的 `"winner"` 键有运行时消费者 `main.py:1243`（见 D4）。
+全仓消费者清单（实施前重新核实）：运行时 4 文件 14 个读写点（pve 7 = 读 :236/:274/:413/:414/:468/:469 + 写 :358；boss 4 = 读 :446/:452/:494 + 写 :527；impart 2 = 读 :115/:119；combat_manager 1 = 写 :1529）；`design_docs/attribute-growth/` 模拟脚本 4 个（直接 `load_module` 引擎，属引擎接口的直接消费者；`rebalance_equipment.py` 调用引擎但不读 winner，见 D5）；测试 6 文件 + `test_combat_handlers.py:46`（fake legacy dict，键保留故无需改，见 tasks 3.1）。`CombatManager.player_vs_player` 的 legacy dict `"winner"` 键（:1529）的运行时消费者为空（`handlers/combat_handlers.py:165,226` 只取 hp/log），仅测试断言其值（`test_trigger_effect_extensions.py:739`）；而 boss legacy dict（`boss_manager.py:527`）的 `"winner"` 键有运行时消费者 `main.py:1243`（见 D4）。
 
 ## Goals / Non-Goals
 
