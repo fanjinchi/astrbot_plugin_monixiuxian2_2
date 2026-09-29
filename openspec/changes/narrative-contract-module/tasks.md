@@ -28,4 +28,4 @@
 
 - [x] 5.1 按 AGENTS.md §7 版本 checklist 评估：纯重构 + 生成物标注，无玩法变化——无需升版本号
 - [x] 5.2 `scripts/sync_content_to_config.py`（数值内容管线）核对不受影响（本变更不触碰其 CSV↔config 映射）
-- [ ] 5.3 本地 conventional commit（不 push）；PR 描述附 2.3 的全池对比结果
+- [x] 5.3 本地 conventional commit（不 push）；PR 描述附 2.3 的全池对比结果
