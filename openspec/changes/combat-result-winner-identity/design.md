@@ -39,13 +39,13 @@ PvP dict（`player_vs_player` :1529）是 handler 的历史接口，运行时无
 4 个脚本（`sim_route_matchup.py:154-160,413-419`、`sweep_route_growth.py:124-129`、`sim_balance_regression.py:317`、`sim_xiuxian_turns.py:275`）用 `result.winner == "draw"` / `== "体修"`（按名字判定）读取胜负，改为 `winner_side`（`== "fighter1"/"fighter2"` 视脚本站位而定）——这些脚本直接加载引擎模块，是接口变更的正当消费者；改动只触碰胜负读取行，模拟数值输出必须逐位不变（校准留档可复现，bd 9j1 的约束）。`rebalance_equipment.py:517` 虽调用 `resolve_combat`，但只读 `result.rounds`、不读 `result.winner`，字段改名对其无影响，不在本次改动范围。
 
 **D6 · PvE 奖励/战报 helper 保持接收 legacy dict，前缀解析改为与 `enemy` 实参显式相等比较（拒绝穿 CombatResult）。**
-`_calculate_rewards`（:210-212 签名为 `result: dict`，:234/:273 走 `result.get("winner")`）与 `_format_combat_result` 由 `trigger_pve_combat` 的 legacy dict（:356-362）喂养。已评估的另一选项——把 `CombatResult` 直接传入两 helper——被**拒绝**：dict 承载 `CombatResult` 没有的键（`player_final_hp`/`player_final_mp` :296-297、`reward` :245），穿对象需连带改写这些读取，且 `test_pve_combat.py` 8 处以裸 dict 直喂两 helper 的用例（:340-399、:517-552）全部要重写，收益为零。最终方案：dict 形态与 `"winner"` 值域均不变（:357 值 = `result.winner_id or "draw"`），两 helper 内删 `isinstance` + `startswith("enemy_")`，改显式比较——`enemy` 本就是两 helper 的实参（:211），`enemy.user_id` 存在（:196 自证）：`is_enemy_winner = winner == enemy.user_id`、`is_draw = winner == "draw"`。与已知 id 相等比较，前缀解析不可复活，`guardian_` 误判类 bug 在此路径根除。
+`_calculate_rewards`（:210-212 签名为 `result: dict`，:234/:273 走 `result.get("winner")`）与 `_format_combat_result` 由 `trigger_pve_combat` 的 legacy dict（:356-362）喂养。已评估的另一选项——把 `CombatResult` 直接传入两 helper——被**拒绝**：dict 承载 `CombatResult` 没有的键（`player_final_hp`/`player_final_mp` :296-297、`reward` :245），穿对象需连带改写这些读取，且 `test_pve_combat.py` 10 处以裸 dict 直喂两 helper 的用例（:340-399、:517-552）全部要重写，收益为零。最终方案：dict 形态与 `"winner"` 值域均不变（:357 值 = `result.winner_id or "draw"`），两 helper 内删 `isinstance` + `startswith("enemy_")`，改显式比较——`enemy` 本就是两 helper 的实参（:211），`enemy.user_id` 存在（:196 自证）：`is_enemy_winner = winner == enemy.user_id`、`is_draw = winner == "draw"`。与已知 id 相等比较，前缀解析不可复活，`guardian_` 误判类 bug 在此路径根除。
 
 ## Risks / Trade-offs
 
 - [字段改名在全仓的涟漪（测试桩构造、断言）] → 消费者清单已在 Context 枚举并在 tasks 逐项列出；`CombatResult` 为 keyword 构造的 dataclass，改名即编译期报错（fail fast），无静默漂移面。
 - [模拟脚本改动破坏校准留档复现] → 只改胜负读取行、不改随机流与公式；实施后对 `sim_route_matchup.py` 做一次改造前后同种子输出比对（bd 9j1 已有逐局播种基础设施）。
-- [调用方误用 `winner_id` 做前缀/包含匹配复活解析] → 无新增 lint 可禁；以 tasks 收尾 grep（`startswith("enemy_")`、`isinstance(winner` 全仓零命中）+ code review 把关。
+- [调用方误用 `winner_id` 做前缀/包含匹配复活解析] → 无新增 lint 可禁；以 tasks 收尾 grep 把关（运行时代码 `startswith("enemy_")`、`isinstance(winner` 零命中；全仓唯一命中 `tests/test_pve_enemy.py:602` 为敌人 id 断言、与 winner 无关，预期保留）+ code review。
 - [`winner_side` 位置语义在多层传递中被张冠李戴] → 调用点均在同函数内构建双方 FighterState 后立即结算，无跨层传递；任务核对每个调用点的 fighter1 归属（玩家侧）。
 - [与在飞变更的行号冲突] → `busy-state-owner`/`add-transaction-unit-of-work` 主要触碰 handler/manager 层守卫与事务，不触碰 `combat_manager.py` 结算段；实施前按当时代码重新锚定 tasks 行号。
 
