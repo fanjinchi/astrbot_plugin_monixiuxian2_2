@@ -236,7 +236,7 @@ GM 系统 SHALL 提供传承实例的预置与清除子命令，用于功能测�
 
 ### Requirement: GM 时间快进
 
-系统 SHALL 提供 GM 子命令「时间快进」，将数据库中明确枚举的未来到期类时间戳统一前移指定秒数，使冷却与长周期玩法的等待立即到期，供功能测试消除真实 sleep 等待。覆盖清单至少包含：`user_cd.scheduled_time`（忙碌状态计划完成时间）、`players.cultivation_start_time`（闭关开始时间）、`combat_cooldowns.last_duel_time/last_spar_time`（决斗/切磋冷却）、`dual_cultivation.last_dual_time`（双修冷却）、`bounty_tasks.expire_time`（进行中悬赏过期时间）、`bank_loans.due_at`（贷款到期时间）、`system_config` 中的 `bounty_abandon_cd_<user_id>`（悬赏放弃冷却）、`boss_next_spawn_time` 与 `spirit_eye_next_spawn_time`（定时任务下次刷新时间）、传承挑战冷却与被夺保护期时间戳。该子命令 SHALL 沿用破坏性操作的「确认」约定，并 SHALL 在回复中列出各域受影响的记录条数。该子命令 SHALL NOT 修改任何冷却/周期的时长配置本身，SHALL NOT 承诺唤醒正处于 `asyncio.sleep` 等待中的定时任务循环（前移 `boss_next_spawn_time` 仅保证该任务下次醒来时立即触发）；正常运行路径在无 GM 调用时行为 MUST 完全不变。
+系统 SHALL 提供 GM 子命令「时间快进」，将到期判定类时间戳统一前移指定秒数，使冷却与长周期玩法的等待立即到期，供功能测试消除真实 sleep 等待。覆盖清单由**字段属主声明、注册表装配**提供：每个拥有到期/冷却时间戳字段的模块以 `TIME_SKIP_ENTRIES` 常量声明其覆盖条目（域标签 + 参数化 UPDATE），GM 侧注册表在装配期汇总；新增等待类冷却域时，在属主模块声明并将该模块登记进 provider 列表后即自动获得快进覆盖与 GM 帮助列出，MUST NOT 要求手改 GM 管理器内的集中清单。注册表 MUST 至少覆盖以下清单：`user_cd.scheduled_time`（忙碌状态计划完成时间）、`players.cultivation_start_time`（闭关开始时间）、`combat_cooldowns.last_duel_time/last_spar_time`（决斗/切磋冷却）、`dual_cultivation.last_dual_time`（双修冷却）、`bounty_tasks.expire_time`（进行中悬赏过期时间）、`bank_loans.due_at`（贷款到期时间）、`system_config` 中的 `bounty_abandon_cd_<user_id>`（悬赏放弃冷却）、`boss_next_spawn_time` 与 `spirit_eye_next_spawn_time`（定时任务下次刷新时间）、`impart_pk_cooldown.failed_at`（传承挑战失败冷却）、`impart_snatch_protection.snatched_at`（被夺保护期）。该子命令 SHALL 沿用破坏性操作的「确认」约定，并 SHALL 在回复中列出各域受影响的记录条数（同域多条 SQL 按域标签聚合计数）。该子命令 SHALL NOT 修改任何冷却/周期的时长配置本身，SHALL NOT 承诺唤醒正处于 `asyncio.sleep` 等待中的定时任务循环（前移 `boss_next_spawn_time` 仅保证该任务下次醒来时立即触发）；正常运行路径在无 GM 调用时行为 MUST 完全不变。
 
 #### Scenario: 快进使历练立即到期
 
@@ -267,6 +267,12 @@ GM 系统 SHALL 提供传承实例的预置与清除子命令，用于功能测�
 
 - **WHEN** 未调用时间快进时玩家进行历练、闭关、决斗等操作
 - **THEN** 冷却与周期行为与既有规则完全一致
+
+#### Scenario: 新冷却域经声明自动覆盖
+
+- **WHEN** 某玩法模块新增一个参与到期判定的时间戳字段，并在其属主模块声明 `TIME_SKIP_ENTRIES` 常量、将该模块登记进注册表 provider 列表
+- **THEN** 该字段自动被「时间快进」覆盖并在 GM 帮助的覆盖域列表中列出，无需修改 GM 管理器内部逻辑；「声明了 `TIME_SKIP_ENTRIES` 但漏登记 provider」由注册表的静态扫描测试钉住（漏登记即失败），既有域清单由最小清单测试钉住
+
 
 ### Requirement: GM 清除全部冷却
 
