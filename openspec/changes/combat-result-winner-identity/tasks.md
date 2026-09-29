@@ -7,9 +7,9 @@
 
 ## 1. 引擎接口重构（combat_manager.py）
 
-- [ ] 1.1 `managers/combat_manager.py:168-177` `CombatResult`：删 `winner: str`，新增 `winner_side: Literal["fighter1", "fighter2", "draw"]` 与 `winner_id: str | None`（docstring 注明：平局时 `winner_side == "draw"` 且 `winner_id is None`；id 仅为便捷查询，身份编码语义由引擎内部消化）；同步更新 `resolve_combat` Returns docstring（:275，现文 "CombatResult with winner, log, and final HP values" 引用被删字段，按 AGENTS.md docstring 约定改为 `winner_side`/`winner_id` 表述）
-- [ ] 1.2 `resolve_combat` 结算分支（:341-363）：五个分支逐一代换——`fighter1.hp <= 0 and fighter2.hp <= 0` / `total_actions >= action_limit` / `else` 三个平局分支 → `winner_side = "draw"; winner_id = None`；`winner = fighter2.user_id` → `winner_side = "fighter2"; winner_id = fighter2.user_id`；`fighter1.hp <= 0` 胜利分支（fighter1 胜）同理；banner/flavor 逻辑一行不动；`CombatResult(...)` 构造（:370-377）同步改字段名
-- [ ] 1.3 `CombatManager.player_vs_player` legacy dict（:1518）：`"winner": result.winner` → `"winner": result.winner_id or "draw"`（值域不变，runtime 无消费者，测试断言原样通过）
+- [ ] 1.1 `managers/combat_manager.py:179-188` `CombatResult`：删 `winner: str`，新增 `winner_side: Literal["fighter1", "fighter2", "draw"]` 与 `winner_id: str | None`（docstring 注明：平局时 `winner_side == "draw"` 且 `winner_id is None`；id 仅为便捷查询，身份编码语义由引擎内部消化）；同步更新 `resolve_combat` Returns docstring（:286，现文 "CombatResult with winner, log, and final HP values" 引用被删字段，按 AGENTS.md docstring 约定改为 `winner_side`/`winner_id` 表述）
+- [ ] 1.2 `resolve_combat` 结算分支（:352-374）：五个分支逐一代换——`fighter1.hp <= 0 and fighter2.hp <= 0` / `total_actions >= action_limit` / `else` 三个平局分支 → `winner_side = "draw"; winner_id = None`；`winner = fighter2.user_id` → `winner_side = "fighter2"; winner_id = fighter2.user_id`；`fighter1.hp <= 0` 胜利分支（fighter1 胜）同理；banner/flavor 逻辑一行不动；`CombatResult(...)` 构造（:381-388）同步改字段名
+- [ ] 1.3 `CombatManager.player_vs_player` legacy dict（:1529）：`"winner": result.winner` → `"winner": result.winner_id or "draw"`（值域不变，runtime 无消费者，测试断言原样通过）
 
 ## 2. 运行时调用点改查询/显式比较
 
@@ -19,9 +19,9 @@
   - `trigger_pve_combat` legacy dict（:357）：`"winner": result.winner_id or "draw"`（下游 `_calculate_rewards`/`_format_combat_result` 接收的 dict 值域保持不变）
   - `challenge_rift_beast`（:412-413）：`won = result.winner_id == player.user_id` 语义不变（design D2 显式比较），`is_draw = result.winner_side == "draw"`；**核对 fighter1 归属为玩家**；`:409-411` 的补丁注释更新为「接口已结构化，前缀判定不可复活」类简述
   - `challenge_legacy_guardian`（:467-468）：同上
-- [ ] 2.2 `managers/boss_manager.py:428-521`：`winner = result.winner` → 结构化读取；`:439` `winner == user_id` → `result.winner_id == user_id`；`:481` `if winner == "draw"` → `result.winner_side == "draw"`；`:514` legacy dict `"winner"` 值 = `result.winner_id or "draw"`；**核对 fighter1 归属**（玩家侧）并据此选 side 或 id 比较。**注意运行时消费者 `main.py:1243`**（`battle_result.get("winner") == user_id`，击败广播门槛）：本任务不动它，值域不变故等值比较语义逐位保持（design D4）
+- [ ] 2.2 `managers/boss_manager.py:441-534`：`winner = result.winner` → 结构化读取；`:452` `winner == user_id` → `result.winner_id == user_id`；`:494` `if winner == "draw"` → `result.winner_side == "draw"`；`:527` legacy dict `"winner"` 值 = `result.winner_id or "draw"`；**核对 fighter1 归属**（玩家侧）并据此选 side 或 id 比较。**注意运行时消费者 `main.py:1243`**（`battle_result.get("winner") == user_id`，击败广播门槛）：本任务不动它，值域不变故等值比较语义逐位保持（design D4）
 - [ ] 2.3 `managers/impart_pk_manager.py:115-119`：`result.winner == "draw"` → `result.winner_side == "draw"`；`attacker_wins = result.winner == attacker.user_id` → `result.winner_id == attacker.user_id`；**核对 attacker 对应 fighter1**（engine 调用处 :107 的实参顺序）
-- [ ] 2.4 收尾 grep：运行时代码（main.py、handlers/、managers/、core/）`startswith("enemy_")`、`isinstance(winner` 零命中；`result.winner`（裸属性）零命中；`"winner"` / `.get("winner"` 仅命中刻意保留的 legacy dict 键（`combat_manager.py:1518`、`pve_combat_manager.py:357`、`boss_manager.py:514` 赋值侧 + `main.py:1243` 消费侧 + 测试 fake/dict 用例），逐处确认属预期
+- [ ] 2.4 收尾 grep：运行时代码（main.py、handlers/、managers/、core/）`startswith("enemy_")`、`isinstance(winner` 零命中；`result.winner`（裸属性）零命中；`"winner"` / `.get("winner"` 仅命中刻意保留的 legacy dict 键（`combat_manager.py:1529`、`pve_combat_manager.py:357`、`boss_manager.py:527` 赋值侧 + `main.py:1243` 消费侧 + 测试 fake/dict 用例），逐处确认属预期
 
 ## 3. 测试与 design_docs 脚本同步
 
