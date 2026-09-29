@@ -16,7 +16,6 @@ Locked contracts:
    about).
 """
 
-import pytest
 
 from tests.helpers import load_module
 

@@ -1,6 +1,5 @@
 """Regression tests for shop buy paths (bd: missing item type crashing purchase)."""
 
-import inspect
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

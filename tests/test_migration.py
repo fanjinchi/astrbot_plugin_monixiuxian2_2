@@ -1,8 +1,9 @@
 """Tests for database migrations (v3.11.0 不再向前兼容：旧库统一重建到最新 schema)。"""
 
+import sqlite3
+
 import aiosqlite
 import pytest
-import sqlite3
 
 from tests.helpers import load_module, load_package_module
 
