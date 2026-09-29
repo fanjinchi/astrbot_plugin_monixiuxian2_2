@@ -124,9 +124,9 @@ def main() -> None:
                     result = sim.ENGINE.resolve_combat(
                         f_ti, f_ling, combat_type="spar", merge_count=10
                     )
-                    if result.winner == "draw":
+                    if result.winner_side == "draw":
                         draws += 1
-                    elif result.winner == "体修":
+                    elif result.winner_side == "fighter1":
                         tixiu_wins += 1
                 decided = BATTLES - draws
                 cells.append(

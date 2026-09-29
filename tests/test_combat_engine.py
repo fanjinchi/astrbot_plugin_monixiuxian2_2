@@ -453,7 +453,8 @@ class TestActionLimit:
         f2 = make_fighter("B", 100, 1, 5, 10)
 
         result = engine.resolve_combat(f1, f2, merge_count=100)
-        assert result.winner == "draw"
+        assert result.winner_side == "draw"
+        assert result.winner_id is None
         assert result.total_actions >= 5
 
 
@@ -500,7 +501,10 @@ class TestFullCombat:
         f2 = make_fighter("B", 100, 50, 5, 10)
 
         result = engine.resolve_combat(f1, f2, combat_type="spar")
-        assert result.winner in (f1.user_id, f2.user_id, "draw")
+        if result.winner_side == "draw":
+            assert result.winner_id is None
+        else:
+            assert result.winner_id in (f1.user_id, f2.user_id)
         # HP was modified on the fighter objects, but the result shows final
         assert result.fighter1_final_hp >= 0
         assert result.fighter2_final_hp >= 0
@@ -512,7 +516,8 @@ class TestFullCombat:
         f2 = make_fighter("B", 10, 10, 5, 10)
 
         result = engine.resolve_combat(f1, f2)
-        assert result.winner == f1.user_id
+        assert result.winner_side == "fighter1"
+        assert result.winner_id == f1.user_id
         assert result.fighter2_final_hp == 0
         assert result.rounds <= 2  # Should end in 1-2 rounds
 
@@ -543,7 +548,12 @@ class TestLegacyAdapter:
         f2 = make_fighter("B", 100, 50, 5, 10)
 
         result = mgr.engine.resolve_combat(f1, f2)
-        assert result.winner in ("A", "B", "draw")
+        assert result.winner_side in ("fighter1", "fighter2", "draw")
+        assert (
+            result.winner_id is None
+            if result.winner_side == "draw"
+            else result.winner_id in (f1.user_id, f2.user_id)
+        )
         assert isinstance(result.combat_log, list)
 
 

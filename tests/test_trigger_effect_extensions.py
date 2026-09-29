@@ -355,7 +355,11 @@ class TestStatusLifecycle:
         actor.trigger_skills = [trigger_skill("蚀骨", "dot", 0.1, duration=5)]
         target = make_fighter("B", 1000, 100, 5, 10, armor=0)
         result = engine.resolve_combat(actor, target, "spar", merge_count=10)
-        assert result.winner in ("A", "B", "draw")
+        assert result.winner_side in ("fighter1", "fighter2", "draw")
+        if result.winner_side == "draw":
+            assert result.winner_id is None
+        else:
+            assert result.winner_id in ("A", "B")
         # The dot fires and the round-start tick applies it
         assert any("侵蚀" in line for line in result.combat_log)
 
@@ -372,14 +376,18 @@ class TestStatusLifecycle:
         target = make_fighter("B", 1000, 100, 5, 10, armor=0)
         # Runs without any database reference
         result = engine.resolve_combat(actor, target, "spar", merge_count=10)
-        assert result.winner in ("A", "B", "draw")
+        assert result.winner_side in ("fighter1", "fighter2", "draw")
+        if result.winner_side == "draw":
+            assert result.winner_id is None
+        else:
+            assert result.winner_id in ("A", "B")
         # Exactly one side is dead (or both in a draw) — no zombie outcomes,
         # and the survivor is above 0 HP (real settlement, not clamping).
         assert result.fighter1_final_hp == 0 or result.fighter2_final_hp == 0
-        if result.winner != "draw":
+        if result.winner_side != "draw":
             winner_hp = (
                 result.fighter1_final_hp
-                if result.winner == "A"
+                if result.winner_id == "A"
                 else result.fighter2_final_hp
             )
             assert winner_hp > 0
@@ -701,7 +709,11 @@ class TestIntegration:
             trigger_skill("回春", "heal", 0.2, trigger_timing="on_defense")
         ]
         result = engine.resolve_combat(attacker, defender, "duel", merge_count=10)
-        assert result.winner in ("A", "B", "draw")
+        assert result.winner_side in ("fighter1", "fighter2", "draw")
+        if result.winner_side == "draw":
+            assert result.winner_id is None
+        else:
+            assert result.winner_id in ("A", "B")
         log_text = "\n".join(result.combat_log)
         assert any(marker in log_text for marker in ("侵蚀", "免死", "恢复"))
 

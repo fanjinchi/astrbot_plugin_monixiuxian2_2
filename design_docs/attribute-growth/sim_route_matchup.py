@@ -155,9 +155,9 @@ def run_matchup_cells(battles: int) -> list[dict[str, Any]]:
                     f_ti, f_ling, combat_type="spar", merge_count=10
                 )
                 rounds_list.append(result.rounds)
-                if result.winner == "draw":
+                if result.winner_side == "draw":
                     draws += 1
-                elif result.winner == "体修":
+                elif result.winner_side == "fighter1":
                     tixiu_wins += 1
             decided = battles - draws
             win_rate = tixiu_wins / decided if decided else 0.0
@@ -414,9 +414,9 @@ def run_loadout_cells(
                 f_ti, f_ling, combat_type="spar", merge_count=10
             )
             rounds_list.append(result.rounds)
-            if result.winner == "draw":
+            if result.winner_side == "draw":
                 draws += 1
-            elif result.winner == "体修":
+            elif result.winner_side == "fighter1":
                 tixiu_wins += 1
         decided = battles - draws
         cross_rows.append(

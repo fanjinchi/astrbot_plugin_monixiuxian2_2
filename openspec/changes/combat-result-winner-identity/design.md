@@ -45,7 +45,7 @@ PvP dict（`player_vs_player` :1529）是 handler 的历史接口，运行时无
 
 - [字段改名在全仓的涟漪（测试桩构造、断言）] → 消费者清单已在 Context 枚举并在 tasks 逐项列出；`CombatResult` 为 keyword 构造的 dataclass，改名即编译期报错（fail fast），无静默漂移面。
 - [模拟脚本改动破坏校准留档复现] → 只改胜负读取行、不改随机流与公式；实施后对 `sim_route_matchup.py` 做一次改造前后同种子输出比对（bd 9j1 已有逐局播种基础设施）。
-- [调用方误用 `winner_id` 做前缀/包含匹配复活解析] → 无新增 lint 可禁；以 tasks 收尾 grep 把关（运行时代码 `startswith("enemy_")`、`isinstance(winner` 零命中；全仓唯一命中 `tests/test_pve_enemy.py:602` 为敌人 id 断言、与 winner 无关，预期保留）+ code review。
+- [调用方误用 `winner_id` 做前缀/包含匹配复活解析] → 无新增 lint 可禁；以 tasks 收尾 grep 把关（运行时代码 `startswith("enemy_")`、`isinstance(winner` 零命中；`result.winner` 属性读取零命中；`\bwinner\b` / `winner ==` 局部变量转发模式逐命中肉眼核查——防 `winner = result.winner` 删了赋值却漏删使用的残留（boss_manager 现状 :446 赋值 :452/:494 使用）；全仓唯一命中 `tests/test_pve_enemy.py:602` 为敌人 id 断言、与 winner 无关，预期保留）+ code review。
 - [`winner_side` 位置语义在多层传递中被张冠李戴] → 调用点均在同函数内构建双方 FighterState 后立即结算，无跨层传递；任务核对每个调用点的 fighter1 归属（玩家侧）。
 - [与在飞变更的行号冲突] → `busy-state-owner`/`add-transaction-unit-of-work` 主要触碰 handler/manager 层守卫与事务，不触碰 `combat_manager.py` 结算段；实施前按当时代码重新锚定 tasks 行号。
 

@@ -89,7 +89,8 @@ def mock_combat_engine():
         )
     )
     engine.resolve_combat.return_value = CombatResult(
-        winner="player_001",
+        winner_side="fighter1",
+        winner_id="player_001",
         combat_log=["第1回合", "玩家攻击"],
         fighter1_final_hp=350,
         fighter2_final_hp=0,
@@ -357,7 +358,8 @@ class TestChallengeBoss:
         mock_db.ext.get_user_cd.return_value = user_cd_idle
         mock_db.get_player_by_id.return_value = player_idle
         mock_combat_engine.resolve_combat.return_value = CombatResult(
-            winner="player_001",
+            winner_side="fighter1",
+            winner_id="player_001",
             combat_log=["胜利"],
             fighter1_final_hp=800,
             fighter2_final_hp=0,
@@ -399,7 +401,8 @@ class TestChallengeBoss:
         mock_db.ext.get_user_cd.return_value = user_cd_idle
         mock_db.get_player_by_id.return_value = player_idle
         mock_combat_engine.resolve_combat.return_value = CombatResult(
-            winner="1",
+            winner_side="fighter2",
+            winner_id="1",
             combat_log=["失败"],
             fighter1_final_hp=0,
             fighter2_final_hp=50,
@@ -441,7 +444,8 @@ class TestChallengeBoss:
         mock_db.ext.get_user_cd.return_value = user_cd_idle
         mock_db.get_player_by_id.return_value = player_idle
         mock_combat_engine.resolve_combat.return_value = CombatResult(
-            winner="draw",
+            winner_side="draw",
+            winner_id=None,
             combat_log=["平局"],
             fighter1_final_hp=100,
             fighter2_final_hp=50,

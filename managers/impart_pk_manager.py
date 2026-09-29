@@ -112,11 +112,11 @@ class ImpartPkManager:
             "target_type": target.legacy_type,
         }
 
-        if result.winner == "draw":
+        if result.winner_side == "draw":
             rewards["draw"] = True
             return False, battle_text, rewards
 
-        attacker_wins = result.winner == attacker.user_id
+        attacker_wins = result.winner_id == attacker.user_id
         if attacker_wins:
             transferred = await self.impart_mgr.transfer_legacy(
                 target.id, attacker.user_id, expected_owner=defender.user_id

@@ -483,9 +483,12 @@ def _make_pve_env():
     return pve, engine, enemy_mgr, guardian
 
 
-def _combat_result(winner: str, player_hp: int = 300) -> CombatResult:
+def _combat_result(
+    winner_side: str, winner_id: str | None = None, player_hp: int = 300
+) -> CombatResult:
     return CombatResult(
-        winner=winner,
+        winner_side=winner_side,
+        winner_id=winner_id,
         combat_log=["第1回合"],
         fighter1_final_hp=player_hp,
         fighter2_final_hp=0,
@@ -497,7 +500,7 @@ def _combat_result(winner: str, player_hp: int = 300) -> CombatResult:
 @pytest.mark.asyncio
 async def test_challenge_rift_beast_directed_group_win():
     pve, engine, enemy_mgr, guardian = _make_pve_env()
-    engine.resolve_combat.return_value = _combat_result("player_001")
+    engine.resolve_combat.return_value = _combat_result("fighter1", winner_id="player_001")
     player = SimpleNamespace(user_id="player_001", level_index=10, hp=500)
 
     outcome = await pve.challenge_rift_beast(player, "rift_test")
@@ -515,7 +518,7 @@ async def test_challenge_rift_beast_guardian_prefixed_enemy_win_is_loss():
     """回归：定向组敌人 user_id 是 guardian_ 前缀——enemy_ 前缀判定会把
     定向组获胜误判为玩家胜利（design D5），必须显式比较 winner。"""
     pve, engine, _, guardian = _make_pve_env()
-    engine.resolve_combat.return_value = _combat_result(guardian.user_id, player_hp=0)
+    engine.resolve_combat.return_value = _combat_result("fighter2", winner_id=guardian.user_id, player_hp=0)
     player = SimpleNamespace(user_id="player_001", level_index=10, hp=500)
 
     outcome = await pve.challenge_rift_beast(player, "rift_test")
@@ -555,7 +558,7 @@ async def test_challenge_rift_beast_fallback_to_global_pool():
         crit_rate=0,
     )
     enemy_mgr.spawn_enemy.return_value = wolf
-    engine.resolve_combat.return_value = _combat_result("player_001")
+    engine.resolve_combat.return_value = _combat_result("fighter1", winner_id="player_001")
     player = SimpleNamespace(user_id="player_001", level_index=10, hp=500)
 
     with patch.object(pve, "_select_enemy_category", return_value="normal") as sel:

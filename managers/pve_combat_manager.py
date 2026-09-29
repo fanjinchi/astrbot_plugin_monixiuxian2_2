@@ -232,8 +232,9 @@ class PVECombatManager:
         }
 
         winner = result.get("winner", "")
-        # In engine: winner = player.user_id if player wins, else enemy.user_id
-        is_enemy_winner = isinstance(winner, str) and winner.startswith("enemy_")
+        # Explicit equality against the enemy's own user_id (engine winner is
+        # player.user_id or enemy.user_id; never prefix-matching, spec D6).
+        is_enemy_winner = winner == enemy.user_id
         is_draw = winner == "draw"
 
         if is_draw:
@@ -271,7 +272,7 @@ class PVECombatManager:
         lines.append("")
 
         winner = result.get("winner", "")
-        is_enemy_winner = isinstance(winner, str) and winner.startswith("enemy_")
+        is_enemy_winner = winner == enemy.user_id
         is_draw = winner == "draw"
 
         if is_draw:
@@ -354,7 +355,7 @@ class PVECombatManager:
 
         # Build the legacy-style result dict used by reward calculation
         legacy_result = {
-            "winner": result.winner,
+            "winner": result.winner_id if result.winner_side != "draw" else "draw",
             "combat_log": result.combat_log,
             "player_final_hp": result.fighter1_final_hp,
             "player_final_mp": result.fighter1_final_hp,
@@ -406,11 +407,11 @@ class PVECombatManager:
             player_fighter, enemy_fighter, combat_type="pve"
         )
 
-        # 3. 胜负必须显式比较 user_id（design D5）：定向组敌人 user_id 是
-        #    guardian_ 前缀，沿用 _calculate_rewards 的 enemy_ 前缀判定会把
-        #    定向组妖兽获胜误判为玩家胜利。平局单列，调用方视同挑战失败。
-        won = result.winner == player.user_id
-        is_draw = result.winner == "draw"
+        # 3. 胜负必须显式比较 user_id（design D5）：接口已结构化
+        #    （winner_id/winner_side），定向组敌人 user_id 是 guardian_ 前缀，
+        #    前缀判定不可复活。平局单列，调用方视同挑战失败。
+        won = result.winner_id == player.user_id
+        is_draw = result.winner_side == "draw"
 
         # 4. HP 写回：胜利按战斗结果；失败/平局不致死但气血降为 1
         #    （challenge_legacy_guardian 同款口径，惩罚语义由调用方消费）
@@ -464,8 +465,8 @@ class PVECombatManager:
         # 3. HP 写回，失败不致死（下限 1，不扣修为/灵石/掉落；平局同归于尽
         #    时同样兜底，避免玩家 hp=0）
         final_hp = result.fighter1_final_hp
-        is_draw = result.winner == "draw"
-        won = result.winner == player.user_id
+        is_draw = result.winner_side == "draw"
+        won = result.winner_id == player.user_id
         if not won:
             final_hp = max(1, final_hp)
         player.hp = final_hp

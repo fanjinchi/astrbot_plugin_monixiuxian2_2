@@ -66,7 +66,8 @@ def mock_combat_engine():
         )
     )
     engine.resolve_combat.return_value = CombatResult(
-        winner="player_001",
+        winner_side="fighter1",
+        winner_id="player_001",
         combat_log=["第1回合", "玩家攻击"],
         fighter1_final_hp=350,
         fighter2_final_hp=0,
@@ -468,7 +469,8 @@ class TestPveEngineIntegration:
     ):
         """When the enemy wins, hp_penalty is set."""
         mock_combat_engine.resolve_combat.return_value = CombatResult(
-            winner="enemy_wolf",
+            winner_side="fighter2",
+            winner_id="enemy_wolf",
             combat_log=["第1回合", "敌人攻击"],
             fighter1_final_hp=0,
             fighter2_final_hp=100,

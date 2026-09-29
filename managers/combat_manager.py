@@ -21,7 +21,7 @@ import os
 import random
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 try:
     from ..models import Item
@@ -178,9 +178,16 @@ class FighterState:
 
 @dataclass
 class CombatResult:
-    """Result of a combat resolution."""
+    """Result of a combat resolution.
 
-    winner: str  # user_id or "draw"
+    ``winner_side`` carries the identity semantics ("fighter1"/"fighter2"/"draw")
+    resolved inside the engine; ``winner_id`` is a convenience lookup for the
+    winning fighter's user_id. On a draw, ``winner_side == "draw"`` and
+    ``winner_id is None``.
+    """
+
+    winner_side: Literal["fighter1", "fighter2", "draw"]
+    winner_id: str | None  # winning fighter's user_id; None when draw
     combat_log: list[str]
     fighter1_final_hp: int
     fighter2_final_hp: int
@@ -283,7 +290,7 @@ class CombatEngine:
             merge_count: Battle report merge chunk size (default from config).
 
         Returns:
-            CombatResult with winner, log, and final HP values.
+            CombatResult with winner_side/winner_id, log, and final HP values.
         """
         if merge_count is None:
             merge_count = self._skill_cfg.get("battle_report_merge_count", 10)
@@ -353,23 +360,28 @@ class CombatEngine:
         # the matching scene's optional literary description line right after it
         # (change D2: banner -> description, adjacent).
         if fighter1.hp <= 0 and fighter2.hp <= 0:
-            winner = "draw"
+            winner_side = "draw"
+            winner_id = None
             log.append(_BANNER_MUTUAL_DESTRUCTION)
             flavor = self._narrative("battle_mutual_destruction")
         elif fighter1.hp <= 0:
-            winner = fighter2.user_id
+            winner_side = "fighter2"
+            winner_id = fighter2.user_id
             log.append(_BANNER_VICTORY.format(name=fighter2.name))
             flavor = self._narrative("battle_victory", {"name": fighter2.name})
         elif fighter2.hp <= 0:
-            winner = fighter1.user_id
+            winner_side = "fighter1"
+            winner_id = fighter1.user_id
             log.append(_BANNER_VICTORY.format(name=fighter1.name))
             flavor = self._narrative("battle_victory", {"name": fighter1.name})
         elif total_actions >= action_limit:
-            winner = "draw"
+            winner_side = "draw"
+            winner_id = None
             log.append(_BANNER_DRAW_STALEMATE)
             flavor = self._narrative("battle_draw_stalemate")
         else:
-            winner = "draw"
+            winner_side = "draw"
+            winner_id = None
             log.append(_BANNER_DRAW)
             flavor = self._narrative("battle_draw")
         if flavor:
@@ -379,7 +391,8 @@ class CombatEngine:
         merged_log = self._merge_log(log, merge_count)
 
         return CombatResult(
-            winner=winner,
+            winner_side=winner_side,
+            winner_id=winner_id,
             combat_log=merged_log,
             fighter1_final_hp=max(0, fighter1.hp),
             fighter2_final_hp=max(0, fighter2.hp),
@@ -1526,7 +1539,7 @@ class CombatManager:
 
         # Map to legacy return format
         return {
-            "winner": result.winner,
+            "winner": result.winner_id if result.winner_side != "draw" else "draw",
             "combat_log": result.combat_log,
             "player1_final_hp": (
                 player1.hp if combat_type == 1 else max(1, result.fighter1_final_hp)

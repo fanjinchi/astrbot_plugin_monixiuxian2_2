@@ -174,7 +174,8 @@ def test_stalemate_banner_and_description_line():
 
     result = engine.resolve_combat(fighter1, fighter2)
 
-    assert result.winner == "draw"
+    assert result.winner_side == "draw"
+    assert result.winner_id is None
     banner = result.combat_log.index(_mod._BANNER_DRAW_STALEMATE)
     assert (
         result.combat_log[banner + 1]
@@ -192,7 +193,8 @@ def test_mutual_destruction_banner_and_description_line():
 
     result = engine.resolve_combat(fighter1, fighter2)
 
-    assert result.winner == "draw"
+    assert result.winner_side == "draw"
+    assert result.winner_id is None
     banner = result.combat_log.index(_mod._BANNER_MUTUAL_DESTRUCTION)
     assert (
         result.combat_log[banner + 1]
@@ -216,7 +218,8 @@ def test_fallback_draw_branch_emits_its_banner():
 
     result = engine.resolve_combat(fighter1, fighter2)
 
-    assert result.winner == "draw"
+    assert result.winner_side == "draw"
+    assert result.winner_id is None
     assert result.combat_log[0] == _mod._BANNER_OPENING
     assert result.combat_log[1] == "甲 VS 乙"
     assert result.combat_log[-2] == _mod._BANNER_DRAW

@@ -443,13 +443,12 @@ HP：{max_hp}
         )
 
         # 7. 处理战斗结果
-        winner = result.winner
         damage_dealt = boss_fighter.max_hp - result.fighter2_final_hp
         damage_ratio = (
             damage_dealt / boss_fighter.max_hp if boss_fighter.max_hp > 0 else 0
         )
 
-        if winner == user_id:
+        if result.winner_id == user_id:
             # 玩家胜利
             boss.status = 0  # 标记Boss为已击败
             await self.db.ext.defeat_boss(boss.boss_id)
@@ -491,7 +490,7 @@ HP：{result.fighter1_final_hp}/{player_fighter.max_hp}
             """.strip()
         else:
             # 玩家失败或平局: consolation reward based on damage dealt.
-            if winner == "draw":
+            if result.winner_side == "draw":
                 reward = int(boss.stone_reward * damage_ratio * 0.5)
             else:
                 reward = int(boss.stone_reward * damage_ratio)
@@ -524,7 +523,7 @@ HP：{result.fighter1_final_hp}/{player_fighter.max_hp}
         full_msg = combat_log + "\n\n" + result_msg
 
         battle_result = {
-            "winner": result.winner,
+            "winner": result.winner_id if result.winner_side != "draw" else "draw",
             "combat_log": result.combat_log,
             "player_final_hp": result.fighter1_final_hp,
             "player_final_mp": result.fighter1_final_hp,

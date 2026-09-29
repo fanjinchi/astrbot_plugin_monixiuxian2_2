@@ -314,7 +314,7 @@ def _make_mirror_pair(
 # ---------------------------------------------------------------------------
 def _one_battle(f1: FighterState, f2: FighterState) -> tuple[int, int, bool]:
     result = ENGINE.resolve_combat(f1, f2, combat_type="spar", merge_count=10)
-    return result.total_actions, result.rounds, result.winner == "draw"
+    return result.total_actions, result.rounds, result.winner_side == "draw"
 
 
 def _percentile(values: list[int], pct: float) -> float:
