@@ -27,8 +27,10 @@ Returns:
 
 import argparse
 import csv
+import importlib.util
 import json
 import re
+import string
 import sys
 from pathlib import Path
 
@@ -113,9 +115,61 @@ DOMAIN_MAX_LEN = {
     "adventure_event": 180,
 }
 
-# 脱槽/白名单共用：同时匹配 {var} 与 {var:spec}（如 {next_bonus:.0%}）。
-# 格式符部分必须是非捕获组——否则 findall 返回元组，白名单核对全崩。
-_WHITELIST_VAR_RE = re.compile(r"\{([a-zA-Z_0-9]+)(?::[^}]*)?\}")
+# 模板变量提取/脱槽统一走 utils/narrative_contract.py 的 string.Formatter 语义
+# （契约单源，openspec change narrative-contract-module）：白名单核对与运行时
+# 插值对「什么是变量」的判定一致；老单标识符 regex 对 {a.b}/{c[0]} 嵌套字段
+# 提取不出根名、脱槽还残留垃圾片段。本脚本是 stdlib 按路径加载脚本，不走插件包
+# import 链（与下方 narrative_defaults 加载同一套路）。
+_contract_spec = importlib.util.spec_from_file_location(
+    "narrative_contract_lint",
+    DESIGN_DIR.parent.parent / "utils" / "narrative_contract.py",
+)
+_narrative_contract = importlib.util.module_from_spec(_contract_spec)
+sys.modules[_contract_spec.name] = _narrative_contract
+_contract_spec.loader.exec_module(_narrative_contract)
+
+_FORMATTER = string.Formatter()
+
+
+def _extract_vars(text: str) -> set[str]:
+    """Root variable names referenced by a template (contract semantics).
+
+    ``{x.name}``/``{x[0]}`` count as their root ``x``, matching the runtime
+    whitelist (admission 与 sync_copy_variants_to_config 同源). Malformed
+    braces raise in the contract; they are tolerated here because render-time
+    validation (``validate_scene`` 花括号不配对) reports them instead.
+
+    Args:
+        text: Narrative template text.
+
+    Returns:
+        Root variable names, or an empty set when braces are malformed.
+    """
+    try:
+        return _narrative_contract.used_vars(text)
+    except ValueError:
+        return set()
+
+
+def _strip_vars(text: str) -> str:
+    """Drop ``{var}`` placeholders (nested fields included) from copy text.
+
+    Rebuilds from ``string.Formatter.parse`` literal segments; the former
+    regex only removed ``{root}`` and left ``.b}`` behind for nested fields,
+    skewing the length / banned-word checks. Malformed braces are left
+    untouched for the same reason as ``_extract_vars``.
+
+    Args:
+        text: Raw text possibly containing template placeholders.
+
+    Returns:
+        Text with every placeholder removed.
+    """
+    try:
+        return "".join(lit for lit, _, _, _ in _FORMATTER.parse(text))
+    except ValueError:
+        return text
+
 
 # canon 四列取值域（spec content-sync-pipeline）
 TONE_TIERS = ("正经", "正经+冷幽默", "玩梗灰", "平淡")
@@ -469,8 +523,6 @@ def _load_var_whitelist() -> dict[str, set[str]]:
     stdlib 脚本不依赖插件包导入链。事件域不在声明集内，保留从
     adventure_config 事件 desc 提取的分支（静态文本，白名单多为空）。
     """
-    import importlib.util
-
     whitelist: dict[str, set[str]] = {}
     init_path = DESIGN_DIR.parent.parent / "data" / "narrative_defaults" / "__init__.py"
     spec = importlib.util.spec_from_file_location("narrative_defaults_lint", init_path)
@@ -488,8 +540,8 @@ def _load_var_whitelist() -> dict[str, set[str]]:
         for ev in events:
             key = str(ev.get("key", "")).strip()
             if key:
-                whitelist[f"adventure_event.{key}"] = set(
-                    _WHITELIST_VAR_RE.findall(ev.get("desc") or "")
+                whitelist[f"adventure_event.{key}"] = _extract_vars(
+                    ev.get("desc") or ""
                 )
     return whitelist
 
@@ -580,7 +632,7 @@ def _check_copy_variants(rows: list[dict], results: list[str], strict: bool) -> 
                 "见 utils/narrative_text.py 「Line-break ownership contract」）"
             )
         # 脱 {var} 槽再跑文本检查：变量名含数字（{name1} 等）不应触发数字违例
-        plain = _WHITELIST_VAR_RE.sub("", raw_text)
+        plain = _strip_vars(raw_text)
         for problem in _text_violations(
             plain, DOMAIN_MAX_LEN.get(domain, DEFAULT_MAX_LEN)
         ):
@@ -596,7 +648,7 @@ def _check_copy_variants(rows: list[dict], results: list[str], strict: bool) -> 
                 "四宗组待 bd n6o 立组时登记）"
             )
         else:
-            for var in _WHITELIST_VAR_RE.findall(text):
+            for var in sorted(_extract_vars(text)):
                 if var not in allowed:
                     results.append(
                         f"{verdict} {where} 变量 {{{var}}} 不在「{wild_key}」白名单"
