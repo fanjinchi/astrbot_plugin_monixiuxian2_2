@@ -8,7 +8,7 @@
 2. 同步闸门：`scripts/sync_copy_variants_to_config.py:141-143` 的 `_template_vars` 是 regex「镜像」（`re.findall(r"\{(\w+)", ...)`），且 `:126` 的 `_default_scene_vars` 里还藏着**第四份**同款内联 regex；regex 在转义花括号、`{x[0]}` 嵌套字段、`{var:spec}` 格式符上与 `string.Formatter` 语义发散——闸门放行的稿子可能在加载校验处被拒，反之亦然，二者只能靠日志事后发现；
 3. lint 闸门：`design_docs/content-design/lint_narrative.py:118` 的 `_WHITELIST_VAR_RE` 是第三个 regex。
 
-同时 `config_manager.py:23-28` 为做加载校验**私有** import 了 `narrative_text` 的内部符号（`_NARRATIVE_ROUTES`、`_iter_scene_entries`），跨模块泄漏实现细节；`narrative_text` 被 4 处 shim 按文件路径独立加载（`managers/combat_manager.py:44-45`、`managers/rift_manager.py:77`、`managers/adventure_manager.py:69`、`core/breakthrough_fortune.py:26`），其导入结构任何裸相对 import 都会破坏这些 standalone 路径。
+同时 `config_manager.py:23-28` 为做加载校验**私有** import 了 `narrative_text` 的内部符号（`_NARRATIVE_ROUTES`、`_iter_scene_entries`），跨模块泄漏实现细节；`narrative_text` 被 4 处 shim 按文件路径独立加载（`managers/combat_manager.py:43-45`、`managers/rift_manager.py:77`、`managers/adventure_manager.py:69`、`core/breakthrough_fortune.py:26`），其导入结构任何裸相对 import 都会破坏这些 standalone 路径。
 
 另一处关系未声明：`config/narrative_config.json`（38 KB，已入库、由同步脚本 tmp+replace 写入）**实际上已是生成物但无声明**。注意这不是「三份拷贝漂移」问题——实测 `data/narrative_defaults/*.py` 与 config 在 43/55 场景上形状与内容**刻意不同**（defaults 是单条「内嵌最小默认」兜底串，config 是全量分桶/双槽变体池），二者语义角色不同、不是副本关系；需要修复的只是 config 生成物身份的显式标注。
 
