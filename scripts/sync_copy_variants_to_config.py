@@ -98,6 +98,8 @@ LEVEL_BAND_TO_BUCKETS = {
 # narrative_config.json 顶层生成物标注（仅写盘 narrative 分支注入）：同步域场景
 # （CSV 有行）以 design_docs/content-design/copy_variants.csv 为准（§15 流程），
 # 手改 FORBIDDEN；非同步域场景（legacy_encounter 等）手改保留现值。
+# 注入模板与 config/narrative_config.json 中的 _meta 段保持逐字节同步
+# （setdefault 只补缺，已存在则保留手改）；修改 `hand_edit` 策略文字需双处更新。
 NARRATIVE_META = {
     "generated_by": "scripts/sync_copy_variants_to_config.py",
     "hand_edit": "同步域场景（CSV 有行）以 design_docs/content-design/copy_variants.csv 为准（§15 流程），手改 FORBIDDEN；非同步域场景（legacy_encounter 等）手改保留现值",

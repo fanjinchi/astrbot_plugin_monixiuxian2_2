@@ -160,6 +160,7 @@ def test_render_broken_template_degrades_to_raw(demo_defaults, monkeypatch):
 
 def test_extract_template_vars():
     assert extract_template_vars("{a}打{b.name}出{c[0]}") == {"a", "b", "c"}
+    assert extract_template_vars("{x[0].name}") == {"x"}  # 下标→点号组合链路
     assert extract_template_vars("无占位") == set()
     with pytest.raises(ValueError):
         extract_template_vars("未闭合{brace")
