@@ -16,13 +16,13 @@
 
 - [x] 3.1 `tests/test_narrative_config.py` 新增 contract 单测：`used_vars` 边界（`{{literal}}` 不产生变量、`{next_bonus:.0%}` 提取 `next_bonus`、`{player.name}` 提取 `player`、畸形花括号 `ValueError`）；`validate_scene` 全形态真假例（双槽非法形态整场景拒绝、未知桶键仅告警不拒、route 越界标注告警、panel 越界变量定位 `[panel]#0`），并断言每条 diagnostic 的 (severity, message) 与 config_manager 现状日志逐字一致（含 `[配置]`/`[内嵌默认]`）；`iter_scene_entries` 分桶/扁平两形态 location 标记；**另修 tests/test_narrative_config.py:212**——该处经 `_config_mod._iter_scene_entries`（config_manager 模块私有属性）访问，2.1 切换公共导入后 config_manager 无此符号必挂，改为从 contract 公共 API import（tests/ 内私有符号消费仅此一处）；**补一个多诊断顺序用例**（同场景同时触发未知桶键告警 + 条目 error，断言 diagnostics 顺序 = 双槽形态检查 → 桶键循环 → 逐条目（route 标注 → 缺 text → 花括号 → 未知变量），与 config_manager.py:600-658 现状执行序一致）；**两种日志前缀须原样复刻——纯按行号指派，与 warning/error 级别非一一对应（缺 text 是 error 级但用「叙事配置」），勿按级别套前缀**：config_manager.py :607/:622/:631/:637 用「叙事配置[{source}]」、:647/:655 用「叙事文案契约违例[{source}]」
 - [x] 3.2 `tests/test_sync_copy_variants_admission.py` 零改动通过——它驱动真实的 `_default_scene_vars()`/`_apply_short_text`，是「:126 regex 迁移后输出与 ⊇ 放行语义逐位不变」的机械锚；若翻红，说明 2.2 改了语义，回退修 migration 而非改测试
-- [x] 3.3 `uv run python -m pytest tests/ -v` 全绿；`uv run ruff format . && uv run ruff check .` 通过；`openspec validate --change narrative-contract-module` 通过
+- [x] 3.3 `uv run python -m pytest tests/ -v` 全绿；`uv run ruff format . && uv run ruff check .` 通过；`openspec validate narrative-contract-module --type change` 通过
 
 ## 4. 文档同步
 
 - [x] 4.1 `AGENTS.md` §5 配置系统补 `narrative_config.json` 的 `_meta` 手改政策指针（同步域 FORBIDDEN / 非同步域保留）；§架构速览与 §15 中 `data/narrative_defaults/` 的「手维护」表述**保持原样**（本变更不再生 defaults，该层仍是代码所有的最小兜底）
 - [x] 4.2 `openspec/specs/narrative-text-config/spec.md`「改文案不改代码」场景（spec.md:30-33）补一句流程指向：非同步域场景手改 config 仍是运营路径（`_meta` 政策保留现值）；同步域场景经 design_docs CSV → sync 脚本入库（§15）。**仅 prose 同步，不动任何 SHALL/Scenario 断言**——该场景 WHEN（运营/策划修改 narrative_config.json）对非同步域依然成立
-- [x] 4.3 用 `bd` 登记跟进 issue：`lint_narrative.py` 白名单 regex 对齐 `narrative_contract`（design_docs 侧独立小变更，消除第三份解析器）
+- [x] 4.3 用 `bd` 登记跟进 issue：`lint_narrative.py` 白名单 regex 对齐 `narrative_contract`（design_docs 侧独立小变更，消除第三份解析器）——**已由 d9541ff 随实施完成**（按路径加载机制规避原 Non-Goal 的反向依赖否决理由），bd `-mgi` 已关闭
 
 ## 5. 收尾
 

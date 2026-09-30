@@ -19,7 +19,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from tests.helpers import load_module
+from tests.helpers import load_module, load_package_module
 
 _mod = load_module("time_skip_registry", "core/time_skip_registry.py")
 TimeSkipRegistry = _mod.TimeSkipRegistry
@@ -196,3 +196,31 @@ class TestCmdHelpCoverage:
             line for line in msg.splitlines() if line.lstrip().startswith("覆盖域：")
         )
         assert covered_line.strip() == f"覆盖域：{EXPECTED_COVERED}"
+
+
+class TestPluginPackageDerivation:
+    """a971965 回归：`_plugin_package()` 必须按加载布局推导包前缀。
+
+    根因：AstrBot 以 ``data.plugins.<dir>`` 命名空间包加载插件
+    （astrbot star_manager），而 tests/helpers.py 把插件目录注入 sys.path
+    后按裸包名导入——归档时的测试验证的是运行时根本不存在的布局，硬编码
+    裸包名的 provider 导入因此漏网约一天。本用例以合成包名复现 AstrBot
+    运行时布局，钉死推导逻辑，防未来再硬编码。
+    """
+
+    def test_runtime_namespace_layout_derives_prefix(self):
+        # 以 AstrBot 运行时的 data.plugins.<dir> 布局加载（合成包名，
+        # 模块无相对导入、加载无副作用）
+        mod = load_package_module(
+            "core/time_skip_registry.py",
+            "data.plugins.astrbot_plugin_monixiuxian2_2.core.time_skip_registry",
+        )
+        assert mod.__package__ == "data.plugins.astrbot_plugin_monixiuxian2_2.core"
+        assert mod._plugin_package() == "data.plugins.astrbot_plugin_monixiuxian2_2"
+
+    def test_bare_layout_falls_back_to_constant(self):
+        # 本文件顶部 load_module 加载的模块 __package__ 为空 → 常量兜底，
+        # 行为与修复前一致（standalone 脚本/显式路径加载场景）
+        assert _mod.__package__ == ""
+        assert _mod._plugin_package() == _mod._PLUGIN_PACKAGE
+        assert _mod._PLUGIN_PACKAGE == "astrbot_plugin_monixiuxian2_2"

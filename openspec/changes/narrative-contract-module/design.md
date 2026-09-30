@@ -22,7 +22,7 @@
 
 **Non-Goals:**
 - **不再生/重排 `data/narrative_defaults/*.py`。** 评审实测 defaults 与 config 在 43/55 场景形状/内容不同——defaults 是「内嵌最小默认」兜底（spec 多处钉死「回退内嵌**最小**默认文案」），config 是全量可调池，二者语义不同源、非拷贝；sync 脚本不负责再生 defaults，该层继续手维护，由「内嵌默认全量符合契约」测试（`tests/test_narrative_config.py`）与 lint/导入双闸门间接约束。曾考虑 `--emit-defaults` 从 config 池冻结快照，因上述语义差异与双槽默认回退路径（`render_narrative:321-331` 不处理双槽 default_value，会丢 panel 机械信息）否决。
-- 不合并 `lint_narrative.py` 的白名单 regex（design_docs 侧独立工具，合并需 design_docs 反向依赖插件包——登记 bd 跟进，见 Risks）。
+- ~~不合并~~ `lint_narrative.py` 的白名单 regex ——**实施期经 d9541ff 完成**（retro 同步）：原否决理由是「合并需 design_docs 反向依赖插件包」，实施发现可按路径加载 `narrative_contract`（lint_narrative.py:127-133，同文件既有 narrative_defaults 按路径加载先例），contract 顶层零依赖、AstrBot 环境外可跑，否决理由被机制规避；bd `-mgi` 已登记并关闭。归档读者注意：本节描述的是立项时点的判断，完成事实以 retro 标注为准。
 - 不改 `render_narrative` 的回退链语义（config→内嵌默认→"" 的三级顺序、双槽短路先于默认回退等均已由 spec 场景钉住）。
 - 不动 `NARRATIVE_SCENE_VARS` 的位置与内容（代码所有的声明层）。
 - 不引入 ADR/CONTEXT.md（`narrative_contract` 是既有契约概念的代码符号，非新领域概念）。
@@ -52,7 +52,7 @@ contract 单测覆盖：`{{}}` 转义不产生变量、`{var:spec}` 提取根名
 - [regex→Formatter 的统一在边缘语法上「改」了闸门判定（`{{` 转义不再误报、畸形花括号从静默变抛错）] → 这是对潜伏 bug 的修复而非回归；257 叶子条目实测零差异；tasks 中要求实施时跑一次全池对比（新旧解析器对 config + defaults 全部叶子条目的输出集合 diff 为空）作为机械验证，结果贴进 PR 描述。
 - [sync 脚本 `used_vars` 抛 `ValueError` 中断导入] → :248/:318 两处包 try/except 按契约不满足跳过场景，与加载校验处置一致；`tests/test_sync_copy_variants_admission.py` 的现有用例（合法模板）零改动通过即证明未误伤。
 - [`config_manager` 校验从「私有 import」改为「公共 API」后，有人绕过 contract 直接手写校验] → contract 的 `validate_scene` 是唯一做形态分支的地方，review checklist 核对 config_manager 不再出现 `_check` 私有逻辑残留。
-- [`lint_narrative.py` 继续用第三份 regex，双标风险残留] → 登记 bd issue 跟进「lint 闸门对齐 narrative_contract」（design_docs 侧允许按路径 import 插件 utils，无环境负担，适合独立小变更）。
+- [`lint_narrative.py` 继续用第三份 regex，双标风险残留] → 已由 d9541ff 实施期解决（retro 同步）：lint 经按路径加载对齐 `narrative_contract` 单源，`{{literal}}` 误报/`{a.b}` 取根/脱槽语义与运行时校验统一；bd `-mgi` 关闭。立项时登记为「残留风险」的判断按完成事实更新。
 - [`_meta` 顶层键被误当域读取] → config_manager 与渲染路径全部按 `NARRATIVE_SCENE_VARS` 声明域/section 名访问，不遍历顶层键；实施时以一条加载日志验证 `_meta` 零影响，并以 sync 脚本一次 `--dry-run` 验证 round-trip。
 
 ## Migration Plan
