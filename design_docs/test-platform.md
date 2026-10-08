@@ -154,3 +154,11 @@ REST POST /api/conversations/{id}/messages {sender, text}
    ```
 
 5. 关闭平台：Dashboard 平台管理禁用 webtest，或卸载插件。
+
+## 项目级约定（当前仓库维护）
+
+本插件的 AGENTS.md 不再维护这些约定，以本节为准：
+
+- 启用前提：Dashboard → 平台管理 → 启用「网页测试平台」；入口 `http://127.0.0.1:8765`（或 Dashboard 插件详情嵌入版）；`/api/status` 应返回 `adapter_ready: true`
+- 反馈闭环：用户批注 → 按 SKILL.md 工作流 D 拉取 → 改插件代码 → 热重载（`POST /api/ops/plugin-reload`，与 Dashboard 重载同一底层但不走登录态）→ 重跑用例/`wait` 断言确认 → 汇报
+- 改动同步：插件代码改动提交到独立仓库；本文档按独立仓库实际代码修正（无自动同步）

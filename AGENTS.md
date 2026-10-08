@@ -29,15 +29,11 @@ AstrBot 插件（文字修仙游戏），Python 插件。作为 AstrBot 的子�
 
 ## AstrBot 官方开发原则（必须遵守）
 
-> 违反会导致插件无法正常运行或被拒收。
+> 权威出处：宿主仓库 `docs/zh/dev/star/plugin.md` 与 `docs/zh/dev/star/guides/storage.md`（跨插件通用，不在本仓库维护）。违反会导致插件无法正常运行或被拒收。
 
-1. 所有 Handler 必须定义在插件类（`Star` 子类）中，文件名必须为 `main.py`
-2. Handler 前两个参数必须为 `self` 和 `event`（`AstrMessageEvent` 类型）
-3. 持久化数据必须存储在 `data/plugin_data/{plugin_name}/` 下，绝不能存在插件自身目录
-4. 禁止使用 `requests`，必须用异步库（`aiohttp`、`httpx`）
-5. 提交前用 `uv run ruff format . && uv run ruff check .` 格式化并检查
-6. 良好的错误处理，不让插件因单个错误崩溃
-7. 功能需经过测试，需包含注释
+- Handler 必须定义在插件类（`Star` 子类）中，文件名必须为 `main.py`；Handler 前两个参数必须为 `self` 和 `event`（`AstrMessageEvent` 类型）
+- 持久化数据必须存储在 `data/plugin_data/{plugin_name}/` 下，绝不能存在插件自身目录；禁止使用 `requests`，必须用异步库（`aiohttp`、`httpx`）
+- 提交前用 `uv run ruff format . && uv run ruff check .`；良好的错误处理，不让插件因单个错误崩溃；功能需经过测试并包含注释
 
 ## 关键开发规范
 
@@ -179,36 +175,23 @@ AstrBot 插件（文字修仙游戏），Python 插件。作为 AstrBot 的子�
 
 ## 网页端测试平台（功能验证与反馈闭环）
 
-贴近真实环境的测试平台：模拟玩家私聊/群聊消息走 AstrBot 真实管线（filter → Handler → 白名单 → 数据库 → 定时任务），消息流双向可见、可批注、可自动化。设计文档：`design_docs/test-platform.md`；插件代码在独立仓库 `~/code/AstrBot/data/plugins/astrbot_plugin_testplatform/`（独立 git 仓库，不在本仓库维护）。
+模拟玩家私聊/群聊消息走 AstrBot 真实管线，可批注、可自动化。项目级约定（启用前提/反馈闭环/改动同步）见 `design_docs/test-platform.md`；平台插件在独立仓库 `astrbot_plugin_testplatform/`（不在本仓库维护）。
 
-- **操作细节一律以 SKILL.md 为准**：`.agents/skills/testing-astrbot-plugins-via-webtest` 是指向测试平台仓库 `skill/` 的符号链接（由平台「Skill 分发」弹层维护，勿手动编辑链接内文件）；手动探测、JSON 用例编写与回归、热重载、批注读取等见该 SKILL.md。本节只保留项目级约定：
-- 启用前提：Dashboard → 平台管理 → 启用「网页测试平台」；入口 `http://127.0.0.1:8765`（或 Dashboard 插件详情嵌入版）；`/api/status` 应返回 `adapter_ready: true`
-- 反馈闭环：用户批注 → 按 SKILL.md 工作流 D 拉取 → 改插件代码 → 热重载（`POST /api/ops/plugin-reload`，与 Dashboard 重载同一底层但不走登录态）→ 重跑用例/`wait` 断言确认 → 汇报
-- **真实环境功能测试由用户手动发起（2026-08-30 定）**：AI 不主动跑平台用例（含 `test_suite_ctl.py run`、平台 CLI、热重载后回归），写完代码以 `pytest tests/` + ruff 为质量门即可收尾；需要真实环境回归时由用户自行运行或明确指示后才执行
-- 改动同步：插件代码改动提交到独立仓库；`design_docs/test-platform.md` 按独立仓库实际代码修正（无自动同步）
+- **操作细节一律以 SKILL.md 为准**：`.agents/skills/testing-astrbot-plugins-via-webtest` 是指向测试平台仓库 `skill/` 的符号链接（平台「Skill 分发」维护，勿手编）；探测、用例编写回归、热重载、批注读取（反馈闭环：批注 → 工作流 D → 改代码 → 热重载 → 重跑断言 → 汇报）见该 SKILL.md
+- **真实环境功能测试由用户手动发起（2026-08-30 定）**：AI 不主动跑平台用例，写完代码以 `pytest tests/` + ruff 为质量门；要真实回归由用户自行运行或明确指示
 
 ## 功能测试套件（项目内用例与结果归档）
 
-统一存放功能测试用例与结果：`functional_tests/`（用例源在 `functional_tests/cases/<domain>/<name>.json`，平台数据目录只保留同步副本）。**所有操作命令、概率效果口径（`--repeat` 非抽样）、fixture profile 清单、并发约束详见 `functional_tests/README.md`**，本节只保留义务：
+统一存放功能测试用例与结果：`functional_tests/`（源用例 `functional_tests/cases/<domain>/<name>.json`，平台数据目录只保留同步副本）。**所有操作命令、概率效果口径（`--repeat` 非抽样）、fixture profile 清单、并发约束详见 `functional_tests/README.md`**，本节只保留义务：
 
-- 用例 `name` 必须等于文件名且全局唯一；JSON 兼容平台 `loader.validate_case`（必填 `description`/`scenario`/`steps`，`owner` = `astrbot_plugin_monixiuxian2_2`）；可声明 `pre_run_hook`（宗门用例已内嵌 fixture 复位）
-- 同步走 `uv run python scripts/test_suite_ctl.py sync-cases`：扫描校验 → 注入缺失 `owner` → 复制到平台目录；无源文件的残留 JSON 逐个告警（不删除），需回填源文件后重新 sync
-- 运行/归档：`test_suite_ctl.py run --tag <tag> | --case <name>`（推荐 one-shot：`run --sync --reload astrbot_plugin_monixiuxian2_2 --export <dir> [--quiet]`）、`export --target <target>` 写 `functional_tests/results/<YYYY-MM-DD>_<target>/`；或平台 CLI `test_platform_cli.py case run[-all]`（`WEBTEST_URL`/`WEBTEST_TOKEN`；⚠ 分域子目录源必须走 sync-cases，平台 CLI glob 非递归）
-- fixture（兼容保留）：`fixture --profile pvp|sect` 向专用测试实例写入固定测试 ID（`900000001`/`900000002`/`900000003`，sect 另含新建型 `900000004`/`900000005`/`900000006`/`900000008`）基线并清除冷却/忙碌；⚠ 仅限独立测试实例，禁止对正式数据执行
+- 用例 `name` 必须等于文件名且全局唯一，JSON 兼容平台 `loader.validate_case`（必填 `description`/`scenario`/`steps`，`owner` = `astrbot_plugin_monixiuxian2_2`）；可声明 `pre_run_hook`（宗门用例已内嵌 fixture 复位）
+- 同步/运行/归档/fixture 命令与口径见 `functional_tests/README.md`（`sync-cases`、`run --tag|--case`、`export --target`、`fixture --profile`；⚠ 分域子目录源必须走 sync-cases，平台 CLI glob 非递归；fixture 仅限独立测试实例，禁止对正式数据执行）；fixture 写固定测试 ID：`900000001`/`900000002`/`900000003`（sect 另含新建型 `900000004`/`900000005`/`900000006`/`900000008`）基线并清除冷却/忙碌
 - 新玩法变更后：先查 `functional_tests/` 对应域用例，有则补/改并跑一次 tag；功能 Bug 用 `bd` 登记，不在套件内直接修游戏代码
 - 平台能力边界：`functional_tests/platform-gap-report.md`（Supported / Partially supported / Unsupported），新用例优先只依赖 Supported 能力
 
 ## 文档地图（必读与维护）
 
-开始任何任务前，先按下表选读对应文档快速定位；完成任务后，按"维护责任"同步文档：
-
-| 文档 | 内容 | 何时读 | 维护责任（何时必须更新） |
-|---|---|---|---|
-| `design_docs/api-overview.md` | 关键 API 速查：指令→main.py 路由→handlers→managers→core→data 全链路索引与检索路径 | 定位代码、理解调用链 | 新增/重命名公开方法、新增子系统 |
-| `design_docs/project-architecture.md` | 架构与系统功能设计总览（分层架构+mermaid 图、20 子系统设计表、openspec 契约、里程碑时间线、bd 对照） | 新增/修改功能、理解系统边界 | 新增子系统、架构变更、openspec spec 增删、里程碑节点 |
-| `design_docs/current-design-report.md` | 数值/机制设计活基线（含 `file:line` 引用） | 改数值、改战斗/技能/成长 | 任何影响玩法的修改（同 §14） |
-| `design_docs/README.md` | design_docs 全部资料清单与类型标注 | 找专题资料（成长/曲线/内容设计/竞品） | 新增 design_docs 资料时登记 |
-| `openspec/specs/` | 行为契约（每篇一目录，当前 16 篇，What/Why 与 Accept 公式） | 改技能/战斗/装备/数值前 | 走 OpenSpec 提案流程（见 §14） |
+开始任何任务前，先查 `design_docs/README.md` 的**文档地图**表格选读对应文档（api-overview / project-architecture / current-design-report / openspec/specs 等，openspec 当前 16 篇）；完成后按"维护责任"同步：新方法→api-overview、新子系统→project-architecture、玩法改动→current-design-report、新资料→README 登记、契约变更→OpenSpec 流程（见 §14）。
 
 **注释约定**：
 

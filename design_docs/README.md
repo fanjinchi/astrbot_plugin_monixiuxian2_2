@@ -24,10 +24,22 @@
 | `mybrute/` | 外部参考 | My Brute（Motion-Twin 自动战斗页游）设计调研：wiki 资料整理 + 网络调研笔记。 |
 | `qpet-daledou/` | 外部参考 | Q宠大乐斗（早期版本，约 2010-2012）设计调研笔记。 |
 | `attribute-growth/` | 混合 | 属性成长与镜像战 TTK 调研：`xiuxian-*`、`worker-xiuxian-report.md` 为本插件蒙特卡洛模拟；`mybrute-*`、`qpet-*` 为竞品模拟；另含业界自动战斗游戏平衡方案网络调研（`auto-battle-balance-web-research.md`）。汇总分析入口 `attribute-growth-analysis.md`，本项目成长/加成平衡设计方案 `growth-balance-proposals.md`。 |
-| `content-design/` | 本项目 | 玩家侧内容设计工作区（武器/功法/心法/防具定稿数值，最终产出 `config/weapons.json` / `skills.json` / `heart_methods.json` / `items.json` 防具段）；设计蓝本取自 `mybrute/`、`qpet-daledou/` 外部调研。**双路线定位与内容四族/机制预算规范：`content-design/route-identity.md`（2026-08-27 定稿，openspec change `dual-route-identity`；2026-09-08 满级面板拆分天生/装备护甲），填充内容前必读。** 防具：`armors.csv` + `armors.md`（2026-09-08 `armor-content-design`，对称 EHP 框架：重甲/法袍 × 9 品级 18 标杆件全通用，占位 3 件删除留档，待用户确认后导入）。另有叙事 canon 体系（`weapons/skills/heart_methods` 三表增 `canon_origin/tone_tier/story_hook/narrative_status` 四列；`events-canon.csv` / `enemies-canon.csv` / `rifts-canon.csv` / `bounty-canon.csv` 四张轻量叙事表）、叙事 lint 脚本 `lint_narrative.py`（禁词/数值承诺/长度/品级冠词/名字一致性闸门，`sync_content_to_config.py` 预算验算后的第二道闸门）与逆向导出补登记脚本 `../scripts/export_config_to_canon.py`（config 缺失条目以 legacy 行补登进设计表，防 reconcile 误删）。 |
+| `content-design/` | 本项目 | 玩家侧内容设计工作区（武器/功法/心法/防具定稿数值，最终产出 `config/weapons.json` / `skills.json` / `heart_methods.json` / `items.json` 防具段）；设计蓝本取自 `mybrute/`、`qpet-daledou/` 外部调研。**双路线定位与内容四族/机制预算规范：`content-design/route-identity.md`（2026-08-27 定稿，openspec change `dual-route-identity`；2026-09-08 满级面板拆分天生/装备护甲），填充内容前必读。** 防具：`armors.csv` + `armors.md`（2026-09-08 `armor-content-design`，对称 EHP 框架：重甲/法袍 × 9 品级 18 标杆件全通用，占位 3 件删除留档，待用户确认后导入）。另有叙事 canon 体系（`weapons/skills/heart_methods` 三表增 `canon_origin/tone_tier/story_hook/narrative_status` 四列；`events-canon.csv` / `rifts-canon.csv` / `bounty-canon.csv` 三张轻量叙事表）、叙事 lint 脚本 `lint_narrative.py`（禁词/数值承诺/长度/品级冠词/名字一致性闸门，`sync_content_to_config.py` 预算验算后的第二道闸门）与逆向导出补登记脚本 `../scripts/export_config_to_canon.py`（config 缺失条目以 legacy 行补登进设计表，防 reconcile 误删）。PVE 怪物/Boss：`pve-enemy-design.md`（2026-10-01 讨论稿：mybrute/qpet 无 PVE 调研的结论、外部调研综述、五维再分配类型学、Step 0-8 设计流程与 7 个待拍板决策点；关联 bd `9u2`/`6ow`/`lky`）。PVE roster 数值表：`enemies.csv`（2026-10-08 Step 4 产出：28 roster+3 守护共 31 行，数值照 pve-enemy-design.md 附录 D.4，叙事重做全部新写；落地后取代 `enemies-canon.csv`）。 |
 | `level-exp-curve/` | 本项目 | 升级经验曲线蒙特卡洛模拟与平衡建议（基于本插件修炼收益假设，如 `core/cultivation_manager.py` 的闭关基础修为），产出 `exp-curve-report.md`、`sim_exp_curve.py`、`balance-recommendations.md`。 |
 | `sect-system-design.md` | 本项目 | **宗门系统扩展总设计**（2026-08-18 建立，2026-08-21 回写 `unify-sect-commands` 指令收敛）：默认宗门（系统势力）配置化、宗门建设/师承任务线/职阶晋升、宗门商店（一期），毁灭与重建（二期）、NPC 人格化预留（三期）；全部宗门功能收敛为「宗门」单指令+子命令（含悬赏独立入口/秘境仅本宗可见/历练事件标记）；含策划配置速查表与架构改造清单。宗门玩法变更时同步本文。 |
 | `novel-research/` | 外部参考 | 修仙小说世界观素材提取库（openspec change `read-novels-extract-content` 产出）：**10 本小说世界观全收录**（境界突破/宗门情节/道具法宝/功法神通/丹药灵药/地名势力/事件奇遇/战斗描写/人物关系 9 维度 + 玩法映射标签），供修仙玩法设计取材。文件：`extract-fanren.md`（凡人修仙传，全本 2446 章）`extract-xianni.md`（仙逆，全本 2088+后记）`extract-zhetian.md`（遮天，全本 1822+大结局）`extract-zhuxian.md`（诛仙，全本 293 章）`extract-yinianyongheng.md`（一念永恒，精读 654 章+网络补足）`extract-woshixiongshizaitaiwenjianle.md`（我师兄实在太稳健了，采样精读 50 章）`extract-dafengdagengren.md`（大奉打更人，采样精读 44 章）`extract-guimizhizhu.md`（诡秘之主，采样精读 24 章）`extract-daoguiyixian.md`（道诡异仙，采样精读 33 章+网络补足）`extract-fubenshidao.md`（佛本是道，采样精读 25 章）。另含 3 本早期专项笔记（`01-fanren-xiuxian-chuan.md`、`02-xian-ni.md`）与**可复用模板清单**（`novel-research/README.md`，各维度玩法设计模板索引）。 |
+
+## 文档地图（必读与维护）
+
+开始任何任务前，先按下表选读对应文档快速定位；完成任务后，按"维护责任"同步文档（AI 任务必读清单）：
+
+| 文档 | 内容 | 何时读 | 维护责任（何时必须更新） |
+|---|---|---|---|
+| `api-overview.md` | 关键 API 速查：指令→main.py 路由→handlers→managers→core→data 全链路索引与检索路径 | 定位代码、理解调用链 | 新增/重命名公开方法、新增子系统 |
+| `project-architecture.md` | 架构与系统功能设计总览（分层架构+mermaid 图、20 子系统设计表、openspec 契约、里程碑时间线、bd 对照） | 新增/修改功能、理解系统边界 | 新增子系统、架构变更、openspec spec 增删、里程碑节点 |
+| `current-design-report.md` | 数值/机制设计活基线（含 `file:line` 引用） | 改数值、改战斗/技能/成长 | 任何影响玩法的修改（同插件根 AGENTS.md §14） |
+| `README.md` | design_docs 全部资料清单与类型标注（本文档） | 找专题资料（成长/曲线/内容设计/竞品） | 新增 design_docs 资料时登记 |
+| `../openspec/specs/` | 行为契约（每篇一目录，当前 16 篇，What/Why 与 Accept 公式） | 改技能/战斗/装备/数值前 | 走 OpenSpec 提案流程（见插件根 AGENTS.md §14） |
 
 ## 使用约定
 
