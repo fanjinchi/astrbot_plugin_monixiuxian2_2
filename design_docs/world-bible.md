@@ -390,7 +390,7 @@
 | 功法 | `design_docs/content-design/skills.csv`（同上四列） | 含宗门池 sect_qingyun/sect_huanxi（导出补登记 legacy 行）与传承池 |
 | 心法 | `design_docs/content-design/heart_methods.csv`（同上四列） | 含青云心典（heart_qy_001，导出补登记 legacy 行）；其余四宗镇派心法为规划位待补 |
 | 历练事件 | `design_docs/content-design/events-canon.csv` | 事件组 key ↔ name 对照 + 叙事列 |
-| 敌人 | `design_docs/content-design/enemies-canon.csv` | 敌人模板 + 精英前缀/Boss 名叙事备注 |
+| 敌人 | `design_docs/content-design/enemies.csv` | 敌人模板数值+叙事合一表（2026-10-08 PVE 重做：28 roster+3 守护） |
 | 秘境 | `design_docs/content-design/rifts-canon.csv` | 秘境 id ↔ name 对照 + 叙事列（config 暂无 `description`，文案待工程变更 bd `og9`） |
 | 悬赏 | `design_docs/content-design/bounty-canon.csv` | 悬赏模板 id ↔ name 对照 + 叙事列 |
 | 丹药 | （待建 `pills-canon.csv`，后续内容变更补） | 名录暂存 `config/pills.json`，以 config 名为准 |

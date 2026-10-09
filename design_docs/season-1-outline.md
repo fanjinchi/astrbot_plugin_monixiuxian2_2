@@ -30,7 +30,7 @@
 | 心法 | 21 本（含补登记的青云心典 heart_qy_001，canon 表 `heart_methods.csv`）+ 4 宗镇派心法规划位（待补） | 补齐路线 × 品级矩阵 | 每本 1 条描述 |
 | 历练事件 | 5 组 15 事件（`adventure_config.json`，canon 表 `events-canon.csv`） | +2 宗门事件（sect_duel/sect_trial，2026-08-29 定） | 每事件 ≥5 条通用 + 每州 ≥1 条专属（15 事件 × 11 ≈ 165 条） |
 | 悬赏主题 | 8 类（`bounty_templates.json`，canon 表 `bounty-canon.csv`） | 8 类不变 | 每类 ≥5 条通用 + 每州 ≥1 条专属 |
-| 敌人 | 12 模板 + 3 守护（`enemies.json`，canon 表 `enemies-canon.csv`） | 不变 | 每模板描述 + 精英前缀/Boss 名叙事化 |
+| 敌人 | 12 模板 + 3 守护（`enemies.json`） | 全部重做：28 只（16 普通+8 精英+4 Boss）+ 3 守护，canon 表 `enemies.csv`（2026-10-08 设计定稿待导入） | 每只描述 + story_hook（enemies.csv 草稿已备） |
 
 ---
 

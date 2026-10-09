@@ -517,6 +517,205 @@ def check_armors(rows: list[dict]) -> list[str]:
     return results
 
 
+# ---------------------------------------------------------------------------
+# PvE 怪物表校验（pve-enemy-design.md Step 5，2026-10-08）
+# 段基准 = 附录 C.4 落位绝对值；原型系数 = §3.2/Q3b；词缀/Boss trim = Q3c 定案。
+# 静态门只管结构纪律与五维量级（防手滑改飞）；胜率/TTK 精度验收在
+# sim_pve_acceptance.py（动态门，真实引擎 3000 场/格）。
+# ---------------------------------------------------------------------------
+
+# 段位 → (锚定级, 区间下限, 区间上限)；新十进制段位（坑 #4 修复口径）
+ENEMY_SEGMENTS = {
+    "练气": (1, 1, 9),
+    "筑基": (10, 10, 19),
+    "金丹": (20, 20, 29),
+    "元婴": (30, 30, 40),
+}
+
+# 附录 C.4 怪物基准表：段×档 → (HP, 伤害, 身法, 迅捷, 护甲)
+ENEMY_TIER_BASE = {
+    ("练气", "normal"): (77, 4, 9, 11, 0),
+    ("练气", "elite"): (196, 16, 9, 12, 3),
+    ("练气", "boss"): (241, 18, 9, 12, 7),
+    ("筑基", "normal"): (129, 16, 20, 21, 0),
+    ("筑基", "elite"): (326, 40, 21, 23, 6),
+    ("筑基", "boss"): (400, 44, 20, 22, 13),
+    ("金丹", "normal"): (258, 34, 32, 33, 0),
+    ("金丹", "elite"): (648, 72, 34, 36, 9),
+    ("金丹", "boss"): (796, 79, 33, 35, 19),
+    ("元婴", "normal"): (353, 57, 45, 45, 0),
+    ("元婴", "elite"): (881, 116, 47, 49, 12),
+    ("元婴", "boss"): (1083, 128, 46, 47, 26),
+}
+
+# 原型五维重分配系数（Q3b；armor_add_r 为减伤率口径加项，按 K=100+10×level 换算）
+ENEMY_ARCHETYPES = {
+    "均衡": (1.00, 1.00, 1.00, 1.00, 0.00),
+    "坚壳": (1.25, 0.85, 0.95, 0.95, 0.04),
+    "猛击": (0.80, 1.25, 1.00, 1.00, 0.00),
+    "迅捷": (0.90, 0.95, 1.10, 1.15, 0.00),
+}
+
+# 精英词缀数值修饰（Q3c；嗜血为纯触发机制，无面板修饰）
+ENEMY_AFFIXES = {
+    "狂暴": (1.10, 1.00, 0.95),  # (dmg×, hp×, spd×) + 甲×0.5 单独处理
+    "坚甲": (1.26, 0.75, 0.95),  # + 甲 +5%r 单独处理
+    "嗜血": (1.00, 1.00, 1.00),
+}
+
+# Boss 原型与 trim（Q3c 定案）：段 → (原型, 技能名, dmg_trim, hp_trim, spd_trim)
+ENEMY_BOSS_SPEC = {
+    "练气": ("均衡", "拱土疗伤", 1.00, 0.95, 1.00),
+    "筑基": ("迅捷", "狼王连咬", 0.82, 1.14, 0.97),
+    "金丹": ("坚壳", "鳞甲反震", 0.85, 1.00, 1.00),
+    "元婴": ("均衡", "九尾现形", 0.975, 1.00, 1.00),
+}
+
+
+def _enemy_expected(seg: str, tier: str, archetype: str, affix: str) -> tuple:
+    """按落位公式重算期望五维：段档基准 × 原型 × 词缀/Boss trim。"""
+    base = ENEMY_TIER_BASE[(seg, tier)]
+    level = ENEMY_SEGMENTS[seg][0]
+    k_shrink = 100 + 10 * level
+    if tier == "boss":
+        archetype, _, d_tri, h_tri, s_tri = ENEMY_BOSS_SPEC[seg]
+    else:
+        d_tri = h_tri = s_tri = 1.0
+    hp_m, dmg_m, agi_m, spd_m, armor_r = ENEMY_ARCHETYPES[archetype]
+    hp = base[0] * hp_m * h_tri
+    dmg = base[1] * dmg_m * d_tri
+    agi = base[2] * agi_m
+    spd = base[3] * spd_m * s_tri
+    armor = base[4] + armor_r / max(1e-9, 1 - armor_r) * k_shrink
+    if affix:
+        a_dmg, a_hp, a_spd = ENEMY_AFFIXES[affix]
+        dmg *= a_dmg
+        hp *= a_hp
+        spd *= a_spd
+        if affix == "狂暴":
+            armor *= 0.5
+        elif affix == "坚甲":
+            armor += 0.05 / (1 - 0.05) * k_shrink
+    return hp, dmg, agi, spd, armor
+
+
+def check_enemies(rows: list[dict]) -> list[str]:
+    """Check enemies.csv: matrix discipline, affix rotation, level anchors, stats.
+
+    Structural rules (Q1 子决策/§3.2)：每段 4 普通+2 精英+1 Boss；词缀 3 种在
+    8 精英位轮转各 2-3 次；Boss 技唯一且在四技表内；level 锚定段门槛级、
+    level_range 与段位十进制区间一致。数值按落位公式重算比对（容差取
+    max(±6%, ±1)，覆盖整数截断——练气段小数值粒度粗，附录 C.2 发现 4）。
+    守护行只查结构（数值列必须留空：动态匹配来访者境界，§3.2）。
+    """
+    results: list[str] = []
+    ids = [r["id"] for r in rows]
+    if len(ids) != len(set(ids)):
+        results.append("FAIL id 存在重复")
+
+    # --- 结构矩阵 ---
+    for seg in ENEMY_SEGMENTS:
+        sub = [r for r in rows if r["segment"] == seg]
+        counts = {"normal": 0, "elite": 0, "boss": 0}
+        for r in sub:
+            if r["tier"] in counts:
+                counts[r["tier"]] += 1
+        ok = counts == {"normal": 4, "elite": 2, "boss": 1}
+        results.append(
+            f"{'PASS' if ok else 'FAIL'} {seg}段矩阵 4普通+2精英+1Boss：实际 {counts}"
+        )
+
+    guardians = [r for r in rows if r["tier"] == "guardian"]
+    ok = len(guardians) == 3
+    results.append(f"{'PASS' if ok else 'FAIL'} 守护 3 只：实际 {len(guardians)}")
+    for r in guardians:
+        filled = [
+            c for c in ("hp", "damage", "agility", "speed", "armor_value") if r.get(c)
+        ]
+        if filled:
+            results.append(
+                f"FAIL {r['id']:<18} 守护数值列必须留空（动态匹配来访者境界），误填 {filled}"
+            )
+
+    # --- 词缀轮转 ---
+    affixes = [r["affix"] for r in rows if r["tier"] == "elite"]
+    rotation = {a: affixes.count(a) for a in ("狂暴", "坚甲", "嗜血")}
+    ok = all(2 <= n <= 3 for n in rotation.values()) and len(affixes) == 8
+    results.append(
+        f"{'PASS' if ok else 'FAIL'} 词缀轮转 3×/3×/2：实际 {rotation}（共 {len(affixes)} 精英位）"
+    )
+    for r in rows:
+        if r["tier"] == "elite" and r["affix"] not in ENEMY_AFFIXES:
+            results.append(f"FAIL {r['id']:<18} 精英词缀「{r['affix']}」不在三词缀表内")
+        if r["tier"] != "elite" and r.get("affix"):
+            results.append(f"FAIL {r['id']:<18} 非精英行不得带词缀「{r['affix']}」")
+
+    # --- Boss 技绑定 ---
+    valid_boss_skills = {spec[1] for spec in ENEMY_BOSS_SPEC.values()}
+    boss_skills = [r["boss_skill"] for r in rows if r["tier"] == "boss"]
+    ok = len(boss_skills) == 4 and set(boss_skills) == valid_boss_skills
+    results.append(
+        f"{'PASS' if ok else 'FAIL'} Boss 四技齐备且唯一：实际 {sorted(boss_skills)}"
+    )
+    for r in rows:
+        if r["tier"] == "boss":
+            expected_skill = ENEMY_BOSS_SPEC.get(r["segment"], (None, None))[1]
+            if r["boss_skill"] != expected_skill:
+                results.append(
+                    f"FAIL {r['id']:<18} Boss 技应为「{expected_skill}」，实际「{r['boss_skill']}」"
+                )
+        elif r.get("boss_skill"):
+            results.append(
+                f"FAIL {r['id']:<18} 非 Boss 行不得带 Boss 技「{r['boss_skill']}」"
+            )
+
+    # --- 等级锚定与区段 ---
+    for r in rows:
+        if r["tier"] == "guardian":
+            continue
+        seg = r["segment"]
+        if seg not in ENEMY_SEGMENTS:
+            results.append(f"FAIL {r['id']:<18} 未知段位「{seg}」")
+            continue
+        anchor, lo, hi = ENEMY_SEGMENTS[seg]
+        if int(r["level"]) != anchor:
+            results.append(
+                f"FAIL {r['id']:<18} level={r['level']} 应为段锚定级 {anchor}（等级固定锚定区段）"
+            )
+        if r["level_range"] != f"{lo}-{hi}":
+            results.append(
+                f"FAIL {r['id']:<18} level_range「{r['level_range']}」应为「{lo}-{hi}」"
+            )
+
+    # --- 五维落位容差 ---
+    for r in rows:
+        if r["tier"] == "guardian":
+            continue
+        seg, tier = r["segment"], r["tier"]
+        if seg not in ENEMY_SEGMENTS or (seg, tier) not in ENEMY_TIER_BASE:
+            continue
+        affix = r.get("affix", "")
+        if affix and affix not in ENEMY_AFFIXES:
+            continue  # 词缀取值域上面已报
+        exp = _enemy_expected(seg, tier, r["archetype"], affix)
+        got = (
+            float(r["hp"]),
+            float(r["damage"]),
+            float(r["agility"]),
+            float(r["speed"]),
+            float(r["armor_value"]),
+        )
+        for col, e, g in zip(
+            ("hp", "damage", "agility", "speed", "armor_value"), exp, got
+        ):
+            tol = max(abs(e) * 0.06, 1.0)
+            if abs(g - e) > tol:
+                results.append(
+                    f"FAIL {r['id']:<18} {col}={g:.0f} 偏离落位公式期望 {e:.1f}（容差 ±{tol:.1f}）"
+                )
+    return results
+
+
 def main() -> int:
     """Run all budget checks and print a report. Returns process exit code."""
     all_lines: list[str] = []
@@ -531,6 +730,7 @@ def main() -> int:
         ("heart_methods.csv", check_route_multipliers),
         ("armors.csv", check_armors),
         ("armors.csv", check_route_multipliers),
+        ("enemies.csv", check_enemies),
     ):
         path = DESIGN_DIR / filename
         with path.open(encoding="utf-8") as f:

@@ -461,11 +461,11 @@ def _check_config_descriptions(strict: bool, max_len: int) -> list[str]:
                     f"{sev} adventure_config.json event_groups.{group}.{ev.get('key')} {problem}"
                 )
 
-    # enemies narrative_status lookup（key → narrative_status）
+    # enemies narrative_status lookup（id → narrative_status）
     enemy_status: dict[str, str] = {}
     try:
-        for r in _load_csv("enemies-canon.csv"):
-            enemy_status[str(r.get("key", "")).strip()] = (
+        for r in _load_csv("enemies.csv"):
+            enemy_status[str(r.get("id", "")).strip()] = (
                 r.get("narrative_status") or ""
             ).strip()
     except FileNotFoundError:
@@ -682,11 +682,11 @@ def main() -> int:
         ("skills.csv", "skills", "id"),
         ("heart_methods.csv", "heart_methods", "id"),
         ("armors.csv", "armors", "id"),
+        ("enemies.csv", "enemies", "id"),
     )
     # 无 description 列的 canon 表：canon 列 + 名字一致 + 叙事待写 backlog
     canon_tables = (
         ("events-canon.csv", "events", "key"),
-        ("enemies-canon.csv", "enemies", "key"),
         ("rifts-canon.csv", "rifts", "id"),
         ("bounty-canon.csv", "bounty", "id"),
     )
