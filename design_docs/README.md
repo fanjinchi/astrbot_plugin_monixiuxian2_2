@@ -36,10 +36,10 @@
 | 文档 | 内容 | 何时读 | 维护责任（何时必须更新） |
 |---|---|---|---|
 | `api-overview.md` | 关键 API 速查：指令→main.py 路由→handlers→managers→core→data 全链路索引与检索路径 | 定位代码、理解调用链 | 新增/重命名公开方法、新增子系统 |
-| `project-architecture.md` | 架构与系统功能设计总览（分层架构+mermaid 图、20 子系统设计表、openspec 契约、里程碑时间线、bd 对照） | 新增/修改功能、理解系统边界 | 新增子系统、架构变更、openspec spec 增删、里程碑节点 |
+| `project-architecture.md` | 架构与系统功能设计总览（分层架构+mermaid 图、20 子系统设计表、openspec 契约、里程碑时间线、bd 对照） | 新增/修改功能、理解系统边界 | 新增子系统、架构变更、里程碑节点 |
 | `current-design-report.md` | 数值/机制设计活基线（含 `file:line` 引用） | 改数值、改战斗/技能/成长 | 任何影响玩法的修改（同插件根 AGENTS.md §14） |
 | `README.md` | design_docs 全部资料清单与类型标注（本文档） | 找专题资料（成长/曲线/内容设计/竞品） | 新增 design_docs 资料时登记 |
-| `../openspec/specs/` | 行为契约（每篇一目录，当前 16 篇，What/Why 与 Accept 公式） | 改技能/战斗/装备/数值前 | 走 OpenSpec 提案流程（见插件根 AGENTS.md §14） |
+| `../openspec/specs/` | 行为契约（每篇一目录，当前 16 篇，What/Why 与 Accept 公式） | 改技能/战斗/装备/数值前 | 只读历史契约（2026-10-09 起不再新增 change；新变更走 Trellis 任务流程，见插件根 AGENTS.md §14） |
 
 ## 使用约定
 

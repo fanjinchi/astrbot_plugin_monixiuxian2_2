@@ -148,7 +148,7 @@ AstrBot 插件（文字修仙游戏），Python 插件。作为 AstrBot 的子�
 - 整体架构/数值基线 → `design_docs/current-design-report.md`
 - 相关描述过时则直接修正；新增资料登记到 `design_docs/README.md` 资料清单
 - 纯 bug 修复（行为与设计意图不变）不要求；拿不准按"影响玩法"处理
-- 正式变更提案仍走 OpenSpec 流程（`openspec/changes/`），design_docs 只负责保持"设计事实"与实现同步
+- 正式变更提案走 Trellis 任务流程（`python3 .trellis/scripts/task.py create`，PRD 进 `.trellis/tasks/`，流程见 `.trellis/workflow.md`）；`openspec/specs`（16 篇）保留为只读历史契约、不再新增 change；design_docs 只负责保持"设计事实"与实现同步
 
 ### 15. 内容设计先行：剧情/数值内容必须先进 design_docs（必做）
 
@@ -158,7 +158,7 @@ AstrBot 插件（文字修仙游戏），Python 插件。作为 AstrBot 的子�
 2. **用户确认**：设计就绪后必须等用户手动确认，不由 AI 自行入库
 3. **导入阶段**（用户发起导入任务）：经 `scripts/sync_content_to_config.py`（预算 + 叙事 lint 双闸门）导入 config；反向补登记用 `scripts/export_config_to_canon.py`；导入后按 §14 同步文档、跑测试与质量门
 
-唯一例外：**工程性 config 变更**（新增字段、结构调整，如 rift 加 description）走 OpenSpec 工程变更，不算内容填充。
+唯一例外：**工程性 config 变更**（新增字段、结构调整，如 rift 加 description）走 Trellis 任务流程的工程变更，不算内容填充。
 
 ## 测试
 
@@ -191,7 +191,9 @@ AstrBot 插件（文字修仙游戏），Python 插件。作为 AstrBot 的子�
 
 ## 文档地图（必读与维护）
 
-开始任何任务前，先查 `design_docs/README.md` 的**文档地图**表格选读对应文档（api-overview / project-architecture / current-design-report / openspec/specs 等，openspec 当前 16 篇）；完成后按"维护责任"同步：新方法→api-overview、新子系统→project-architecture、玩法改动→current-design-report、新资料→README 登记、契约变更→OpenSpec 流程（见 §14）。
+开始任何任务前，先查 `design_docs/README.md` 的**文档地图**表格选读对应文档（api-overview / project-architecture / current-design-report / openspec/specs 等，openspec 当前 16 篇，自 2026-10-09 起为只读历史契约）；完成后按"维护责任"同步：新方法→api-overview、新子系统→project-architecture、玩法改动→current-design-report、新资料→README 登记、契约变更→Trellis 任务流程（见 §14）。
+
+**Skill 路由（2026-10-09 定）**：任务生命周期走 trellis-* skills（brainstorm/check/update-spec 等）；工程执行细节按需用 mattpocock skills（tdd、diagnosing-bugs、code-review、prototype、research、grilling 等，全局 `~/.agents/skills/` 分发）；openspec-* skills 与 `openspec/specs/` 保留为只读参考、不再路由新变更。
 
 **注释约定**：
 
