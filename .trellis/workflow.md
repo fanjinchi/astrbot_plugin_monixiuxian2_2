@@ -154,7 +154,8 @@ Phase 3: Finish  → verify, update spec, commit, and wrap up
 
 ### Request Triage
 
-- Simple conversation or small task: ask only whether this turn should create a Trellis task. If the user says no, skip Trellis for this session.
+- Inline task (read-only Q&A, code explanation, local config or copy tweak, single-file or root-cause-clear fix): handle directly with minimal verification — do not ask to create a Trellis task. Inline work never gets a task card (host global rule: only durable / multi-decision work enters the board).
+- Simple conversation or small task (not clearly inline): ask only whether this turn should create a Trellis task. If the user says no, skip Trellis for this session.
 - Complex task: ask whether you may create a Trellis task and enter planning. If the user says no, do not do broad inline implementation; explain, clarify scope, or suggest a smaller split.
 - User approval to create a task is not approval to start implementation. Planning still happens first.
 
@@ -296,6 +297,9 @@ When a user request matches one of these intents inside an active task, route fi
 - Planning or unclear requirements -> `trellis-brainstorm`.
 - Before editing -> `trellis-before-dev`; after editing -> `trellis-check`.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
+- Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; shipped on DeepSeek Harness at `~/.agents/skills/`).
+- Main session by default (DeepSeek Harness): exploration, implementation, checks and acceptance run in the main session — only spawn sub-agents when the user explicitly asks or a chosen workflow/skill requires parallelism.
+- Host task board: cards with host-managed lifecycle (prompt/description/resume/archive) stay under host control; a Trellis task provides the engineering method for the same work. Do not duplicate card bookkeeping into `.trellis/tasks/` and do not fight the host card state.
 
 [/codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
@@ -304,6 +308,8 @@ When a user request matches one of these intents inside an active task, route fi
 - Task creation approval is not implementation approval; implementation waits for `task.py start` after artifact review.
 - PRD-only is valid for lightweight tasks; complex tasks need `design.md` + `implement.md`.
 - Planning must be persisted to task artifacts; checks must run before reporting completion.
+- One owner per stage; only durable / multi-decision work gets a task (host global rule).
+- Commits need user confirmation — Phase 3.4's one-shot plan already matches the host rule (local commit only on explicit user request; never push without explicit request). Trellis tooling's own auto-commits (journal / task archive) are toolchain behavior, not a substitute for that confirmation.
 
 ### Loading Step Detail
 
