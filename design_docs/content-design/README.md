@@ -31,6 +31,7 @@
 | `sim_pve_acceptance.py` | PvE 验收门（2026-10-08 Step 5，proto_pve_roster.py 转正）：enemies.csv × T2 标模 × 3000 场真实引擎，胜率/TTK 锚点带 + 天花板档对 Boss ≤70% 自动断言，非零退出码 |
 | `events-canon.csv` | 历练事件叙事表（事件组 key/name + 叙事四列，无数值列） |
 | `enemies.csv` | PVE 怪物数值+叙事合一表（2026-10-08 Step 4 产出：28 roster+3 守护共 31 行，数值照 pve-enemy-design.md 附录 D.4；取代旧 enemies-canon.csv） |
+| `world_bosses.csv` | 世界 Boss（天灾）名册+数值表（2026-10-10 Step 6 产出：4 段 × 1 只，HP 锚实测照附录 F，含三阶段参数与全套可配置文案，占位待审） |
 | `rifts-canon.csv` | 秘境叙事表（id/name + 叙事四列 + 文案待工程变更备注） |
 | `bounty-canon.csv` | 悬赏叙事表（模板 id/name + 叙事四列 + category/difficulty 备注） |
 | `validate_budget.py` | 数值预算验算脚本（§3 速查表的机器校验） |

@@ -313,6 +313,13 @@ def _load_name_maps() -> dict[str, dict[str, str]]:
         for tpl in group.get("templates", []):
             enemy_map[str(tpl.get("key", ""))] = tpl.get("name", "")
     maps["enemies"] = enemy_map
+    # boss_config.json world_bosses 名册（Step 6 重建后落地；当前 config 尚无该键 → 空表，
+    # 名字一致性对新增条目自动跳过）
+    boss_cfg = _load_json(CONFIG_DIR / "boss_config.json")
+    maps["world_bosses"] = {
+        str(b.get("id", "")): b.get("name", "")
+        for b in boss_cfg.get("world_bosses", [])
+    }
     # rift_config.json rifts（id 为 int，统一 str 比较）
     rift = _load_json(CONFIG_DIR / "rift_config.json")
     maps["rifts"] = {
@@ -683,6 +690,7 @@ def main() -> int:
         ("heart_methods.csv", "heart_methods", "id"),
         ("armors.csv", "armors", "id"),
         ("enemies.csv", "enemies", "id"),
+        ("world_bosses.csv", "world_bosses", "id"),
     )
     # 无 description 列的 canon 表：canon 列 + 名字一致 + 叙事待写 backlog
     canon_tables = (
