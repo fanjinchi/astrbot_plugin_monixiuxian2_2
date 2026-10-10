@@ -299,7 +299,6 @@ When a user request matches one of these intents inside an active task, route fi
 - Before editing -> `trellis-before-dev`; after editing -> `trellis-check`.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
 - Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; shipped on DeepSeek Harness at `~/.agents/skills/`).
-- Main session by default (DeepSeek Harness): exploration, implementation, checks and acceptance run in the main session — only spawn sub-agents when the user explicitly asks or a chosen workflow/skill requires parallelism.
 - Host task board: cards with host-managed lifecycle (prompt/description/resume/archive) stay under host control; a Trellis task provides the engineering method for the same work. Do not duplicate card bookkeeping into `.trellis/tasks/` and do not fight the host card state.
 
 [/codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
