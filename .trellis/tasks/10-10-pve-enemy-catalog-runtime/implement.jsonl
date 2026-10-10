@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/index.md","reason":"后端规范入口与实现边界"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"内容 adapter、loader 和测试质量要求"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"普通目录与专项组共享 profile/Fighter mapper"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"CSV、生成配置、runtime、Fighter 四层一致性"}
+{"file":".trellis/tasks/10-10-pve-enemy-world-boss-redesign/research/current-system-evidence.md","reason":"旧动态派生、难度倍率和内容治理证据"}

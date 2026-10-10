@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"复核 schema/golden/兼容回归与质量门"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"复核内容到战斗状态的逐层一致性"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复核 mapper 复用且专项组未重复实现"}

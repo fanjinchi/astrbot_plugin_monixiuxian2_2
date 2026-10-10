@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"复核单次消费、故障回滚与幂等事务"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"复核状态机、模拟、重启和完整质量门"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"复核路线收益、气血、疲劳和时间字段无断层"}

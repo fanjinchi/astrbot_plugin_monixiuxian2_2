@@ -1,0 +1,33 @@
+{
+  "id": "pve-enemy-world-boss-redesign",
+  "name": "pve-enemy-world-boss-redesign",
+  "title": "PVE 怪物与世界 Boss 重做总规划",
+  "description": "把已封板的 PVE 战斗设计拆为可独立验收的气血、敌人运行时、普通 PVE、世界 Boss、奖励事实边界和集成上线任务；Step 7 奖励经济另行规划。",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "guigui",
+  "assignee": "guigui",
+  "createdAt": "2026-10-10",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-10-pve-player-health-foundation",
+    "10-10-pve-enemy-catalog-runtime",
+    "10-10-pve-persistence-transaction-foundation",
+    "10-10-pve-adventure-settlement",
+    "10-10-pve-world-boss-domain",
+    "10-10-pve-cross-system-integration"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

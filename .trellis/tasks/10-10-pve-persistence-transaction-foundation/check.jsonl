@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"复核版本连续性、schema parity、事务和回滚"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"复核故障注入、并发和完整质量门"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"复核 Health/Adventure/Boss/outbox 共享契约边界"}

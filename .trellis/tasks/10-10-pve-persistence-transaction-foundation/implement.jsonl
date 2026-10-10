@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/index.md","reason":"后端规范入口与必读索引"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"连续迁移、事务叶子、外键与回滚约束"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"静态审计、故障注入与质量门"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"共享 schema 与多个领域服务的契约一致性"}
+{"file":".trellis/tasks/10-10-pve-enemy-world-boss-redesign/research/current-system-evidence.md","reason":"v34 reset 路径、裸 commit、time-skip 与旧 Boss 现状证据"}

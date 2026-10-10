@@ -26,7 +26,7 @@
 | `heart_methods.csv` | 心法设计表（每行一个心法） |
 | `armors.csv` | 防具设计表（每行一件防具：重甲/法袍 × 9 品级标杆件，2026-09-08 armor-content-design） |
 | `armors.md` | 防具设计说明（供给曲线/对称 EHP 推导、M 序列、占位防具删除留档） |
-| `pve-enemy-design.md` | PVE 怪物/Boss 设计讨论稿（2026-10-01）：现状五坑诊断、外部调研（图谱矩阵/TTK 双向锚定/机制增量/放置倍率/世界 Boss 奖励结构）、五维再分配类型学、Step 0-8 设计流程、决策点 Q1-Q7；关联 bd `9u2`/`6ow`/`lky` |
+| `pve-enemy-design.md` | PVE 怪物/Boss 分层状态设计（2026-10-01 建立）：Step 0–6 战斗机制与数值规划已封板，Step 7 奖励经济未定，Step 8 管实施/内容批准；CSV 正式战斗内容与叙事状态仍须独立 approval manifest/hash/列范围确认；含现状五坑、外部调研、五维类型学及 Q1–Q7 决策；关联 bd `9u2`/`6ow`/`lky` |
 | `proto_pve_feel.py` | **一次性原型脚本（非生产代码）**：真实引擎跑标模玩家 vs 三档怪物，验证 Step 0 难度锚手感（结果与迭代记录见 pve-enemy-design.md 附录 A） |
 | `sim_pve_acceptance.py` | PvE 验收门（2026-10-08 Step 5，proto_pve_roster.py 转正）：enemies.csv × T2 标模 × 3000 场真实引擎，胜率/TTK 锚点带 + 天花板档对 Boss ≤70% 自动断言，非零退出码 |
 | `events-canon.csv` | 历练事件叙事表（事件组 key/name + 叙事四列，无数值列） |

@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"复核跨 child schema/事务/回滚闭环"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"复核父 AC 和完整质量门证据"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"复核五个 child 合并后无跨层断点"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复核父任务未承载一锅端实现且模块不重复"}

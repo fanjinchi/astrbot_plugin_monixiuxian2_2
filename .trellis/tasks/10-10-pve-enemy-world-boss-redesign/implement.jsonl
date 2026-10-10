@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/index.md","reason":"父任务实施阶段的后端规范入口"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"跨 child 迁移、事务与回滚总约束"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"父 AC、完整质量门与证据要求"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"内容、气血、PVE、Boss、事件的端到端映射"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"监督 children 深模块边界与复用"}
+{"file":".trellis/tasks/10-10-pve-enemy-world-boss-redesign/research/current-system-evidence.md","reason":"规划所依据的现状证据和旧路径风险"}

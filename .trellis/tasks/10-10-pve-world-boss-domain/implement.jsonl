@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/index.md","reason":"后端规范入口与实现边界"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Boss 多表原子挑战、迁移和并发约束"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"生命周期、并发、故障和 outbox 测试要求"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"轮询、领域、数据库、广播与时间的完整链路"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复用 transaction、Health Domain 和事件调度边界"}
+{"file":".trellis/tasks/10-10-pve-enemy-world-boss-redesign/research/current-system-evidence.md","reason":"旧 Boss CRUD、伤害误算、广播和日期证据"}

@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"复核迁移原子性、fresh schema 和增量链"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"复核测试覆盖与完整质量门"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"复核所有层级无含混 hp 契约"}

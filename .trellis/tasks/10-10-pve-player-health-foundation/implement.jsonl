@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/index.md","reason":"后端规范入口与必读索引"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"players schema 增量迁移、事务与回滚约束"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"模型重构、测试与质量门要求"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"气血字段跨数据库、领域和消费者的一致性"}
+{"file":".trellis/tasks/10-10-pve-enemy-world-boss-redesign/research/current-system-evidence.md","reason":"旧 hp 双义、迁移和 busy/time-skip 现状证据"}

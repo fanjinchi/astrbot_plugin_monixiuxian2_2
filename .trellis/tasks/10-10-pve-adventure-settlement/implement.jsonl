@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/index.md","reason":"后端规范入口与实现边界"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"pending、收益、气血和疲劳的原子结算"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"状态机、并发、重启与统计回归要求"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"handler、领域、数据库、时间快进的完整链路"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复用 Health Domain 与 Fighter mapper"}
+{"file":".trellis/tasks/10-10-pve-enemy-world-boss-redesign/research/current-system-evidence.md","reason":"现有 Adventure/EncounterStore/疲劳缺陷证据"}
