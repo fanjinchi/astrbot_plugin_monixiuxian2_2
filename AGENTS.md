@@ -247,3 +247,17 @@ If you're using Codex or another agent-capable tool, additional project-scoped h
 Managed by Trellis. Edits outside this block are preserved; edits inside may be overwritten by a future `trellis update`.
 
 <!-- TRELLIS:END -->
+
+## Agent skills
+
+### Issue tracker
+
+本项目 issue 追踪用 bd (beads) CLI（`.beads/` 本地数据库，非 GitHub Issues）。见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+默认五角色词表（needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix）。见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+单上下文：`GLOSSARY.md` + `docs/adr/` 于仓库根（不存在时由 /domain-modeling 惰性创建）；设计事实以 `design_docs/` 为权威。见 `docs/agents/domain.md`。
