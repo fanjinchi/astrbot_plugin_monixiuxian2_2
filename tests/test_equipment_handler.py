@@ -103,6 +103,7 @@ class FakeConfigManager:
             "烈火诀": {"type": "功法", "rank": "灵品"},
         }
         self.weapons_data = {}
+        self.heart_methods_data = {}
 
 
 @pytest.fixture

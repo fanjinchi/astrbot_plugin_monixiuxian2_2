@@ -57,8 +57,8 @@ class HealthService:
 
     Args:
         db: plugin DataBase instance.
-        config_manager: ConfigManager (items_data/weapons_data for the
-            max_hp equipment aggregation).
+        config_manager: ConfigManager (items_data/weapons_data/
+            heart_methods_data for the max_hp equipment aggregation).
         equipment_manager: core EquipmentManager used to resolve equipped
             item configs; None degrades max_hp to base_hp (fresh/legacy
             callers without equipment wiring).
@@ -84,27 +84,16 @@ class HealthService:
         """
         equipped = []
         if self._equipment is not None and self._config is not None:
-            # Mirrors CombatManager._build_equipped_items slot-for-slot (weapon,
-            # armor, main heart method, technique list; heart_methods_data is
-            # the third lookup source) so the recovery ceiling equals the
-            # combat ceiling — a player can never exceed what combat knows.
-            names = [player.weapon, player.armor, player.main_technique]
-            names += (
-                player.get_techniques_list()
-                if hasattr(player, "get_techniques_list")
-                else []
+            # Combat/panel/health all share the equipment chain's builder
+            # (weapon, armor, main heart method, technique list), so the
+            # recovery ceiling equals the combat ceiling — a player can never
+            # exceed what combat knows.
+            equipped = self._equipment.get_equipped_items(
+                player,
+                self._config.items_data,
+                self._config.weapons_data,
+                self._config.heart_methods_data,
             )
-            for name in names:
-                if not name:
-                    continue
-                item = self._equipment.parse_item_from_name(
-                    name,
-                    self._config.items_data,
-                    self._config.weapons_data,
-                    self._config.heart_methods_data,
-                )
-                if item:
-                    equipped.append(item)
         attrs = player.get_total_attributes(equipped, pill_multipliers=None)
         return max(1, int(attrs["max_hp"]))
 

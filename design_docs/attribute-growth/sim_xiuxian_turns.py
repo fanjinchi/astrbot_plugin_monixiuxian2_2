@@ -106,7 +106,7 @@ class WeaponStats:
 
 
 def _parse_weapon(w: dict[str, Any]) -> WeaponStats:
-    """Mirror combat_manager._parse_item_config for weapon entries."""
+    """Weapon parse mirror for scenario C (legacy five-dim mapping)."""
     physical_damage = w.get("physical_damage", 0)
     magic_damage = w.get("magic_damage", 0)
     physical_defense = w.get("physical_defense", 0)
@@ -606,7 +606,7 @@ def write_methodology(rows: list[dict[str, Any]]) -> Path:
         "- **场景 C（armed-milestone）**：里程碑等级 `10/20/30/40/50/60/70/80/90/99`，双方装备该等级可用的最强武器。",
         "  - 武器筛选：`required_level_index ≤ level`，先按品级（凡→灵→地→天→皇→帝→道→仙→混元先天），再按 `damage = physical_damage + magic_damage`，最后按 `base_damage`。",
         "  - 装备后：`damage += weapon.damage`，`armor_value += weapon.armor_value`，`weapon_k` 与 `base_damage` 使用武器值。",
-        "  - 武器 `damage` 与 `armor_value` 的解析逻辑与 `combat_manager.py:_parse_item_config` 保持一致（`damage = max(原有 damage, physical_damage + magic_damage)`，`armor_value = max(原有 armor_value, physical_defense + magic_defense)`）。",
+        "  - 武器 `damage` 与 `armor_value` 的解析沿用旧五维回退（`damage = max(原有 damage, physical_damage + magic_damage)`，`armor_value = max(原有 armor_value, physical_defense + magic_defense)`）；该回退 v3.7.1 已从生产解析移除，现生产入口为 `core/equipment_manager.py:parse_item_from_name`。",
         "- **pip 工具结论**：仅使用 Python 标准库（`random`、`csv`、`statistics`、`math`、`json`、`importlib`、`dataclasses`、`pathlib`），无需安装任何第三方包。",
         "",
         "## 4. 关键数值发现",

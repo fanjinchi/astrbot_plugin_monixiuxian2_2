@@ -100,7 +100,7 @@
 | `CultivationManager` | `generate_new_player_stats` / `calculate_cultivation_exp` / `get_spiritual_root_speed` / `apply_cultivation_comprehension` | 四主属性（气血/伤害/身法/迅捷+armor）初始生成；闭关修为计算；闭关结束领悟判定 |
 | `BreakthroughManager` | `check_breakthrough_requirements` / `calculate_breakthrough_success_rate` / `execute_breakthrough` | 突破条件/成功率（连败保底 pity）/执行 |
 | `SkillManager` | `roll_*_comprehension`（突破成/败/闭关/通用池）/ `set|clear_study_target` / `get_heart_method_passive` / `can_equip_technique` / `get_battle_loadout` | 领悟（升星）判定、修习目标、心法被动、**出战配置导出给战斗引擎**；领悟池全渠道注入本宗 `skill_pool` 并打 origin_sect_id/sect_bound 标记；`get_battle_loadout` 注入镇派功法 mainbuff 触发 |
-| `EquipmentManager` | `equip_item` / `unequip_item` / `get_equipped_items` / `parse_item_from_name` | 装备穿戴（境界要求校验；装备唯一依据=已领悟表 player_skills） |
+| `EquipmentManager` | `equip_item` / `unequip_item` / `get_equipped_items` / `parse_item_from_name` | 装备穿戴（境界要求校验；装备唯一依据=已领悟表 player_skills）；解析与槽位枚举由模块级 `parse_item_from_name` / `build_equipped_items` 承接（三源回退 items→weapons→heart_methods，战斗/面板/健康三域共用同一入口） |
 | `PillManager` | `use_pill` / `handle_resurrection` / `calculate_pill_attribute_effects` / `get_breakthrough_modifiers` / `consume_breakthrough_effects` | 丹药服用/回生丹复活/属性乘算加成/突破临时加成生命周期 |
 | `StorageRingManager` | `store_item` / `retrieve_item` / `discard_item` / `upgrade_ring` / `has_item` / `is_sect_bound_item` | 储物戒存取（事务保护，每物品占 1 格）；**所有物品发放的统一入口**；`is_sect_bound_item` 识别宗门绑定物（treasure/sect_bound/sect_id）供赠予拦截 |
 | `ShopManager` | `generate_shop_items` / `should_refresh_shop` / `get_item_details` / `get_sect_shop_discount` / 三阁展示方法 | 商店刷新（库存+折扣）、丹阁/器阁/百宝阁展示；`get_sect_shop_discount` 读宗门职阶 benefits.shop_discount |

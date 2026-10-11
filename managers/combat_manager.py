@@ -14,7 +14,6 @@ Implements the spec-driven combat-core requirements:
 
 from __future__ import annotations
 
-import json
 import logging
 import math
 import os
@@ -24,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
 try:
+    from ..core.equipment_manager import build_equipped_items
     from ..models import Item
     from ..utils.narrative_text import render_narrative
 except ImportError:
@@ -47,6 +47,16 @@ except ImportError:
     _narrative_mod = importlib.util.module_from_spec(_narrative_spec)
     _narrative_spec.loader.exec_module(_narrative_mod)
     render_narrative = _narrative_mod.render_narrative
+
+    # core/equipment_manager.py is import-safe standalone (it carries its own
+    # fallback for models.py), so a plain by-path load works here as well.
+    _equipment_spec = importlib.util.spec_from_file_location(
+        "combat_equipment_manager",
+        os.path.join(_plugin_root, "core", "equipment_manager.py"),
+    )
+    _equipment_mod = importlib.util.module_from_spec(_equipment_spec)
+    _equipment_spec.loader.exec_module(_equipment_mod)
+    build_equipped_items = _equipment_mod.build_equipped_items
 
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
@@ -453,86 +463,17 @@ class CombatEngine:
         )
 
     def _build_equipped_items(self, player: Player) -> list[Item]:
-        """Build Item objects for the player's current equipment."""
-        items: list[Item] = []
-        slot_names = [
-            player.weapon,
-            player.armor,
-            player.main_technique,
-        ] + player.get_techniques_list()
-        for name in slot_names:
-            if not name:
-                continue
-            item = self._parse_item_config(name)
-            if item:
-                items.append(item)
-        return items
+        """Build Item objects for the player's current equipment.
 
-    def _parse_item_config(self, name: str) -> Item | None:
-        """Parse a named equipment config into an Item instance."""
-        cfg = self.config_manager.items_data.get(name)
-        if not cfg:
-            cfg = self.config_manager.weapons_data.get(name)
-        if not cfg:
-            cfg = self.config_manager.heart_methods_data.get(name)
-        if not cfg:
-            return None
-
-        item_type = cfg.get("type", "")
-        subtype = cfg.get("subtype", "")
-        if item_type == "法器":
-            if subtype == "武器":
-                item_type = "weapon"
-            elif subtype == "防具":
-                item_type = "armor"
-            else:
-                item_type = "accessory"
-        elif item_type == "功法":
-            item_type = "technique"
-        elif "passive_bonus" in cfg or "skill_pool" in cfg:
-            item_type = "main_technique"
-        elif "trigger_skill" in cfg or "ultimate" in cfg:
-            item_type = "technique"
-
-        def _json_str(value) -> str:
-            """Serialize a value to a JSON string (passes strings through; falls back to an empty dict/array literal)."""
-            if isinstance(value, str):
-                return value
-            try:
-                return json.dumps(value, ensure_ascii=False)
-            except (TypeError, ValueError):
-                return "{}" if isinstance(value, dict) else "[]"
-
-        damage = cfg.get("damage", 0)
-        armor_value = cfg.get("armor_value", 0)
-        equip_effects = cfg.get("equip_effects", {})
-        attack = equip_effects.get("attack", 0)
-        defense = equip_effects.get("defense", 0)
-        if attack:
-            damage = max(damage, attack)
-        if defense:
-            armor_value = max(armor_value, defense)
-
-        return Item(
-            item_id=cfg.get("id", name),
-            name=name,
-            item_type=item_type,
-            description=cfg.get("description", ""),
-            rank=cfg.get("rank", ""),
-            required_level_index=cfg.get("required_level_index", 0),
-            weapon_category=cfg.get("weapon_category", ""),
-            damage=damage,
-            agility=cfg.get("agility", 0),
-            speed=cfg.get("speed", 0),
-            hp=cfg.get("hp", 0),
-            armor_value=armor_value,
-            weapon_coefficient_k=cfg.get("weapon_coefficient_k", 1.0),
-            base_damage=cfg.get("base_damage", 0),
-            route_multiplier=_json_str(cfg.get("route_multiplier", {})),
-            trigger_skills=_json_str(cfg.get("trigger_skills", [])),
-            exp_multiplier=cfg.get("exp_multiplier", 0.0),
-            passive_bonus=_json_str(cfg.get("passive_bonus", {})),
-            skill_pool=_json_str(cfg.get("skill_pool", [])),
+        Delegates to the equipment chain's shared builder, so combat and the
+        panel/health views resolve the exact same slots through the same
+        parser (previously this class kept a near-copy of that mapping).
+        """
+        return build_equipped_items(
+            player,
+            self.config_manager.items_data,
+            self.config_manager.weapons_data,
+            self.config_manager.heart_methods_data,
         )
 
     # ------------------------------------------------------------------

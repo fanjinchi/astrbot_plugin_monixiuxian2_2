@@ -111,90 +111,6 @@
     "price": 3600,
     "shop_weight": 100
   },
-  "3001": {
-    "name": "青锋剑",
-    "type": "法器",
-    "subtype": "武器",
-    "rank": "凡品",
-    "description": "由精铁打造的利剑，是修士入门的常用法器。",
-    "price": 800,
-    "equip_effects": {
-      "attack": 8
-    },
-    "shop_weight": 1000
-  },
-  "3003": {
-    "name": "烈阳刀",
-    "type": "法器",
-    "subtype": "武器",
-    "rank": "珍品",
-    "description": "刀身赤红，挥舞间似有烈阳之威。",
-    "price": 4000,
-    "equip_effects": {
-      "attack": 25
-    },
-    "shop_weight": 100
-  },
-  "3005": {
-    "name": "弑神枪",
-    "type": "法器",
-    "subtype": "武器",
-    "rank": "帝品",
-    "description": "传说中的禁忌法器，枪出如龙，有弑神之威。",
-    "price": 9999999,
-    "equip_effects": {
-      "attack": 500
-    },
-    "shop_weight": 20
-  },
-  "3006": {
-    "name": "镇魂幡",
-    "type": "法器",
-    "subtype": "饰品",
-    "rank": "圣品",
-    "description": "以幽魂草和千年玄铁炼制，对鬼魅有天然的克制之力。",
-    "price": 500000,
-    "shop_weight": 100,
-    "armor_value": 25,
-    "base_damage": 25,
-    "weapon_coefficient_k": 0.5
-  },
-  "3007": {
-    "name": "寒霜剑",
-    "type": "法器",
-    "subtype": "武器",
-    "rank": "圣品",
-    "description": "剑身由玄冰之核打造，挥舞时可冰封百里。",
-    "price": 600000,
-    "equip_effects": {
-      "attack": 250
-    },
-    "shop_weight": 100
-  },
-  "3009": {
-    "name": "妖精之弓",
-    "type": "法器",
-    "subtype": "武器",
-    "rank": "圣品",
-    "description": "以月光粉尘和神木打造，箭矢能追踪敌人。",
-    "price": 550000,
-    "equip_effects": {
-      "attack": 220
-    },
-    "shop_weight": 100
-  },
-  "3010": {
-    "name": "戮仙剑阵",
-    "type": "法器",
-    "subtype": "饰品",
-    "rank": "帝品",
-    "description": "四把神剑组成的无上剑阵，非天道圣人不可挡。",
-    "price": 8888888,
-    "shop_weight": 20,
-    "armor_value": 30,
-    "base_damage": 29,
-    "weapon_coefficient_k": 0.5
-  },
   "4001": {
     "name": "长春功残篇",
     "type": "功法",
@@ -237,15 +153,6 @@
     "rank": "凡品",
     "description": "修炼后身轻如燕，提升移动速度（暂无实际效果）。（已废弃：旧版功法物品，无对应技能，不可作为领悟凭据）",
     "price": 1200,
-    "shop_weight": 0,
-    "legacy": true
-  },
-  "4006": {
-    "name": "龟息功",
-    "type": "功法",
-    "rank": "凡品",
-    "description": "模拟玄龟呼吸，修炼后气息绵长，提升耐力（暂无实际效果）。（已废弃：旧版功法物品，无对应技能，不可作为领悟凭据）",
-    "price": 900,
     "shop_weight": 0,
     "legacy": true
   },

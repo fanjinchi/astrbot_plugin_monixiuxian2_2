@@ -784,7 +784,7 @@ class GMManager:
         if not tokens:
             return (
                 False,
-                f"❌ 请输入{item_kind}名称，例如：/修仙GM 给予{item_kind} 青锋剑",
+                f"❌ 请输入{item_kind}名称，例如：/修仙GM 给予{item_kind} 青铜剑",
             )
 
         item_name = tokens[0]

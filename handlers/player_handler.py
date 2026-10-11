@@ -193,7 +193,10 @@ class PlayerHandler:
         # 获取装备加成后的属性
         equipment_manager = self.equipment_manager
         equipped_items = equipment_manager.get_equipped_items(
-            player, self.config_manager.items_data, self.config_manager.weapons_data
+            player,
+            self.config_manager.items_data,
+            self.config_manager.weapons_data,
+            self.config_manager.heart_methods_data,
         )
         total_attrs = player.get_total_attributes(equipped_items, pill_multipliers)
 
@@ -415,7 +418,10 @@ class PlayerHandler:
         if player.main_technique:
             equipment_manager = self.equipment_manager
             equipped_items = equipment_manager.get_equipped_items(
-                player, self.config_manager.items_data, self.config_manager.weapons_data
+                player,
+                self.config_manager.items_data,
+                self.config_manager.weapons_data,
+                self.config_manager.heart_methods_data,
             )
             # 找到主修心法
             for item in equipped_items:

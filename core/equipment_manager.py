@@ -1,10 +1,31 @@
 # core/equipment_manager.py
 
+import importlib.util
 import json
+import os
+import sys
 from typing import TYPE_CHECKING
 
-from ..data import DataBase
-from ..models import Item, Player
+try:
+    from ..data import DataBase
+    from ..models import Item, Player
+except ImportError:  # 独立运行（测试/脚本）时降级加载依赖，沿用 core/busy_state.py 范式
+
+    def _load_module(name, rel_path):
+        """Import a plugin module by file path so this file can run standalone under tests."""
+        plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        path = os.path.join(plugin_root, rel_path)
+        spec = importlib.util.spec_from_file_location(name, path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
+    # models.py 可独立加载；DataBase 仅用于类型标注，standalone 下用 object 占位
+    DataBase = object
+    _models = _load_module("equipment_manager_models", "models.py")
+    Item = _models.Item
+    Player = _models.Player
 
 if TYPE_CHECKING:
     from ..config_manager import ConfigManager
@@ -42,6 +63,122 @@ def _normalize_item_type(item_config: dict) -> str:
     return item_type
 
 
+def parse_item_from_name(
+    item_name: str,
+    items_data: dict,
+    weapons_data: dict,
+    heart_methods_data: dict,
+) -> Item | None:
+    """Resolve one equipment name into an Item through the static config tables.
+
+    Single parse entry for the combat, panel and health chains, which used to
+    carry near-identical copies of this mapping. Lookup falls back
+    items.json -> weapons.json -> heart_methods.json; first hit wins.
+
+    Args:
+        item_name: Equipment name as stored on the player; empty means no slot.
+        items_data: items.json table keyed by name.
+        weapons_data: weapons.json table keyed by name.
+        heart_methods_data: heart_methods.json table keyed by name. Required on
+            purpose: a defaulted table let callers silently drop the main heart
+            method's bonuses (bd hnz), so all three tables are always passed.
+
+    Returns:
+        The parsed Item, or None when the name is empty or unknown.
+    """
+    if not item_name:
+        return None
+
+    item_config = items_data.get(item_name)
+    if not item_config and weapons_data:
+        item_config = weapons_data.get(item_name)
+    if not item_config and heart_methods_data:
+        item_config = heart_methods_data.get(item_name)
+
+    if not item_config:
+        return None
+
+    item_type = _normalize_item_type(item_config)
+
+    # New four-main-attribute framework fields (preferred)
+    damage = item_config.get("damage", 0)
+    agility = item_config.get("agility", 0)
+    speed = item_config.get("speed", 0)
+    hp = item_config.get("hp", 0)
+    armor_value = item_config.get("armor_value", 0)
+    weapon_coefficient_k = item_config.get("weapon_coefficient_k", 1.0)
+    base_damage = item_config.get("base_damage", 0)
+    route_multiplier = item_config.get("route_multiplier", {})
+    trigger_skills = item_config.get("trigger_skills", [])
+    passive_bonus = item_config.get("passive_bonus", {})
+    skill_pool = item_config.get("skill_pool", [])
+
+    # Legacy equip_effects mapping (items.json 法器)
+    equip_effects = item_config.get("equip_effects", {})
+    attack = equip_effects.get("attack", 0)
+    defense = equip_effects.get("defense", 0)
+    if attack:
+        damage = max(damage, attack)
+    if defense:
+        armor_value = max(armor_value, defense)
+
+    return Item(
+        item_id=item_config.get("id", item_name),
+        name=item_name,
+        item_type=item_type,
+        description=item_config.get("description", ""),
+        rank=item_config.get("rank", ""),
+        required_level_index=item_config.get("required_level_index", 0),
+        weapon_category=item_config.get("weapon_category", ""),
+        damage=damage,
+        agility=agility,
+        speed=speed,
+        hp=hp,
+        armor_value=armor_value,
+        weapon_coefficient_k=weapon_coefficient_k,
+        base_damage=base_damage,
+        route_multiplier=_json_str(route_multiplier),
+        trigger_skills=_json_str(trigger_skills),
+        exp_multiplier=item_config.get("exp_multiplier", 0.0),
+        passive_bonus=_json_str(passive_bonus),
+        skill_pool=_json_str(skill_pool),
+    )
+
+
+def build_equipped_items(
+    player: Player,
+    items_data: dict,
+    weapons_data: dict,
+    heart_methods_data: dict,
+) -> list[Item]:
+    """Collect a player's equipped items in slot order.
+
+    Sole slot enumeration for the combat, panel and health chains:
+    weapon -> armor -> main heart method -> technique list. Empty or unknown
+    names are skipped, so the result only holds resolvable items.
+
+    Args:
+        player: Player model holding the equipped names.
+        items_data: items.json table keyed by name.
+        weapons_data: weapons.json table keyed by name.
+        heart_methods_data: heart_methods.json table keyed by name (required;
+            omitting it used to drop the main heart method's bonuses silently).
+
+    Returns:
+        Parsed items in slot order.
+    """
+    equipped: list[Item] = []
+    names = [player.weapon, player.armor, player.main_technique]
+    names += player.get_techniques_list()
+    for name in names:
+        if not name:
+            continue
+        item = parse_item_from_name(name, items_data, weapons_data, heart_methods_data)
+        if item:
+            equipped.append(item)
+    return equipped
+
+
 class EquipmentManager:
     """装备管理器 - 处理装备的穿戴、卸下和属性计算"""
 
@@ -59,121 +196,45 @@ class EquipmentManager:
         self,
         item_name: str,
         items_data: dict,
-        weapons_data: dict | None = None,
-        heart_methods_data: dict | None = None,
+        weapons_data: dict,
+        heart_methods_data: dict,
     ) -> Item | None:
-        """从物品名称解析为Item对象
+        """从物品名称解析为Item对象（委托模块级 parse_item_from_name）
 
         Args:
             item_name: 物品名称
             items_data: 物品配置数据字典
-            weapons_data: 武器配置数据字典（可选）
-            heart_methods_data: 心法配置数据字典（可选）
+            weapons_data: 武器配置数据字典
+            heart_methods_data: 心法配置数据字典（必传：旧默认值让漏传的心法加成静默消失）
 
         Returns:
             Item对象，如果未找到则返回None
         """
-        if not item_name or item_name == "":
-            return None
-
-        item_config = items_data.get(item_name)
-        if not item_config and weapons_data:
-            item_config = weapons_data.get(item_name)
-        if not item_config and heart_methods_data:
-            item_config = heart_methods_data.get(item_name)
-
-        if not item_config:
-            return None
-
-        item_type = _normalize_item_type(item_config)
-
-        # New four-main-attribute framework fields (preferred)
-        damage = item_config.get("damage", 0)
-        agility = item_config.get("agility", 0)
-        speed = item_config.get("speed", 0)
-        hp = item_config.get("hp", 0)
-        armor_value = item_config.get("armor_value", 0)
-        weapon_coefficient_k = item_config.get("weapon_coefficient_k", 1.0)
-        base_damage = item_config.get("base_damage", 0)
-        route_multiplier = item_config.get("route_multiplier", {})
-        trigger_skills = item_config.get("trigger_skills", [])
-        passive_bonus = item_config.get("passive_bonus", {})
-        skill_pool = item_config.get("skill_pool", [])
-
-        # Legacy equip_effects mapping (items.json 法器)
-        equip_effects = item_config.get("equip_effects", {})
-        attack = equip_effects.get("attack", 0)
-        defense = equip_effects.get("defense", 0)
-        if attack:
-            damage = max(damage, attack)
-        if defense:
-            armor_value = max(armor_value, defense)
-
-        return Item(
-            item_id=item_config.get("id", item_name),
-            name=item_name,
-            item_type=item_type,
-            description=item_config.get("description", ""),
-            rank=item_config.get("rank", ""),
-            required_level_index=item_config.get("required_level_index", 0),
-            weapon_category=item_config.get("weapon_category", ""),
-            damage=damage,
-            agility=agility,
-            speed=speed,
-            hp=hp,
-            armor_value=armor_value,
-            weapon_coefficient_k=weapon_coefficient_k,
-            base_damage=base_damage,
-            route_multiplier=_json_str(route_multiplier),
-            trigger_skills=_json_str(trigger_skills),
-            exp_multiplier=item_config.get("exp_multiplier", 0.0),
-            passive_bonus=_json_str(passive_bonus),
-            skill_pool=_json_str(skill_pool),
+        return parse_item_from_name(
+            item_name, items_data, weapons_data, heart_methods_data
         )
 
     def get_equipped_items(
-        self, player: Player, items_data: dict, weapons_data: dict = None
+        self,
+        player: Player,
+        items_data: dict,
+        weapons_data: dict,
+        heart_methods_data: dict,
     ) -> list[Item]:
-        """获取玩家所有已装备的物品
+        """获取玩家所有已装备的物品（委托模块级 build_equipped_items）
 
         Args:
             player: 玩家对象
             items_data: 物品配置数据字典
-            weapons_data: 武器配置数据字典（可选）
+            weapons_data: 武器配置数据字典
+            heart_methods_data: 心法配置数据字典（必传：旧默认值即主修心法加成丢失的成因）
 
         Returns:
             已装备物品列表
         """
-        equipped = []
-
-        # 武器
-        if player.weapon:
-            item = self.parse_item_from_name(player.weapon, items_data, weapons_data)
-            if item:
-                equipped.append(item)
-
-        # 防具
-        if player.armor:
-            item = self.parse_item_from_name(player.armor, items_data, weapons_data)
-            if item:
-                equipped.append(item)
-
-        # 主修心法
-        if player.main_technique:
-            item = self.parse_item_from_name(
-                player.main_technique, items_data, weapons_data
-            )
-            if item:
-                equipped.append(item)
-
-        # 功法列表
-        techniques_list = player.get_techniques_list()
-        for technique_name in techniques_list:
-            item = self.parse_item_from_name(technique_name, items_data, weapons_data)
-            if item:
-                equipped.append(item)
-
-        return equipped
+        return build_equipped_items(
+            player, items_data, weapons_data, heart_methods_data
+        )
 
     def check_equipment_level_requirement(
         self, player: Player, item: Item

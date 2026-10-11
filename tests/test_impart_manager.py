@@ -76,6 +76,9 @@ class DummyConfigManager:
         }
         self.level_data = [{"level": i, "level_name": f"Level{i}"} for i in range(10)]
         self.body_level_data = self.level_data
+        # 装备链解析需要三张物品表（DummyConfigManager 里原先只补了心法表）
+        self.items_data = {}
+        self.weapons_data = {}
         self.heart_methods_data = {
             "传承心法·吐纳": {
                 "id": "heart_impart_001",

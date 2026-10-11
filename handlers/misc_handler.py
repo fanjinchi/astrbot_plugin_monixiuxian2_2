@@ -1,9 +1,25 @@
 # handlers/misc_handler.py
+import re
+from pathlib import Path
+
 from astrbot.api.event import AstrMessageEvent
 
 from ..data import DataBase
 
 __all__ = ["MiscHandler"]
+
+# 帮助头版本号取自 metadata.yaml（唯一版本源），避免像硬编码 v3.8.1 那样与插件版本长期脱钩
+_METADATA_PATH = Path(__file__).resolve().parent.parent / "metadata.yaml"
+
+
+def _plugin_version() -> str:
+    """Read the plugin version from metadata.yaml so the help header cannot drift."""
+    try:
+        metadata = _METADATA_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    match = re.search(r"^version:\s*(\S+)", metadata, re.MULTILINE)
+    return match.group(1) if match else ""
 
 
 class MiscHandler:
@@ -14,8 +30,9 @@ class MiscHandler:
 
     async def handle_help(self, event: AstrMessageEvent):
         """显示帮助信息"""
+        title = f"📖 修仙指令大全 {_plugin_version()}".rstrip()
         help_text = (
-            "📖 修仙指令大全 v3.8.1\n"
+            f"{title}\n"
             "━━━━━━━━━━━━━━━\n"
             "\n"
             "📖【入门 & 基础】\n"

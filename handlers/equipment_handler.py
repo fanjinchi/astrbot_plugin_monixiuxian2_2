@@ -46,7 +46,10 @@ class EquipmentHandler:
 
         # 获取所有已装备物品
         equipped_items = self.equipment_manager.get_equipped_items(
-            player, self.config_manager.items_data, self.config_manager.weapons_data
+            player,
+            self.config_manager.items_data,
+            self.config_manager.weapons_data,
+            self.config_manager.heart_methods_data,
         )
 
         await self.pill_manager.update_temporary_effects(player)
