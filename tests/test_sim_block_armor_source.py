@@ -16,7 +16,6 @@ Locked contracts:
    about).
 """
 
-
 from tests.helpers import load_module
 
 _reg_mod = load_module(

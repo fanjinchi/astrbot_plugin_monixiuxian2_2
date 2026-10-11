@@ -47,6 +47,7 @@ class PlayerHandler:
         equipment_manager: EquipmentManager,
         impart_mgr: ImpartManager,
         busy_state: BusyState,
+        health_service=None,
     ):
         self.db = db
         self.config = config
@@ -58,6 +59,8 @@ class PlayerHandler:
         self.pill_manager = pill_manager
         self.equipment_manager = equipment_manager
         self.busy_state = busy_state
+        # 健康域（可选）：面板展示当前气血需要权威快照（顺带惰性结算）
+        self.health_service = health_service
 
     def _render_narrative(
         self,
@@ -194,6 +197,13 @@ class PlayerHandler:
         )
         total_attrs = player.get_total_attributes(equipped_items, pill_multipliers)
 
+        # 面板展示当前气血：权威快照顺带完成惰性恢复结算（普通读取即结算点）。
+        # 未接线健康域时退回旧行为（只显示上限）。
+        hp_line = f"  气血：{total_attrs['max_hp']}\n"
+        if self.health_service is not None:
+            snap = await self.health_service.get_health_snapshot(player)
+            hp_line = f"  气血：{snap['current_hp']}/{total_attrs['max_hp']}\n"
+
         combat_power = player.combat_power(equipped_items, pill_multipliers)
 
         # 获取宗门信息
@@ -263,7 +273,7 @@ class PlayerHandler:
             f"  伤害：{total_attrs['damage']}\n"
             f"  身法：{total_attrs['agility']}\n"
             f"  迅捷：{total_attrs['speed']}\n"
-            f"  气血：{total_attrs['hp']}\n"
+            f"{hp_line}"
             f"  护甲：{total_attrs.get('armor_value', 0)}\n"
             f"\n"
             f"【装备信息】\n"

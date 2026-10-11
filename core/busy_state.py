@@ -86,10 +86,17 @@ class BusyState:
     Args:
         db: The plugin DataBase instance (assembly-injected; never
             self-constructed by consumers).
+        health_service: Optional HealthService (child A player-health
+            foundation).  Every authoritative user_cd write settles the OLD
+            state and advances the recovery anchor inside the SAME outer
+            transaction before the new status is written — busy time never
+            heals (design: lazy recovery).  None only in unit-test fixtures
+            that do not wire the health domain.
     """
 
-    def __init__(self, db: "DataBase"):
+    def __init__(self, db: "DataBase", health_service=None):
         self._db = db
+        self._health = health_service
 
     async def set_busy(
         self,
@@ -113,8 +120,9 @@ class BusyState:
         default message is only visible in the race window.
 
         Args:
-            player: Player object; only ``user_id`` (persistence) and
-                ``state`` (mirror) are touched.
+            player: Player object; ``user_id`` (persistence), ``state``
+                (mirror) and ``current_hp`` (settle 结算值同步，防止后续
+                update_player 陈旧回写) are touched.
             status: Activity status (UserStatus member / int value).
             scheduled_time: Planned completion timestamp; 0 for indefinite.
             extra_data: Optional payload (e.g. adventure route_key, rift
@@ -131,6 +139,12 @@ class BusyState:
                 # owner rolls back on clean exit), report the current status.
                 txn.abort()
                 return False, DEFAULT.format(status=UserStatus.get_name(user_cd.type))
+            # 健康域结算点（child A AC4）：同一事务内先结算旧状态并前移
+            # 恢复锚点，再写新忙碌状态；败者分支保持纯只读、零写入。
+            # settle 的返回值回写内存 current_hp：本流程后续的
+            # update_player 才不会把已结算的回血用陈旧值刷掉。
+            if self._health is not None:
+                player.current_hp = await self._health.settle(player.user_id)
             await self._db.ext.set_user_busy(
                 player.user_id, int(status), scheduled_time, extra_data or {}
             )
@@ -155,6 +169,9 @@ class BusyState:
             scheduled_time: Cooldown expiry timestamp.
         """
         async with self._db.transaction():
+            if self._health is not None:
+                # 同事务结算旧状态 + 前移锚点（AC4，与 set_busy 同规则）。
+                await self._health.settle(user_id)
             await self._db.ext.set_user_busy(user_id, int(status), scheduled_time)
 
     async def clear(self, player: Player) -> None:
@@ -169,6 +186,11 @@ class BusyState:
             player: Player object whose state mirror is reset in memory.
         """
         async with self._db.transaction():
+            if self._health is not None:
+                # 转空闲前结算：忙碌期间的不补恢复，锚点跳到现在
+                # （下一次恢复自 clear 起算，AC4）。返回值同步内存
+                # current_hp，避免调用方后续 update_player 陈旧回写。
+                player.current_hp = await self._health.settle(player.user_id)
             await self._db.ext.set_user_free(player.user_id)
             player.state = "空闲"
 

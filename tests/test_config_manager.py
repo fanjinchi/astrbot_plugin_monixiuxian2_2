@@ -172,9 +172,13 @@ class TestGetPillConfig:
         exp_name = next(iter(config_manager.exp_pills_data))
         util_name = next(iter(config_manager.utility_pills_data))
 
-        assert config_manager.get_pill_config(pill_name) is config_manager.pills_data[pill_name]
         assert (
-            config_manager.get_pill_config(exp_name) is config_manager.exp_pills_data[exp_name]
+            config_manager.get_pill_config(pill_name)
+            is config_manager.pills_data[pill_name]
+        )
+        assert (
+            config_manager.get_pill_config(exp_name)
+            is config_manager.exp_pills_data[exp_name]
         )
         assert (
             config_manager.get_pill_config(util_name)
@@ -208,9 +212,7 @@ class TestGetPillConfig:
     def _raw_names(self, fname: str) -> list[str]:
         import json
 
-        raw = json.loads(
-            (PLUGIN_ROOT / "config" / fname).read_text(encoding="utf-8")
-        )
+        raw = json.loads((PLUGIN_ROOT / "config" / fname).read_text(encoding="utf-8"))
         return [item.get("name") for item in raw]
 
     def test_no_duplicates_in_pills_table(self):

@@ -110,6 +110,16 @@ def mock_db():
     db.get_player_by_id = AsyncMock()
     db.update_player = AsyncMock()
 
+    # child A：GM force-settle 现在包在 db.transaction() 里（settle+上移锚点
+    # 与 scheduled_time 同一事务），mock 需要支持 async with。
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def _fake_txn():
+        yield db
+
+    db.transaction = MagicMock(side_effect=lambda: _fake_txn())
+
     ext = MagicMock()
     ext.get_user_cd = AsyncMock()
     ext.set_user_free = AsyncMock()
@@ -162,7 +172,8 @@ def make_player(user_id="12345", user_name="测试道友", cultivation_type="灵
         damage=10,
         agility=5,
         speed=5,
-        hp=100,
+        base_hp=100,
+        current_hp=100,
         armor_value=0,
         weapon="青锋剑",
         armor="",
@@ -265,7 +276,7 @@ class TestSetNumericAttributes:
         success, msg = await gm_manager.cmd_set_hp(event, "500")
 
         assert success is True
-        assert player.hp == 500
+        assert player.base_hp == 500
 
     @pytest.mark.asyncio
     async def test_set_gold_with_at_mention(self, gm_manager, mock_db):
@@ -401,9 +412,7 @@ class TestClearCD:
         mock_db.update_player.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_clear_cd_dual_write_in_single_transaction(
-        self, gm_real_db, real_db
-    ):
+    async def test_clear_cd_dual_write_in_single_transaction(self, gm_real_db, real_db):
         """R2：set_user_free 与 update_player 必须落在同一次 CM 事务内。
 
         参考 test_transaction_atomicity 的 _txn_depth 口径：写执行瞬间
@@ -789,9 +798,7 @@ class _FakeImpartManager:
         self._next_id = 1
         self.created = []
 
-    async def create_legacy(
-        self, owner_id, legacy_type, sect_id=None, activate=False
-    ):
+    async def create_legacy(self, owner_id, legacy_type, sect_id=None, activate=False):
         inst = _FakeLegacyInstance(self._next_id, owner_id, legacy_type, sect_id)
         self._next_id += 1
         self.created.append(inst)

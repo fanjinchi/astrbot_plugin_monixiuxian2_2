@@ -16,7 +16,9 @@ if TYPE_CHECKING:
 # 全新安装与旧库统一直接生成最新 schema。MIGRATION_TASKS 注册机制
 # 保留，供后续版本（v33+）做真正的增量升级。
 # v34: 删除测试秘境「试炼古境」（add-rift-encounters 脚手架验证完毕拆除）
-LATEST_DB_VERSION = 34
+# v35: players 健康分层（child A: base_hp 永久底子 / current_hp 战气血 /
+# health_recovered_at 懒恢复锚点；max_hp 只算不落库）
+LATEST_DB_VERSION = 35
 
 # 增量任务链的适用下限：v32 是 _create_all_tables 冻结的完整 schema 基线，
 # 只有达到该版本的库才具备迁移任务依赖的全部表结构；更早的旧库必须走
@@ -54,6 +56,92 @@ async def _remove_trial_rift_v34(
     await conn.execute("DELETE FROM rifts WHERE rift_id = 7")
 
 
+@migration(35)
+async def _players_health_layers_v35(
+    conn: aiosqlite.Connection, config_manager: ConfigManager
+):
+    """v35（child A 健康地基）：players.hp 拆分为三层健康模型。
+
+    - hp → base_hp（永久底子，RENAME COLUMN 保留数据）；
+    - current_hp（战斗气血，不变式 0<=current<=动态 max）；
+    - health_recovered_at（懒恢复锚点，unix 秒，0=未结算）。
+
+    一次性回填服务（design D1）：每个现存玩家的 current_hp 初始化为
+    迁移时刻的动态 max_hp（装备/心法聚合同 HealthService 计算路径，
+    非裸 base_hp），锚点设为迁移时刻——升级当刻满血、无历史欠账。
+    框架已在本任务外层 BEGIN 事务内执行（失败整体回滚、版本停在 v34），
+    因此 ALTER+回填+版本推进原子生效。项目未上线，无双写/别名过渡。
+    """
+    import time
+
+    cursor = await conn.execute("PRAGMA table_info(players)")
+    cols = {row[1] for row in await cursor.fetchall()}
+    if "base_hp" in cols:
+        # 幂等守卫：schema 已升级（重复执行不应二次改名/回填）。
+        return
+    if "hp" not in cols:
+        raise RuntimeError("v35 迁移失败：players 表缺少 hp 列，schema 无法识别")
+
+    await conn.execute("ALTER TABLE players RENAME COLUMN hp TO base_hp")
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN current_hp INTEGER NOT NULL DEFAULT 100"
+    )
+    await conn.execute(
+        "ALTER TABLE players ADD COLUMN health_recovered_at INTEGER NOT NULL DEFAULT 0"
+    )
+
+    # 回填复用 HealthService.compute_max_hp（纯聚合，不触库），保证
+    # 迁移口径与运行时恢复上限完全一致。
+    from ..core.equipment_manager import EquipmentManager
+    from ..core.health import HealthService
+    from ..models import Player
+
+    health = HealthService(
+        db=None,
+        config_manager=config_manager,
+        equipment_manager=EquipmentManager(db=None),
+    )
+    migration_now = int(time.time())
+    cursor = await conn.execute(
+        "SELECT user_id, base_hp, level_index, cultivation_type, weapon, "
+        "armor, main_technique, techniques FROM players"
+    )
+    rows = await cursor.fetchall()
+    for (
+        user_id,
+        base_hp,
+        level_index,
+        cultivation_type,
+        weapon,
+        armor,
+        main_technique,
+        techniques,
+    ) in rows:
+        player = Player(
+            user_id=user_id,
+            base_hp=int(base_hp or 0),
+            level_index=int(level_index or 0),
+            cultivation_type=cultivation_type or "灵修",
+            weapon=weapon or "",
+            armor=armor or "",
+            main_technique=main_technique or "",
+            techniques=techniques or "[]",
+        )
+        max_hp = health.compute_max_hp(player)
+        await conn.execute(
+            "UPDATE players SET current_hp = ?, health_recovered_at = ? "
+            "WHERE user_id = ?",
+            (max_hp, migration_now, user_id),
+        )
+
+    # 结构校验（PRD：改名/加列后核验列存在），失败则框架回滚停在 v34。
+    cursor = await conn.execute("PRAGMA table_info(players)")
+    cols = {row[1] for row in await cursor.fetchall()}
+    missing = {"base_hp", "current_hp", "health_recovered_at"} - cols
+    if missing:
+        raise RuntimeError(f"v35 迁移失败：players 缺少列 {sorted(missing)}")
+
+
 async def _create_all_tables(conn: aiosqlite.Connection):
     """Create the current (v32) schema for a fresh database.
 
@@ -88,7 +176,12 @@ async def _create_all_tables(conn: aiosqlite.Connection):
             damage INTEGER NOT NULL DEFAULT 10,
             agility INTEGER NOT NULL DEFAULT 5,
             speed INTEGER NOT NULL DEFAULT 5,
-            hp INTEGER NOT NULL DEFAULT 100,
+            -- v35 健康分层：base_hp 永久底子、current_hp 战气血
+            -- （0<=current<=运行时聚合的 max_hp，max 不落库）、
+            -- health_recovered_at 懒恢复锚点（0=未结算，首次结算只认时钟）。
+            base_hp INTEGER NOT NULL DEFAULT 100,
+            current_hp INTEGER NOT NULL DEFAULT 100,
+            health_recovered_at INTEGER NOT NULL DEFAULT 0,
             armor_value INTEGER NOT NULL DEFAULT 0,
 
             weapon TEXT NOT NULL DEFAULT '',

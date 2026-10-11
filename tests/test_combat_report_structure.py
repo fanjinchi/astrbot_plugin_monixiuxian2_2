@@ -141,8 +141,7 @@ def test_opening_block_order_is_banner_versus_flavor_panels():
     assert result.combat_log[1] == "测试玩家1 VS 测试玩家2"
     # 内嵌默认描述行（config 池为空时的回退句）
     assert (
-        result.combat_log[2]
-        == "杀气先到，人影随后。你握紧了兵刃站定——这一战，躲不过。"
+        result.combat_log[2] == "杀气先到，人影随后。你握紧了兵刃站定——这一战，躲不过。"
     )
     assert result.combat_log[3].startswith("测试玩家1：气血 100000/100000")
     assert result.combat_log[4].startswith("测试玩家2：气血 2/2")
@@ -159,15 +158,17 @@ def test_victory_banner_is_followed_by_its_description_line():
 
     banner = result.combat_log.index("☆━━━━ 测试玩家1 胜利！━━━━☆")
     assert (
-        result.combat_log[banner + 1]
-        == "测试玩家1 站到最后，兵器归鞘——这一战，胜了。"
+        result.combat_log[banner + 1] == "测试玩家1 站到最后，兵器归鞘——这一战，胜了。"
     )
 
 
 def test_stalemate_banner_and_description_line():
     """触顶平局：胶着横幅 + 对应场景描述行。"""
     engine = make_engine(
-        {"combat": {"action_limit": 1}, "skill_system": {"battle_report_merge_count": 1}}
+        {
+            "combat": {"action_limit": 1},
+            "skill_system": {"battle_report_merge_count": 1},
+        }
     )
     fighter1 = make_fighter("甲", 100000, 1, 0, 10)
     fighter2 = make_fighter("乙", 100000, 1, 0, 10)
@@ -240,13 +241,11 @@ def test_empty_config_pool_falls_back_to_embedded_description_line():
     assert result.combat_log[0] == _mod._BANNER_OPENING
     assert result.combat_log[1] == "测试玩家1 VS 测试玩家2"
     assert (
-        result.combat_log[2]
-        == "杀气先到，人影随后。你握紧了兵刃站定——这一战，躲不过。"
+        result.combat_log[2] == "杀气先到，人影随后。你握紧了兵刃站定——这一战，躲不过。"
     )
     banner = result.combat_log.index("☆━━━━ 测试玩家1 胜利！━━━━☆")
     assert (
-        result.combat_log[banner + 1]
-        == "测试玩家1 站到最后，兵器归鞘——这一战，胜了。"
+        result.combat_log[banner + 1] == "测试玩家1 站到最后，兵器归鞘——这一战，胜了。"
     )
 
 
@@ -379,9 +378,7 @@ def test_remaining_hp_is_thousands_separated(monkeypatch):
 
     log = _resolve_one_attack(engine, defender, 5, monkeypatch)
 
-    assert (
-        "守方 气血只剩 1,241 点，一口气吊着，人还站着。" in log
-    ), f"千分位失配: {log}"
+    assert "守方 气血只剩 1,241 点，一口气吊着，人还站着。" in log, f"千分位失配: {log}"
     assert "1241" not in "\n".join(log)
 
 
@@ -401,9 +398,13 @@ def test_thresholds_are_read_from_combat_config(monkeypatch):
     default_defender.max_hp = 10000
 
     # 受击后比例 0.86 ∈ (0.85, 0.9] → 残局档；默认阈值（mid=0.6）下不出行
-    assert _tier_of(_resolve_one_attack(engine, defender, 5, monkeypatch), "守方") == "mid"
     assert (
-        _tier_of(_resolve_one_attack(make_engine(), default_defender, 5, monkeypatch), "守方")
+        _tier_of(_resolve_one_attack(engine, defender, 5, monkeypatch), "守方") == "mid"
+    )
+    assert (
+        _tier_of(
+            _resolve_one_attack(make_engine(), default_defender, 5, monkeypatch), "守方"
+        )
         is None
     )
 

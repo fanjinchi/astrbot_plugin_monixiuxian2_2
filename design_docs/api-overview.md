@@ -104,6 +104,7 @@
 | `PillManager` | `use_pill` / `handle_resurrection` / `calculate_pill_attribute_effects` / `get_breakthrough_modifiers` / `consume_breakthrough_effects` | 丹药服用/回生丹复活/属性乘算加成/突破临时加成生命周期 |
 | `StorageRingManager` | `store_item` / `retrieve_item` / `discard_item` / `upgrade_ring` / `has_item` / `is_sect_bound_item` | 储物戒存取（事务保护，每物品占 1 格）；**所有物品发放的统一入口**；`is_sect_bound_item` 识别宗门绑定物（treasure/sect_bound/sect_id）供赠予拦截 |
 | `ShopManager` | `generate_shop_items` / `should_refresh_shop` / `get_item_details` / `get_sect_shop_discount` / 三阁展示方法 | 商店刷新（库存+折扣）、丹阁/器阁/百宝阁展示；`get_sect_shop_discount` 读宗门职阶 benefits.shop_discount |
+| `HealthService`（health.py） | `get_health_snapshot` / `settle` / `compute_max_hp` / `clamp_current_hp` / `apply_current_hp_change` / `set_current_hp` / `heal_to_full` / `add_base_hp` | 玩家气血三层域唯一入口：`base_hp` 永久底数 / `current_hp` 当前值 / `health_recovered_at` 恢复锚；`max_hp` 运行时聚合不入库；空闲每分钟恢复 1% 上限（读取时按锚结算、幂等、重启安全），忙碌转换在 `BusyState`/GM 权威写入的同一事务内先结算旧状态并推进锚点；恢复锚**不注册**进时间快进表，GM 时间快进不产生气血恢复 |
 | `GMManager` | `dispatch` / `cmd_set_*` / `cmd_give_*` / `cmd_force_adventure|rift` / `cmd_force_rift_puzzle|beast|legacy` / `cmd_advance_master` / `cmd_clear_cd` / `cmd_clear_bounty` / `cmd_clear_all_cooldowns` / `cmd_time_skip` / `cmd_seed` / `cmd_spawn_boss` | GM 子命令分发（目标解析 @提及→数字id→发送者；触发秘境谜题/妖兽/传承用 `single_token_is_target=True` 使单数字 token 视为目标）；全操作写审计日志（500MB 滚动）；`cmd_set_mp/atk/mental_power` 为废弃属性别名；`设置贡献/设置职位` 写宗门字段；`师承推进`（战斗/历练/突破/捐献）确定性推进师承链；`清除悬赏` 清进行中悬赏+放弃冷却（供测试环境重置悬赏状态）；强制结算与正常流程一致追加师承链推进并清除历练休整冷却；测试工具三件套：`时间快进` 按时间快进注册表（`core/time_skip_registry.py` 聚合各属主模块 `TIME_SKIP_ENTRIES`）全库前移到期判定时间戳（不可逆，需「确认」）、`清除全部冷却` 按玩家归零全部冷却（既有清除命令并集）、`随机种子` 注入/重置全局 `random.seed`（进程级、不持久化） |
 | `EncounterStore`（encounter_store.py） | `pend` / `get_active` / `consume` | 秘境/历练遭遇的内存 pending 表（每玩家 puzzle/beast/legacy 各一，惰性过期、同类覆盖刷新；热重载丢失零惩罚）；main.py 装配单例注入 RiftManager/AdventureManager |
 | `RiftPuzzleManager`（rift_puzzle_manager.py） | `generate` / `RiftPuzzle.check` | 古阵谜题纯逻辑引擎：谜题族注册表随机抽取（五行破阵/洛书数阵/灵龟辨窟），三态校验（正确/错误/非法形式不耗次），无 IO 可单测 |
@@ -115,7 +116,7 @@
 |---|---|---|
 | `DataBase`（data_manager.py） | `connect/ensure_connection/reconnect` / `create_player` / `get_player_by_id` / `update_player` / `delete_player_cascade` / `get_shop_data` / `decrement_shop_item_stock` | 连接管理（定时任务前先 `ensure_connection`）；玩家 CRUD 字段从 `Player` dataclass 动态生成；商店库存**原子扣减/回滚** |
 | `DatabaseExtended`（database_extended.py，`db.ext`） | 按域分组：宗门 `*_sect*`、Boss `*_boss`、秘境 `*_rift`、状态 `create/get/update_user_cd`+`set_user_busy/free`、技能 `learn_or_star_up`/`get_learned_skills`/`is_skill_learned`、悬赏 `*_bounty`、银行/贷款 `*_loan*`/`add_bank_transaction`、赠予 `*_pending_gift*`、系统配置 `get/set_system_config`（KV 表，悬赏放弃冷却等都用它） | 全部扩展表 SQL |
-| `MigrationManager`（migration.py） | `migrate_or_reset()` | 版本化迁移：新装直接建最新 schema（v34）；旧库按版本升序逐个事务执行 `@migration(version)` 注册的任务；低于任务链下限的旧库整体重建为最新 schema（**重置前自动备份** `<db>.v<版本>.pre-reset.bak`）；版本高于 v34 时拒绝降级运行 |
+| `MigrationManager`（migration.py） | `migrate_or_reset()` | 版本化迁移：新装直接建最新 schema（v35）；旧库按版本升序逐个事务执行 `@migration(version)` 注册的任务；低于任务链下限的旧库整体重建为最新 schema（**重置前自动备份** `<db>.v<版本>.pre-reset.bak`）；版本高于 v35 时拒绝降级运行 |
 
 并发敏感操作惯例：`await db.conn.execute("BEGIN IMMEDIATE")` + try/commit/rollback（参照 `BountyManager.accept_bounty`）。
 
@@ -123,7 +124,7 @@
 
 | 文件 | 作用 |
 |---|---|
-| `models.py` | `Player` dataclass（四主属性：damage/agility/speed/hp + armor_value）、`Item`/`StorageRing`（`atk` 等旧字段仅存于 `Boss` 模型） |
+| `models.py` | `Player` dataclass（主属性 damage/agility/speed + armor_value；气血三层 `base_hp`/`current_hp`/`health_recovered_at`，气血上限 `max_hp` 运行时聚合不入库；`get_total_attributes` 输出键为 `max_hp`）、`Item`/`StorageRing`（`atk` 等旧字段仅存于 `Boss` 模型） |
 | `models_extended.py` | `UserStatus` 枚举（IDLE/CULTIVATING/ADVENTURING/EXPLORING/SECT_TASK，忙碌状态真源之一）、`Sect/Boss/Rift` 等扩展模型 |
 | `config_manager.py` | 加载 `config/*.json`（缺失时从 `data/default_configs.py` 建默认）；静态配置改后需重启 |
 | `data/default_configs.py` | 全部 JSON 配置的默认值（平衡数值真源之一） |

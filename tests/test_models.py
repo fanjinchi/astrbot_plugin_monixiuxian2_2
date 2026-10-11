@@ -15,7 +15,8 @@ def test_heart_method_route_multiplier_one_behaves_like_legacy():
         damage=100,
         agility=50,
         speed=50,
-        hp=200,
+        base_hp=200,
+        current_hp=200,
         armor_value=30,
     )
     heart = Item(
@@ -28,7 +29,7 @@ def test_heart_method_route_multiplier_one_behaves_like_legacy():
     )
     total = player.get_total_attributes([heart])
     assert total["damage"] == 110  # 100 * (1 + 0.1 * 1.0)
-    assert total["hp"] == 210  # 200 * (1 + 0.05 * 1.0)
+    assert total["max_hp"] == 210  # 200 * (1 + 0.05 * 1.0)
     assert total["armor_value"] == 40  # 30 + int(10 * 1.0)
     assert total["exp_multiplier"] == 0.1
 
@@ -41,7 +42,8 @@ def test_heart_method_route_multiplier_amplifies_passive_and_armor():
         damage=100,
         agility=50,
         speed=50,
-        hp=200,
+        base_hp=200,
+        current_hp=200,
         armor_value=30,
     )
     heart = Item(
@@ -54,7 +56,7 @@ def test_heart_method_route_multiplier_amplifies_passive_and_armor():
     )
     total = player.get_total_attributes([heart])
     assert total["damage"] == 112  # 100 * (1 + 0.1 * 1.2)
-    assert total["hp"] == 212  # 200 * (1 + 0.05 * 1.2)
+    assert total["max_hp"] == 212  # 200 * (1 + 0.05 * 1.2)
     assert total["armor_value"] == 42  # 30 + int(10 * 1.2)
     assert total["exp_multiplier"] == 0.1  # exp_multiplier NOT multiplied
 
@@ -67,7 +69,8 @@ def test_heart_method_route_multiplier_defaults_to_one():
         damage=100,
         agility=50,
         speed=50,
-        hp=200,
+        base_hp=200,
+        current_hp=200,
         armor_value=30,
     )
     # Explicit empty JSON object
@@ -111,7 +114,8 @@ def test_combat_power_sums_attributes_with_armor_floor_division():
         damage=100,
         agility=50,
         speed=50,
-        hp=200,
+        base_hp=200,
+        current_hp=200,
         armor_value=35,  # odd value pins the //2 floor (35 // 2 == 17)
     )
     assert player.combat_power([]) == 417  # 100 + 50 + 50 + 200 + 17
@@ -125,7 +129,8 @@ def test_combat_power_applies_pill_multipliers_when_passed():
         damage=100,
         agility=50,
         speed=50,
-        hp=200,
+        base_hp=200,
+        current_hp=200,
         armor_value=35,
     )
     base = player.combat_power([])
@@ -142,7 +147,8 @@ def test_combat_power_ignores_block_armor_value():
         damage=100,
         agility=50,
         speed=50,
-        hp=200,
+        base_hp=200,
+        current_hp=200,
         armor_value=35,
     )
     weapon = Item(
@@ -166,7 +172,7 @@ def test_combat_power_ignores_block_armor_value():
         int(total["damage"])
         + int(total["agility"])
         + int(total["speed"])
-        + int(total["hp"])
+        + int(total["max_hp"])
         + total["armor_value"] // 2
     )
     assert player.combat_power([weapon, armor]) == expected == 432

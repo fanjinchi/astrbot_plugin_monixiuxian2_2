@@ -573,7 +573,8 @@ class FakePlayer:
         self.damage = kwargs.get("damage", 10)
         self.agility = kwargs.get("agility", 5)
         self.speed = kwargs.get("speed", 5)
-        self.hp = kwargs.get("hp", 100)
+        self.base_hp = kwargs.get("base_hp", kwargs.get("hp", 100))
+        self.current_hp = self.base_hp
         self.armor_value = kwargs.get("armor_value", 0)
         self.weapon = kwargs.get("weapon", "")
         self.armor = kwargs.get("armor", "")
@@ -595,7 +596,7 @@ class FakePlayer:
             "damage": self.damage,
             "agility": self.agility,
             "speed": self.speed,
-            "hp": self.hp,
+            "max_hp": self.base_hp,
             "armor_value": self.armor_value,
             "exp_multiplier": 0.0,
         }
@@ -604,7 +605,7 @@ class FakePlayer:
             total["damage"] += int(item.damage * mult)
             total["agility"] += int(item.agility * mult)
             total["speed"] += int(item.speed * mult)
-            total["hp"] += int(item.hp * mult)
+            total["max_hp"] += int(item.hp * mult)
             total["armor_value"] += int(item.armor_value * mult)
             if item.item_type == "main_technique":
                 try:
@@ -613,7 +614,7 @@ class FakePlayer:
                     passive = {}
                 for key, value in passive.items():
                     if key == "hp_percent":
-                        total["hp"] = int(total["hp"] * (1 + value))
+                        total["max_hp"] = int(total["max_hp"] * (1 + value))
                     elif key == "damage_percent":
                         total["damage"] = int(total["damage"] * (1 + value))
                     elif key == "agility_percent":

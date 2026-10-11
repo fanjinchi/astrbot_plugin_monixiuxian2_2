@@ -91,6 +91,7 @@ class GMManager:
         impart_manager=None,
         *,
         busy_state: "BusyState",
+        health_service=None,
     ):
         self.db = db
         self.config_manager = config_manager
@@ -103,6 +104,9 @@ class GMManager:
         self.sect_manager = sect_manager
         self.impart_manager = impart_manager
         self.busy_state = busy_state
+        # child A 健康域：气血设置与强制结算的 current_hp 边界；
+        # 测试夹具可不接线，其余 GM 命令不依赖它。
+        self.health_service = health_service
         self.plugin_data_path = plugin_data_path
         self.broadcast_callback = broadcast_callback
 
@@ -718,8 +722,19 @@ class GMManager:
     async def cmd_set_hp(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
-        """GM command: set the target player's hp."""
-        return await self._set_numeric_attr(event, args, "气血", "hp", "气血")
+        """GM command: set the target player's permanent base HP.
+
+        三层语义（child A design）：「设置气血」改的是永久底数 base_hp，
+        气血上限由它在运行时聚合得出；战斗/恢复层 current_hp 不动，若新
+        上限低于当前气血则就地收敛（下一次权威读取同样会收敛）。
+        """
+        ok, msg = await self._set_numeric_attr(event, args, "气血", "base_hp", "气血")
+        if ok and self.health_service is not None:
+            target_id, _ = self._resolve_target(event, args)
+            player = await self._get_player(target_id)
+            if player:
+                await self.health_service.clamp_current_hp(player)
+        return ok, msg
 
     async def cmd_set_mp(
         self, event: "AstrMessageEvent", args: str
@@ -957,9 +972,14 @@ class GMManager:
 
         # 将计划完成时间提前到当前时间，立即结算
         # force-settle 例外（design §D3）：仅上移 scheduled_time，保留直写
-        # update_user_cd——BusyState 的断言/镜像语义不适用于 GM 强制结算
-        user_cd.scheduled_time = int(time.time())
-        await self.db.ext.update_user_cd(user_cd)
+        # update_user_cd——BusyState 的断言/镜像语义不适用于 GM 强制结算。
+        # child A AC4：本入口仍是权威的 user_cd 写点——同一事务内先结算
+        # 旧状态并前移恢复锚点（update_user_cd 提交已按 _txn_depth 门控）。
+        async with self.db.transaction():
+            if self.health_service is not None:
+                await self.health_service.settle(target_id)
+            user_cd.scheduled_time = int(time.time())
+            await self.db.ext.update_user_cd(user_cd)
 
         success, msg, reward_data = await self.adventure_manager.finish_adventure(
             target_id
@@ -1034,9 +1054,14 @@ class GMManager:
 
         # 将计划完成时间提前到当前时间，立即结算
         # force-settle 例外（design §D3）：仅上移 scheduled_time，保留直写
-        # update_user_cd——BusyState 的断言/镜像语义不适用于 GM 强制结算
-        user_cd.scheduled_time = int(time.time())
-        await self.db.ext.update_user_cd(user_cd)
+        # update_user_cd——BusyState 的断言/镜像语义不适用于 GM 强制结算。
+        # child A AC4：本入口仍是权威的 user_cd 写点——同一事务内先结算
+        # 旧状态并前移恢复锚点（update_user_cd 提交已按 _txn_depth 门控）。
+        async with self.db.transaction():
+            if self.health_service is not None:
+                await self.health_service.settle(target_id)
+            user_cd.scheduled_time = int(time.time())
+            await self.db.ext.update_user_cd(user_cd)
 
         success, msg, reward_data = await self.rift_manager.finish_exploration(
             target_id

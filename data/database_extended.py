@@ -707,7 +707,11 @@ class DatabaseExtended:
                 user_cd.user_id,
             ),
         )
-        await self.conn.commit()
+        # D2 ownership gate: commit only outside an active CM transaction
+        # (child A step-5 audit: GM force-settle user_cd runs inside the
+        # settle+anchor outer transaction).
+        if getattr(self.conn, "_txn_depth", 0) == 0:
+            await self.conn.commit()
 
     async def set_user_busy(
         self,
@@ -892,13 +896,6 @@ class DatabaseExtended:
             raise
 
     # ===== Player扩展字段更新方法 =====
-
-    async def update_player_hp_mp(self, user_id: str, hp: int, mp: int):
-        """更新玩家HP（MP字段已废弃，保留参数仅作兼容）。"""
-        await self.conn.execute(
-            "UPDATE players SET hp = ? WHERE user_id = ?", (hp, user_id)
-        )
-        await self.conn.commit()
 
     async def update_player_sect_info(
         self, user_id: str, sect_id: int, sect_position: int

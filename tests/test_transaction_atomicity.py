@@ -129,6 +129,8 @@ def _make_shop_handler(db: DataBase) -> ShopHandler:
     handler.shop_manager.get_sect_shop_discount.return_value = 1.0
     handler.storage_ring_manager = StorageRingManager(db, config_manager)
     handler.pill_manager = PillManager(db, config_manager)
+    # child A：尾部气血保底现在会经 health 域夹取；__new__ 绕过构造器需补默认属性
+    handler.health_service = None
     return handler
 
 
@@ -265,7 +267,8 @@ async def test_delete_player_cascade_commit_contract(db):
         await db.delete_player_cascade("u1")
         assert db.conn.in_transaction
         assert (
-            await _fetchone(db, "SELECT user_id FROM players WHERE user_id = 'u1'") is None
+            await _fetchone(db, "SELECT user_id FROM players WHERE user_id = 'u1'")
+            is None
         )
         txn.abort()
     assert await db.get_player_by_id("u1") is not None  # 回滚可撤销
@@ -313,7 +316,9 @@ async def test_add_pill_to_inventory_commit_contract(db):
     assert (await db.get_player_by_id("u1")).get_pills_inventory() == {}
 
     player = await db.get_player_by_id("u1")  # 重取，避免沿用被 mutation 的旧对象
-    await pill_mgr.add_pill_to_inventory(player, "回气丹", 2)  # 独立调用：fail-open 提交
+    await pill_mgr.add_pill_to_inventory(
+        player, "回气丹", 2
+    )  # 独立调用：fail-open 提交
     assert not db.conn.in_transaction
     assert (await db.get_player_by_id("u1")).get_pills_inventory() == {"回气丹": 2}
 
@@ -1128,7 +1133,9 @@ async def test_upgrade_farm_commits_fee_and_level_together(db, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_collect_spirit_eye_rolls_back_when_timestamp_update_fails(db, monkeypatch):
+async def test_collect_spirit_eye_rolls_back_when_timestamp_update_fails(
+    db, monkeypatch
+):
     """S4 collect_spirit_eye: timestamp UPDATE fails -> the EXP payout must roll back."""
     mgr = SpiritEyeManager(db)
     await _make_player(db, gold=0)
@@ -1385,7 +1392,9 @@ async def _seed_clear_all_cooldowns_state(db: DataBase, user_id: str = "u1") -> 
 
 
 @pytest.mark.asyncio
-async def test_clear_all_cooldowns_rolls_back_and_keeps_route_cooldowns(db, monkeypatch):
+async def test_clear_all_cooldowns_rolls_back_and_keeps_route_cooldowns(
+    db, monkeypatch
+):
     """S9: step-3 failure -> earlier steps roll back AND the in-memory route cooldown stays."""
     uid = "u1"
     duel_before = await _seed_clear_all_cooldowns_state(db, uid)
@@ -1417,7 +1426,9 @@ async def test_clear_all_cooldowns_rolls_back_and_keeps_route_cooldowns(db, monk
     assert row[0] == duel_before
     # 步骤 1 的 user_cd 行同样回滚：只断言 player.state 时，这一层的门控回退不会变红
     row = await _fetchone(db, "SELECT type FROM user_cd WHERE user_id = ?", (uid,))
-    assert row[0] == 1  # 仍为忙碌（_seed_clear_all_cooldowns_state 的 set_user_busy 种子值）
+    assert (
+        row[0] == 1
+    )  # 仍为忙碌（_seed_clear_all_cooldowns_state 的 set_user_busy 种子值）
     # 步骤 6 未执行：内存态冷却不可回滚，必须在 CM 退出后才弹出
     assert uid in adventure._route_cooldowns
     _assert_committed_and_idle(db)
@@ -1790,7 +1801,9 @@ async def test_rebirth_rolls_back_delete_when_cooldown_write_fails(db, monkeypat
     await _seed_sect_treasure_state(db, uid)
     handler = PlayerHandler.__new__(PlayerHandler)
     handler.db = db
-    handler.sect_mgr = SectManager(db, _SectFakeConfig(), busy_state=make_busy_state(db))
+    handler.sect_mgr = SectManager(
+        db, _SectFakeConfig(), busy_state=make_busy_state(db)
+    )
     handler.busy_state = make_busy_state(db)
     event = _make_event("弃道重修 确认", sender_id=uid)
 
@@ -1816,7 +1829,9 @@ async def test_rebirth_commits_reclaim_delete_and_cooldown(db):
     await _seed_sect_treasure_state(db, uid)
     handler = PlayerHandler.__new__(PlayerHandler)
     handler.db = db
-    handler.sect_mgr = SectManager(db, _SectFakeConfig(), busy_state=make_busy_state(db))
+    handler.sect_mgr = SectManager(
+        db, _SectFakeConfig(), busy_state=make_busy_state(db)
+    )
     handler.busy_state = make_busy_state(db)
     event = _make_event("弃道重修 确认", sender_id=uid)
 

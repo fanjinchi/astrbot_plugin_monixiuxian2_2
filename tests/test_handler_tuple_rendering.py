@@ -75,12 +75,8 @@ class TestStorageRingRendering:
         ring_manager.retrieve_item = AsyncMock(
             return_value=(True, "✅ 已从储物戒取出【精铁】x1")
         )
-        ring_manager.discard_item = AsyncMock(
-            return_value=(True, "🗑️ 已丢弃【杂草】x1")
-        )
-        return StorageRingHandler(
-            db, MagicMock(), storage_ring_manager=ring_manager
-        )
+        ring_manager.discard_item = AsyncMock(return_value=(True, "🗑️ 已丢弃【杂草】x1"))
+        return StorageRingHandler(db, MagicMock(), storage_ring_manager=ring_manager)
 
     @pytest.mark.asyncio
     async def test_retrieve_renders_message_part_of_tuple(self, handler):

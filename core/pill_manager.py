@@ -12,9 +12,16 @@ from ..models import Player
 class PillManager:
     """丹药管理器 - 处理丹药效果、属性加成和限制机制"""
 
-    def __init__(self, db: DataBase, config_manager: ConfigManager):
+    def __init__(
+        self,
+        db: DataBase,
+        config_manager: ConfigManager,
+        health_service=None,
+    ):
         self.db = db
         self.config_manager = config_manager
+        # child A 健康域：恢复类丹药只动 current_hp；未接线时退化为内存字段。
+        self.health_service = health_service
 
     def _ensure_non_negative_attributes(self, player: Player):
         """保证属性不为负"""
@@ -24,7 +31,8 @@ class PillManager:
             "damage",
             "agility",
             "speed",
-            "hp",
+            "base_hp",
+            "current_hp",
             "armor_value",
         ]
         for attr in attrs:
@@ -348,12 +356,15 @@ class PillManager:
 
                 # 应用增益
                 permanent_gains[level_key][attr_key] += actual_gain
-                setattr(player, attr_key, getattr(player, attr_key) + int(actual_gain))
+                # child A：气血永久增益落 base_hp（对外配置键仍是 hp，契约不变）
+                field = "base_hp" if attr_key == "hp" else attr_key
+                setattr(player, field, getattr(player, field) + int(actual_gain))
                 gains_applied[attr_name] = int(actual_gain)
             else:
                 # 负向效果直接应用
                 permanent_gains[level_key][attr_key] += gain
-                setattr(player, attr_key, getattr(player, attr_key) + int(gain))
+                field = "base_hp" if attr_key == "hp" else attr_key  # child A
+                setattr(player, field, getattr(player, field) + int(gain))
                 gains_applied[attr_name] = int(gain)
 
         # 处理修炼倍率（永久）
@@ -431,16 +442,25 @@ class PillManager:
             )
 
         if restore:
-            old_hp = player.hp
-            if restore == -1:
-                # Restore to full: use a generous cap matching the old full-energy semantic.
-                player.hp = max(player.hp, 1000)
-                actual_restore = player.hp - old_hp
+            # child A：恢复只动 current_hp 并被动态 max_hp 封顶；-1 视为回满。
+            old_hp = player.current_hp
+            if self.health_service is not None:
+                if restore == -1:
+                    new_hp = await self.health_service.heal_to_full(player)
+                else:
+                    new_hp = await self.health_service.apply_current_hp_change(
+                        player, restore
+                    )
+                actual_restore = new_hp - old_hp
+            elif restore == -1:
+                # 未接线回退：沿用旧的宽松回满语义
+                player.current_hp = max(old_hp, 1000)
+                actual_restore = player.current_hp - old_hp
             else:
-                player.hp = old_hp + restore
+                player.current_hp = old_hp + restore
                 actual_restore = restore
             msg_parts.append(f"🌟 恢复气血：+{actual_restore}")
-            msg_parts.append(f"🩸 当前气血：{player.hp}")
+            msg_parts.append(f"🩸 当前气血：{player.current_hp}")
 
         # 重置永久丹药增益
         if pill_data.get("resets_permanent_pills"):
@@ -490,7 +510,7 @@ class PillManager:
             "damage": max(player.damage, 1),
             "agility": max(player.agility, 1),
             "speed": max(player.speed, 1),
-            "hp": max(player.hp, 1),
+            "hp": max(player.base_hp, 1),
             "armor_value": max(player.armor_value, 1),
             "lifespan": max(player.lifespan, 1),
         }
@@ -521,7 +541,12 @@ class PillManager:
         player.damage = player.damage // 2
         player.agility = player.agility // 2
         player.speed = player.speed // 2
-        player.hp = max(1, player.hp // 2)
+        # child A：回生丹减半的是永久底数；current 层由健康域按新上限收敛
+        player.base_hp = max(1, player.base_hp // 2)
+        if self.health_service is not None:
+            await self.health_service.clamp_current_hp(player)
+        else:
+            player.current_hp = max(0, min(player.current_hp, player.base_hp))
         player.armor_value = player.armor_value // 2
 
         self._ensure_non_negative_attributes(player)
@@ -700,23 +725,34 @@ class PillManager:
         # 气血回复/消耗（新框架统一为 hp）
         if "spiritual_qi_regen_per_minute" in effect:
             total_qi = effect["spiritual_qi_regen_per_minute"] * minutes
-            player.hp += total_qi
+            player.current_hp += total_qi
             changed = True
 
         if "blood_qi_regen_per_minute" in effect:
             total_blood = effect["blood_qi_regen_per_minute"] * minutes
-            player.hp += total_blood
+            player.current_hp += total_blood
             changed = True
 
         if "blood_qi_cost_per_minute" in effect:
             total_cost = effect["blood_qi_cost_per_minute"] * minutes
-            player.hp = max(1, player.hp - total_cost)
+            player.current_hp = max(1, player.current_hp - total_cost)
             changed = True
 
         if changed:
+            # 周期回复不得把超上限血量落库：此处为同步路径，走不了 async
+            # 边界 API，直接用健康域的同步上限聚合钳制。
+            self._clamp_periodic_current_hp(player)
             self._ensure_non_negative_attributes(player)
 
         return changed
+
+    def _clamp_periodic_current_hp(self, player: Player) -> None:
+        """把 current_hp 收进动态上限（健康域接线时）；未接线保持旧行为。"""
+        if self.health_service is None:
+            return
+        max_hp = self.health_service.compute_max_hp(player)
+        if player.current_hp > max_hp:
+            player.current_hp = max_hp
 
     def _reset_permanent_pill_effects(self, player: Player) -> bool:
         """清空永久丹药增益并回退属性"""
@@ -739,7 +775,9 @@ class PillManager:
                 value = gain.get(attr_key, 0)
                 if value:
                     delta = int(value)
-                    setattr(player, attr_key, getattr(player, attr_key) - delta)
+                    # child A：气血永久增益的回退同样落在 base_hp（对外 gain 键仍是 hp）
+                    field = "base_hp" if attr_key == "hp" else attr_key
+                    setattr(player, field, getattr(player, field) - delta)
                     changed = True
 
             if "cultivation_multiplier" in gain:

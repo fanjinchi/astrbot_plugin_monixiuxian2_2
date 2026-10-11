@@ -55,7 +55,9 @@ async def test_fresh_install_reaches_latest_version():
         "damage",
         "agility",
         "speed",
-        "hp",
+        "base_hp",
+        "current_hp",
+        "health_recovered_at",
         "armor_value",
         "study_target",
         "battle_report_merge_count",
@@ -291,7 +293,9 @@ async def test_legacy_db_rebuilt_to_latest_schema():
             "damage",
             "agility",
             "speed",
-            "hp",
+            "base_hp",
+            "current_hp",
+            "health_recovered_at",
             "armor_value",
             "study_target",
             "battle_report_merge_count",
@@ -414,7 +418,7 @@ async def test_v34_task_removes_trial_rift_on_existing_db():
         await MigrationManager(db_conn, DummyConfigManager()).migrate_or_reset()
 
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
-            assert (await cursor.fetchone())[0] == 34
+            assert (await cursor.fetchone())[0] == LATEST_DB_VERSION  # 链条现推进到 v35
         async with db_conn.execute(
             "SELECT COUNT(*) FROM rifts WHERE rift_id = 7"
         ) as cursor:

@@ -165,8 +165,9 @@ class CombatHandlers:
         result = await self.combat_mgr.player_vs_player(p1, p2, combat_type=2)  # 2=决斗
 
         # 结算（写入最终气血）
-        p1.hp = result["player1_final_hp"]
-        p2.hp = result["player2_final_hp"]
+        # child A：结算写回 current_hp 层
+        p1.current_hp = result["player1_final_hp"]
+        p2.current_hp = result["player2_final_hp"]
         await self.db.update_player(p1)
         await self.db.update_player(p2)
 
@@ -226,8 +227,9 @@ class CombatHandlers:
         result = await self.combat_mgr.player_vs_player(p1, p2, combat_type=1)
 
         # 写入最终气血（切磋原本不消耗，但统一引擎可能修正数值）
-        p1.hp = result["player1_final_hp"]
-        p2.hp = result["player2_final_hp"]
+        # child A：结算写回 current_hp 层
+        p1.current_hp = result["player1_final_hp"]
+        p2.current_hp = result["player2_final_hp"]
         await self.db.update_player(p1)
         await self.db.update_player(p2)
 

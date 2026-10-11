@@ -199,10 +199,15 @@ class CombatEngine:
     """Unified combat engine."""
 
     def __init__(
-        self, config_manager: ConfigManager, skill_manager: SkillManager | None = None
+        self,
+        config_manager: ConfigManager,
+        skill_manager: SkillManager | None = None,
+        health_service=None,
     ):
         self.config_manager = config_manager
         self.skill_manager = skill_manager
+        # child A 健康域：战斗起步池用结算后的 current_hp；未接线时回退满状态。
+        self.health_service = health_service
         self._combat_cfg = config_manager.game_config.get("combat", {})
         self._skill_cfg = config_manager.game_config.get("skill_system", {})
 
@@ -416,11 +421,20 @@ class CombatEngine:
         equipped_items = self._build_equipped_items(player)
         total_attrs = player.get_total_attributes(equipped_items, pill_multipliers=None)
 
+        # child A AC3/AC5：动态上限来自聚合 max_hp；起步池是结算后的 current_hp。
+        # 健康域未接线（测试夹具/旧调用方）时回退满状态，保持旧行为。
+        hp_max = total_attrs["max_hp"]
+        if self.health_service is not None:
+            snap = await self.health_service.get_health_snapshot(player)
+            hp_now = max(0, min(snap["current_hp"], hp_max))
+        else:
+            hp_now = hp_max
+
         return FighterState(
             user_id=player.user_id,
             name=player.user_name or player.user_id,
-            hp=total_attrs["hp"],
-            max_hp=total_attrs["hp"],
+            hp=hp_now,
+            max_hp=hp_max,
             damage=total_attrs["damage"],
             agility=total_attrs["agility"],
             speed=total_attrs["speed"],
@@ -1459,9 +1473,14 @@ class CombatManager:
     """
 
     def __init__(
-        self, config_manager: ConfigManager, skill_manager: SkillManager | None = None
+        self,
+        config_manager: ConfigManager,
+        skill_manager: SkillManager | None = None,
+        health_service=None,
     ):
-        self.engine = CombatEngine(config_manager, skill_manager)
+        self.engine = CombatEngine(
+            config_manager, skill_manager, health_service=health_service
+        )
         self.config_manager = config_manager
 
     @staticmethod
@@ -1538,16 +1557,24 @@ class CombatManager:
         )
 
         # Map to legacy return format
+        # child A：切磋不消耗气血，返回 fighter 起步值（健康域接线时即结算后的
+        # current_hp）；决斗取引擎终值，保底 1、封顶 fighter 动态上限。
+        p1_final = (
+            f1.hp
+            if combat_type == 1
+            else max(1, min(int(result.fighter1_final_hp), f1.max_hp))
+        )
+        p2_final = (
+            f2.hp
+            if combat_type == 1
+            else max(1, min(int(result.fighter2_final_hp), f2.max_hp))
+        )
         return {
             "winner": result.winner_id if result.winner_side != "draw" else "draw",
             "combat_log": result.combat_log,
-            "player1_final_hp": (
-                player1.hp if combat_type == 1 else max(1, result.fighter1_final_hp)
-            ),
-            "player1_final_mp": player1.hp,  # Legacy MP = HP in new system
-            "player2_final_hp": (
-                player2.hp if combat_type == 1 else max(1, result.fighter2_final_hp)
-            ),
-            "player2_final_mp": player2.hp,
+            "player1_final_hp": p1_final,
+            "player1_final_mp": p1_final,  # Legacy MP = HP in new system
+            "player2_final_hp": p2_final,
+            "player2_final_mp": p2_final,
             "rounds": result.rounds,
         }

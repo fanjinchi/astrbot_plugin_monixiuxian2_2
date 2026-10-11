@@ -94,7 +94,7 @@ def _make_finished_rift_db(rift_id: int = 1):
     player.level_index = 10
     player.experience = 0
     player.gold = 0
-    player.hp = 500
+    player.current_hp = 500
     db.get_player_by_id = AsyncMock(return_value=player)
     return db
 
@@ -162,7 +162,7 @@ async def test_finish_exploration_no_auto_pve_and_pve_won_false():
     assert reward_data["exp"] == 1000
     assert reward_data["gold"] == 500
     player = db.get_player_by_id.return_value
-    assert player.hp == 500  # 结算不再碰 hp
+    assert player.current_hp == 500  # 结算不再碰当前气血
 
 
 # ===== _roll_encounters 判定 =====
@@ -397,7 +397,7 @@ async def test_accept_beast_challenge_loss_consumes_without_rewards():
     roll.assert_not_awaited()  # 失败无掉落
     player = db.get_player_by_id.return_value
     assert player.experience == 0  # 敌人修为不入账
-    db.update_player.assert_awaited()  # hp=1（战斗层写回）落库
+    db.update_player.assert_awaited()  # current_hp=1（战斗层写回）落库
     assert mgr.encounter_store.get_active("u1", "beast") is None  # 机缘消耗
     assert "战报：战败" in msg and "机缘已消耗" in msg
 
@@ -500,8 +500,10 @@ def _combat_result(
 @pytest.mark.asyncio
 async def test_challenge_rift_beast_directed_group_win():
     pve, engine, enemy_mgr, guardian = _make_pve_env()
-    engine.resolve_combat.return_value = _combat_result("fighter1", winner_id="player_001")
-    player = SimpleNamespace(user_id="player_001", level_index=10, hp=500)
+    engine.resolve_combat.return_value = _combat_result(
+        "fighter1", winner_id="player_001"
+    )
+    player = SimpleNamespace(user_id="player_001", level_index=10, current_hp=500)
 
     outcome = await pve.challenge_rift_beast(player, "rift_test")
 
@@ -509,7 +511,7 @@ async def test_challenge_rift_beast_directed_group_win():
     enemy_mgr.spawn_enemy.assert_not_called()
     assert outcome.won is True and outcome.draw is False
     assert outcome.enemy_exp == 1234
-    assert player.hp == 300  # 胜利按战斗结果写回
+    assert player.current_hp == 300  # 胜利按战斗结果写回
     assert "石傀儡" in outcome.battle_msg
 
 
@@ -518,27 +520,29 @@ async def test_challenge_rift_beast_guardian_prefixed_enemy_win_is_loss():
     """回归：定向组敌人 user_id 是 guardian_ 前缀——enemy_ 前缀判定会把
     定向组获胜误判为玩家胜利（design D5），必须显式比较 winner。"""
     pve, engine, _, guardian = _make_pve_env()
-    engine.resolve_combat.return_value = _combat_result("fighter2", winner_id=guardian.user_id, player_hp=0)
-    player = SimpleNamespace(user_id="player_001", level_index=10, hp=500)
+    engine.resolve_combat.return_value = _combat_result(
+        "fighter2", winner_id=guardian.user_id, player_hp=0
+    )
+    player = SimpleNamespace(user_id="player_001", level_index=10, current_hp=500)
 
     outcome = await pve.challenge_rift_beast(player, "rift_test")
 
     assert outcome.won is False
     assert outcome.draw is False
-    assert player.hp == 1  # 失败不致死但气血降为 1
+    assert player.current_hp == 1  # 失败不致死但气血降为 1
 
 
 @pytest.mark.asyncio
 async def test_challenge_rift_beast_draw_is_not_a_win():
     pve, engine, _, _ = _make_pve_env()
     engine.resolve_combat.return_value = _combat_result("draw", player_hp=0)
-    player = SimpleNamespace(user_id="player_001", level_index=10, hp=500)
+    player = SimpleNamespace(user_id="player_001", level_index=10, current_hp=500)
 
     outcome = await pve.challenge_rift_beast(player, "rift_test")
 
     assert outcome.won is False
     assert outcome.draw is True  # 平局单列
-    assert player.hp == 1
+    assert player.current_hp == 1
 
 
 @pytest.mark.asyncio
@@ -558,8 +562,10 @@ async def test_challenge_rift_beast_fallback_to_global_pool():
         crit_rate=0,
     )
     enemy_mgr.spawn_enemy.return_value = wolf
-    engine.resolve_combat.return_value = _combat_result("fighter1", winner_id="player_001")
-    player = SimpleNamespace(user_id="player_001", level_index=10, hp=500)
+    engine.resolve_combat.return_value = _combat_result(
+        "fighter1", winner_id="player_001"
+    )
+    player = SimpleNamespace(user_id="player_001", level_index=10, current_hp=500)
 
     with patch.object(pve, "_select_enemy_category", return_value="normal") as sel:
         outcome = await pve.challenge_rift_beast(player, None)
@@ -575,7 +581,7 @@ async def test_challenge_rift_beast_fallback_to_global_pool():
 async def test_challenge_rift_beast_spawn_failure_returns_none():
     pve, _, enemy_mgr, _ = _make_pve_env()
     enemy_mgr.spawn_enemy_from_group.side_effect = ValueError("未知的定向敌人组")
-    player = SimpleNamespace(user_id="player_001", level_index=10, hp=500)
+    player = SimpleNamespace(user_id="player_001", level_index=10, current_hp=500)
 
     assert await pve.challenge_rift_beast(player, "rift_test") is None
 

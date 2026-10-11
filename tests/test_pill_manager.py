@@ -35,10 +35,12 @@ def pill_manager(config_manager):
 
 def test_ensure_non_negative_attributes_handles_new_attrs(pill_manager):
     """_ensure_non_negative_attributes must only touch existing Player fields."""
-    player = _Player(user_id="u1", damage=10, agility=5, speed=5, hp=100, armor_value=5)
-    player.hp = -10
+    player = _Player(
+        user_id="u1", damage=10, agility=5, speed=5, base_hp=100, armor_value=5
+    )
+    player.base_hp = -10
     pill_manager._ensure_non_negative_attributes(player)
-    assert player.hp == 0
+    assert player.base_hp == 0
 
 
 def test_pill_attribute_effects_map_to_new_keys(pill_manager):
@@ -66,7 +68,7 @@ def test_pill_attribute_effects_map_to_new_keys(pill_manager):
 def test_pill_multipliers_apply_to_total_attributes():
     """get_total_attributes must read the new pill multiplier keys."""
     player = _Player(
-        user_id="u1", damage=100, agility=50, speed=50, hp=100, armor_value=50
+        user_id="u1", damage=100, agility=50, speed=50, base_hp=100, armor_value=50
     )
     equipped = []
     pill_multipliers = {
@@ -78,19 +80,19 @@ def test_pill_multipliers_apply_to_total_attributes():
     }
     total = player.get_total_attributes(equipped, pill_multipliers)
     assert total["damage"] == 150
-    assert total["hp"] == 120
+    assert total["max_hp"] == 120
     assert total["armor_value"] == 55
 
 
 @pytest.mark.asyncio
 async def test_use_instant_pill_maps_restore_to_hp(pill_manager, config_manager):
     """Legacy spiritual_qi/blood_qi restore keys must map to hp in new framework."""
-    player = _Player(user_id="u1", hp=50)
+    player = _Player(user_id="u1", base_hp=50, current_hp=50)
     player.set_pills_inventory({"test_restore": 1})
     pill_data = {"spiritual_qi_restore": 30}
     ok, msg = await pill_manager._use_instant_pill(player, "test_restore", pill_data)
     assert ok
-    assert player.hp == 80
+    assert player.current_hp == 80
 
 
 @pytest.mark.asyncio
@@ -104,7 +106,8 @@ async def test_handle_resurrection_uses_new_attrs(pill_manager):
         damage=100,
         agility=50,
         speed=50,
-        hp=200,
+        base_hp=200,
+        current_hp=200,
         armor_value=30,
     )
     ok = await pill_manager.handle_resurrection(player)
@@ -113,5 +116,6 @@ async def test_handle_resurrection_uses_new_attrs(pill_manager):
     assert player.damage == 50
     assert player.agility == 25
     assert player.speed == 25
-    assert player.hp == 100
+    assert player.base_hp == 100
+    assert player.current_hp == 100  # 当前层被夹回新上限
     assert player.armor_value == 15

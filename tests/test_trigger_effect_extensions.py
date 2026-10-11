@@ -738,7 +738,7 @@ class TestIntegration:
 
             def get_total_attributes(self, items, pill_multipliers=None):
                 return {
-                    "hp": self.hp,
+                    "max_hp": self.hp,
                     "damage": 100,
                     "agility": 10,
                     "speed": 10,

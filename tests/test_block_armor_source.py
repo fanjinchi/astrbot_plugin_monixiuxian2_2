@@ -215,7 +215,7 @@ class TestFighterStateBuildPaths:
                     "damage": 10,
                     "agility": 5,
                     "speed": 5,
-                    "hp": 100,
+                    "max_hp": 100,
                     "armor_value": 80,
                     "exp_multiplier": 0.0,
                 }

@@ -124,7 +124,9 @@ class Player:
     damage: int = 10  # Damage (attack power)
     agility: int = 5  # Agility (dodge/hit)
     speed: int = 5  # Speed (initiative frequency)
-    hp: int = 100  # HP (life)
+    base_hp: int = 100  # HP (life) - permanent foundation; only explicit base-HP growth (breakthrough/permanent pills/GM) changes it
+    current_hp: int = 100  # Live combat health (invariant 0 <= current_hp <= dynamic max_hp; writes go through core/health.py)
+    health_recovered_at: int = 0  # Lazy-recovery anchor (unix seconds; 0 = never settled, first settle only adopts the clock)
 
     # Armor value (derived from equipment)
     armor_value: int = 0
@@ -272,15 +274,17 @@ class Player:
             pill_multipliers: Optional pill attribute multipliers
 
         Returns:
-            Dict with damage, agility, speed, hp, armor_value, block_armor_value
-            and exp_multiplier.
+            Dict with damage, agility, speed, max_hp, armor_value,
+            block_armor_value and exp_multiplier. 'max_hp' is the dynamic
+            ceiling aggregated from base_hp + equipment/heart-method/pill
+            bonuses (child A health model: never persisted).
         """
         # Base attributes from player
         total = {
             "damage": self.damage,
             "agility": self.agility,
             "speed": self.speed,
-            "hp": self.hp,
+            "max_hp": self.base_hp,
             "armor_value": self.armor_value,
             # Block-rate armor starts from the innate panel value; only weapon-slot
             # equipment adds to it below (design D1: 格挡来自肉身功夫与持械卸力).
@@ -296,7 +300,7 @@ class Player:
             total["damage"] += int(item.damage * mult)
             total["agility"] += int(item.agility * mult)
             total["speed"] += int(item.speed * mult)
-            total["hp"] += int(item.hp * mult)
+            total["max_hp"] += int(item.hp * mult)
             total["armor_value"] += int(item.armor_value * mult)
             # Weapon armor also feeds block rate; armor/technique/main_technique slot
             # armor is reduction-only by design (spec: combat-core 格挡率来源分离).
@@ -312,7 +316,9 @@ class Player:
                     for key, value in passive.items():
                         effective_value = value * heart_route_mult
                         if key == "hp_percent":
-                            total["hp"] = int(total["hp"] * (1 + effective_value))
+                            total["max_hp"] = int(
+                                total["max_hp"] * (1 + effective_value)
+                            )
                         elif key == "damage_percent":
                             total["damage"] = int(
                                 total["damage"] * (1 + effective_value)
@@ -335,7 +341,7 @@ class Player:
                 total["agility"] * pill_multipliers.get("agility", 1.0)
             )
             total["speed"] = int(total["speed"] * pill_multipliers.get("speed", 1.0))
-            total["hp"] = int(total["hp"] * pill_multipliers.get("hp", 1.0))
+            total["max_hp"] = int(total["max_hp"] * pill_multipliers.get("hp", 1.0))
             total["armor_value"] = int(
                 total["armor_value"] * pill_multipliers.get("armor_value", 1.0)
             )
@@ -371,6 +377,6 @@ class Player:
             int(total_attrs["damage"])
             + int(total_attrs["agility"])
             + int(total_attrs["speed"])
-            + int(total_attrs["hp"])
+            + int(total_attrs["max_hp"])
             + int(total_attrs.get("armor_value", 0)) // 2
         )

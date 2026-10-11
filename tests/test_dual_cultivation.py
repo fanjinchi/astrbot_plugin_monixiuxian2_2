@@ -54,9 +54,7 @@ def manager(fake_db, fake_config, fake_config_manager):
         fake_db,
         fake_config,
         fake_config_manager,
-        cultivation_manager=CultivationManager(
-            fake_config, fake_config_manager, None
-        ),
+        cultivation_manager=CultivationManager(fake_config, fake_config_manager, None),
         busy_state=make_busy_state(fake_db),
     )
 

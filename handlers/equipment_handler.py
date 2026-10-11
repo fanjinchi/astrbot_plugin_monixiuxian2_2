@@ -28,6 +28,7 @@ class EquipmentHandler:
         storage_ring_manager: StorageRingManager,
         equipment_manager: EquipmentManager,
         pill_manager: PillManager,
+        health_service=None,
     ):
         self.db = db
         self.config_manager = config_manager
@@ -35,6 +36,8 @@ class EquipmentHandler:
         self.storage_ring_manager = storage_ring_manager
         self.equipment_manager = equipment_manager
         self.pill_manager = pill_manager
+        # 健康域（可选）：装备/卸下改变动态上限后钳制 current_hp
+        self.health_service = health_service
 
     @player_required
     async def handle_show_equipment(self, player: Player, event: AstrMessageEvent):
@@ -78,7 +81,7 @@ class EquipmentHandler:
             damage_bonus = total_attrs["damage"] - player.damage
             agility_bonus = total_attrs["agility"] - player.agility
             speed_bonus = total_attrs["speed"] - player.speed
-            hp_bonus = total_attrs["hp"] - player.hp
+            hp_bonus = total_attrs["max_hp"] - player.base_hp
             armor_bonus = total_attrs["armor_value"] - player.armor_value
             exp_multiplier = total_attrs["exp_multiplier"]
             # base_damage 是武器每击基础伤害（不经过属性词条通道），单独汇总展示
@@ -239,6 +242,9 @@ class EquipmentHandler:
         success, message = await self.equipment_manager.equip_item(player, item)
 
         if success:
+            # 换装可能降低动态上限（换成更弱装备）：钳制 current_hp
+            if self.health_service is not None:
+                await self.health_service.clamp_current_hp(player)
             # 显示属性加成
             attr_display = item.get_attribute_display()
             result_msg = f"{message}\n━━━━━━━━━━━━━━━\n属性加成：{attr_display}"
@@ -283,6 +289,9 @@ class EquipmentHandler:
         )
 
         if success:
+            # 卸下后动态上限下降：钳制 current_hp，避免库里存 current>max
+            if self.health_service is not None:
+                await self.health_service.clamp_current_hp(player)
             # 卸下成功后，将装备存入储物戒
             storage_msg = ""
             if unequipped_item_name:

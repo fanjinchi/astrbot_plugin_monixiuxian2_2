@@ -58,7 +58,7 @@ def mock_combat_engine():
         side_effect=lambda p: MagicMock(
             user_id=p.user_id,
             name=p.user_name or p.name,
-            hp=p.hp,
+            hp=p.current_hp,
             damage=getattr(p, "damage", 10),
             agility=getattr(p, "agility", 5),
             speed=getattr(p, "speed", 5),
@@ -113,7 +113,8 @@ def mock_player():
     player.user_name = "测试道友"
     player.level_index = 10
     player.experience = 10000
-    player.hp = 500
+    player.base_hp = 500
+    player.current_hp = 500
     player.damage = 50
     player.agility = 15
     player.speed = 15
@@ -424,7 +425,7 @@ class TestPveEngineIntegration:
     async def test_calls_resolve_combat_and_writes_back_hp(
         self, pve_manager, mock_combat_engine, mock_player
     ):
-        """After combat, player.hp is updated from the engine result."""
+        """After combat, player.current_hp is updated from the engine result."""
         with patch.object(pve_manager, "_should_trigger_combat", return_value=True):
             with patch.object(
                 pve_manager, "_select_enemy_category", return_value="normal"
@@ -437,7 +438,7 @@ class TestPveEngineIntegration:
                 )
 
         mock_combat_engine.resolve_combat.assert_called_once()
-        assert mock_player.hp == 350
+        assert mock_player.current_hp == 350
         assert "胜利" in msg
         assert rewards["bonus_exp"] == 8500
 
@@ -589,13 +590,24 @@ def mock_pve_combat_mgr():
 @pytest.fixture
 def adventure_manager(mock_db, mock_storage_ring_manager, mock_pve_combat_mgr):
     """AdventureManager with mocked dependencies."""
-    return AdventureManager(mock_db, mock_storage_ring_manager, mock_pve_combat_mgr, busy_state=make_busy_state(mock_db))
+    return AdventureManager(
+        mock_db,
+        mock_storage_ring_manager,
+        mock_pve_combat_mgr,
+        busy_state=make_busy_state(mock_db),
+    )
 
 
 @pytest.fixture
 def rift_manager(mock_db, mock_storage_ring_manager, mock_pve_combat_mgr):
     """RiftManager with mocked dependencies."""
-    return RiftManager(mock_db, None, mock_storage_ring_manager, mock_pve_combat_mgr, busy_state=make_busy_state(mock_db))
+    return RiftManager(
+        mock_db,
+        None,
+        mock_storage_ring_manager,
+        mock_pve_combat_mgr,
+        busy_state=make_busy_state(mock_db),
+    )
 
 
 @pytest.fixture
@@ -746,7 +758,7 @@ class TestRiftSettlementNoAutoPve:
         mock_db.get_player_by_id.return_value = mock_player
         mock_player.experience = 0
         mock_player.gold = 0
-        mock_player.hp = 500
+        mock_player.current_hp = 500
         rift_manager.config = {
             "puzzle_rate": 0.0,
             "beast_rate": 0.0,
@@ -767,4 +779,4 @@ class TestRiftSettlementNoAutoPve:
         mock_roll.assert_awaited_once()
         assert reward_data["exp"] > 0 and reward_data["gold"] > 0
         assert reward_data["pve_won"] is False
-        assert mock_player.hp == 500
+        assert mock_player.current_hp == 500

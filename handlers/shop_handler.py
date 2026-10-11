@@ -41,6 +41,7 @@ class ShopHandler:
         storage_ring_manager: StorageRingManager,
         equipment_manager: EquipmentManager,
         pill_manager: PillManager,
+        health_service=None,
     ):
         self.db = db
         self.config = config
@@ -49,6 +50,8 @@ class ShopHandler:
         self.storage_ring_manager = storage_ring_manager
         self.equipment_manager = equipment_manager
         self.pill_manager = pill_manager
+        # child A 健康域：食补恢复/上限丹药的 current/base 边界
+        self.health_service = health_service
         access_control = self.config.get("ACCESS_CONTROL", {})
         self.shop_manager_ids = {
             str(user_id) for user_id in access_control.get("SHOP_MANAGERS", [])
@@ -368,10 +371,17 @@ class ShopHandler:
             # 恢复/扣除气血（新框架统一为 hp）
             if "add_hp" in effects:
                 hp_change = effects["add_hp"]
-                old_hp = player.hp
-                player.hp = max(1, player.hp + hp_change)
+                # child A：食补恢复动 current 层，封顶动态上限、保底 1 口径不变
+                old_hp = player.current_hp
+                if self.health_service is not None:
+                    new_hp = await self.health_service.apply_current_hp_change(
+                        player, hp_change, minimum=1
+                    )
+                else:
+                    new_hp = max(1, player.current_hp + hp_change)
+                    player.current_hp = new_hp
                 if hp_change > 0:
-                    effect_msgs.append(f"气血+{player.hp - old_hp}")
+                    effect_msgs.append(f"气血+{new_hp - old_hp}")
                 else:
                     effect_msgs.append(f"气血{hp_change}")
 
@@ -384,7 +394,11 @@ class ShopHandler:
             # 增加气血上限（新框架统一为 hp）
             if "add_max_hp" in effects:
                 max_hp_gain = effects["add_max_hp"]
-                player.hp = max(1, player.hp + max_hp_gain)
+                # child A：上限丹药涨永久 base_hp，不直接回血
+                if self.health_service is not None:
+                    await self.health_service.add_base_hp(player, max_hp_gain)
+                else:
+                    player.base_hp = max(1, player.base_hp + max_hp_gain)
                 effect_msgs.append(f"气血上限+{max_hp_gain}")
 
             # 增加灵力（新框架映射到伤害）
@@ -449,7 +463,10 @@ class ShopHandler:
         player.damage = max(0, player.damage)
         player.agility = max(0, player.agility)
         player.speed = max(0, player.speed)
-        player.hp = max(1, player.hp)
+        player.current_hp = max(1, player.current_hp)
+        if self.health_service is not None:
+            # 持久化前让 current 落回动态上限内（child A 不变量）
+            await self.health_service.clamp_current_hp(player)
         player.armor_value = max(0, player.armor_value)
 
         await self.db.update_player(player)

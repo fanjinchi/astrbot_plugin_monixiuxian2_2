@@ -177,7 +177,8 @@ async def test_breakthrough_failure_penalty_uses_current_level_exp(
         level_index=10,
         cultivation_type="灵修",
         experience=10**7,
-        hp=100,
+        base_hp=100,
+        current_hp=100,
         damage=10,
         agility=5,
         speed=5,
@@ -348,7 +349,8 @@ class TestGrowthByRoute:
             level_index=5,
             cultivation_type="体修",
             experience=10**9,
-            hp=100,
+            base_hp=100,
+            current_hp=100,
             damage=10,
             agility=5,
             speed=5,
@@ -359,7 +361,7 @@ class TestGrowthByRoute:
 
         assert success and not died
         assert player.level_index == 6
-        assert player.hp == 100 + 17
+        assert player.base_hp == 100 + 17
         # 战斗点总量恒为 random_growth_step=5，只验证分配守恒不锁定随机落点
         assert (player.damage - 10) + (player.agility - 5) + (player.speed - 5) == 5
         assert "气血 +17" in msg
@@ -407,7 +409,8 @@ class TestSuccessPanelStreakBonusLineBreak:
             level_index=5,
             cultivation_type="灵修",
             experience=10**9,
-            hp=100,
+            base_hp=100,
+            current_hp=100,
             damage=10,
             agility=5,
             speed=5,

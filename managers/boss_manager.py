@@ -514,8 +514,8 @@ HP：{result.fighter1_final_hp}/{player_fighter.max_hp}
             if reward > 0:
                 player.gold += reward
 
-        # 更新玩家HP
-        player.hp = result.fighter1_final_hp
+        # 更新玩家当前气血（child A：current_hp 层，引擎封顶在动态上限内）
+        player.current_hp = int(result.fighter1_final_hp)
         await self.db.update_player(player)
 
         # 返回完整战斗日志

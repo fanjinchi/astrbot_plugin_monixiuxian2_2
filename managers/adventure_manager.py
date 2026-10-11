@@ -289,7 +289,8 @@ class AdventureManager:
                 combat_msg = combat_result[0]
                 rewards = combat_result[1]
                 if rewards.get("hp_penalty"):
-                    player.hp = 1
+                    # child A：败局惩罚只扣 current 层
+                    player.current_hp = 1
             else:
                 rewards = base_rewards
         else:

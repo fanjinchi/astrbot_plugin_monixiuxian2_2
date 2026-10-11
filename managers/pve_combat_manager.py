@@ -347,7 +347,8 @@ class PVECombatManager:
         )
 
         # 6. 将战斗后的当前 HP 写回玩家对象
-        player.hp = result.fighter1_final_hp
+        # child A：写回的是 current_hp 层（引擎已在 fighter 动态上限内给出终值）
+        player.current_hp = int(result.fighter1_final_hp)
 
         # 7. 计算奖励
         if base_rewards is None:
@@ -416,7 +417,7 @@ class PVECombatManager:
         # 4. HP 写回：胜利按战斗结果；失败/平局不致死但气血降为 1
         #    （challenge_legacy_guardian 同款口径，惩罚语义由调用方消费）
         final_hp = result.fighter1_final_hp if won else 1
-        player.hp = final_hp
+        player.current_hp = final_hp  # child A：current 层写回
 
         # 5. 组织战报（无奖励结算；奖励由 RiftManager 组装）
         lines = list(result.combat_log or [])
@@ -469,7 +470,7 @@ class PVECombatManager:
         won = result.winner_id == player.user_id
         if not won:
             final_hp = max(1, final_hp)
-        player.hp = final_hp
+        player.current_hp = final_hp  # child A：current 层写回
 
         # 4. 组织结果消息（无奖励结算）
         lines = list(result.combat_log or [])

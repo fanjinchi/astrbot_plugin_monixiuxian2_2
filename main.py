@@ -270,24 +270,33 @@ class XiuXianPlugin(Star):
             StorageRingManager,
         )
         from .core.encounter_store import EncounterStore
+        from .core.health import HealthService
         from .data.default_configs import RIFT_CONFIG
 
         # Phase 1: 核心管理器（无相互依赖，仅依赖 db/config）
         skill_manager = SkillManager(self.config_manager, self.db)
         storage_ring_mgr = StorageRingManager(self.db, self.config_manager)
         equipment_mgr = EquipmentManager(self.db, self.config_manager, storage_ring_mgr)
+        # child A 健康域唯一入口：动态上限聚合与懒恢复结算（design 健康域）
+        health_service = HealthService(
+            self.db, self.config_manager, equipment_manager=equipment_mgr
+        )
         cultivation_mgr = CultivationManager(
             self.config, self.config_manager, skill_manager
         )
-        pill_mgr = PillManager(self.db, self.config_manager)
+        pill_mgr = PillManager(
+            self.db, self.config_manager, health_service=health_service
+        )
         shop_mgr = ShopManager(self.config, self.config_manager)
         # 忙碌状态 owner（user_cd + player.state 镜像双层写统一入口，design D1）
-        busy_state = BusyState(self.db)
+        busy_state = BusyState(self.db, health_service)
 
         # Phase 2: 业务管理器（依赖 Phase 1 实例，按依赖序构造）
         bank_mgr = BankManager(self.db, self.config)
         bounty_mgr = BountyManager(self.db, storage_ring_mgr)
-        combat_mgr = CombatManager(self.config_manager, skill_manager)
+        combat_mgr = CombatManager(
+            self.config_manager, skill_manager, health_service=health_service
+        )
         enemy_mgr = EnemyManager(config_manager=self.config_manager)
         impart_mgr = ImpartManager(self.db, self.config_manager)
         pve_combat_mgr = PVECombatManager(
@@ -364,6 +373,7 @@ class XiuXianPlugin(Star):
             sect_manager=sect_mgr,
             impart_manager=impart_mgr,
             busy_state=busy_state,
+            health_service=health_service,
         )
 
         # Phase 3: 业务处理器（依赖前两阶段实例）
@@ -379,6 +389,7 @@ class XiuXianPlugin(Star):
             equipment_manager=equipment_mgr,
             impart_mgr=impart_mgr,
             busy_state=busy_state,
+            health_service=health_service,
         )
         equipment_handler = EquipmentHandler(
             self.db,
@@ -387,6 +398,7 @@ class XiuXianPlugin(Star):
             storage_ring_manager=storage_ring_mgr,
             equipment_manager=equipment_mgr,
             pill_manager=pill_mgr,
+            health_service=health_service,
         )
         breakthrough_handler = BreakthroughHandler(
             self.db,
@@ -406,6 +418,7 @@ class XiuXianPlugin(Star):
             storage_ring_manager=storage_ring_mgr,
             equipment_manager=equipment_mgr,
             pill_manager=pill_mgr,
+            health_service=health_service,
         )
         storage_ring_handler = StorageRingHandler(
             self.db, self.config_manager, storage_ring_manager=storage_ring_mgr

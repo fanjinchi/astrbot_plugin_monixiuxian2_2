@@ -19,6 +19,14 @@ PLAYER_FIELDS = {f.name for f in fields(Player)}
 _PLAYER_FIELDS = [f.name for f in fields(Player)]
 _PLAYER_FIELDS_SET = set(_PLAYER_FIELDS)
 
+# 领域独占列：health_recovered_at（懒恢复锚点）只能由 HealthService 的
+# settle/_write_anchor 直写（core/health.py），绝不随 update_player 落库。
+# 调用方持有的内存 Player 副本不承载权威锚点——结算把锚点前移后，若陈旧的
+# 内存值再被全字段 UPDATE 刷回数据库，已结算的恢复窗口会复活（重复回血、
+# 忙碌窗口被补上血，违反 AC4）。INSERT（创角）仍写入该列（默认 0）。
+_DOMAIN_OWNED_FIELDS = frozenset({"health_recovered_at"})
+_UPDATE_FIELDS = [f for f in _PLAYER_FIELDS if f not in _DOMAIN_OWNED_FIELDS]
+
 
 def _build_insert_sql():
     """构建 INSERT SQL（从 Player dataclass 动态生成）"""
@@ -28,15 +36,15 @@ def _build_insert_sql():
 
 
 def _build_update_sql():
-    """构建 UPDATE SQL（从 Player dataclass 动态生成）"""
-    set_clauses = ", ".join([f"{f} = ?" for f in _PLAYER_FIELDS if f != "user_id"])
+    """构建 UPDATE SQL（从 Player dataclass 动态生成，排除领域独占列）"""
+    set_clauses = ", ".join([f"{f} = ?" for f in _UPDATE_FIELDS if f != "user_id"])
     return f"UPDATE players SET {set_clauses} WHERE user_id = ?"
 
 
 def _player_to_tuple(player: Player, for_insert: bool = True):
     """将 Player 对象转换为 SQL 参数元组"""
     values = []
-    for f in _PLAYER_FIELDS:
+    for f in _PLAYER_FIELDS if for_insert else _UPDATE_FIELDS:
         val = getattr(player, f)
         # 布尔值转整数
         if isinstance(val, bool):
@@ -281,7 +289,10 @@ class DataBase:
         sql = _build_insert_sql()
         params = _player_to_tuple(player, for_insert=True)
         await self.conn.execute(sql, params)
-        await self.conn.commit()
+        # D2 ownership gate: commit only outside an active CM transaction
+        # (child A step-5 audit: 创角 may run inside a settle+create txn).
+        if getattr(self.conn, "_txn_depth", 0) == 0:
+            await self.conn.commit()
 
     async def get_player_by_id(self, user_id: str) -> Player:
         """根据用户ID获取玩家信息"""
@@ -312,6 +323,10 @@ class DataBase:
 
     async def update_player(self, player: Player):
         """更新玩家信息（字段从 Player dataclass 动态生成，避免遗漏）
+
+        领域独占列 health_recovered_at（懒恢复锚点）不在 UPDATE 之列——
+        它只能由 HealthService 结算时直写；调用方内存副本中的锚点值会被
+        忽略，永不回写数据库。
 
         Args:
             player: 玩家对象

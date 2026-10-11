@@ -667,7 +667,9 @@ async def test_13_begin_failure_compensation_clears_state(db):
 
     async def failing_execute(sql, parameters=None):
         if sql.strip().upper().startswith("BEGIN"):
-            raise sqlite3.OperationalError("cannot start a transaction within a transaction")
+            raise sqlite3.OperationalError(
+                "cannot start a transaction within a transaction"
+            )
         return await orig_execute(sql, parameters)
 
     db.conn.execute = failing_execute

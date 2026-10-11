@@ -254,7 +254,9 @@ class CultivationManager:
                 # 灵修迅捷身份从创角开始（dual-route-identity C1 决策）：
                 # 区间 10-18 高于体修的 5-12，对冲体修创角的面板优势
                 speed=random.randint(10, 18),
-                hp=random.randint(90, 130),
+                # child A：创角 current 与永久底数一致；恢复锚点留 0 由首次读取收编
+                base_hp=(hp_roll := random.randint(90, 130)),
+                current_hp=hp_roll,
                 armor_value=0,
             )
         else:  # 体修
@@ -269,7 +271,8 @@ class CultivationManager:
                 damage=random.randint(15, 30),
                 agility=random.randint(3, 10),
                 speed=random.randint(5, 12),
-                hp=random.randint(120, 180),
+                base_hp=(hp_roll := random.randint(120, 180)),
+                current_hp=hp_roll,
                 armor_value=random.randint(3, 10),
             )
 

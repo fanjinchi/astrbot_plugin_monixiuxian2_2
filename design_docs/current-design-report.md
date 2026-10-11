@@ -104,7 +104,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | 突破 | breakthrough_fail_streak（连败计数，保底机制用） |
 | 闭关/签到 | cultivation_start_time、last_check_in_date |
 | 装备栏 | weapon、armor、main_technique、techniques（JSON 列表，最多 4 个功法，`game_config.skill_system.max_technique_slots`） |
-| **四主属性** | **damage（伤害/攻击）、agility（身法/闪避命中）、speed（迅捷/出手频率）、hp（气血/生命上限）** |
+| **主属性** | **damage（伤害/攻击）、agility（身法/闪避命中）、speed（迅捷/出手频率）**；气血三层：`base_hp`（永久底数）/`current_hp`（当前气血）/`health_recovered_at`（惰性恢复锚），上限 `max_hp`=底数+装备/功法/心法/丹药聚合、运行时计算不入库 |
 | 护甲 | armor_value（装备提供的百分比减伤来源，不作为主属性；减伤率 = 护甲/(护甲+K)） |
 | 技能修习 | study_target（修习目标）、battle_report_merge_count（战报合并条数偏好） |
 | 宗门 | sect_id、sect_position（0宗主/1长老/2亲传/3内门/4外门）、sect_contribution、sect_task、sect_elixir_get、sect_treasure_claims（JSON，宝库已领取 id 列表，v29）、sect_master_progress（JSON，师承任务链进度：chain_id/stage_index/progress/done，v30） |
@@ -155,7 +155,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
   - **连败保底**：每败 +5%（`breakthrough_pity_step`），19 连败必成（`breakthrough_pity_guarantee`）
 - **成功收益**：level_index +1，触发**方案A成长（路线化）**（breakthrough_manager.py `_get_growth_params`，2026-08-27 `dual-route-identity`）：
   - 成长参数按「路线 × 大境界段」取表（`skill_system.growth_by_route`，数组下标=大境界序号，升境界的突破按原段结算）；缺表时回退全局配置
-  - 气血独立通道：`hp += hp_step[路线][段]`；战斗属性 `random_growth_step`（默认 5）点按该段权重逐点随机
+  - **气血独立通道**：`base_hp += hp_step[路线][段]`（突破只涨永久底数，当前气血不动）；战斗属性 `random_growth_step`（默认 5）点按该段权重逐点随机
   - 定稿数值与校准结论见 `content-design/route-identity.md` §2（体修初期略强→元婴收敛至 ~50% 胜率）
   - 突破失败无任何属性奖励
 - **失败死亡判定**：`death_rate = clamp(uniform(0.005, 0.03) × 丹药死亡倍率, 0, 1)`（v3.7.0 起由 [0.01,0.1] 下调）
@@ -411,7 +411,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | v31 | rifts 播种青云剑冢（id 6，青云门专属秘境；config/rift_config.json 该条目 id 同步 4→6，消除与 id 4 玄冰地宫的冲突） |
 | v32 | 传承系统改版：legacy_instances/impart_pk_cooldown/impart_snatch_protection 三表，impart_info 数据拷贝后 DROP |
 | v33 | rifts 播种试炼古境（id 7，遭遇机制测试脚手架；增量任务链仅对 ≥ TASK_CHAIN_MIN_VERSION(=32) 的库开放，更早旧库走重建路径） |
-| v34 | 拆除试炼古境测试脚手架：删除 rifts 表 id 7 行（幂等；v33 播种的验证用秘境，功能验证通过后移除）（当前最新） |
+| v34 | 拆除试炼古境测试脚手架：删除 rifts 表 id 7 行（幂等；v33 播种的验证用秘境，功能验证通过后移除） |
+| v35 | 玩家气血三层化：`players.hp` RENAME→`base_hp`，新增 `current_hp`+`health_recovered_at`；一次性按迁移时点动态上限 backfill（rename+列新增+校验在同一迁移事务，失败回滚保持 v34）（当前最新） |
 
 ---
 

@@ -78,8 +78,8 @@ def mock_combat_engine():
         side_effect=lambda p: FighterState(
             user_id=p.user_id,
             name=p.user_name or p.user_id,
-            hp=p.hp,
-            max_hp=p.hp,
+            hp=p.current_hp,
+            max_hp=p.current_hp,
             damage=p.damage,
             agility=p.agility,
             speed=p.speed,
@@ -136,7 +136,13 @@ def mock_storage_ring_manager():
 @pytest.fixture
 def boss_manager(mock_db, mock_combat_manager, mock_config_manager):
     """BossManager with mocked dependencies and deterministic HP variance."""
-    mgr = BossManager(mock_db, mock_combat_manager, mock_config_manager, None, busy_state=make_busy_state(mock_db))
+    mgr = BossManager(
+        mock_db,
+        mock_combat_manager,
+        mock_config_manager,
+        None,
+        busy_state=make_busy_state(mock_db),
+    )
     mgr._resolve_boss_stats = lambda level_config: mgr._generate_boss_stats(
         level_config
     )
@@ -153,7 +159,8 @@ def player_idle():
         damage=100,
         agility=30,
         speed=20,
-        hp=1000,
+        base_hp=1000,
+        current_hp=1000,
         armor_value=10,
         gold=0,
     )
@@ -210,7 +217,13 @@ class TestBossStatGeneration:
         ]
         config.game_config = {"pve": {"difficulty_multiplier": 2.0}}
         config.boss_config = {}
-        mgr = BossManager(mock_db, mock_combat_manager, config, None, busy_state=make_busy_state(mock_db))
+        mgr = BossManager(
+            mock_db,
+            mock_combat_manager,
+            config,
+            None,
+            busy_state=make_busy_state(mock_db),
+        )
         level_config = {
             "name": "筑基",
             "level_index": 10,
@@ -238,7 +251,13 @@ class TestBossStatGeneration:
         ]
         config.game_config = {"pve": {"difficulty_multiplier": 1.0}}
         config.boss_config = {}
-        mgr = BossManager(mock_db, mock_combat_manager, config, None, busy_state=make_busy_state(mock_db))
+        mgr = BossManager(
+            mock_db,
+            mock_combat_manager,
+            config,
+            None,
+            busy_state=make_busy_state(mock_db),
+        )
         level_config = {
             "name": "筑基",
             "level_index": 10,
@@ -280,7 +299,13 @@ class TestBossStatGeneration:
                 }
             ]
         }
-        mgr = BossManager(mock_db, mock_combat_manager, config, None, busy_state=make_busy_state(mock_db))
+        mgr = BossManager(
+            mock_db,
+            mock_combat_manager,
+            config,
+            None,
+            busy_state=make_busy_state(mock_db),
+        )
         assert mgr.levels[0]["level_index"] == 1
 
 
@@ -386,7 +411,7 @@ class TestChallengeBoss:
         assert player_idle.gold == 1000
         mock_db.ext.defeat_boss.assert_awaited_once_with(1)
         mock_db.update_player.assert_awaited_once()
-        assert player_idle.hp == 800
+        assert player_idle.current_hp == 800
 
     @pytest.mark.asyncio
     async def test_challenge_defeat(
@@ -551,8 +576,8 @@ class TestBossInfoAndAutoSpawn:
     @pytest.mark.asyncio
     async def test_auto_spawn_boss_by_average_level(self, boss_manager, mock_db):
         """auto_spawn_boss picks a tier matching the average player level."""
-        p1 = Player(user_id="a", level_index=8, hp=100, damage=10)
-        p2 = Player(user_id="b", level_index=12, hp=100, damage=10)
+        p1 = Player(user_id="a", level_index=8, base_hp=100, current_hp=100, damage=10)
+        p2 = Player(user_id="b", level_index=12, base_hp=100, current_hp=100, damage=10)
         mock_db.get_all_players.return_value = [p1, p2]
         success, _msg, boss = await boss_manager.auto_spawn_boss()
         assert success

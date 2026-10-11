@@ -252,8 +252,8 @@ class BreakthroughManager:
                 player.cultivation_type, next_level_index - 1
             )
 
-            # HP 独立通道
-            player.hp += hp_step
+            # HP 独立通道（child A：突破只涨永久 base_hp，不碰 current_hp）
+            player.base_hp += hp_step
             hp_growth = hp_step
 
             # 战斗属性点逐点随机
@@ -379,7 +379,7 @@ class BreakthroughManager:
                     "damage": player.damage,
                     "agility": player.agility,
                     "speed": player.speed,
-                    "hp": player.hp,
+                    "hp": player.base_hp,
                     "armor_value": player.armor_value,
                 },
                 # success 渲染发生在 level_index 已 +1 之后，段位桶按突破后
