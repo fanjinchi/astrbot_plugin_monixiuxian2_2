@@ -57,3 +57,10 @@
 - ❌ 手写 `player.state` / `user_cd` 判断绕过 BusyState（双层漂移、快进失效）
 - ❌ 新增冷却域不登记 time_skip_registry（快进测试隐性失败）
 - ❌ 硬编码数据库路径或把数据文件写进插件目录
+- ❌ 领域服务直写某列、通用 `update_player` 又按 dataclass 全字段落库 —— 调用方内存
+  里的陈旧字段会在下一次 `update_player` 把领域服务写入的值静默刷回（气血基座 P0：
+  settle 推进的 health_recovered_at 锚点被战斗后 update_player 回刷，恢复窗口复活）。
+  修法二选一（可叠加）：把该列登记进 `data/data_manager.py` 的 `_DOMAIN_OWNED_FIELDS`
+  （UPDATE 排除、INSERT 保留），让领域服务成为唯一写入方；和/或领域服务写库后同步
+  回写内存对象（参考 BusyState 钩子 settle 后回写 `player.current_hp`）。新增"领域
+  服务直写 + 调用方缓存 player 再 update_player"模式的列时，必须过一遍这个检查。
