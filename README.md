@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.18.1
+> **版本:** v3.19.0
 > **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -303,6 +303,26 @@ astrbot_plugin_monixiuxian2_2/
 ---
 
 ## 📝 更新日志
+
+---
+
+### v3.19.0 - PVE 固定名册内容管线与敌人运行时基座（Trellis child B）
+
+**✨ 新增**
+
+- **敌人内容治理管线**：`scripts/sync_content_to_config.py` 敌人域 adapter——`enemies.csv` / `world_bosses.csv` 经 `core/enemy_schema.py`（schema v2：稳定 id、段位/类别枚举、五维边界、词条与 Boss 机制结构、阶段阈值降序、legacy 死键拒绝）校验后渲染为 profile 文档；draft 内容仅可 `--enemies-preview-out` 只读预览（不触碰正式 `config/`），正式写入必须显式 `--approval-manifest`（绑定 CSV SHA-256、获批数据集/列范围、叙事决策），draft、缺 manifest、hash 漂移、列越权、未获批叙事一律 fail closed；战斗数值批准与 `narrative_status` 相互独立
+- **固定名册 catalog**：`managers/enemy_catalog.py`——28 只普通敌人 + 4 只世界 Boss 不可变档案（按 id 与 `(realm_segment, category)` 索引），resolver 难度只在单点乘伤害；Enemy→FighterState **唯一 mapper**（`build_enemy_fighter`）完整映射 `level_index`、暴击、护甲、触发技能、大招；世界 Boss 提供 60%/20% 阶段、48h 存活、每日 3 次、击杀 12h/消散 24h 元数据 profile（生命周期与实例化归后续 child）
+
+**🔧 修复（运行时语义，动态路径即刻生效）**
+
+- **PvE 全局难度只乘伤害**：`pve.difficulty_multiplier` 原实现同时乘 HP/护甲（历练与秘境/守护两条路径），现仅乘伤害，与 pve-enemy-design「难度只乘伤害」定案一致；死配置 `difficulty_coefficients`（加载后从未消费）从 `config/enemies.json`、`data/default_configs.py` 与 loader 删除
+- **敌人战斗映射补全**：敌人生成记录真实 `level_index`（原 Fighter 缺省 lv1，护甲减伤 K 常数算错）；配置暴击率 >0 生效（/100 覆盖引擎默认 15%，动态模板守护 8/10/12% 即刻起参战）；精英词条与 Boss 触发技/大招经统一映射透传；秘境兽/传承守护与 PVE 战斗管理器的 Fighter 构建收敛到唯一 mapper
+
+**🧪 测试**
+
+- 新增 `tests/test_enemy_sync_gate.py`（22 例：preview 28+4 渲染/确定性、正式写五类负向闸门、schema 负例矩阵）与 `tests/test_enemy_catalog_runtime.py`（56 例：28+4 四层逐字段一致 CSV→preview→profile→Fighter、词条/机制映射与验收模拟器常数互锁、resolver 段位锁定与确定性、难度只乘伤害回归、守护/秘境专项组回归、mapper 向后兼容）；全量 `pytest tests/` 1055 passed，ruff format/check 绿
+
+**📌 边界**：正式内容 sync 与调用方切流（固定名册启用）属父计划 Batch 5，待用户内容批准后执行；本版本运行时仍走动态生成路径，仅难度与映射语义按定案修正。Step 7 奖励经济（敌人 exp 派生）不在本批次。
 
 ---
 

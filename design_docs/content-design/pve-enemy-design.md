@@ -49,6 +49,18 @@
 > 招牌技定案（`world_bosses.csv`，附录 F v2 实测）：罴王=连咬 / 鼍龙=反震 / 朱厌=灼烧 /
 > 巴蛇=绞杀（trim×0.85）；纪律 = 禁用一切"回复/减免 Boss 血量"机制（回血/吸血/减伤/免死），
 > 招牌技变更必须连带重测 HP 锚。
+>
+> **实施状态（2026-10-12，Trellis child B `10-10-pve-enemy-catalog-runtime`）**：Step 3 定案三项中属本
+> child 的两项已落地——`difficulty_coefficients` 死配置删除（config/enemies.json + default_configs.py +
+> loader）、`pve.difficulty_multiplier` 收敛为只乘伤害（动态与定向组两条路径）、`crit_rate` 经唯一 mapper
+> `managers/enemy_catalog.py:build_enemy_fighter` 接线（>0 时 /100 覆盖，否则保持默认 0.15；随附补齐
+> `level_index` 护甲 K 常数与触发技/大招透传）。玩家侧暴击补完（base_crit_rate 物化）与 `exp_needed`
+> 修为派生退役不属本 child。固定名册管线：`core/enemy_schema.py`（schema v2 校验 + 词条/机制映射单一
+> 真相）→ `scripts/sync_content_to_config.py` 敌人域（draft 只读 preview / `--approval-manifest` 正式写
+> 闸门 fail closed；`status` 列 = 战斗数值机器闸门、与 `narrative_status` 独立）→ `managers/enemy_catalog.py`
+> （不可变 catalog、(realm_segment, category) 索引、难度单点施加）。**正式 sync 未执行**（内容仍 draft），
+> 28+4 四层一致性经真实 CSV preview 验收；正式 generated config 复验与调用方切流留父计划 Batch 5，
+> 世界 Boss 仅提供不可变 profile（生命周期归 child D）。
 
 ---
 

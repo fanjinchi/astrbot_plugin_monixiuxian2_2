@@ -30,8 +30,22 @@ skills.csv sync: trigger skills keep the persisted ``trigger_condition`` key
 MUST NOT be declared); effect values follow the 0.x additive contract
 (``effect_value = x`` means ``x(1+x)`` on the effect base).
 
+Enemy/world-boss fixed roster (Trellis 10-10-pve-enemy-catalog-runtime) is a
+SEPARATE domain with governance gating and is NOT synced by a bare run:
+
+- ``--enemies-preview-out PATH``: render enemies.csv + world_bosses.csv into a
+  schema-v2 combat-profile document at PATH (memory/tmp use; e.g. tests). Draft
+  rows are allowed here; the render carries ``source.mode="preview"`` and
+  ``approval=null`` — preview can never carry or forge formal approval state.
+- ``--approval-manifest PATH``: formal write. Requires every non-guardian row
+  ``status=final``, narrative decisions approved per dataset, CSV SHA-256 and
+  column scope matching the manifest, else the whole run aborts WITHOUT
+  touching config/enemies.json (fail closed). Legacy sections
+  (enemy_groups/drop_tables/naming) pass through from the existing config.
+
 Usage:
-    uv run python scripts/sync_content_to_config.py [--dry-run]
+    uv run python scripts/sync_content_to_config.py [--dry-run] \
+        [--enemies-preview-out PATH | --approval-manifest PATH]
 
 Returns:
     Exit code 0 on success (or successful dry-run), 1 on contract errors or
@@ -40,6 +54,7 @@ Returns:
 
 import argparse
 import csv
+import importlib.util
 import json
 import subprocess
 import sys
@@ -111,15 +126,161 @@ def _num(text: str):
         return float(text)
 
 
-def _load_rows(filename: str) -> tuple[list[dict], list[dict]]:
+def _load_rows(
+    filename: str, base_dir: Path | None = None
+) -> tuple[list[dict], list[dict]]:
     """Load a design CSV, splitting (syncable draft/final rows, skipped legacy rows)."""
-    with (DESIGN_DIR / filename).open(encoding="utf-8") as f:
+    with ((base_dir or DESIGN_DIR) / filename).open(encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     active = [r for r in rows if (r.get("status") or "").strip() in ("draft", "final")]
     skipped = [
         r for r in rows if (r.get("status") or "").strip() not in ("draft", "final")
     ]
     return active, skipped
+
+
+_ENEMY_SCHEMA_MOD = None
+
+
+def _load_enemy_schema():
+    """Load core/enemy_schema.py by file spec (its parent package pulls astrbot).
+
+    Returns:
+        The schema module object (cached across calls).
+    """
+    global _ENEMY_SCHEMA_MOD
+    if _ENEMY_SCHEMA_MOD is None:
+        path = PLUGIN_ROOT / "core" / "enemy_schema.py"
+        spec = importlib.util.spec_from_file_location("sync_enemy_schema", path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        _ENEMY_SCHEMA_MOD = mod
+    return _ENEMY_SCHEMA_MOD
+
+
+def render_enemy_document(
+    design_dir: Path,
+    *,
+    manifest: dict | None,
+    manifest_path: Path | None,
+    existing_config: dict | None,
+) -> tuple[dict, list[str]]:
+    """Render the fixed-roster enemies/world-boss document from design CSVs.
+
+    Two modes (Child B R1/AC1): ``manifest=None`` is preview rendering — draft
+    rows allowed, ``source.approval`` stays None; formal rendering runs the
+    fail-closed approval gate and passes the legacy specialist sections
+    through from ``existing_config``.
+
+    Args:
+        design_dir: directory holding enemies.csv / world_bosses.csv.
+        manifest: parsed approval manifest (formal mode only).
+        manifest_path: manifest file location for the audit block.
+        existing_config: current config/enemies.json (formal passthrough).
+
+    Returns:
+        ``(document, errors)``; document is ``{}`` when errors are present.
+    """
+    schema = _load_enemy_schema()
+    errors: list[str] = []
+    roster_csv = design_dir / schema.ROSTER_CSV
+    boss_csv = design_dir / schema.WORLD_BOSS_CSV
+    try:
+        csv_hashes = {
+            schema.ROSTER_CSV: schema.sha256_file(roster_csv),
+            schema.WORLD_BOSS_CSV: schema.sha256_file(boss_csv),
+        }
+    except OSError as exc:
+        return {}, [f"敌人 CSV 源读取失败: {exc}"]
+
+    roster_rows, _ = _load_rows(schema.ROSTER_CSV, base_dir=design_dir)
+    boss_rows, _ = _load_rows(schema.WORLD_BOSS_CSV, base_dir=design_dir)
+
+    entries: list[dict] = []
+    for row in roster_rows:
+        ctx = f"{schema.ROSTER_CSV}[{(row.get('id') or '?').strip()}]"
+        entry = schema.build_enemy_profile(row, ctx, errors)
+        if entry is not None:
+            entries.append(entry)
+    bosses: list[dict] = []
+    for row in boss_rows:
+        ctx = f"{schema.WORLD_BOSS_CSV}[{(row.get('id') or '?').strip()}]"
+        entry = schema.build_world_boss_profile(row, ctx, errors)
+        if entry is not None:
+            bosses.append(entry)
+
+    # Stable ids must be unique across the whole roster (catalog index key).
+    for label, items in (("enemies", entries), ("world_bosses", bosses)):
+        seen: set[str] = set()
+        for item in items:
+            if item["id"] in seen:
+                errors.append(f"{label}: duplicate id {item['id']!r}")
+            seen.add(item["id"])
+
+    if not entries:
+        errors.append("enemies: 无名册条目可渲染（空导入会清空正式配置，拒绝）")
+    if not bosses:
+        errors.append("world_bosses: 无世界 Boss 档案可渲染（空导入拒绝）")
+
+    # 守护者行是专项组配置（动态匹配），不进名册 sections；审批闸门口径
+    # 只覆盖实际写入的行，draft 守护行不阻塞 Batch 5 正式同步。
+    gate_roster = [r for r in roster_rows if (r.get("tier") or "") != "guardian"]
+
+    doc: dict[str, Any] = {
+        "schema_version": schema.SCHEMA_VERSION,
+        "profile_version": schema.PROFILE_VERSION,
+        "generator": schema.GENERATOR,
+        "source": {
+            "mode": "preview" if manifest is None else "formal",
+            "approval": None
+            if manifest is None
+            else {
+                "manifest_path": str(manifest_path) if manifest_path else "",
+                "manifest_sha256": (
+                    schema.sha256_file(manifest_path) if manifest_path else None
+                ),
+                "datasets": manifest.get("datasets", {}),
+            },
+            schema.ROSTER_CSV: {
+                "path": f"design_docs/content-design/{schema.ROSTER_CSV}",
+                "sha256": csv_hashes[schema.ROSTER_CSV],
+                "rows": len(entries),
+            },
+            schema.WORLD_BOSS_CSV: {
+                "path": f"design_docs/content-design/{schema.WORLD_BOSS_CSV}",
+                "sha256": csv_hashes[schema.WORLD_BOSS_CSV],
+                "rows": len(bosses),
+            },
+        },
+        "enemies": sorted(entries, key=lambda e: e["id"]),
+        "world_bosses": sorted(bosses, key=lambda b: b["id"]),
+    }
+
+    if manifest is not None:
+        errors.extend(
+            schema.check_approval(
+                manifest,
+                csv_hashes,
+                {schema.ROSTER_CSV: gate_roster, schema.WORLD_BOSS_CSV: boss_rows},
+                require_final=True,
+            )
+        )
+        if existing_config is None:
+            errors.append("正式写入需要现有 config/enemies.json 作为专项组透传源")
+        else:
+            # 守护者/掉落/命名沿用现有配置段直到 Batch 5 切流（R4：专项组
+            # 不退化；drop_tables 有 adventure_manager 消费者）。
+            for key in ("enemy_groups", "drop_tables", "naming"):
+                if key in existing_config:
+                    doc[key] = existing_config[key]
+
+    if errors:
+        return {}, errors
+    errors.extend(schema.validate_enemy_document(doc))
+    if errors:
+        return {}, errors
+    return doc, []
 
 
 def _validate_trigger_skills(raw_json: str, ctx: str, errors: list[str]) -> list[dict]:
@@ -600,7 +761,54 @@ def main() -> int:
         action="store_true",
         help="print the merge summary without writing files",
     )
+    parser.add_argument(
+        "--enemies-preview-out",
+        metavar="PATH",
+        help="render enemies/world-boss schema-v2 preview document to PATH "
+        "(draft rows allowed; never touches config/)",
+    )
+    parser.add_argument(
+        "--approval-manifest",
+        metavar="PATH",
+        help="approval manifest JSON required for the FORMAL enemy-domain "
+        "write; without it the enemy domain is skipped entirely",
+    )
     args = parser.parse_args()
+
+    if args.enemies_preview_out:
+        if args.approval_manifest:
+            print(
+                "Contract errors, nothing was written:\n"
+                "  ERROR preview 模式不得携带 --approval-manifest"
+                "（preview 不得接受或伪造正式批准状态）"
+            )
+            return 1
+        doc, preview_errors = render_enemy_document(
+            DESIGN_DIR,
+            manifest=None,
+            manifest_path=None,
+            existing_config=None,
+        )
+        if preview_errors:
+            print("Contract errors, nothing was written:")
+            for e in preview_errors:
+                print(f"  ERROR {e}")
+            return 1
+        out = Path(args.enemies_preview_out)
+        if args.dry_run:
+            print(f"Dry run: preview would be written to {out} (no files written).")
+            return 0
+        out.parent.mkdir(parents=True, exist_ok=True)
+        tmp = out.with_suffix(out.suffix + ".tmp")
+        tmp.write_text(
+            json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        tmp.replace(out)
+        print(
+            f"Preview rendered {len(doc['enemies'])} roster + "
+            f"{len(doc['world_bosses'])} world-boss profiles -> {out}"
+        )
+        return 0
 
     errors: list[str] = []
     weapon_rows, weapon_skipped = _load_rows("weapons.csv")
@@ -625,6 +833,29 @@ def main() -> int:
             if item["name"] in seen:
                 errors.append(f"{label}: duplicate name {item['name']!r} in CSV")
             seen.add(item["name"])
+
+    enemies_doc: dict | None = None
+    enemies_cfg_path = CONFIG_DIR / "enemies.json"
+    if args.approval_manifest:
+        manifest_path = Path(args.approval_manifest)
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"approval manifest 读取失败: {exc}")
+            manifest = None
+        existing: dict | None
+        try:
+            existing = json.loads(enemies_cfg_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"现有 config/enemies.json 读取失败: {exc}")
+            existing = None
+        enemies_doc, enemy_errors = render_enemy_document(
+            DESIGN_DIR,
+            manifest=manifest,
+            manifest_path=manifest_path,
+            existing_config=existing,
+        )
+        errors.extend(enemy_errors)
 
     if errors:
         print("Contract errors, nothing was written:")
@@ -770,21 +1001,27 @@ def main() -> int:
 
     # Atomic per-file writes: serialize to a sibling temp file, then replace,
     # so a crash mid-write cannot leave a truncated config (review m5).
-    for path, cfg in (
+    write_pairs = [
         (weapons_cfg_path, weapons_cfg),
         (hearts_cfg_path, hearts_cfg),
         (skills_cfg_path, skills_cfg),
         (items_cfg_path, items_cfg),
-    ):
+    ]
+    if enemies_doc is not None:
+        write_pairs.append((enemies_cfg_path, enemies_doc))
+    else:
+        print(
+            "enemy/world-boss domain: SKIPPED (无 --approval-manifest；"
+            "固定名册正式写入在 Batch 5 内容批准后执行)"
+        )
+    for path, cfg in write_pairs:
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(
             json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
         tmp.replace(path)
-    print(
-        f"\nWrote {weapons_cfg_path}, {hearts_cfg_path}, {skills_cfg_path} "
-        f"and {items_cfg_path}."
-    )
+    wrote = [str(p) for p, _ in write_pairs]
+    print("\nWrote " + ", ".join(wrote) + ".")
     return 0
 
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -62,6 +62,16 @@ class Enemy:
     armor_value: int
     exp: int
     crit_rate: int = 0
+    # 统一战斗档案字段（Trellis 10-10-pve-enemy-catalog-runtime R3）：
+    # 固定名册/专项组共用同一个 Fighter mapper 的输入。0/空 = 来源未知，
+    # mapper 回退旧口径（level_index=1、crit 默认 0.15），保证未切流的
+    # 动态路径逐点兼容。
+    profile_id: str = ""
+    level_index: int = 0
+    affix: str = ""
+    boss_skill: str = ""
+    trigger_skills: list[dict] = field(default_factory=list)
+    ultimates: list[dict] = field(default_factory=list)
     # Legacy fields kept for compatibility with old callers/tests
     mp: int = 0
     max_mp: int = 0
@@ -120,7 +130,6 @@ class EnemyManager:
         """
         self.config_manager: ConfigManager | None = config_manager
         self.enemy_groups: list[dict] = []
-        self.difficulty_coefficients: dict = {}
         self.naming: dict = {}
         self.level_config: list = []
         self.reload_config(level_config)
@@ -148,9 +157,9 @@ class EnemyManager:
         # 传承守护组不再单独存顶层键：组本身就放在 enemy_groups 列表内
         # （由 get_guardian_group_key 指定的 key 标识，不带 level_range，
         # 只能经 spawn_enemy_from_group 定向触达，避免被普通战斗匹配）
-        self.difficulty_coefficients = config.get(
-            "difficulty_coefficients", self.DEFAULT_CONFIG["difficulty_coefficients"]
-        )
+        # difficulty_coefficients 死配置已删除（pve-enemy-design Step3 定案：
+        # 加载即弃、无消费者；生效难度旋钮唯一 = game_config pve.
+        # difficulty_multiplier，只乘伤害）
         self.naming = config.get("naming", self.DEFAULT_CONFIG["naming"])
 
         if level_config is not None:
@@ -207,6 +216,19 @@ class EnemyManager:
             if group.get("level_range"):
                 return group
         return self.enemy_groups[-1] if self.enemy_groups else {}
+
+    def _actual_level(self, level_idx: int) -> int:
+        """``level_config`` 下标 -> 实际 1-based 等级（FighterState.level_index）。
+
+        护甲减伤公式 K=100+10×防守方等级读的就是实际等级；旧实现漏传导致
+        敌人恒按 1 级吃减伤（调研 current-system-evidence 陷阱 #3/#5）。
+        配置条目缺 ``level`` 键时回退 idx+1（0-based 下标语义）。
+        """
+        if 0 <= level_idx < len(self.level_config):
+            entry = self.level_config[level_idx]
+            if isinstance(entry, dict):
+                return int(entry.get("level", level_idx + 1))
+        return level_idx + 1
 
     def _global_difficulty_multiplier(self) -> float:
         """读取 game_config 中的 PvE 全局难度系数。"""
@@ -302,7 +324,9 @@ class EnemyManager:
         生成一个敌人。
 
         敌人的四主属性基于对应境界的基准区间，再乘以模板倍率、类别倍率
-        和全局 PvE 难度系数生成；不再使用旧的 base_exp 派生 hp/atk。
+        生成；全局 PvE 难度系数（``pve.difficulty_multiplier``）**只乘伤害**。
+        本动态派生路径为固定名册（``managers/enemy_catalog.py``）正式启用前
+        的临时入口，Batch 5 切流后退役，不再被新调用方使用。
 
         Args:
             player_level: 玩家等级，用于选择敌人分组
@@ -359,15 +383,15 @@ class EnemyManager:
             base_speed = max(1, base_damage // 2)
 
         damage = int(self._randomize_base_value(base_damage) * atk_mult)
-        hp = int(self._randomize_base_value(base_hp) * hp_mult)
+        # max(1,…) 仅是原难度块里的既有下限保护，与难度无关，留在属性处
+        hp = max(1, int(self._randomize_base_value(base_hp) * hp_mult))
         agility = self._randomize_base_value(base_agility)
         speed = self._randomize_base_value(base_speed)
 
-        # 应用全局 PvE 难度系数
+        # 全局难度旋钮唯一生效面 = 伤害（hp/护甲保留设计基准面板；设计定案
+        # pve-enemy-design.md Step3，Child B R2/AC4——难度回归只允许伤害变化）
         difficulty_multiplier = self._global_difficulty_multiplier()
         damage = max(1, int(damage * difficulty_multiplier))
-        hp = max(1, int(hp * difficulty_multiplier))
-        armor_value = max(0, int(armor_value * difficulty_multiplier))
 
         # 修为奖励仍按敌人等级锚定
         exp_reward = self._get_level_base(enemy_level, "exp_needed")
@@ -394,6 +418,7 @@ class EnemyManager:
         return Enemy(
             user_id=f"enemy_{template.get('key', 'unknown')}_{suffix}_{random_token}",
             name=name,
+            level_index=self._actual_level(enemy_level),
             hp=hp,
             max_hp=hp,
             damage=damage,
@@ -468,14 +493,14 @@ class EnemyManager:
             base_speed = max(1, base_damage // 2)
 
         damage = int(self._randomize_base_value(base_damage) * atk_mult)
-        hp = int(self._randomize_base_value(base_hp) * hp_mult)
+        # max(1,…) 仅是原难度块里的既有下限保护，与难度无关，留在属性处
+        hp = max(1, int(self._randomize_base_value(base_hp) * hp_mult))
         agility = self._randomize_base_value(base_agility)
         speed = self._randomize_base_value(base_speed)
 
+        # 同 spawn_enemy：全局难度只乘伤害（R2 单点生效面）
         difficulty_multiplier = self._global_difficulty_multiplier()
         damage = max(1, int(damage * difficulty_multiplier))
-        hp = max(1, int(hp * difficulty_multiplier))
-        armor_value = max(0, int(armor_value * difficulty_multiplier))
 
         exp_reward = self._get_level_base(enemy_level, "exp_needed")
 
@@ -484,9 +509,21 @@ class EnemyManager:
         EnemyManager._spawn_counter += 1
         suffix = EnemyManager._spawn_counter
         random_token = f"{random.getrandbits(16):04x}"
+        # 定向组统一档案：稳定 profile_id=模板 key，模板若配技能/绝招随
+        # 统一 mapper 进战斗（当前 legacy_guardian 无技能，行为不变；R4）
         return Enemy(
             user_id=f"guardian_{template.get('key', 'unknown')}_{suffix}_{random_token}",
             name=name,
+            level_index=self._actual_level(enemy_level),
+            profile_id=template.get("key", "unknown"),
+            trigger_skills=[
+                dict(sk)
+                for sk in template.get("trigger_skills", [])
+                if isinstance(sk, dict)
+            ],
+            ultimates=[
+                dict(u) for u in template.get("ultimates", []) if isinstance(u, dict)
+            ],
             hp=hp,
             max_hp=hp,
             damage=damage,

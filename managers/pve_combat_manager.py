@@ -24,10 +24,14 @@ def _load_module(name, rel_path):
 
 try:
     from ..managers.combat_manager import CombatEngine, CombatManager, FighterState
+    from ..managers.enemy_catalog import build_enemy_fighter
     from ..managers.enemy_manager import Enemy, EnemyManager
     from ..models import Player
 except ImportError:
     # Standalone execution (for testing)
+    _ec = _load_module("pve_combat_manager_enemy_catalog", "managers/enemy_catalog.py")
+    build_enemy_fighter = _ec.build_enemy_fighter
+
     _cm = _load_module("pve_combat_manager_combat", "managers/combat_manager.py")
     CombatEngine = _cm.CombatEngine
     CombatManager = _cm.CombatManager
@@ -191,21 +195,13 @@ class PVECombatManager:
         return "normal"
 
     def _build_enemy_fighter(self, enemy: Enemy) -> FighterState:
-        """Build a FighterState directly from an Enemy object."""
-        return FighterState(
-            user_id=enemy.user_id,
-            name=enemy.name,
-            hp=enemy.hp,
-            max_hp=enemy.max_hp,
-            damage=enemy.damage,
-            agility=enemy.agility,
-            speed=enemy.speed,
-            armor_value=enemy.armor_value,
-            # PvE 敌人护甲语义等同天生护甲，全额参与格挡（design D2）；
-            # getattr 回退兑现「敌可携 block_armor_value 覆盖」的契约，当前
-            # Enemy 无此属性 → 回退合并护甲，行为逐点不变。
-            block_armor_value=getattr(enemy, "block_armor_value", enemy.armor_value),
-        )
+        """Build a FighterState via the single fixed-roster mapper (Child B R3).
+
+        映射逻辑收敛到 ``managers/enemy_catalog.build_enemy_fighter``：名册、
+        动态临时路径、秘境兽/传承守护共用同一个 Enemy→Fighter 口径
+        （level_index/暴击/技能不再丢失；旧 Enemy 实例字段缺省时逐点兼容）。
+        """
+        return build_enemy_fighter(enemy)
 
     def _calculate_rewards(
         self, result: dict, base_rewards: dict, enemy: Enemy

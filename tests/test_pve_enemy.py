@@ -148,11 +148,6 @@ SAMPLE_ENEMIES_CONFIG = {
             "drop_tier": "top",
         },
     ],
-    "difficulty_coefficients": {
-        "normal": 0.85,
-        "elite": 1.0,
-        "boss": 1.2,
-    },
     "naming": {
         "normal": "{name}",
         "elite": "{prefix}{name}",
