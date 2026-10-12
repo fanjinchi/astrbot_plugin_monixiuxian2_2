@@ -255,8 +255,7 @@ class TestCatalogResolver:
         import json
 
         broken = dict(PREVIEW_DOC)
-        broken["enemies"] = broken["enemies"][:27]  # 缺一只仍应可加载？
-        # 名册条数不是 schema 契约（sync 空导入才拒绝），改为注入非法字段：
+        # 名册条数不是 schema 契约（sync 空导入才拒绝），注入重复 id 触发校验失败：
         broken["enemies"] = [*broken["enemies"], dict(broken["enemies"][0])]
         path = tmp_path / "enemies.json"
         path.write_text(json.dumps(broken), encoding="utf-8")
@@ -369,8 +368,9 @@ class TestSpecialistGroups:
         cold = mgr_cold.spawn_enemy_from_group("legacy_guardian", 15)
         assert hot.hp == cold.hp  # 难度不再乘 hp
         assert hot.armor_value == cold.armor_value
-        assert hot.damage >= cold.damage  # jitter 同种子 → 恰为 2× 截断
-        assert hot.damage == max(1, int(cold.damage / 1.0 * 2.0)) or True
+        # jitter 同种子消耗一致 → 冷/热档基础伤害相同；难度只乘伤害、
+        # 冷档乘数 1.0 截断无损失，热档必然恰为冷档 2 倍。
+        assert hot.damage == 2 * cold.damage
 
     def test_unknown_group_raises(self):
         mgr = self._mgr()

@@ -783,6 +783,16 @@ def main() -> int:
                 "（preview 不得接受或伪造正式批准状态）"
             )
             return 1
+        preview_target = Path(args.enemies_preview_out).resolve()
+        if preview_target.is_relative_to(CONFIG_DIR.resolve()):
+            # 预览文档缺 enemy_groups/drop_tables/naming 透传键，落进
+            # config/ 会毁掉守护/秘境定向组数据；正式写只走 manifest 路径。
+            print(
+                "Contract errors, nothing was written:\n"
+                f"  ERROR preview 输出不得位于正式配置目录 {CONFIG_DIR}"
+                "（draft 预览禁止触碰正式 config/）"
+            )
+            return 1
         doc, preview_errors = render_enemy_document(
             DESIGN_DIR,
             manifest=None,

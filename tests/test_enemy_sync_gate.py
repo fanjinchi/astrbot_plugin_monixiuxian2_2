@@ -10,6 +10,8 @@
 """
 
 import csv
+import subprocess
+import sys
 from pathlib import Path
 
 from tests.helpers import PLUGIN_ROOT, load_module
@@ -69,6 +71,33 @@ def _render(design_dir, manifest=None, existing=None):
 
 
 # ────────────────────────────── preview：真实 CSV 全量渲染 ──────────────────
+
+
+class TestCliPreviewGuard:
+    """`--enemies-preview-out` CLI 守卫：禁止写正式 config/ 目录。"""
+
+    _SCRIPT = PLUGIN_ROOT / "scripts" / "sync_content_to_config.py"
+
+    def _run(self, out_path: Path):
+        return subprocess.run(
+            [sys.executable, str(self._SCRIPT), "--enemies-preview-out", str(out_path)],
+            capture_output=True,
+            text=True,
+        )
+
+    def test_preview_out_rejects_config_dir(self):
+        target = PLUGIN_ROOT / "config" / "enemies.json"
+        before = target.read_bytes()
+        proc = self._run(target)
+        assert proc.returncode != 0
+        assert "preview" in proc.stdout or "preview" in proc.stderr
+        assert target.read_bytes() == before  # 正式文件未被触碰
+
+    def test_preview_out_allows_tmp_path(self, tmp_path):
+        out = tmp_path / "preview.json"
+        proc = self._run(out)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert out.exists()
 
 
 class TestPreviewRendering:

@@ -1,24 +1,26 @@
 # managers/enemy_catalog.py
-"""固定敌人名册运行时：不可变 catalog、段位 resolver 与统一 Fighter 映射。
+"""Fixed enemy-roster runtime: immutable catalog, segment resolver, one mapper.
 
-Trellis 10-10-pve-enemy-catalog-runtime（Child B）交付物之一：
-28 只名册敌人 + 4 只世界 Boss 的 combat profile 由
-``scripts/sync_content_to_config.py`` 从 design_docs 名册 CSV 渲染进
-``config/enemies.json``（schema_version=2），本模块负责加载、校验、索引与
-到 ``FighterState`` 的唯一映射。名册数值是设计段位绝对面板——无
-exp_needed 派生、无随机等级、无类别倍率、无 ±10% 抖动（R2/AC2）；
-``pve.difficulty_multiplier`` 只在 ``spawn_enemy`` 单点乘伤害。
+Trellis 10-10-pve-enemy-catalog-runtime (Child B) deliverable: the 28 roster
+enemies and 4 world bosses get their combat profiles rendered from the
+design_docs roster CSVs into ``config/enemies.json`` (schema_version=2) by
+``scripts/sync_content_to_config.py``; this module loads, validates, indexes
+and maps them to ``FighterState`` through the single mapper below. Roster
+numbers are absolute per-segment design panels — no exp_needed derivation, no
+random level, no category multipliers, no ±10% jitter (R2/AC2); the
+``pve.difficulty_multiplier`` knob multiplies damage only, at one place in
+``spawn_enemy``.
 
-Child B 不切调用方：本模块不写库、不发奖、不接冒险/秘境生命周期
-（Batch 5 切流、Child C/D 接管）。世界 Boss 仅提供不可变 profile 与
-copy-to-snapshot 输入，实例化/消散属 Child D。
+Child B wires no callers: this module never writes the DB, grants rewards or
+touches adventure/rift lifecycles (Batch 5 cutover, Child C/D own those).
+World bosses are immutable profiles / copy-to-snapshot inputs only;
+instance lifecycle and dissipation belong to Child D.
 """
 
 from __future__ import annotations
 
 import json
 import random
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -31,7 +33,7 @@ except ImportError:  # 独立测试环境无 astrbot
     logger = logging.getLogger("enemy_catalog")
 
 try:
-    from ..core.enemy_schema import SCHEMA_VERSION, validate_enemy_document
+    from ..core.enemy_schema import validate_enemy_document
     from .combat_manager import FighterState
     from .enemy_manager import Enemy
 except ImportError:
@@ -52,7 +54,6 @@ except ImportError:
         return mod
 
     _schema = _standalone("enemy_catalog_schema", "core/enemy_schema.py")
-    SCHEMA_VERSION = _schema.SCHEMA_VERSION
     validate_enemy_document = _schema.validate_enemy_document
     _cm = _standalone("enemy_catalog_combat", "managers/combat_manager.py")
     FighterState = _cm.FighterState
@@ -70,32 +71,32 @@ __all__ = [
 
 
 class EnemyCatalogError(ValueError):
-    """固定名册 catalog 拒绝加载/解析时的 fail-closed 错误。"""
+    """Fail-closed error: the fixed roster document is rejected."""
 
 
 @dataclass(frozen=True)
 class EnemyCombatProfile:
-    """单只名册敌人的不可变战斗档案（schema PROFILE_VERSION=1 字段集）。
+    """Immutable combat profile of one roster enemy (PROFILE_VERSION=1 shape).
 
     Attributes:
-        id: 名册稳定 id（enemies.csv ``id`` 列）。
-        name: 完整显示名（精英含词缀前缀，CSV 已烘焙）。
-        segment: 境界段（练气/筑基/金丹/元婴）。
-        category: 档位（normal/elite/boss）。
-        archetype: 原型标签（均衡/坚壳/猛击/迅捷，仅溯源展示）。
-        level_index: 设计等级（1-based，进 FighterState.level_index）。
-        level_range: 服务等级闭区间 (low, high)，1-based。
-        hp: 气血绝对值。
-        damage: 伤害绝对值。
-        agility: 身法绝对值。
-        speed: 迅捷绝对值。
-        armor_value: 护甲绝对值。
-        crit_rate: 暴击率（百分数原值；0 表示用引擎基础暴击率）。
-        affix: 精英词缀名（否则空串）。
-        boss_skill: Boss 机制名（否则空串）。
-        trigger_skills: 触发技 dict 元组（sync 物化产物）。
-        ultimates: 绝招 dict 元组。
-        exp: 修为奖励占位（Step 7 奖励经济接管前恒 0）。
+        id: stable roster id (enemies.csv ``id`` column).
+        name: full display name (elites carry the affix prefix, baked in CSV).
+        segment: realm segment label (练气/筑基/金丹/元婴).
+        category: tier ("normal" / "elite" / "boss").
+        archetype: archetype tag (均衡/坚壳/猛击/迅捷; provenance display only).
+        level_index: designed level (1-based; fed into FighterState.level_index).
+        level_range: inclusive served level band (low, high), 1-based.
+        hp: absolute health panel value.
+        damage: absolute damage panel value.
+        agility: absolute agility panel value.
+        speed: absolute speed panel value.
+        armor_value: absolute armor panel value.
+        crit_rate: raw percent value (0 means "use the engine base crit rate").
+        affix: elite affix name, else empty string.
+        boss_skill: boss mechanic name, else empty string.
+        trigger_skills: materialized trigger-skill dicts (sync output).
+        ultimates: materialized ultimate dicts.
+        exp: reward placeholder (always 0 until Step 7 economy takes over).
     """
 
     id: str
@@ -155,20 +156,23 @@ class EnemyCombatProfile:
 
 @dataclass(frozen=True)
 class WorldBossProfile:
-    """单只世界 Boss 的不可变战斗+元数据档案（Child D 只做输入，不做实例）。
+    """Immutable combat + metadata profile of one world boss.
+
+    Child D consumes it as snapshot input only; nothing here instantiates or
+    schedules instances.
 
     Attributes:
         id / name / segment / level_index / hp / damage / agility / speed /
-        armor_value / crit_rate: 同 :class:`EnemyCombatProfile` 语义。
-        signature_skill: 招牌技显示名（world_bosses.csv）。
-        skill_key: 招牌技机制 key（连咬/反震/灼烧/绞杀）。
-        trigger_skills / ultimates: 物化技能元组。
-        phase_thresholds: (P2, P3) HP 占比降序阈值。
-        phase2_damage_multiplier: P2 伤害倍率。
-        phase3_damage_multiplier: P3 伤害倍率。
-        phase3_armor_multiplier: P3 护甲倍率。
+        armor_value / crit_rate: same semantics as :class:`EnemyCombatProfile`.
+        signature_skill: signature-skill display name (world_bosses.csv).
+        skill_key: signature-skill mechanic key (连咬/反震/灼烧/绞杀).
+        trigger_skills / ultimates: materialized skill dict tuples.
+        phase_thresholds: (P2, P3) remaining-HP thresholds, descending.
+        phase2_damage_multiplier: P2 damage multiplier.
+        phase3_damage_multiplier: P3 damage multiplier.
+        phase3_armor_multiplier: P3 armor multiplier.
         lifetime_h / daily_attempts / respawn_after_kill_h /
-        respawn_after_dissipate_h: 刷新/消散元数据（小时/次数）。
+        respawn_after_dissipate_h: spawn/dissipation metadata (hours/attempts).
     """
 
     id: str
@@ -246,9 +250,10 @@ def profile_to_enemy(
 ) -> Enemy:
     """Instantiate one immutable combat profile into a battle-carrier ``Enemy``.
 
-    绝对面板原样拷贝；``difficulty_multiplier`` **只乘伤害**（R2；与旧
-    spawn_enemy 同用 int 截断口径）。技能元组逐字段 deepcopy 成列表，
-    catalog 的不可变档案永不被战斗侧写脏。
+    Absolute panel values are copied verbatim; ``difficulty_multiplier``
+    multiplies **damage only** (R2; same int-truncation convention as the old
+    ``spawn_enemy``). Skill tuples are copied dict-by-dict into lists so the
+    immutable catalog profile can never be dirtied by battle-side writes.
 
     Args:
         profile: roster or world-boss combat profile.
@@ -291,19 +296,23 @@ def profile_to_enemy(
 
 
 def build_enemy_fighter(enemy: Enemy) -> FighterState:
-    """Enemy → FighterState 的唯一映射（名册/动态/专项组共用，R3）。
+    """The single Enemy → FighterState mapper (roster/dynamic/group shared, R3).
 
-    映射口径与验收门 design_docs/content-design/sim_pve_acceptance.py
-    ``build_monster`` 逐字段一致：
+    Field-for-field aligned with the acceptance-gate
+    design_docs/content-design/sim_pve_acceptance.py ``build_monster``:
 
-    - 妖兽空手：``weapon_k=0.5``、``base_damage=5``（附录 C.4；与引擎
-      缺省回退数值相同，显式写入保证字段级一致）。
-    - ``block_armor_value`` 等同天生护甲全额进格挡（design D2）。
-    - ``level_index`` 透传（修坑 #5：护甲减伤 K=100+10×守方等级不再
-      恒按 1 计）；未携带（旧 Enemy 实例，0）保持引擎默认 1，行为逐点不变。
-    - ``crit_rate`` >0 时按百分数 /100 覆盖引擎基础暴击率（Step3 定案，
-      修坑 #3）；0/缺省保持默认。
-    - trigger_skills/ultimates 原样传入（修坑：Boss 机制此前不进战斗）。
+    - beast unarmed: ``weapon_k=0.5``, ``base_damage=5`` (附录 C.4; numerically
+      identical to the engine's fallback, written explicitly for field-level
+      equality).
+    - ``block_armor_value`` equals innate armor, fully counted in block
+      (design D2).
+    - ``level_index`` passes through (pit #5 fixed: armor mitigation
+      K=100+10×defender level no longer stuck at 1); carriers without it
+      (old Enemy instances, 0) keep the engine default 1 — point-compatible.
+    - ``crit_rate`` > 0 overrides the engine base crit as percent/100 (Step 3
+      decision, pit #3); 0/absent keeps the default.
+    - trigger_skills/ultimates pass through verbatim (pit fixed: boss
+      mechanics previously never reached the battle).
 
     Args:
         enemy: any enemy carrier (roster-spawned or legacy dynamic).
@@ -343,14 +352,16 @@ def build_enemy_fighter(enemy: Enemy) -> FighterState:
 
 
 class EnemyCatalog:
-    """固定名册不可变 catalog：(境界段, 档位) 索引 + 段位 resolver。
+    """Immutable fixed-roster catalog: (segment, category) index + resolver.
 
-    加载即全量校验（:func:`core.enemy_schema.validate_enemy_document`），
-    任何契约错误 fail-closed 抛 :class:`EnemyCatalogError`——运行时永远
-    不会消费半旧半新的混合格式。
+    Construction validates the whole document
+    (:func:`core.enemy_schema.validate_enemy_document`); any contract error
+    fails closed with :class:`EnemyCatalogError` — the runtime can never
+    consume a half-old/half-new mixed format.
 
     Attributes:
-        meta: 文档审计头（schema/profile 版本、来源 CSV hash 等）。
+        meta: document audit header (schema/profile versions, source CSV
+            hashes etc.).
     """
 
     def __init__(self, doc: dict, source: str = ""):
@@ -407,14 +418,15 @@ class EnemyCatalog:
         """Load and validate a v2 roster document from disk.
 
         Args:
-            path: config/enemies.json（或测试临时 preview）路径。
+            path: config/enemies.json (or a test tmp preview) path.
 
         Returns:
             Ready immutable catalog.
 
         Raises:
-            EnemyCatalogError: file unreadable or contract-invalid（含
-                v1 旧格式——需经 sync 重新生成，Batch 5 切流）。
+            EnemyCatalogError: file unreadable or contract-invalid (v1
+                legacy files included — they must be re-rendered by sync,
+                Batch 5 cutover).
         """
         try:
             doc = cls.read_document(path)
@@ -441,10 +453,6 @@ class EnemyCatalog:
         if not isinstance(doc, dict):
             raise EnemyCatalogError("敌人名册配置必须是 JSON 对象")
         return doc
-
-    def is_fixed_roster(self) -> bool:
-        """Return True when the document carries the v2 fixed-roster schema."""
-        return self.meta.get("schema_version") == SCHEMA_VERSION
 
     # ---------------------------------------------------------------- queries
 
@@ -497,7 +505,8 @@ class EnemyCatalog:
     def segment_for_level(self, player_level: int) -> str:
         """Map a player level to its serving roster segment.
 
-        区间外侧夹取（低→首段，高→末段），与旧动态分组越界回退语义一致。
+        Levels outside all bands clamp to the first/last band, matching the
+        old dynamic path's "fall back to the highest range group" semantics.
 
         Args:
             player_level: player's level_index (1-based).
@@ -529,21 +538,23 @@ class EnemyCatalog:
     ) -> Enemy:
         """Instantiate one roster enemy for the encounter request.
 
-        与旧 ``EnemyManager.spawn_enemy`` 同名同参，便于 Batch 5 切流；
-        差异即本 child 的存在意义：面板取设计段位绝对值，无随机等级/
-        类别倍率/±10% 抖动，难度系数只乘伤害（R2/AC5）。
+        Same name/signature as the old ``EnemyManager.spawn_enemy`` to keep
+        the Batch 5 cutover mechanical; the difference is this child's reason
+        to exist: panels are the designed segment's absolute values — no
+        random level, no category multipliers, no ±10% jitter — and the
+        difficulty multiplier hits damage only (R2/AC5).
 
         Args:
-            player_level: 玩家等级，决定服务段位。
-            category: "normal" / "elite" / "boss"。
-            difficulty_multiplier: game_config ``pve.difficulty_multiplier``。
+            player_level: player level, selects the serving segment.
+            category: "normal" / "elite" / "boss".
+            difficulty_multiplier: game_config ``pve.difficulty_multiplier``.
             rng: injectable randomness source (tests freeze seeds).
 
         Returns:
             Enemy carrier ready for :func:`build_enemy_fighter`.
 
         Raises:
-            EnemyCatalogError: 段位/档位组合在名册中不存在。
+            EnemyCatalogError: the (segment, category) bucket is absent.
         """
         segment = self.segment_for_level(player_level)
         pool = self.profiles_for(segment, category)
@@ -560,15 +571,11 @@ class EnemyCatalog:
         return enemy
 
 
-def load_catalog(
-    path: Path, difficulty_provider: Callable[[], float] | None = None
-) -> EnemyCatalog | None:
+def load_catalog(path: Path) -> EnemyCatalog | None:
     """Best-effort catalog loader for future call-site wiring.
 
     Args:
         path: enemies config path.
-        difficulty_provider: reserved hook for the live multiplier knob
-            (Batch 5 切流时由装配段注入；Child B 不接调用方).
 
     Returns:
         EnemyCatalog when the file holds a valid v2 document, else None

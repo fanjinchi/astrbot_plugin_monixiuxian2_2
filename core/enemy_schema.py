@@ -73,8 +73,8 @@ PHASE_COUNT = 2
 # ------------------------------------------- mechanic materialization maps
 # 权威口径 = pve-enemy-design.md 附录 D.2/D.3 + F（Q3c/Step6 定案数值）。
 # 必须与设计验收门 design_docs/content-design/sim_pve_acceptance.py 的
-# AFFIX_SKILLS/BOSS_MECHANICS 逐字段一致（tests/test_enemy_catalog.py 对照
-# 断言），否则运行时与验收模拟分叉。
+# AFFIX_SKILLS/BOSS_MECHANICS 逐字段一致（tests/test_enemy_catalog_runtime.py
+# TestSimParity 对照断言），否则运行时与验收模拟分叉。
 # 狂暴/坚甲是纯面板词缀（CSV 绝对值已烘焙），不挂触发技；只有嗜血是机制。
 
 AFFIX_TRIGGER_SKILLS: dict[str, list[dict[str, Any]]] = {
@@ -258,6 +258,17 @@ def parse_phase_thresholds(text: str) -> tuple[float, float] | None:
 
 
 def _to_int(value: Any, ctx: str, col: str, errors: list[str]) -> int:
+    """Parse a CSV cell as int, appending an error on failure.
+
+    Args:
+        value: Raw CSV cell.
+        ctx: Row context label used in the error message.
+        col: Column name used in the error message.
+        errors: Shared error sink; appended on parse failure.
+
+    Returns:
+        Parsed int, or -1 sentinel when invalid (error recorded).
+    """
     try:
         return int(str(value).strip())
     except (TypeError, ValueError):
@@ -266,6 +277,17 @@ def _to_int(value: Any, ctx: str, col: str, errors: list[str]) -> int:
 
 
 def _to_float(value: Any, ctx: str, col: str, errors: list[str]) -> float:
+    """Parse a CSV cell as float, appending an error on failure.
+
+    Args:
+        value: Raw CSV cell.
+        ctx: Row context label used in the error message.
+        col: Column name used in the error message.
+        errors: Shared error sink; appended on parse failure.
+
+    Returns:
+        Parsed float, or NaN when invalid (error recorded).
+    """
     try:
         return float(str(value).strip())
     except (TypeError, ValueError):
@@ -554,6 +576,17 @@ _LEGACY_KEYS = {
 
 
 def _check_trigger_skill(skill: dict, ctx: str, errors: list[str]) -> None:
+    """Validate one trigger-skill dict shape, appending errors.
+
+    Only the structural minimum is checked (object with timing/effect/rate
+    keys); engine effect semantics are validated by the effect handler at
+    combat time, and numeric ranges are checked by the callers' builders.
+
+    Args:
+        skill: Candidate trigger skill dict.
+        ctx: Row context label used in error messages.
+        errors: Shared error sink.
+    """
     if not isinstance(skill, dict):
         errors.append(f"{ctx}: trigger skill must be an object")
         return

@@ -664,6 +664,9 @@ ENEMY_CONFIG = {
             "key": "legacy_guardian",
             "name": "传承之地守护",
             "description": "传承获取前置挑战的守护 NPC 组；不带 level_range，只能经 spawn_enemy_from_group 定向触达。",
+            # crit_rate 单位 = 百分整数（与 config/enemies.json 同口径，
+            # Fighter mapper 按 /100 接线，pve-enemy-design Step3 定案）；
+            # 此前写小数 0.05 在接线后会变成 ≈0% 暴击。
             "templates": [
                 {
                     "key": "guardian_low",
@@ -672,7 +675,7 @@ ENEMY_CONFIG = {
                     "hp_mult": 1.0,
                     "atk_mult": 0.9,
                     "defense": 5,
-                    "crit_rate": 0.05,
+                    "crit_rate": 5,
                 },
                 {
                     "key": "guardian_mid",
@@ -681,7 +684,7 @@ ENEMY_CONFIG = {
                     "hp_mult": 1.1,
                     "atk_mult": 1.0,
                     "defense": 10,
-                    "crit_rate": 0.08,
+                    "crit_rate": 8,
                 },
                 {
                     "key": "guardian_high",
@@ -690,7 +693,7 @@ ENEMY_CONFIG = {
                     "hp_mult": 1.2,
                     "atk_mult": 1.1,
                     "defense": 20,
-                    "crit_rate": 0.1,
+                    "crit_rate": 10,
                 },
             ],
         },

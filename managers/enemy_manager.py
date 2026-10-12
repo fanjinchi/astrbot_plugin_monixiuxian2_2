@@ -218,11 +218,13 @@ class EnemyManager:
         return self.enemy_groups[-1] if self.enemy_groups else {}
 
     def _actual_level(self, level_idx: int) -> int:
-        """``level_config`` 下标 -> 实际 1-based 等级（FighterState.level_index）。
+        """Map a ``level_config`` index to the actual 1-based level.
 
-        护甲减伤公式 K=100+10×防守方等级读的就是实际等级；旧实现漏传导致
-        敌人恒按 1 级吃减伤（调研 current-system-evidence 陷阱 #3/#5）。
-        配置条目缺 ``level`` 键时回退 idx+1（0-based 下标语义）。
+        The value fed into ``FighterState.level_index``; armor mitigation
+        (K=100+10×defender level) reads the actual level, and the old code
+        dropped it, so enemies always ate the level-1 mitigation (research
+        current-system-evidence pitfalls #3/#5). Falls back to idx+1 when
+        the config entry has no ``level`` key (0-based index semantics).
         """
         if 0 <= level_idx < len(self.level_config):
             entry = self.level_config[level_idx]
