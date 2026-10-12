@@ -28,7 +28,7 @@ PROVIDER_MODULES = _mod._PROVIDER_MODULES
 # 插件根目录，静态扫描基于它定位 core/managers/handlers 源码
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 
-# 注册表条目 label 锚点（11 条，顺序 = provider 列表序块连续聚合）。
+# 注册表条目 label 锚点（14 条，顺序 = provider 列表序块连续聚合）。
 # 3.1 行序 / 3.2 FIELD_TO_LABEL / 3.3 覆盖域行三处共用，避免未来加域时三处漂移。
 EXPECTED_LABELS: tuple[str, ...] = (
     "历练/秘境/宗门任务计划完成时间",  # 1 user_cd (busy_state)
@@ -39,18 +39,22 @@ EXPECTED_LABELS: tuple[str, ...] = (
     "悬赏放弃冷却",  # 6 bounty_abandon (bounty_manager)
     "贷款到期时间",  # 7 bank_loans (bank_manager)
     "Boss/灵眼下次刷新时间",  # 8 boss (boss_manager)
-    "Boss/灵眼下次刷新时间",  # 9 spirit_eye (spirit_eye_manager)
-    "传承挑战冷却",  # 10 impart_pk
-    "传承被夺保护期",  # 11 impart_snatch
+    "世界Boss实例到期时间",  # 9 world_boss_instances (boss_manager)
+    "世界Boss下次再生时间",  # 10 world_boss_instances (boss_manager)
+    "Boss/灵眼下次刷新时间",  # 11 spirit_eye (spirit_eye_manager)
+    "传承挑战冷却",  # 12 impart_pk
+    "传承被夺保护期",  # 13 impart_snatch
+    "历练路线疲劳到期时间",  # 14 adventure_fatigue (adventure_manager)
 )
 
-# 覆盖域行 = label 去重（11 条目仅 Boss/灵眼同 label 合并 → 10 项；
-# 明细 10 行 = 覆盖域 10 项，见 design.md D4 隐性耦合注记）
+# 覆盖域行 = label 去重（14 条目仅 Boss/灵眼同 label 合并 → 13 项；
+# 明细 13 行 = 覆盖域 13 项，见 design.md D4 隐性耦合注记）
 EXPECTED_COVERED = "、".join(dict.fromkeys(EXPECTED_LABELS))
 
 # field → label 映射（field 契约面 → label 实现面搭桥，抄自
-# openspec/specs/gm-commands/spec.md 「GM 时间快进」覆盖枚举；
-# 域数 = 10，行数 = 11（Boss/灵眼同域拆条共享 label））。
+# openspec/specs/gm-commands/spec.md 「GM 时间快进」覆盖枚举 +
+# Trellis child P design §5 新增两个 PVE 冷却域；
+# 域数 = 13，行数 = 14（Boss/灵眼同域拆条共享 label））。
 # 行序与 EXPECTED_LABELS 一致，由 test_registry_labels_match_spec_field_mapping
 # 钉住（field 键的先后即注册表行序，防映射锚点与装配锚点漂移）。
 FIELD_TO_LABEL: dict[str, str] = {
@@ -62,9 +66,12 @@ FIELD_TO_LABEL: dict[str, str] = {
     "system_config.bounty_abandon_cd_<user_id>": EXPECTED_LABELS[5],
     "bank_loans.due_at": EXPECTED_LABELS[6],
     "system_config.boss_next_spawn_time": EXPECTED_LABELS[7],
-    "system_config.spirit_eye_next_spawn_time": EXPECTED_LABELS[8],
-    "impart_pk_cooldown.failed_at": EXPECTED_LABELS[9],
-    "impart_snatch_protection.snatched_at": EXPECTED_LABELS[10],
+    "world_boss_instances.expires_at": EXPECTED_LABELS[8],
+    "world_boss_instances.next_spawn_at": EXPECTED_LABELS[9],
+    "system_config.spirit_eye_next_spawn_time": EXPECTED_LABELS[10],
+    "impart_pk_cooldown.failed_at": EXPECTED_LABELS[11],
+    "impart_snatch_protection.snatched_at": EXPECTED_LABELS[12],
+    "adventure_fatigue.fatigue_until": EXPECTED_LABELS[13],
 }
 
 # 扫描目录 = 全部可能落声明的位置（core/managers/handlers）；合法属主 =
@@ -83,8 +90,9 @@ class TestRegistryAssembly:
     def test_entry_count_and_structure(self):
         reg = _registry()
         entries = reg.entries()
-        # 拆条后 11 条（Boss/灵眼双键拆为两条单键）
-        assert len(entries) == 11
+        # 拆条后 14 条（Boss/灵眼双键拆为两条单键；child P 新增世界Boss 2 条
+        # 与历练疲劳 1 条）
+        assert len(entries) == 14
         # 全部是 (label, SQL) 二元组且 SQL 非空
         for label, sql in entries:
             assert isinstance(label, str) and label
@@ -96,11 +104,11 @@ class TestRegistryAssembly:
         labels = [label for label, _ in _registry().entries()]
         assert labels == list(EXPECTED_LABELS)
 
-    def test_label_set_is_exact_ten_domains(self):
-        # label 集合 = 10 个域标签（Boss/灵眼同 label 去重）
+    def test_label_set_is_exact_thirteen_domains(self):
+        # label 集合 = 13 个域标签（Boss/灵眼同 label 去重）
         labels = {label for label, _ in _registry().entries()}
         assert labels == set(EXPECTED_LABELS)
-        assert len(labels) == 10
+        assert len(labels) == 13
 
     def test_provider_registration_is_immutable_list(self):
         # provider 列表是登记点，顺序即块序；必须为元组防误改
@@ -115,6 +123,7 @@ class TestRegistryAssembly:
             "managers.boss_manager",
             "managers.spirit_eye_manager",
             "managers.impart_manager",
+            "managers.adventure_manager",
         )
 
 

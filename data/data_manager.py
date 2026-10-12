@@ -342,7 +342,10 @@ class DataBase:
     async def delete_player(self, user_id: str):
         """删除玩家"""
         await self.conn.execute("DELETE FROM players WHERE user_id = ?", (user_id,))
-        await self.conn.commit()
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
+            await self.conn.commit()
 
     async def delete_player_cascade(self, user_id: str):
         """级联删除玩家及所有关联数据
@@ -458,7 +461,10 @@ class DataBase:
             """,
             (shop_id, last_refresh_time, items_json),
         )
-        await self.conn.commit()
+        # D2 ownership gate: commit only outside an active CM transaction.
+        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
+        if getattr(self.conn, "_txn_depth", 0) == 0:
+            await self.conn.commit()
 
     async def decrement_shop_item_stock(
         self,

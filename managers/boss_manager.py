@@ -51,12 +51,27 @@ except ImportError:
 # 只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py 装配汇总。
 # 与 spirit_eye_manager 的条目共享标签「Boss/灵眼下次刷新时间」，按 D2a 拆条后
 # 聚合时 boss 在前、spirit_eye 相邻在后。
+# v37 新世界Boss（child P design §5）：expires_at 是实例寿命到期时刻、
+# next_spawn_at 是终态后的再生资格时刻，两者均参与到期判定 → 必须登记；
+# 旧 Boss 模型（bosses 表）无新增到期时间戳，不在此登记。
 TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
     (
         "Boss/灵眼下次刷新时间",
         "UPDATE system_config "
         "SET value = CAST(CAST(value AS INTEGER) - ? AS TEXT) "
         "WHERE key = 'boss_next_spawn_time' AND CAST(value AS INTEGER) > 0",
+    ),
+    (
+        "世界Boss实例到期时间",
+        "UPDATE world_boss_instances "
+        "SET expires_at = expires_at - ? "
+        "WHERE state = 'active' AND expires_at > 0",
+    ),
+    (
+        "世界Boss下次再生时间",
+        "UPDATE world_boss_instances "
+        "SET next_spawn_at = next_spawn_at - ? "
+        "WHERE next_spawn_at > 0",
     ),
 )
 

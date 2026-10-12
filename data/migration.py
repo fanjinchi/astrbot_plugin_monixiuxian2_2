@@ -18,7 +18,16 @@ if TYPE_CHECKING:
 # v34: 删除测试秘境「试炼古境」（add-rift-encounters 脚手架验证完毕拆除）
 # v35: players 健康分层（child A: base_hp 永久底子 / current_hp 战气血 /
 # health_recovered_at 懒恢复锚点；max_hp 只算不落库）
-LATEST_DB_VERSION = 35
+#
+# 版本归属链（child P: PVE 持久化与事务基座，design §1 冻结）：
+# v36: 历练结算事实 + 效果消费幂等 + 持久疲劳（adventure_*）
+# v37: 世界 Boss 实例/出生快照版本/挑战/每日次数/台账/贡献（world_boss_*）
+# v38: 业务事件 outbox + 逐目标投递 claim（business_events / event_deliveries）
+# 每版 migration task 与 _create_all_tables 共用同一建表函数（单一真源，
+# 全新安装与逐版升级不可能漂移）；VERSION_SCHEMA_TABLES 声明每版拥有的表，
+# 供 schema parity 测试构造「升级前」库存档。只有 SQLite 约束要求时才允许
+# 继续拆连续 v39…，不得复用已发布版本做别的结构。
+LATEST_DB_VERSION = 38
 
 # 增量任务链的适用下限：v32 是 _create_all_tables 冻结的完整 schema 基线，
 # 只有达到该版本的库才具备迁移任务依赖的全部表结构；更早的旧库必须走
@@ -28,6 +37,30 @@ TASK_CHAIN_MIN_VERSION = 32
 MIGRATION_TASKS: dict[
     int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]
 ] = {}
+
+# 每版拥有的表（child P 冻结的版本归属矩阵，design §1）。索引/触发器随表
+# 一起归属对应版本；本表是 schema parity 测试构造「升级前」库存档的唯一依据
+# ——测试按此 DROP 掉 v>=N 的表并把 db_info.version 回退到 N-1，再跑任务链，
+# 结果必须与全新安装的归一化 schema 逐表一致。新增版本时必须同步登记，
+# 否则 parity 测试无法复现该版本的升级前状态。
+VERSION_SCHEMA_TABLES: dict[int, tuple[str, ...]] = {
+    36: (
+        "adventure_settlements",
+        "adventure_effects",
+        "adventure_fatigue",
+    ),
+    37: (
+        "world_boss_instances",
+        "world_boss_challenges",
+        "world_boss_daily_attempts",
+        "world_boss_ledger",
+        "world_boss_contributions",
+    ),
+    38: (
+        "business_events",
+        "event_deliveries",
+    ),
+}
 
 
 def migration(version: int):
@@ -142,11 +175,278 @@ async def _players_health_layers_v35(
         raise RuntimeError(f"v35 迁移失败：players 缺少列 {sorted(missing)}")
 
 
+async def _create_adventure_persistence_tables(conn: aiosqlite.Connection):
+    """Create the v36 adventure persistence objects (settlement / effects / fatigue).
+
+    单一真源：v36 migration task 与 _create_all_tables 都调用本函数，
+    全新安装与逐版升级因此不可能漂移（PRD R1 的 fresh/upgrade 同构要求）。
+    child P 只建「可被幂等消费的事实」，不实现逃跑判定、战斗结算或奖励发放。
+    """
+    # 历练结算事实：一次 adventure run 至多一条，字段是后续奖励服务的
+    # 幂等消费输入（真实气血差、结局、档案版本），不含任何奖励声明。
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS adventure_settlements (
+            settlement_id TEXT PRIMARY KEY,
+            adventure_run_id TEXT NOT NULL UNIQUE,
+            user_id TEXT NOT NULL
+                REFERENCES players(user_id) ON DELETE CASCADE,
+            encounter_id TEXT NOT NULL DEFAULT '',
+            profile_id TEXT NOT NULL DEFAULT '',
+            profile_version INTEGER NOT NULL DEFAULT 0,
+            risk_level INTEGER NOT NULL DEFAULT 0,
+            outcome TEXT NOT NULL DEFAULT '',
+            hp_before INTEGER NOT NULL DEFAULT 0,
+            hp_after INTEGER NOT NULL DEFAULT 0,
+            fled INTEGER NOT NULL DEFAULT 0 CHECK (fled IN (0, 1)),
+            defeated INTEGER NOT NULL DEFAULT 0 CHECK (defeated IN (0, 1)),
+            settled_at INTEGER NOT NULL DEFAULT 0,
+            cas_version INTEGER NOT NULL DEFAULT 1
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_adventure_settlements_user "
+        "ON adventure_settlements(user_id, settled_at DESC)"
+    )
+
+    # 效果消费 claim 表：消费者按 (consumer_name, settlement_id, effect_type)
+    # 唯一，插入即领取、冲突即已消费（幂等重复投递不重复发放）。
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS adventure_effects (
+            effect_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            consumer_name TEXT NOT NULL,
+            settlement_id TEXT NOT NULL
+                REFERENCES adventure_settlements(settlement_id) ON DELETE CASCADE,
+            effect_type TEXT NOT NULL,
+            claimed_at INTEGER NOT NULL DEFAULT 0,
+            cas_version INTEGER NOT NULL DEFAULT 1,
+            UNIQUE (consumer_name, settlement_id, effect_type)
+        )
+    """)
+
+    # 持久疲劳（替代进程内 _route_cooldowns）：fatigue_until 是参与到期判定的
+    # 绝对时间戳 → 必须登记 GM 时间快进（见 managers/adventure_manager.py）。
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS adventure_fatigue (
+            user_id TEXT PRIMARY KEY
+                REFERENCES players(user_id) ON DELETE CASCADE,
+            route_id TEXT NOT NULL DEFAULT '',
+            fatigue_until INTEGER NOT NULL DEFAULT 0,
+            last_settlement_id TEXT NOT NULL DEFAULT '',
+            cas_version INTEGER NOT NULL DEFAULT 1
+        )
+    """)
+
+
+@migration(36)
+async def _adventure_persistence_v36(
+    conn: aiosqlite.Connection, config_manager: ConfigManager
+):
+    """v36（child P）：历练结算事实、效果消费幂等表、持久疲劳表。
+
+    纯建表，无历史数据搬迁：疲劳此前只存在于进程内字典（重启即丢），
+    升级后从空表开始是正确语义（无人处于疲劳），不需要回填。
+    框架已在本任务外层 BEGIN 事务内执行，失败整体回滚、版本停在 v35。
+    """
+    await _create_adventure_persistence_tables(conn)
+
+
+async def _create_world_boss_persistence_tables(conn: aiosqlite.Connection):
+    """Create the v37 world-boss persistence objects (instance / challenge / ledger).
+
+    实例行同时承载不可变出生快照（birth_snapshot：技能、阶段规则等只在
+    生成时复制一次的档案字段）与 CAS 版本号，使热更新 config 不会改变
+    正在进行的战斗；终态转换由条件写入（state + cas_version 的 CAS）达成，
+    repository 不实现阶段推进/末击判定（child D 的领域状态机）。
+    """
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS world_boss_instances (
+            instance_id TEXT PRIMARY KEY,
+            profile_id TEXT NOT NULL,
+            profile_version INTEGER NOT NULL DEFAULT 0,
+            boss_name TEXT NOT NULL DEFAULT '',
+            boss_level INTEGER NOT NULL DEFAULT 0,
+            max_hp INTEGER NOT NULL DEFAULT 0,
+            current_hp INTEGER NOT NULL DEFAULT 0,
+            atk INTEGER NOT NULL DEFAULT 0,
+            defense INTEGER NOT NULL DEFAULT 0,
+            agility INTEGER NOT NULL DEFAULT 0,
+            speed INTEGER NOT NULL DEFAULT 0,
+            armor_value INTEGER NOT NULL DEFAULT 0,
+            phase INTEGER NOT NULL DEFAULT 1 CHECK (phase BETWEEN 1 AND 3),
+            state TEXT NOT NULL DEFAULT 'active'
+                CHECK (state IN ('active', 'defeated', 'dissipated')),
+            birth_snapshot TEXT NOT NULL DEFAULT '{}',
+            spawned_at INTEGER NOT NULL DEFAULT 0,
+            expires_at INTEGER NOT NULL DEFAULT 0,
+            next_spawn_at INTEGER NOT NULL DEFAULT 0,
+            terminated_at INTEGER NOT NULL DEFAULT 0,
+            cas_version INTEGER NOT NULL DEFAULT 1,
+            CHECK (current_hp >= 0),
+            CHECK (current_hp <= max_hp)
+        )
+    """)
+    # expires_at（48h 寿命）与 next_spawn_at（终态后的再生资格时刻）都是
+    # 参与到期判定的绝对时间戳 → 登记 GM 时间快进（managers/boss_manager.py）。
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_world_boss_instances_state "
+        "ON world_boss_instances(state, expires_at)"
+    )
+
+    # 挑战明细：challenge_id 即请求幂等键（同一 id 重放不二次扣次数/伤害）；
+    # 伤害只等于本行记录的 hp_before - hp_after，不得用 max_hp - final_hp 重算。
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS world_boss_challenges (
+            challenge_id TEXT PRIMARY KEY,
+            instance_id TEXT NOT NULL
+                REFERENCES world_boss_instances(instance_id) ON DELETE CASCADE,
+            user_id TEXT NOT NULL
+                REFERENCES players(user_id) ON DELETE CASCADE,
+            date_key TEXT NOT NULL,
+            outcome TEXT NOT NULL DEFAULT '',
+            damage_dealt INTEGER NOT NULL DEFAULT 0,
+            hp_before INTEGER NOT NULL DEFAULT 0,
+            hp_after INTEGER NOT NULL DEFAULT 0,
+            player_hp_before INTEGER NOT NULL DEFAULT 0,
+            player_hp_after INTEGER NOT NULL DEFAULT 0,
+            fled INTEGER NOT NULL DEFAULT 0 CHECK (fled IN (0, 1)),
+            is_last_hit INTEGER NOT NULL DEFAULT 0 CHECK (is_last_hit IN (0, 1)),
+            phase_changed INTEGER NOT NULL DEFAULT 0,
+            instance_cas_version INTEGER NOT NULL DEFAULT 0,
+            attempted_at INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_world_boss_challenges_instance "
+        "ON world_boss_challenges(instance_id, attempted_at)"
+    )
+
+    # 每日次数：date_key 是 Asia/Shanghai 自然日键，绝不能登记时间快进
+    # （字段跳前不得顺手重置每日次数）；主键 (date_key, user_id) = 跨 Boss 全局
+    # 每人每日一计（child D PRD R3：每名玩家每个自然日最多 3 次）。
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS world_boss_daily_attempts (
+            date_key TEXT NOT NULL,
+            user_id TEXT NOT NULL
+                REFERENCES players(user_id) ON DELETE CASCADE,
+            attempts_used INTEGER NOT NULL DEFAULT 0,
+            cas_version INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (date_key, user_id)
+        )
+    """)
+
+    # 贡献台账：每次成功挑战一条 append-only 事实，UNIQUE(instance_id,
+    # challenge_id) 使台账写入本身幂等；是 Step 7 奖励输入的审计面。
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS world_boss_ledger (
+            entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            instance_id TEXT NOT NULL
+                REFERENCES world_boss_instances(instance_id) ON DELETE CASCADE,
+            challenge_id TEXT NOT NULL
+                REFERENCES world_boss_challenges(challenge_id) ON DELETE CASCADE,
+            user_id TEXT NOT NULL
+                REFERENCES players(user_id) ON DELETE CASCADE,
+            profile_version INTEGER NOT NULL DEFAULT 0,
+            damage_dealt INTEGER NOT NULL DEFAULT 0,
+            recorded_at INTEGER NOT NULL DEFAULT 0,
+            UNIQUE (instance_id, challenge_id)
+        )
+    """)
+
+    # 按玩家累计贡献（instance × user）：条件累加，供结算与展示读取。
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS world_boss_contributions (
+            instance_id TEXT NOT NULL
+                REFERENCES world_boss_instances(instance_id) ON DELETE CASCADE,
+            user_id TEXT NOT NULL
+                REFERENCES players(user_id) ON DELETE CASCADE,
+            profile_version INTEGER NOT NULL DEFAULT 0,
+            total_damage INTEGER NOT NULL DEFAULT 0,
+            attempt_count INTEGER NOT NULL DEFAULT 0,
+            first_hit_at INTEGER NOT NULL DEFAULT 0,
+            last_hit_at INTEGER NOT NULL DEFAULT 0,
+            is_last_hit INTEGER NOT NULL DEFAULT 0 CHECK (is_last_hit IN (0, 1)),
+            cas_version INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (instance_id, user_id)
+        )
+    """)
+
+
+@migration(37)
+async def _world_boss_persistence_v37(
+    conn: aiosqlite.Connection, config_manager: ConfigManager
+):
+    """v37（child P）：世界 Boss 实例/出生快照/挑战/每日次数/台账/贡献表。
+
+    新建独立实例表而不是改造旧 boss 表：旧表语义（status 1 存活/0 被击败、
+    stone_reward 即时灵石）与新生命周期（active/defeated/dissipated + 真实
+    伤害贡献）不同，Batch 4/5 切流前旧 CRUD 继续可用，两套并存。
+    """
+    await _create_world_boss_persistence_tables(conn)
+
+
+async def _create_event_outbox_tables(conn: aiosqlite.Connection):
+    """Create the v38 outbox objects (business events / per-destination delivery).
+
+    事务内只写这两张表，网络投递在事务外消费（design §5：不把网络等待
+    放进数据库事务）；claim 状态机 queued → dispatching → sent | queued |
+    uncertain，uncertain 永不自动重试。本系统不提供 exactly-once 保证。
+    """
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS business_events (
+            event_id TEXT PRIMARY KEY,
+            business_key TEXT NOT NULL UNIQUE,
+            event_type TEXT NOT NULL,
+            aggregate_type TEXT NOT NULL,
+            aggregate_id TEXT NOT NULL,
+            payload TEXT NOT NULL DEFAULT '{}',
+            occurred_at INTEGER NOT NULL DEFAULT 0,
+            cas_version INTEGER NOT NULL DEFAULT 1
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_business_events_type_time "
+        "ON business_events(event_type, occurred_at)"
+    )
+
+    # 逐目标投递：UNIQUE(event_id, platform, group_id) 保证同一事件对同一
+    # 群至多一条投递记录；某目标失败不重放已 sent 的其它目标。
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS event_deliveries (
+            delivery_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id TEXT NOT NULL
+                REFERENCES business_events(event_id) ON DELETE CASCADE,
+            platform TEXT NOT NULL,
+            group_id TEXT NOT NULL,
+            state TEXT NOT NULL DEFAULT 'queued'
+                CHECK (state IN ('queued', 'dispatching', 'sent', 'uncertain')),
+            claim_owner TEXT NOT NULL DEFAULT '',
+            claim_expires_at INTEGER NOT NULL DEFAULT 0,
+            attempt_count INTEGER NOT NULL DEFAULT 0,
+            next_retry_at INTEGER NOT NULL DEFAULT 0,
+            last_error TEXT NOT NULL DEFAULT '',
+            updated_at INTEGER NOT NULL DEFAULT 0,
+            cas_version INTEGER NOT NULL DEFAULT 1,
+            UNIQUE (event_id, platform, group_id)
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_event_deliveries_claim "
+        "ON event_deliveries(state, next_retry_at)"
+    )
+
+
+@migration(38)
+async def _event_outbox_v38(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """v38（child P）：业务事件表 + 逐目标投递（outbox）表。"""
+    await _create_event_outbox_tables(conn)
+
+
 async def _create_all_tables(conn: aiosqlite.Connection):
-    """Create the current (v32) schema for a fresh database.
+    """Create the current (v38) schema for a fresh database.
 
     唯一的建表入口：全新安装与旧库重建都走这里，保证两条路径 schema
-    完全一致（不再存在多套历史建表函数漂移的问题）。
+    完全一致（不再存在多套历史建表函数漂移的问题）。v36 起新增的 PVE
+    表由本函数直接调用各版本的共享建表函数，与 migration task 同源。
     """
 
     # 数据库版本信息表
@@ -555,6 +855,13 @@ async def _create_all_tables(conn: aiosqlite.Connection):
         CREATE INDEX IF NOT EXISTS idx_system_config_updated
         ON system_config(updated_at)
     """)
+
+    # === PVE 持久化基座（v36-v38，child P）===
+    # 与对应 migration task 共用同一建表函数：全新安装的 schema 必须与
+    # v34 → v35 → v36 → v37 → v38 逐版升级的结果逐表一致。
+    await _create_adventure_persistence_tables(conn)
+    await _create_world_boss_persistence_tables(conn)
+    await _create_event_outbox_tables(conn)
 
     # 插入默认秘境数据
     import json

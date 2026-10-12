@@ -28,3 +28,31 @@
 - 原子故障注入/CAS/幂等测试；
 - time-skip provider/field matrix；
 - 完整质量门摘要。
+
+### 执行记录（2026-10-13，Steps 1–7 全部完成）
+
+- **版本矩阵/共享 schema**：`LATEST_DB_VERSION=38`；v36 settlement/effect/fatigue、
+  v37 instance/challenge/daily_attempts/ledger/contribution、v38 business_events/event_deliveries；
+  DDL builder 由 `@migration(36/37/38)` 与 `_create_all_tables` 共用（fresh==upgrade 锁定决策）。
+  测试：`test_pve_persistence_foundation.py` 版本 ownership、fresh 建表、
+  逐版 rewound-snapshot parity（N∈{36,37,38}）、v34→latest 数据保全、
+  逐版注错回滚+重跑幂等。
+- **repositories**：`data/pve_repository.py`（AdventureRepository/WorldBossRepository/
+  OutboxRepository + `shanghai_date_key`）；insert-or-read 幂等、CAS、effect/delivery
+  claim、`uncertain` 不自动回收、日次数单语句封顶。测试覆盖契约与 FK 违例。
+- **事务叶子审计**：`data/` 裸 `commit()` 清零（allowlist 仅 owner 层 2 点），
+  20 处按 `_txn_depth` 门控；`test_leaf_commit_defers_to_outer_transaction`
+  用旁观连接验证外事务内不提前落盘；四条 §3 原子图故障注入全回滚。
+  静态审计测试 `test_no_ungated_commit_in_data_layer` 常驻把关。
+- **time-skip 注册**：boss_manager 增世界Boss到期/再生 2 条、adventure_manager 新声明
+  疲劳条并登记 `_PROVIDER_MODULES`；注册表 14 条目/13 域
+  （`test_time_skip_registry.py` 锚点同步，9 passed）；health 锚点、结算/效果历史、
+  daily attempts、date_key 负向不覆盖断言在案；三条新 SQL 已在 v38 实库实测前移语义
+  （fatigue_until/expires_at(state='active')/next_spawn_at(>0)）。
+- **质量门**：`ruff format`（129 files unchanged）+ `ruff check`（core/data/handlers/
+  managers/tests/utils/main.py 等 All checks passed）；
+  `pytest tests/ -q` → **1092 passed**（基线 1057 + 本任务新增 35）。
+- **遗留（不属本 child）**：`data/` 之外 6 处裸 `conn.commit()`
+  （combat_handlers.py:75、spirit_farm_manager.py:144、spirit_eye_manager.py:79/187、
+  bounty_manager.py:671、dual_cultivation_manager.py:164），归 children C/D/E 接入时处理，
+  已用 bd 登记。

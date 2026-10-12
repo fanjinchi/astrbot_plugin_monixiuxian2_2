@@ -76,6 +76,19 @@ except ImportError:
 if TYPE_CHECKING:
     from ..core import BusyState, StorageRingManager
 
+# GM「时间快进」覆盖条目（openspec change: gm-time-skip-registry）：声明即覆盖，
+# 只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py 装配汇总。
+# v36 历练疲劳（child P design §5）：adventure_fatigue.fatigue_until 是路线疲劳
+# 到期时刻；历练忙碌本身走 user_cd（core/busy_state 已覆盖），此处只登记疲劳表。
+TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
+    (
+        "历练路线疲劳到期时间",
+        "UPDATE adventure_fatigue "
+        "SET fatigue_until = fatigue_until - ? "
+        "WHERE fatigue_until > 0",
+    ),
+)
+
 
 class AdventureManager:
     """历练系统管理器"""

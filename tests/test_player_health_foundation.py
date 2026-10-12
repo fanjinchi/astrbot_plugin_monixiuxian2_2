@@ -144,7 +144,8 @@ async def test_fresh_schema_has_three_layer_health_columns():
         assert "hp" not in cols, "bare hp column survived on fresh schema"
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
             row = await cursor.fetchone()
-        assert row[0] == LATEST_DB_VERSION == 35
+        # 钉住链条末端版本；新增迁移版本时同步更新（见 child P design §1）
+        assert row[0] == LATEST_DB_VERSION == 38
     finally:
         await db_conn.close()
 
@@ -239,7 +240,7 @@ async def test_v34_upgrade_backfills_dynamic_max(tmp_path):
         assert rows["u_sword"][3] > 0 and rows["u_bare"][3] > 0
         async with conn.execute("SELECT version FROM db_info") as cursor:
             row = await cursor.fetchone()
-        assert row[0] == 35
+        assert row[0] == LATEST_DB_VERSION
     finally:
         await conn.close()
 
