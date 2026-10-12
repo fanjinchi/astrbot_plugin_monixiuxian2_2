@@ -18,7 +18,7 @@
 ## 2. 不可变 catalog / resolver（R2，AC4 的代码基座）
 
 - `managers/enemy_catalog.py`（新增）：
-  - `EnemyCombatProfile`/`WorldBossProfile` frozen dataclass + `from_dict`（白名单挑选已知字段、未知键忽略——文档整体先过 `validate_enemy_document` 严格校验，未知键在写入口已拦截；skill 列表逐 dict 复制防外部变异）；`EnemyCatalog` 构造即 `validate_enemy_document`，失败抛 `EnemyCatalogError`；`.roster`/`.world_bosses` 不可变 tuple；`(realm_segment, category)` 索引 + 段位等级带（由 28 只 `level_range` 推导，边界外钳制）。
+  - `EnemyCombatProfile`/`WorldBossProfile` frozen dataclass + `from_dict`（白名单挑选已知字段、未知键忽略——文档由 sync 确定性生成，`validate_enemy_document` 在写入口严格拦截 legacy 死键/未知枚举/重复 id，profile 内未知键无现实注入通道；skill 列表逐 dict 复制防外部变异）；`EnemyCatalog` 构造即 `validate_enemy_document`，失败抛 `EnemyCatalogError`；`.roster`/`.world_bosses` 不可变 tuple；`(realm_segment, category)` 索引 + 段位等级带（由 28 只 `level_range` 推导，边界外钳制）。
   - `spawn_enemy(player_level, category, difficulty_multiplier)`：段位由等级定、池内随机取一只，绝对面板直通；**难度只在 `profile_to_enemy` 单点乘伤害**（`max(1, int(dmg×mult))`，HP/护甲/身法/迅捷/暴击/词条不受影响）；注入 rng 可确定性重放；user_id 形状 `enemy_{id}_{seq}_{token}`。
   - `load_catalog(path)` 对旧 v1 config 返回 None（动态路径继续服务，Batch 5 切流钩子），v2 坏档抛错；`EnemyCatalog.read_document` 暴露原始 JSON。
   - 专项组兼容（R4）的实际交付形态：未新增独立的 `group_to_profile` 函数——定向组生成保持 `EnemyManager.spawn_enemy_from_group` 原入口与选组来源（秘境兽 enemy_group_key、传承守护 `get_guardian_group_key()`），输出改为**统一档案形状**的 Enemy（`profile_id`=模板 key、真实 `level_index`、模板 `trigger_skills`/`ultimates` passthrough），战斗入口与固定名册共用**同一个** `build_enemy_fighter` mapper；守护胜率按 Step 3「只做兼容适配，不重新平衡」不变。

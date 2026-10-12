@@ -579,8 +579,9 @@ def _check_trigger_skill(skill: dict, ctx: str, errors: list[str]) -> None:
     """Validate one trigger-skill dict shape, appending errors.
 
     Only the structural minimum is checked (object with timing/effect/rate
-    keys); engine effect semantics are validated by the effect handler at
-    combat time, and numeric ranges are checked by the callers' builders.
+    keys); all skill values come from the code-materialized mechanic maps
+    (AFFIX_TRIGGER_SKILLS / BOSS_SKILL_MECHANICS / signature skills) and
+    have no CSV injection channel.
 
     Args:
         skill: Candidate trigger skill dict.
