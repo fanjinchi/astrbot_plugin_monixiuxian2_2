@@ -9,6 +9,7 @@
 - 依赖玩家气血 child 的 `current_hp` / 动态 `max_hp` / transaction-friendly Health Domain。
 - 依赖固定敌人目录 child 的稳定 enemy id 和完整 combat profile。
 - 依赖持久化/事务基座 child 提供的 v36 settlement/effect/fatigue schema、CAS/幂等 repository、commit 纪律和 fatigue time-skip provider；本 child 不再自行分配迁移版本或重复定义共享表。
+- 基座遗留的事务叶子门控技术债（bd `astrbot_plugin_monixiuxian2_2-qbo`）按「谁接入谁修」归属：`handlers/combat_handlers.py:75` 的裸 `await self.db.conn.commit()` 位于本 child 战斗结算将被 `db.transaction()` 包裹的调用图上，接线前必须先门控（与 world-boss child 共享此点，先接入方负责，后方仅确认已清零）。
 - 正式启用固定名册前需通过内容同步用户确认门。
 
 ## Requirements

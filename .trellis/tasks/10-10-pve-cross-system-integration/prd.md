@@ -18,6 +18,7 @@
 ### R1. 全消费者组合复核
 
 - Health child 已原子迁移创角、突破、装备、功法、丹药、商店、GM、PvP、现有 PVE/秘境/Boss 和显示/排行消费者；本 child 负责在新 Adventure/Boss 流程接线后静态清零并做跨玩法组合回归，不把基础 `Player.hp` 迁移留到此处。
+- 静态清零范围含 `data/` 之外遗留的事务叶子门控（bd `astrbot_plugin_monixiuxian2_2-qbo`）：`managers/spirit_farm_manager.py:144`、`managers/spirit_eye_manager.py:79` 与 `:187`、`managers/bounty_manager.py:671`、`managers/dual_cultivation_manager.py:164` 的裸 `conn.commit()` 在本 child 门控为按 `conn._txn_depth` 叶子提交；`handlers/combat_handlers.py:75` 已由 adventure/world-boss child 按「谁接入谁修」处理，本 child 仅复核静态审计为空。
 - 产品代码和测试不得遗留 `Player.hp`、含混属性键或“战败写1”语义。
 - 属性变化、购买/使用药品和跨玩法战斗均维护 current clamp。
 

@@ -9,6 +9,7 @@
 - 依赖玩家气血 child 的 current/max HP 和事务友好 API。
 - 依赖目录 child 的固定 Boss profile/snapshot contract。
 - 依赖持久化/事务基座 child 提供 v37 instance/attempt/ledger/contribution、v38 business-event/delivery schema、CAS/claim repository、commit 纪律与 Boss lifecycle time-skip provider；本 child 不再自行分配 migration 版本。
+- 基座遗留的事务叶子门控技术债（bd `astrbot_plugin_monixiuxian2_2-qbo`）按「谁接入谁修」归属：`handlers/combat_handlers.py:75` 的裸 `await self.db.conn.commit()` 位于本 child 原子挑战（`async with db.transaction()` 内 CAS 写回）的调用图上，接线前必须先门控（与 adventure-settlement child 共享此点，先接入方负责，后方仅确认已清零）。
 - 正式 profile 配置启用仍受用户内容确认门控制。
 
 ## Requirements
