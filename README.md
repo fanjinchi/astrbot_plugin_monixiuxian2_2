@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.19.0
+> **版本:** v3.20.0
 > **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -303,6 +303,17 @@ astrbot_plugin_monixiuxian2_2/
 ---
 
 ## 📝 更新日志
+
+---
+
+### v3.20.0 - PVE 持久化与事务基座：数据库 v36–v38 + 仓储原语（Trellis child P）
+
+**🛠 工程（无玩法变更，玩家不可见）**
+
+- **迁移链 v36–v38（数据库版本 35→38）**：v36 历练结算域（`adventure_settlements`/`adventure_effects`/`adventure_fatigue`）、v37 世界 Boss 域（`world_boss_instances`/`challenges`/`daily_attempts`/`ledger`/`contributions`）、v38 事件外发域（`business_events`/`event_deliveries`）；DDL builder 单一来源，fresh install 与逐版本升级链 schema 一致（参数化 parity 测试锁定）
+- **事务叶子门控**：`data/` 层 20 处裸 `conn.commit()` 改为按 `conn._txn_depth` 门控——standalone 自提交、被 `db.transaction()` 包裹时静默让位给 owner 提交，消除"块内提前提交"类原子性 bug；`data/` 外 6 处遗留已登记 bd 待 children C/D/E 接入时收敛
+- **PVE 仓储基元**（`data/pve_repository.py`，仅原语不含业务）：insert-or-read 幂等（run/instance/challenge/ledger/event 各唯一键）、谓词列 + `cas_version` CAS 冲突（缺版本显式报错）、效果 claim 三元组唯一、Boss 每日次数北京日界单语句封顶（满额返回 None 不消耗）、贡献累积与 sticky 末击、Outbox delivery `queued→dispatching→sent|queued|uncertain` claim/lease 生命周期（uncertain 只人工裁决）
+- **时间模型**：`shanghai_date_key` 北京时间日界；历练疲劳到期与 Boss 实例到期/再生登记 GM「时间快进」（注册表 14 条目/13 域）；健康锚点、结算/效果记录、每日计数明确不被快进覆盖（静态契约测试双向锁定）
 
 ---
 

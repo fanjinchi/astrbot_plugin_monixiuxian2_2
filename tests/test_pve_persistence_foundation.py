@@ -19,6 +19,7 @@
 """
 
 import ast
+import asyncio
 import json
 import sqlite3
 import sys
@@ -56,7 +57,8 @@ OutboxRepository = _repo_mod.OutboxRepository
 shanghai_date_key = _repo_mod.shanghai_date_key
 
 _registry_mod = load_package_module(
-    "core/time_skip_registry.py", "astrbot_plugin_monixiuxian2_2.core.time_skip_registry"
+    "core/time_skip_registry.py",
+    "astrbot_plugin_monixiuxian2_2.core.time_skip_registry",
 )
 TimeSkipRegistry = _registry_mod.TimeSkipRegistry
 
@@ -150,7 +152,9 @@ async def _schema_snapshot(conn):
         if table_type != "table":
             continue
         table_info = {
-            "table_info": sorted(await _pragma_rows(conn, f"PRAGMA table_info({name})")),
+            "table_info": sorted(
+                await _pragma_rows(conn, f"PRAGMA table_info({name})")
+            ),
             "index_list": sorted(
                 row
                 for row in await _pragma_rows(conn, f"PRAGMA index_list({name})")
@@ -318,9 +322,7 @@ async def test_v34_upgrade_chain_preserves_data(tmp_path):
         await MigrationManager(conn, StubConfigManager()).migrate_or_reset()
         assert await _db_version(conn) == LATEST_DB_VERSION
         assert (
-            await _scalar(
-                conn, "SELECT base_hp FROM players WHERE user_id='u_bare'"
-            )
+            await _scalar(conn, "SELECT base_hp FROM players WHERE user_id='u_bare'")
             == 120
         )
         names = await _table_names(conn)
@@ -470,9 +472,7 @@ async def test_effect_claim_first_consumer_wins(db):
     assert not await adv.claim_effect(
         consumer_name="gold", effect_type="reward", **common
     )
-    assert await adv.claim_effect(
-        consumer_name="bag", effect_type="reward", **common
-    )
+    assert await adv.claim_effect(consumer_name="bag", effect_type="reward", **common)
     assert await adv.claim_effect(consumer_name="gold", effect_type="hp", **common)
     claims = await adv.list_effect_claims("set-claim")
     assert len(claims) == 3
@@ -566,7 +566,10 @@ async def test_boss_instance_replay_keeps_birth_snapshot(db):
     assert not created2
     assert replay["max_hp"] == 10000 and replay["profile_version"] == 3
     assert replay["boss_name"] == "苍岩龙主"
-    assert json.loads(replay["birth_snapshot"]) == {"phases": [1, 2, 3], "skills": ["劈岳"]}
+    assert json.loads(replay["birth_snapshot"]) == {
+        "phases": [1, 2, 3],
+        "skills": ["劈岳"],
+    }
     assert await boss.list_instances(states=("active",)) == [replay]
     assert await boss.list_instances(states=("defeated",)) == []
 
@@ -607,6 +610,90 @@ async def test_boss_instance_cas_damage_conflict(db):
 
 
 @pytest.mark.asyncio
+async def test_cas_update_instance_requires_cas_version(db):
+    """expected 缺 cas_version 必须显式报错——静默按 0 会伪装成永远冲突。"""
+    boss = WorldBossRepository(db.conn)
+    await _seed_instance(boss)
+    with pytest.raises(ValueError):
+        await boss.cas_update_instance(
+            "ins-1",
+            expected={"state": "active", "current_hp": 10000},
+            current_hp=1,
+        )
+    row = await boss.get_instance("ins-1")
+    assert row["current_hp"] == 10000 and row["cas_version"] == 1, (
+        "参数校验必须发生在任何 DB 写入之前"
+    )
+
+
+@pytest.mark.asyncio
+async def test_instance_cas_conflict_under_concurrent_tasks(db):
+    """AC4 真并发：两任务交错读同一前像，后写者必须 CAS 失败。
+
+    用 Event 钉死交错点：A 读 → B 读（同一 cas_version）→ A 写 → B 写。
+    gather 保证两个 racer 是独立 Task，走真实调度而非顺序模拟。
+    """
+    boss = WorldBossRepository(db.conn)
+    await _seed_instance(boss)
+    a_read, b_read, a_done = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    async def _racer_a() -> bool:
+        snap = await boss.get_instance("ins-1")
+        assert snap["cas_version"] == 1
+        a_read.set()
+        await b_read.wait()
+        ok = await boss.cas_update_instance(
+            "ins-1",
+            expected={
+                "state": snap["state"],
+                "current_hp": snap["current_hp"],
+                "cas_version": snap["cas_version"],
+            },
+            current_hp=7000,
+        )
+        a_done.set()
+        return ok
+
+    async def _racer_b() -> bool:
+        await a_read.wait()
+        snap = await boss.get_instance("ins-1")
+        b_read.set()
+        await a_done.wait()
+        ok = await boss.cas_update_instance(
+            "ins-1",
+            expected={
+                "state": snap["state"],
+                "current_hp": snap["current_hp"],
+                "cas_version": snap["cas_version"],
+            },
+            current_hp=6000,
+        )
+        return ok
+
+    ok_a, ok_b = await asyncio.gather(_racer_a(), _racer_b())
+    assert ok_a is True and ok_b is False, "基于同一陈旧前像的后写者必须败给 CAS"
+    row = await boss.get_instance("ins-1")
+    assert row["current_hp"] == 7000 and row["cas_version"] == 2
+
+
+@pytest.mark.asyncio
+async def test_daily_attempts_gather_concurrency_respects_cap(db):
+    """并发自增每日次数：5 任务 gather、limit=3 恰好 3 次成功且不越帽。"""
+    boss = WorldBossRepository(db.conn)
+    date_key = shanghai_date_key(T0)
+    results = await asyncio.gather(
+        *[
+            boss.increment_daily_attempts(date_key=date_key, user_id="u1", limit=3)
+            for _ in range(5)
+        ]
+    )
+    granted = [row for row in results if row is not None]
+    assert len(granted) == 3, "封顶语义必须扛住任务交错"
+    final = await boss.get_daily_attempts(date_key=date_key, user_id="u1")
+    assert final["attempts_used"] == 3
+
+
+@pytest.mark.asyncio
 async def test_daily_attempts_capped_per_beijing_day(db):
     """每日次数按 (date_key, user_id) 封顶：满额返回 None 且不消耗。"""
     boss = WorldBossRepository(db.conn)
@@ -614,12 +701,19 @@ async def test_daily_attempts_capped_per_beijing_day(db):
     for expected in (1, 2, 3):
         row = await boss.increment_daily_attempts(date_key=day_a, user_id="u1", limit=3)
         assert row is not None and row["attempts_used"] == expected
-    assert await boss.increment_daily_attempts(date_key=day_a, user_id="u1", limit=3) is None
+    assert (
+        await boss.increment_daily_attempts(date_key=day_a, user_id="u1", limit=3)
+        is None
+    )
     stuck = await boss.get_daily_attempts(date_key=day_a, user_id="u1")
     assert stuck["attempts_used"] == 3, "封顶后不得再自增"
-    other_day = await boss.increment_daily_attempts(date_key=day_b, user_id="u1", limit=3)
+    other_day = await boss.increment_daily_attempts(
+        date_key=day_b, user_id="u1", limit=3
+    )
     assert other_day["attempts_used"] == 1, "跨自然日重新计数"
-    other_user = await boss.increment_daily_attempts(date_key=day_a, user_id="u2", limit=3)
+    other_user = await boss.increment_daily_attempts(
+        date_key=day_a, user_id="u2", limit=3
+    )
     assert other_user["attempts_used"] == 1, "按玩家维度独立"
 
 
@@ -648,7 +742,9 @@ async def test_challenge_replay_and_ledger_idempotent(db):
     replay, created2 = await boss.record_challenge(
         **{**common, "damage_dealt": 5, "hp_after": 9995}
     )
-    assert not created2 and replay["damage_dealt"] == 1000 and replay["hp_after"] == 9000
+    assert (
+        not created2 and replay["damage_dealt"] == 1000 and replay["hp_after"] == 9000
+    )
     assert len(await boss.list_challenges("ins-1")) == 1
 
     ledger, l_created = await boss.record_ledger(
@@ -694,12 +790,20 @@ async def test_contribution_accumulates_with_sticky_last_hit(db):
     assert killer["first_hit_at"] == T0 and killer["last_hit_at"] == T0 + 10
     assert killer["is_last_hit"] == 1
     later = await boss.accumulate_contribution(
-        instance_id="ins-1", user_id="u1", profile_version=3, damage_dealt=1, now=T0 + 20
+        instance_id="ins-1",
+        user_id="u1",
+        profile_version=3,
+        damage_dealt=1,
+        now=T0 + 20,
     )
     assert later["is_last_hit"] == 1, "非终击不得清除 sticky last-hit"
     assert later["first_hit_at"] == T0
     await boss.accumulate_contribution(
-        instance_id="ins-1", user_id="u2", profile_version=3, damage_dealt=500, now=T0 + 5
+        instance_id="ins-1",
+        user_id="u2",
+        profile_version=3,
+        damage_dealt=500,
+        now=T0 + 5,
     )
     board = await boss.list_contributions("ins-1")
     assert [row["user_id"] for row in board] == ["u1", "u2"]
@@ -729,7 +833,9 @@ async def test_event_business_key_and_delivery_pair_idempotent(db):
         occurred_at=T0 + 99,
         payload="{}",
     )
-    assert not created2 and replay["event_id"] == "ev-a", "business_key 重放须返回原事件"
+    assert not created2 and replay["event_id"] == "ev-a", (
+        "business_key 重放须返回原事件"
+    )
     delivery, d1 = await outbox.add_delivery(
         event_id="ev-a", platform="aiocqhttp", group_id="100", now=T0
     )
@@ -766,6 +872,98 @@ async def test_foreign_keys_enforced_on_new_tables(db):
     assert await _scalar(db.conn, "SELECT COUNT(*) FROM event_deliveries") == 0
 
 
+@pytest.mark.asyncio
+async def test_foreign_key_check_clean_on_seeded_db(db):
+    """PRD R1 点名：PVE 十表全部灌入合法关联行后 foreign_key_check 零违例。
+
+    逐表断言非空，防止「空库平凡通过」的假阳性。
+    """
+    adv = AdventureRepository(db.conn)
+    boss = WorldBossRepository(db.conn)
+    outbox = OutboxRepository(db.conn)
+    date_key = shanghai_date_key(T0)
+    await adv.insert_settlement(
+        settlement_id="set-fk",
+        adventure_run_id="run-fk",
+        user_id="u1",
+        now=T0,
+    )
+    assert await adv.claim_effect(
+        consumer_name="gold", settlement_id="set-fk", effect_type="reward", now=T0
+    )
+    await adv.set_fatigue(user_id="u1", route_id="r-fk", fatigue_until=T0 + 3600)
+    await _seed_instance(boss)
+    assert await boss.increment_daily_attempts(date_key=date_key, user_id="u1", limit=3)
+    await boss.record_challenge(
+        challenge_id="ch-fk",
+        instance_id="ins-1",
+        user_id="u1",
+        date_key=date_key,
+        damage_dealt=1500,
+        hp_before=10000,
+        hp_after=8500,
+        player_hp_before=500,
+        player_hp_after=480,
+        instance_cas_version=1,
+        now=T0,
+        outcome="win",
+    )
+    await boss.record_ledger(
+        instance_id="ins-1",
+        challenge_id="ch-fk",
+        user_id="u1",
+        profile_version=3,
+        damage_dealt=1500,
+        now=T0,
+    )
+    await boss.accumulate_contribution(
+        instance_id="ins-1",
+        user_id="u1",
+        profile_version=3,
+        damage_dealt=1500,
+        now=T0,
+        is_last_hit=False,
+    )
+    await _seed_event_and_delivery(outbox)
+    assert await _pragma_rows(db.conn, "PRAGMA foreign_key_check") == []
+    for table in sorted(PVE_DOMAIN_TABLES):
+        assert await _scalar(db.conn, f"SELECT COUNT(*) FROM {table}") > 0, (
+            f"{table} 未灌数据，FK 检查结论无效"
+        )
+
+
+@pytest.mark.asyncio
+async def test_foreign_key_check_clean_on_v34_upgraded_db(tmp_path):
+    """真实 v34→latest 升级链产物库同样须通过 foreign_key_check。"""
+    path = str(tmp_path / "v34.db")
+    await build_v34_db(path)
+    conn = await aiosqlite.connect(path)
+    try:
+        await MigrationManager(conn, StubConfigManager()).migrate_or_reset()
+        assert await _db_version(conn) == LATEST_DB_VERSION
+        boss = WorldBossRepository(conn)
+        await boss.insert_instance(
+            instance_id="ins-fk2",
+            profile_id="pf_cangyan",
+            profile_version=3,
+            max_hp=5000,
+            now=T0,
+            expires_at=T0 + 3600,
+            boss_name="苍岩龙主",
+        )
+        await boss.accumulate_contribution(
+            instance_id="ins-fk2",
+            user_id="u_bare",
+            profile_version=3,
+            damage_dealt=200,
+            now=T0,
+            is_last_hit=False,
+        )
+        assert await _pragma_rows(conn, "PRAGMA foreign_key_check") == []
+    finally:
+        await conn.close()
+
+
 # ----------------------------------------------------------------------
 # AC4 强化 — Outbox dispatcher claim/lease 生命周期（design §3.4）
 # ----------------------------------------------------------------------
@@ -777,9 +975,7 @@ async def test_dispatcher_claim_lease_and_complete_lifecycle(db):
     outbox = OutboxRepository(db.conn)
     _event, delivery = await _seed_event_and_delivery(outbox)
     did = delivery["delivery_id"]
-    claimed = await outbox.claim_delivery(
-        did, owner="w1", lease_until=T0 + 30, now=T0
-    )
+    claimed = await outbox.claim_delivery(did, owner="w1", lease_until=T0 + 30, now=T0)
     assert claimed and claimed["state"] == "dispatching"
     assert claimed["claim_owner"] == "w1"
     assert claimed["attempt_count"] == delivery["attempt_count"] + 1
@@ -813,7 +1009,9 @@ async def test_dispatcher_claim_lease_and_complete_lifecycle(db):
     assert done["state"] == "sent" and done["claim_owner"] == ""
     assert done["next_retry_at"] == 0
     assert (
-        await outbox.claim_delivery(did, owner="w3", lease_until=T0 + 9999, now=T0 + 999)
+        await outbox.claim_delivery(
+            did, owner="w3", lease_until=T0 + 9999, now=T0 + 999
+        )
         is None
     ), "sent 是终态，不可再 claim"
 
@@ -844,7 +1042,9 @@ async def test_retry_watermark_and_uncertain_never_auto_reclaimed(db):
         await outbox.claim_delivery(did, owner="w1", lease_until=T0 + 90, now=T0 + 10)
         is None
     ), "未到重试水位不得重新领取"
-    again = await outbox.claim_delivery(did, owner="w1", lease_until=T0 + 90, now=T0 + 60)
+    again = await outbox.claim_delivery(
+        did, owner="w1", lease_until=T0 + 90, now=T0 + 60
+    )
     assert again is not None and again["attempt_count"] == 2
     assert (
         await outbox.complete_delivery(
@@ -1075,9 +1275,7 @@ async def test_dispatcher_claim_graph_rolls_back_atomically(db):
     fresh = await outbox.get_delivery(did)
     assert fresh["state"] == "queued" and fresh["claim_owner"] == ""
     async with db.transaction():
-        assert await outbox.claim_delivery(
-            did, owner="w1", lease_until=T0 + 30, now=T0
-        )
+        assert await outbox.claim_delivery(did, owner="w1", lease_until=T0 + 30, now=T0)
     assert (await outbox.get_delivery(did))["state"] == "dispatching"
 
 

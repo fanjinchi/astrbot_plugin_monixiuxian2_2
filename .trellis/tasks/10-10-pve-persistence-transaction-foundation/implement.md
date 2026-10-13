@@ -52,7 +52,39 @@
 - **质量门**：`ruff format`（129 files unchanged）+ `ruff check`（core/data/handlers/
   managers/tests/utils/main.py 等 All checks passed）；
   `pytest tests/ -q` → **1092 passed**（基线 1057 + 本任务新增 35）。
+  ⚠️ 该轮 format 遍历因 AstrBot 根 `pyproject.toml` `exclude=["tests"]` 未覆盖插件
+  `tests/` 目录，评审修正轮已显式补跑（见下）。
 - **遗留（不属本 child）**：`data/` 之外 6 处裸 `conn.commit()`
   （combat_handlers.py:75、spirit_farm_manager.py:144、spirit_eye_manager.py:79/187、
   bounty_manager.py:671、dual_cultivation_manager.py:164），归 children C/D/E 接入时处理，
   已用 bd 登记。
+
+### 评审修正（2026-10-13，两轴 code-review 后）
+
+Standards/Spec 双轴评审（0 项 P0/P1），核实后修复以下各项：
+
+- **#3 docstring 契约**：模块头与 `BaseRepository` 原表述「传入 `as txn` 让出的连接」
+  有误（`_TransactionCM.__aenter__` 返回 CM 自身、无 `__getattr__` 转发）；改为明确
+  只能传 `db.conn`。children C/D/E 按此接入不会再撞 AttributeError。
+- **#5 CAS 漏版本静默冲突**：`cas_update_instance` 原 `expected.get("cas_version", 0)`
+  漏传时伪装成永远冲突 → 缺键直接 `ValueError`（校验先于任何 DB 写入），docstring
+  同步修正「单独传」的过时表述。
+- **a1 `PRAGMA foreign_key_check` fixture（PRD R1 点名）**：新增两测——fresh v38 十表
+  全灌关联行后零违例（逐表断言非空防平凡通过）；真实 v34→latest 升级链产物库同样
+  通过。原「FK 强制」测试的孤儿 IntegrityError 断言保留。
+- **a2 AC4 真并发**：新增 `asyncio.gather` 双任务交错测试——两 racer 读同一
+  cas_version 前像（Event 钉死交错点），先写者胜、后写者 CAS 败；另加 5 任务并发
+  `increment_daily_attempts`（limit=3）恰好 3 次成功不越帽。
+- **#2 §7 版本 checklist**：`metadata.yaml` 与 README 版本行 v3.19.0 → **v3.20.0**，
+  README 更新日志补 child P 工程条目（对照 child A/B 先例）。§7 第 3 项（修仙帮助
+  文本）不适用：无新指令、无玩法变更。
+- **#1 format 盲区补跑**：显式 `ruff format` 覆盖 `tests/`（新测试文件 1 处重排）；
+  重跑 `ruff format --check tests/ core data handlers managers utils main.py` →
+  **141 files already formatted**；`ruff check` 触及文件 All checks passed；
+  `pytest tests/ -q` → **1097 passed**（1092 + 本轮新增 5）。
+- **评审校准记录（不修）**：`CHECK(phase BETWEEN 1 AND 3)` 非越界——兄弟 PRD
+  world-boss-domain R5 明写三阶段；`increment_daily_attempts` 封顶后种子行留存是
+  单语句原子的实现前提，非缺陷；`_insert_or_read` 报错文案、data/ 门控同形代码
+  22 处收敛、parity 测试取材（合成回退 vs 真实 v34 链）列为后续建议——其中
+  fresh/upgrade 列序差异仅存在于合成口径，读路径全按列名，无实害，且用户已定
+  后续以功能完备态统一重建初始化模板。

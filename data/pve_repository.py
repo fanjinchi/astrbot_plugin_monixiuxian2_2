@@ -4,7 +4,8 @@
 本模块只提供 **schema 写入契约 + 幂等 / CAS / claim 原子原语**，不实现任何领域
 行为：不跑 CombatEngine、不计算逃跑与阶段、不渲染消息、不在数据库事务内等待
 网络。领域状态机（历练结算流程、世界 Boss 生命周期、群广播投递）由 children
-C/D/E 在 ``async with db.transaction() as txn:`` 内组合调用本模块。
+C/D/E 在 ``async with db.transaction():`` 内组合调用本模块（传入 ``db.conn``；
+``as txn`` 让出的是上下文管理器本身而非连接，不能作为 conn 传入）。
 
 约定（.trellis/tasks/10-10-pve-persistence-transaction-foundation/design.md）：
 
@@ -93,9 +94,10 @@ class BaseRepository:
     """Shared transaction-leaf plumbing for the PVE repositories.
 
     Args:
-        conn: Active aiosqlite connection. Pass the connection yielded by
-            ``async with db.transaction() as txn``（或 ``db.conn``）；仓储自身
-            不开启也不嵌套事务。
+        conn: Active aiosqlite connection — pass ``db.conn`` (inside
+            ``async with db.transaction():`` the manager yields itself, not
+            a connection, so ``txn`` must never be passed here). The
+            repository never opens or nests transactions itself.
     """
 
     def __init__(self, conn: aiosqlite.Connection):
@@ -626,19 +628,26 @@ class WorldBossRepository(BaseRepository):
         """Conditionally update an instance from the before-image the caller read.
 
         伤害写回与终态转换都走本方法：``expected`` 携带短读中参与校验的列
-        （``state``/``current_hp``/``expires_at`` 等，``cas_version`` 单独传），
-        任何一列不匹配即返回冲突 —— 并发挑战中失败的一方必须重读重算，
-        不能把旧战报强套到已被移动过的实例上。
+        （``state``/``current_hp``/``expires_at`` 等），且必须包含读到的
+        ``cas_version`` —— 任何一列不匹配即返回冲突，并发挑战中失败的一方
+        必须重读重算，不能把旧战报强套到已被移动过的实例上。漏传
+        ``cas_version`` 直接报错：静默按 0 处理会伪装成永远的版本冲突。
 
         Args:
             instance_id: Row to update.
-            expected: Extra predicate columns beyond the primary key.
+            expected: Extra predicate columns beyond the primary key; must
+                include ``cas_version`` from the caller's short read.
             **values: Columns to write.
 
         Returns:
             ``True`` if updated, ``False`` if the row moved underneath the caller.
         """
-        expected_version = int(expected.get("cas_version", 0) or 0)
+        if "cas_version" not in expected:
+            raise ValueError(
+                "expected must carry cas_version from the caller's read; "
+                "omitting it would masquerade as a permanent version conflict"
+            )
+        expected_version = int(expected["cas_version"])
         keys: dict[str, Any] = {k: v for k, v in expected.items() if k != "cas_version"}
         keys["instance_id"] = instance_id
         moved = await self._update_where(
