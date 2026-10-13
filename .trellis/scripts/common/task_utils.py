@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 # Path Safety
 # =============================================================================
 
+
 def is_within_tasks_dir(task_dir_abs: Path, repo_root: Path | None = None) -> bool:
     """Check that a resolved task directory really is a task under the tasks dir.
 
@@ -55,6 +56,7 @@ def is_within_tasks_dir(task_dir_abs: Path, repo_root: Path | None = None) -> bo
 # =============================================================================
 # Task Lookup
 # =============================================================================
+
 
 def find_task_by_name(task_name: str, tasks_dir: Path) -> Path | None:
     """Find task directory by name (exact or suffix match).
@@ -89,7 +91,8 @@ def find_task_by_name(task_name: str, tasks_dir: Path) -> Path | None:
 
     # Try suffix match (e.g., "my-task" matches "01-21-my-task")
     matches = sorted(
-        d for d in tasks_dir.iterdir()
+        d
+        for d in tasks_dir.iterdir()
         if d.is_dir() and d.name.endswith(f"-{task_name}")
     )
     if len(matches) == 1:
@@ -106,6 +109,7 @@ def find_task_by_name(task_name: str, tasks_dir: Path) -> Path | None:
 # =============================================================================
 # Archive Operations
 # =============================================================================
+
 
 def archive_destination_for(task_dir_abs: Path) -> Path:
     """Path a task would be archived to: <tasks>/archive/<YYYY-MM>/<name>."""
@@ -165,8 +169,7 @@ def archive_task_dir(task_dir_abs: Path, repo_root: Path | None = None) -> Path 
 
 
 def archive_task_complete(
-    task_dir_abs: Path,
-    repo_root: Path | None = None
+    task_dir_abs: Path, repo_root: Path | None = None
 ) -> dict[str, str]:
     """Complete archive workflow: archive directory.
 
@@ -191,6 +194,7 @@ def archive_task_complete(
 # =============================================================================
 # Task Directory Resolution
 # =============================================================================
+
 
 def resolve_task_dir(target_dir: str, repo_root: Path) -> Path | None:
     """Resolve task directory to an absolute path inside the tasks directory.
@@ -251,7 +255,10 @@ def resolve_task_dir(target_dir: str, repo_root: Path) -> Path | None:
         tasks_lexical = get_tasks_dir(repo_root.resolve())
         tasks_resolved = tasks_lexical.resolve()
     except (OSError, RuntimeError) as e:
-        print(f"Error: could not resolve task directory '{target_dir}': {e}", file=sys.stderr)
+        print(
+            f"Error: could not resolve task directory '{target_dir}': {e}",
+            file=sys.stderr,
+        )
         return None
 
     if resolved == tasks_resolved:
@@ -494,5 +501,7 @@ if __name__ == "__main__":
     tasks = get_tasks_dir(repo)
 
     print(f"Tasks dir: {tasks}")
-    print(f"resolve_task_dir('.trellis/tasks/test'): {resolve_task_dir('.trellis/tasks/test', repo)}")
+    print(
+        f"resolve_task_dir('.trellis/tasks/test'): {resolve_task_dir('.trellis/tasks/test', repo)}"
+    )
     print(f"resolve_task_dir('../test'): {resolve_task_dir('../test', repo)}")

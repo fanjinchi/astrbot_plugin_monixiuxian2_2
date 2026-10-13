@@ -123,6 +123,7 @@ MAX_CONVERGENCE_REFS = 100
 # Helper Functions
 # =============================================================================
 
+
 def get_latest_journal_info(dev_dir: Path) -> tuple[Path | None, int, int]:
     """Get latest journal file info.
 
@@ -189,7 +190,7 @@ def count_journal_files(dev_dir: Path, active_num: int) -> str:
     files = sorted(
         [f for f in dev_dir.glob(f"{FILE_JOURNAL_PREFIX}*.md") if f.is_file()],
         key=lambda f: _extract_journal_num(f.stem),
-        reverse=True
+        reverse=True,
     )
 
     for f in files:
@@ -295,7 +296,11 @@ def warn_if_parallel_worktree(repo_root: Path) -> None:
 
 
 def create_new_journal_file(
-    dev_dir: Path, num: int, developer: str, today: str, max_lines: int = 2000,
+    dev_dir: Path,
+    num: int,
+    developer: str,
+    today: str,
+    max_lines: int = 2000,
 ) -> Path | None:
     """Create a new journal file. Returns None when the write fails."""
     prev_num = num - 1
@@ -317,6 +322,7 @@ def create_new_journal_file(
 # =============================================================================
 # Commit evidence (R1) — accurate subjects or nothing
 # =============================================================================
+
 
 def parse_commit_tokens(commit: str) -> tuple[list[str], str | None]:
     """Split --commit into bounded hex OIDs. Returns (tokens, error)."""
@@ -340,14 +346,14 @@ def parse_commit_tokens(commit: str) -> tuple[list[str], str | None]:
     return tokens, None
 
 
-def parse_subject_overrides(values: list[str] | None) -> tuple[dict[str, str], str | None]:
+def parse_subject_overrides(
+    values: list[str] | None,
+) -> tuple[dict[str, str], str | None]:
     """Parse `--commit-subject <oid>=<subject>` into a one-to-one mapping."""
     overrides: dict[str, str] = {}
     for raw in values or []:
         if "=" not in raw:
-            return {}, (
-                f"invalid --commit-subject '{raw}': expected <oid>=<subject>"
-            )
+            return {}, (f"invalid --commit-subject '{raw}': expected <oid>=<subject>")
         oid_part, subject = raw.split("=", 1)
         oid = oid_part.strip().lower()
         subject = subject.strip()
@@ -440,6 +446,7 @@ def escape_markdown_cell(text: str) -> str:
 # Record identity (R2)
 # =============================================================================
 
+
 def _normalize_text(value: str | None) -> str:
     return " ".join((value or "").split())
 
@@ -526,6 +533,7 @@ def render_legacy_marker(fingerprint: str) -> str:
 # Session numbering (collision-proof across concurrent branches)
 # =============================================================================
 
+
 def _repo_relative(repo_root: Path, path: Path) -> str | None:
     try:
         return path.resolve().relative_to(repo_root.resolve()).as_posix()
@@ -574,9 +582,7 @@ def _convergence_refs(repo_root: Path) -> list[str]:
     default = _default_branch_local(repo_root)
     if default:
         for ref in (f"refs/heads/{default}", f"refs/remotes/origin/{default}"):
-            rc, _, _ = run_git(
-                ["show-ref", "--verify", "--quiet", ref], cwd=repo_root
-            )
+            rc, _, _ = run_git(["show-ref", "--verify", "--quiet", ref], cwd=repo_root)
             if rc == 0:
                 add(ref)
 
@@ -666,9 +672,7 @@ def resolve_next_session(repo_root: Path, dev_dir: Path, index_file: Path) -> in
     if dev_rel:
         highest = max(
             highest,
-            _max_session_across_refs(
-                repo_root, _convergence_refs(repo_root), dev_rel
-            ),
+            _max_session_across_refs(repo_root, _convergence_refs(repo_root), dev_rel),
         )
 
     return highest + 1
@@ -677,6 +681,7 @@ def resolve_next_session(repo_root: Path, dev_dir: Path, index_file: Path) -> in
 # =============================================================================
 # Pending-record classifier (R3/R4)
 # =============================================================================
+
 
 def find_marker_entries(dev_dir: Path, marker: str) -> list[tuple[Path, int | None]]:
     """Locate every journal entry carrying `marker`.
@@ -753,7 +758,7 @@ def _entry_date_at(lines: list[str], marker_index: int) -> str | None:
     spacing around the header ever changes, and stops well before it could
     reach the next entry.
     """
-    for line in lines[marker_index + 1:marker_index + 6]:
+    for line in lines[marker_index + 1 : marker_index + 6]:
         match = ENTRY_DATE_RE.match(line.strip())
         if match:
             return match.group(1)
@@ -833,18 +838,28 @@ def classify_record(
 
     if len(hits) > 1:
         files = ", ".join(sorted({p.name for p, _ in hits}))
-        return "", None, None, (
-            f"found {len(hits)} journal entries carrying this record's marker "
-            f"({files}). Refusing to guess which one to resume — remove the "
-            "duplicate entry or pass --idempotency-key to record a new session."
+        return (
+            "",
+            None,
+            None,
+            (
+                f"found {len(hits)} journal entries carrying this record's marker "
+                f"({files}). Refusing to guess which one to resume — remove the "
+                "duplicate entry or pass --idempotency-key to record a new session."
+            ),
         )
 
     journal_file, session_num = hits[0]
     if session_num is None:
-        return "", None, None, (
-            f"{journal_file.name} carries this record's marker without a "
-            "'## Session N:' heading above it. The pending record is malformed; "
-            "repair it by hand before retrying."
+        return (
+            "",
+            None,
+            None,
+            (
+                f"{journal_file.name} carries this record's marker without a "
+                "'## Session N:' heading above it. The pending record is malformed; "
+                "repair it by hand before retrying."
+            ),
         )
 
     head_content = content_at_head(repo_root, journal_file)
@@ -856,10 +871,15 @@ def classify_record(
 
     recorded_total = get_current_session(index_file)
     if recorded_total > session_num:
-        return "", None, None, (
-            f"journal entry for session {session_num} has no index row, but "
-            f"index.md already counts {recorded_total} sessions. Repairing the "
-            "row would rewrite a later record — resolve index.md by hand."
+        return (
+            "",
+            None,
+            None,
+            (
+                f"journal entry for session {session_num} has no index row, but "
+                f"index.md already counts {recorded_total} sessions. Repairing the "
+                "row would rewrite a later record — resolve index.md by hand."
+            ),
         )
 
     return STATE_JOURNAL_RECORDED, journal_file, session_num, None
@@ -869,7 +889,10 @@ def classify_record(
 # Rendering
 # =============================================================================
 
-def _render_bullet_section(header: str, items: list[str], bullet_prefix: str = "- ") -> str:
+
+def _render_bullet_section(
+    header: str, items: list[str], bullet_prefix: str = "- "
+) -> str:
     """Render a Markdown section as bullets, or "" when there is no content.
 
     A section with zero provided values is omitted entirely from the
@@ -917,7 +940,9 @@ def generate_session_content(
     branch_line = f"\n**Branch**: `{branch}`" if branch else ""
 
     main_changes_section = _render_main_changes(changes or [], extra_content)
-    testing_section = _render_bullet_section("Testing", tests or [], bullet_prefix="- [OK] ")
+    testing_section = _render_bullet_section(
+        "Testing", tests or [], bullet_prefix="- [OK] "
+    )
     next_steps_section = _render_bullet_section("Next Steps", next_steps or [])
 
     return f"""
@@ -976,7 +1001,10 @@ def update_index(
     content = index_file.read_text(encoding="utf-8")
 
     if "@@@auto:current-status" not in content:
-        print("Error: Markers not found in index.md. Please ensure markers exist.", file=sys.stderr)
+        print(
+            "Error: Markers not found in index.md. Please ensure markers exist.",
+            file=sys.stderr,
+        )
         return False
 
     # Process sections
@@ -1040,15 +1068,22 @@ def update_index(
             ):
                 new_lines.append("| # | Date | Title | Commits | Branch |")
                 continue
-            if re.match(r"^\|\s*#\s*\|\s*Date\s*\|\s*Title\s*\|\s*Commits\s*\|\s*Branch\s*\|\s*$", line):
+            if re.match(
+                r"^\|\s*#\s*\|\s*Date\s*\|\s*Title\s*\|\s*Commits\s*\|\s*Branch\s*\|\s*$",
+                line,
+            ):
                 new_lines.append("| # | Date | Title | Commits | Branch |")
                 continue
-            if re.match(r"^\|\s*#\s*\|\s*Date\s*\|\s*Title\s*\|\s*Commits\s*\|\s*$", line):
+            if re.match(
+                r"^\|\s*#\s*\|\s*Date\s*\|\s*Title\s*\|\s*Commits\s*\|\s*$", line
+            ):
                 new_lines.append("| # | Date | Title | Commits | Branch |")
                 continue
             if re.match(r"^\|[-| ]+\|\s*$", line) and not header_written:
                 new_lines.append("|---|------|-------|---------|--------|")
-                new_lines.append(f"| {new_session} | {today} | {title} | {commit_display} | `{branch or '-'}` |")
+                new_lines.append(
+                    f"| {new_session} | {today} | {title} | {commit_display} | `{branch or '-'}` |"
+                )
                 header_written = True
                 continue
             new_lines.append(line)
@@ -1066,6 +1101,7 @@ def update_index(
 # =============================================================================
 # Main Function
 # =============================================================================
+
 
 def _auto_commit_workspace(repo_root: Path) -> str:
     """Stage Trellis-owned workspace + current-task paths and commit.
@@ -1139,9 +1175,7 @@ def _auto_commit_workspace(repo_root: Path) -> str:
         return COMMIT_FAILED
 
     # Check if there are staged changes for the paths we just staged.
-    rc, _, _ = run_git(
-        ["diff", "--cached", "--quiet", "--", *paths], cwd=repo_root
-    )
+    rc, _, _ = run_git(["diff", "--cached", "--quiet", "--", *paths], cwd=repo_root)
     if rc == 0:
         print("[OK] No workspace changes to commit.", file=sys.stderr)
         return COMMIT_SKIPPED
@@ -1244,8 +1278,17 @@ def add_session(
     today = datetime.now().strftime("%Y-%m-%d")
 
     payload = _fingerprint_payload(
-        developer, title, summary, package, branch, evidence,
-        changes, extra_content, tests, next_steps, idempotency_key,
+        developer,
+        title,
+        summary,
+        package,
+        branch,
+        evidence,
+        changes,
+        extra_content,
+        tests,
+        next_steps,
+        idempotency_key,
     )
     marker = render_marker(compute_record_fingerprint(payload))
 
@@ -1311,8 +1354,17 @@ def add_session(
         new_session = resolve_next_session(repo_root, dev_dir, index_file)
 
         session_content = generate_session_content(
-            new_session, title, evidence, summary, today, marker, package, branch,
-            changes=changes, extra_content=extra_content, tests=tests,
+            new_session,
+            title,
+            evidence,
+            summary,
+            today,
+            marker,
+            package,
+            branch,
+            changes=changes,
+            extra_content=extra_content,
+            tests=tests,
             next_steps=next_steps,
         )
         content_lines = len(session_content.splitlines())
@@ -1321,7 +1373,10 @@ def add_session(
         print(f"Title: {title}", file=sys.stderr)
         print(f"Commit: {format_commit_display(evidence)}", file=sys.stderr)
         print("", file=sys.stderr)
-        print(f"Current journal file: {FILE_JOURNAL_PREFIX}{current_num}.md", file=sys.stderr)
+        print(
+            f"Current journal file: {FILE_JOURNAL_PREFIX}{current_num}.md",
+            file=sys.stderr,
+        )
         print(f"Current lines: {current_lines}", file=sys.stderr)
         print(f"New content lines: {content_lines}", file=sys.stderr)
         print(f"Total after append: {current_lines + content_lines}", file=sys.stderr)
@@ -1332,8 +1387,13 @@ def add_session(
 
         if current_lines + content_lines > max_lines:
             target_num = current_num + 1
-            print(f"[!] Exceeds {max_lines} lines, creating {FILE_JOURNAL_PREFIX}{target_num}.md", file=sys.stderr)
-            target_file = create_new_journal_file(dev_dir, target_num, developer, today, max_lines)
+            print(
+                f"[!] Exceeds {max_lines} lines, creating {FILE_JOURNAL_PREFIX}{target_num}.md",
+                file=sys.stderr,
+            )
+            target_file = create_new_journal_file(
+                dev_dir, target_num, developer, today, max_lines
+            )
             if target_file is None:
                 print(
                     f"Error: failed to create {FILE_JOURNAL_PREFIX}{target_num}.md; "
@@ -1351,7 +1411,9 @@ def add_session(
             return 1
 
         try:
-            existing = target_file.read_text(encoding="utf-8") if target_file.is_file() else ""
+            existing = (
+                target_file.read_text(encoding="utf-8") if target_file.is_file() else ""
+            )
         except OSError as exc:
             print(f"Error: cannot read {target_file}: {exc}", file=sys.stderr)
             return 1
@@ -1453,6 +1515,7 @@ def add_session(
 # Main Entry
 # =============================================================================
 
+
 def main() -> int:
     """CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -1477,13 +1540,19 @@ def main() -> int:
             "(repeatable). The mapping must be one-to-one with --commit."
         ),
     )
-    parser.add_argument("--summary", default="Session summary was not supplied.", help="Brief summary")
+    parser.add_argument(
+        "--summary", default="Session summary was not supplied.", help="Brief summary"
+    )
     parser.add_argument("--content-file", help="Path to file with detailed content")
     parser.add_argument("--package", help="Package name tag (e.g., cli, docs-site)")
     parser.add_argument("--branch", help="Branch name (auto-detected if omitted)")
-    parser.add_argument("--change", action="append", help="Main Changes bullet (repeatable)")
+    parser.add_argument(
+        "--change", action="append", help="Main Changes bullet (repeatable)"
+    )
     parser.add_argument("--test", action="append", help="Testing bullet (repeatable)")
-    parser.add_argument("--next-step", action="append", help="Next Steps bullet (repeatable)")
+    parser.add_argument(
+        "--next-step", action="append", help="Next Steps bullet (repeatable)"
+    )
     parser.add_argument(
         "--idempotency-key",
         help=(
@@ -1491,10 +1560,14 @@ def main() -> int:
             "already-committed identical record a no-op instead of a new session."
         ),
     )
-    parser.add_argument("--no-commit", action="store_true",
-                        help="Skip auto-commit of workspace changes")
-    parser.add_argument("--stdin", action="store_true",
-                        help="Read extra content from stdin (explicit opt-in)")
+    parser.add_argument(
+        "--no-commit", action="store_true", help="Skip auto-commit of workspace changes"
+    )
+    parser.add_argument(
+        "--stdin",
+        action="store_true",
+        help="Read extra content from stdin (explicit opt-in)",
+    )
 
     args = parser.parse_args()
 
@@ -1520,7 +1593,10 @@ def main() -> int:
         elif not validate_package(package, repo_root):
             packages = get_packages(repo_root)
             available = ", ".join(sorted(packages.keys())) if packages else "(none)"
-            print(f"Error: unknown package '{package}'. Available: {available}", file=sys.stderr)
+            print(
+                f"Error: unknown package '{package}'. Available: {available}",
+                file=sys.stderr,
+            )
             return 1
     else:
         # Inferred: active task's task.json.package → default_package → None
@@ -1530,8 +1606,12 @@ def main() -> int:
     branch = resolve_session_branch(repo_root, args.branch, task_data)
 
     return add_session(
-        args.title, args.commit, args.summary,
-        changes=args.change, extra_content=extra_content, tests=args.test,
+        args.title,
+        args.commit,
+        args.summary,
+        changes=args.change,
+        extra_content=extra_content,
+        tests=args.test,
         next_steps=args.next_step,
         auto_commit=not args.no_commit,
         package=package,

@@ -98,14 +98,10 @@ def safe_trellis_paths_to_add(
         if ws.is_dir():
             for f in sorted(ws.glob(f"{FILE_JOURNAL_PREFIX}*.md")):
                 if f.is_file():
-                    paths.append(
-                        f"{DIR_WORKFLOW}/{DIR_WORKSPACE}/{developer}/{f.name}"
-                    )
+                    paths.append(f"{DIR_WORKFLOW}/{DIR_WORKSPACE}/{developer}/{f.name}")
             index_md = ws / "index.md"
             if index_md.is_file():
-                paths.append(
-                    f"{DIR_WORKFLOW}/{DIR_WORKSPACE}/{developer}/index.md"
-                )
+                paths.append(f"{DIR_WORKFLOW}/{DIR_WORKSPACE}/{developer}/index.md")
 
     tasks_dir = repo_root / DIR_WORKFLOW / DIR_TASKS
     if not tasks_dir.is_dir():
@@ -120,9 +116,7 @@ def safe_trellis_paths_to_add(
             paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{task_name}")
         archived_task = tasks_dir / DIR_ARCHIVE / task_name
         if archived_task.is_dir():
-            paths.append(
-                f"{DIR_WORKFLOW}/{DIR_TASKS}/{DIR_ARCHIVE}/{task_name}"
-            )
+            paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{DIR_ARCHIVE}/{task_name}")
         return paths
 
     # Legacy wide scope (no task_name): each direct child of tasks/ that is a
@@ -179,9 +173,7 @@ def safe_archive_paths_to_add(
         # handles the source-side deletes via `git rm --cached`
         # explicitly.
         if archive_dir.is_dir():
-            paths.append(
-                f"{DIR_WORKFLOW}/{DIR_TASKS}/{DIR_ARCHIVE}"
-            )
+            paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{DIR_ARCHIVE}")
         for child_name in modified_children or []:
             paths.append(f"{DIR_WORKFLOW}/{DIR_TASKS}/{child_name}")
         return paths

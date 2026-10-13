@@ -75,7 +75,10 @@ def read_json_checked(path: Path) -> tuple[dict | None, str | None]:
 def describe_json_read_failure(path: Path, reason: str | None) -> tuple[str, str]:
     """Return ``(what happened, what to do)`` for a read_json_checked reason."""
     if reason == JSON_READ_MISSING:
-        return (f"{path}: file not found", "Pass an existing task directory, or create the task first.")
+        return (
+            f"{path}: file not found",
+            "Pass an existing task directory, or create the task first.",
+        )
     if reason == JSON_READ_UNREADABLE:
         return (
             f"{path}: could not be read (permission denied or I/O error)",

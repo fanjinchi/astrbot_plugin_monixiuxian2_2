@@ -43,6 +43,7 @@ _run_git_command = run_git
 # Main Entry
 # =============================================================================
 
+
 def main() -> None:
     """CLI entry point."""
     import argparse
@@ -90,9 +91,7 @@ def main() -> None:
             else:
                 parser.exit(2, "Phase Index section not found in workflow.md\n")
         if args.platform:
-            effective = resolve_effective_platform(
-                args.platform, read_trellis_config()
-            )
+            effective = resolve_effective_platform(args.platform, read_trellis_config())
             content = filter_platform(content, effective)
         print(content, end="")
     else:

@@ -49,7 +49,7 @@ If the user wants only one platform to avoid sub-agents, first confirm whether t
 
 | `status` | Artifact state | Resume at |
 | --- | --- | --- |
-| `planning` | `prd.md` missing | Phase 1.1 (load `trellis-brainstorm`) |
+| `planning` | `prd.md` missing | Phase 1.1 (load `grill-with-docs`) |
 | `planning` | lightweight task with `prd.md` complete | ask for start review, then run `task.py start` |
 | `planning` | complex task missing `design.md` or `implement.md` | complete missing planning artifacts |
 | `planning` | complex task has `prd.md`, `design.md`, and `implement.md` | ask for start review, then run `task.py start` |

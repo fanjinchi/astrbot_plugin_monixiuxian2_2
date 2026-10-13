@@ -36,7 +36,7 @@ Index files list the specific guideline docs to read when you actually start cod
 ## Step 4: Decide next action
 From Step 1 you know the current task and status. Check the task directory:
 
-- **Active task status `planning` + no `prd.md`** → Phase 1.1. Load the `trellis-brainstorm` skill.
+- **Active task status `planning` + no `prd.md`** → Phase 1.1. Load the `grill-with-docs` skill.
 - **Active task status `planning` + `prd.md` exists** → stay in Phase 1. Lightweight tasks can be PRD-only; complex tasks need `design.md` + `implement.md`. Load the relevant Phase 1 step detail before `task.py start`.
 - **Active task status `in_progress`** → Phase 2 step 2.1. Load the step detail:
   ```bash
@@ -50,7 +50,7 @@ From Step 1 you know the current task and status. Check the task directory:
 
 | User intent | Skill |
 |---|---|
-| New feature / unclear requirements | `trellis-brainstorm` |
+| New feature / unclear requirements | `grill-with-docs` |
 | About to write code | `trellis-before-dev` |
 | Done coding / quality check | `trellis-check` |
 | Stuck / fixed same bug multiple times | `trellis-break-loop` |

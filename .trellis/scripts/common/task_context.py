@@ -60,6 +60,7 @@ _CODE_FILE_EXTENSIONS = {
 # Command: add-context
 # =============================================================================
 
+
 def cmd_add_context(args: argparse.Namespace) -> int:
     """Add entry to JSONL context file."""
     repo_root = get_repo_root()
@@ -78,10 +79,12 @@ def cmd_add_context(args: argparse.Namespace) -> int:
     # The JSONL name is user input joined onto the task dir — keep it a plain
     # filename so it cannot create files elsewhere.
     if "/" in jsonl_name or "\\" in jsonl_name or jsonl_name in (".", ".."):
-        print(colored(
-            f"Error: context file must be a plain name (e.g. implement, check): {jsonl_name}",
-            Colors.RED,
-        ))
+        print(
+            colored(
+                f"Error: context file must be a plain name (e.g. implement, check): {jsonl_name}",
+                Colors.RED,
+            )
+        )
         return 1
 
     # Support shorthand
@@ -124,6 +127,7 @@ def cmd_add_context(args: argparse.Namespace) -> int:
 # =============================================================================
 # Command: validate
 # =============================================================================
+
 
 def curated_entry_count(jsonl_file: Path) -> int | None:
     """Count curated entries in a jsonl context manifest.
@@ -267,7 +271,9 @@ def _resolve_context_entry_path(
     return resolved_path
 
 
-def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = None) -> int:
+def _validate_jsonl(
+    jsonl_file: Path, repo_root: Path, task_dir: Path | None = None
+) -> int:
     """Validate a single JSONL file.
 
     ``{"_example": ...}`` placeholder rows written by older Trellis versions
@@ -349,12 +355,16 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
         full_path = _resolve_context_entry_path(file_path, repo_root, task_dir)
         if entry_type == "directory":
             if full_path is None or not full_path.is_dir():
-                print(f"  {colored(f'{file_name}:{line_num}: Directory not found: {file_path}', Colors.RED)}")
+                print(
+                    f"  {colored(f'{file_name}:{line_num}: Directory not found: {file_path}', Colors.RED)}"
+                )
                 errors += 1
             continue
 
         if full_path is None or not full_path.is_file():
-            print(f"  {colored(f'{file_name}:{line_num}: File not found: {file_path}', Colors.RED)}")
+            print(
+                f"  {colored(f'{file_name}:{line_num}: File not found: {file_path}', Colors.RED)}"
+            )
             errors += 1
             continue
 
@@ -394,7 +404,7 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
             f"  {colored(f'{file_name}: ✗ (0 curated entries — sub-agents would get zero spec context)', Colors.RED)}"
         )
         print(
-            f"    Curate it:  python3 .trellis/scripts/task.py add-context <task> {action} <path> \"<why>\""
+            f'    Curate it:  python3 .trellis/scripts/task.py add-context <task> {action} <path> "<why>"'
         )
         print(
             "    Intentionally empty? Bypass at start: task.py start <task> --allow-empty-context"
@@ -412,6 +422,7 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
 # =============================================================================
 # Command: list-context
 # =============================================================================
+
 
 def cmd_list_context(args: argparse.Namespace) -> int:
     """List JSONL context entries."""

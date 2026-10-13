@@ -132,9 +132,7 @@ def get_session_auto_commit(repo_root: Path | None = None) -> bool:
     """
     config = _load_config(repo_root)
     raw = config.get("session_auto_commit", DEFAULT_SESSION_AUTO_COMMIT)
-    return coerce_config_bool(
-        raw, DEFAULT_SESSION_AUTO_COMMIT, "session_auto_commit"
-    )
+    return coerce_config_bool(raw, DEFAULT_SESSION_AUTO_COMMIT, "session_auto_commit")
 
 
 def get_codex_dispatch_mode(repo_root: Path | None = None) -> str:

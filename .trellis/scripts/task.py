@@ -80,6 +80,7 @@ from common.task_context import (
 # Command: start / finish
 # =============================================================================
 
+
 def _record_start_state(
     task_json_path: Path,
     repo_root: Path,
@@ -188,7 +189,9 @@ def cmd_start(args: argparse.Namespace) -> int:
 
     if not full_path.is_dir():
         print(colored(f"Error: Task not found: {task_input}", Colors.RED))
-        print("Hint: Use task name (e.g., 'my-task') or full path (e.g., '.trellis/tasks/01-31-my-task')")
+        print(
+            "Hint: Use task name (e.g., 'my-task') or full path (e.g., '.trellis/tasks/01-31-my-task')"
+        )
         return 1
 
     # Context-manifest gate (#573): a seeded-but-uncurated implement/check
@@ -203,13 +206,17 @@ def cmd_start(args: argparse.Namespace) -> int:
             if curated_entry_count(full_path / name) == 0
         ]
         if empty_manifests:
-            print(colored(
-                f"Error: {' and '.join(empty_manifests)} "
-                f"{'has' if len(empty_manifests) == 1 else 'have'} no curated entries",
-                Colors.RED,
-            ))
+            print(
+                colored(
+                    f"Error: {' and '.join(empty_manifests)} "
+                    f"{'has' if len(empty_manifests) == 1 else 'have'} no curated entries",
+                    Colors.RED,
+                )
+            )
             print("Sub-agents (implement/check) would run with zero spec context.")
-            print(f"  Curate:  python3 .trellis/scripts/task.py add-context {task_input} implement <path> \"<why>\"")
+            print(
+                f'  Curate:  python3 .trellis/scripts/task.py add-context {task_input} implement <path> "<why>"'
+            )
             print(f"  Verify:  python3 .trellis/scripts/task.py validate {task_input}")
             print("  Intentionally empty? Re-run start with --allow-empty-context")
             return 1
@@ -227,7 +234,9 @@ def cmd_start(args: argparse.Namespace) -> int:
         # an absolute-path fallback) is exactly the pattern that let a `..`
         # ref escape into storage before this fix.
         print(colored(f"Error: Task not found: {task_input}", Colors.RED))
-        print("Hint: Use task name (e.g., 'my-task') or full path (e.g., '.trellis/tasks/01-31-my-task')")
+        print(
+            "Hint: Use task name (e.g., 'my-task') or full path (e.g., '.trellis/tasks/01-31-my-task')"
+        )
         return 1
 
     task_json_path = full_path / FILE_TASK_JSON
@@ -237,16 +246,20 @@ def cmd_start(args: argparse.Namespace) -> int:
         # Hook didn't inject TRELLIS_CONTEXT_ID (common on Windows + Claude Code,
         # --continue resume path, fork distribution, hooks disabled, etc.). Skip
         # per-session pointer write; AI continues based on conversation context.
-        print(colored(
-            "ℹ Session identity not available; active-task pointer not persisted "
-            "this session (degraded mode). AI continues based on conversation context.",
-            Colors.YELLOW,
-        ))
-        print(colored(
-            "Hint: run inside an AI IDE/session that exposes session identity, "
-            "or set TRELLIS_CONTEXT_ID before running task.py start.",
-            Colors.YELLOW,
-        ))
+        print(
+            colored(
+                "ℹ Session identity not available; active-task pointer not persisted "
+                "this session (degraded mode). AI continues based on conversation context.",
+                Colors.YELLOW,
+            )
+        )
+        print(
+            colored(
+                "Hint: run inside an AI IDE/session that exposes session identity, "
+                "or set TRELLIS_CONTEXT_ID before running task.py start.",
+                Colors.YELLOW,
+            )
+        )
 
         # Still flip task.json status: planning → in_progress so downstream phases proceed.
         if task_json_path.is_file():
@@ -263,7 +276,12 @@ def cmd_start(args: argparse.Namespace) -> int:
             _record_start_state(task_json_path, repo_root)
 
         print()
-        print(colored("The hook will now inject context from this task's jsonl files.", Colors.BLUE))
+        print(
+            colored(
+                "The hook will now inject context from this task's jsonl files.",
+                Colors.BLUE,
+            )
+        )
 
         run_task_hooks("after_start", task_json_path, repo_root)
         return 0
@@ -353,6 +371,7 @@ def cmd_current(args: argparse.Namespace) -> int:
 # Command: list
 # =============================================================================
 
+
 def _display_status(t, all_statuses: dict) -> str:
     """Return the status label to show for a task in `list` output.
 
@@ -400,24 +419,31 @@ def cmd_list(args: argparse.Namespace) -> int:
                 continue
             if filter_status and t.status != filter_status:
                 continue
-            items.append({
-                "dir": f"{DIR_WORKFLOW}/{DIR_TASKS}/{dir_name}",
-                "id": t.raw.get("id") or dir_name,
-                "title": t.title,
-                "status": t.status,
-                "display_status": _display_status(t, all_statuses),
-                "priority": t.priority,
-                "assignee": t.assignee or None,
-                "parent": t.parent,
-                "children": list(t.children),
-                "package": t.package,
-            })
+            items.append(
+                {
+                    "dir": f"{DIR_WORKFLOW}/{DIR_TASKS}/{dir_name}",
+                    "id": t.raw.get("id") or dir_name,
+                    "title": t.title,
+                    "status": t.status,
+                    "display_status": _display_status(t, all_statuses),
+                    "priority": t.priority,
+                    "assignee": t.assignee or None,
+                    "parent": t.parent,
+                    "children": list(t.children),
+                    "package": t.package,
+                }
+            )
         print(json.dumps({"tasks": items}, ensure_ascii=False))
         return 0
 
     if filter_mine:
         if not developer:
-            print(colored("Error: No developer set. Run init_developer.py first", Colors.RED), file=sys.stderr)
+            print(
+                colored(
+                    "Error: No developer set. Run init_developer.py first", Colors.RED
+                ),
+                file=sys.stderr,
+            )
             print(DEVELOPER_HINT, file=sys.stderr)
             return 1
         print(colored(f"My tasks (assignee: {developer}):", Colors.BLUE))
@@ -457,7 +483,9 @@ def cmd_list(args: argparse.Namespace) -> int:
         if filter_mine:
             print(f"{prefix}{dir_name}/ ({status_label}){pkg_tag}{progress}{marker}")
         else:
-            print(f"{prefix}{dir_name}/ ({status_label}){pkg_tag}{progress} [{colored(t.assignee or '-', Colors.CYAN)}]{marker}")
+            print(
+                f"{prefix}{dir_name}/ ({status_label}){pkg_tag}{progress} [{colored(t.assignee or '-', Colors.CYAN)}]{marker}"
+            )
         count += 1
 
         # Print children indented
@@ -487,6 +515,7 @@ def cmd_list(args: argparse.Namespace) -> int:
 # =============================================================================
 # Command: list-archive
 # =============================================================================
+
 
 def cmd_list_archive(args: argparse.Namespace) -> int:
     """List archived tasks."""
@@ -521,6 +550,7 @@ def cmd_list_archive(args: argparse.Namespace) -> int:
 # =============================================================================
 # Help
 # =============================================================================
+
 
 def show_usage() -> None:
     """Show usage help."""
@@ -595,6 +625,7 @@ Examples:
 # Main Entry
 # =============================================================================
 
+
 def main() -> int:
     """CLI entry point."""
     # Deprecation guard: `init-context` was removed in v0.5.0-beta.12.
@@ -616,7 +647,10 @@ def main() -> int:
             "sub-agent-capable platforms and curated by the AI during planning when needed.",
             file=sys.stderr,
         )
-        print("See .trellis/workflow.md planning artifact guidance or run:", file=sys.stderr)
+        print(
+            "See .trellis/workflow.md planning artifact guidance or run:",
+            file=sys.stderr,
+        )
         print(
             "  python3 ./.trellis/scripts/get_context.py --mode phase --step 1",
             file=sys.stderr,
@@ -636,7 +670,9 @@ def main() -> int:
     # create
     p_create = subparsers.add_parser("create", help="Create new task")
     p_create.add_argument("title", help="Task title (required, non-empty)")
-    p_create.add_argument("--slug", "-s", help="Task slug without the MM-DD date prefix")
+    p_create.add_argument(
+        "--slug", "-s", help="Task slug without the MM-DD date prefix"
+    )
     p_create.add_argument("--assignee", "-a", help="Assignee developer")
     p_create.add_argument("--priority", "-p", default="P2", help="Priority (P0-P3)")
     p_create.add_argument(
@@ -644,7 +680,9 @@ def main() -> int:
         "-d",
         help="Task description (required, non-empty — an empty one is refused at archive)",
     )
-    p_create.add_argument("--parent", help="Parent task directory (establishes subtask link)")
+    p_create.add_argument(
+        "--parent", help="Parent task directory (establishes subtask link)"
+    )
     p_create.add_argument("--package", help="Package name for monorepo projects")
     p_create.add_argument(
         "--base-branch",
@@ -692,10 +730,12 @@ def main() -> int:
 
     # current
     p_current = subparsers.add_parser("current", help="Show active task")
-    p_current.add_argument("--source", action="store_true",
-                           help="Show active task source")
-    p_current.add_argument("--json", action="store_true",
-                           help="Output machine-readable JSON")
+    p_current.add_argument(
+        "--source", action="store_true", help="Show active task source"
+    )
+    p_current.add_argument(
+        "--json", action="store_true", help="Output machine-readable JSON"
+    )
 
     # finish
     subparsers.add_parser("finish", help="Clear active task")
@@ -716,7 +756,9 @@ def main() -> int:
     p_scope.add_argument("scope", help="Scope name")
 
     # set-meta
-    p_setmeta = subparsers.add_parser("set-meta", help="Set/overwrite a task metadata key")
+    p_setmeta = subparsers.add_parser(
+        "set-meta", help="Set/overwrite a task metadata key"
+    )
     p_setmeta.add_argument("dir", help="Task directory")
     p_setmeta.add_argument("key", help="Metadata key")
     p_setmeta.add_argument("value", help="Metadata value")
@@ -734,7 +776,9 @@ def main() -> int:
     # archive
     p_archive = subparsers.add_parser("archive", help="Archive task")
     p_archive.add_argument("name", help="Task directory or name")
-    p_archive.add_argument("--no-commit", action="store_true", help="Skip auto git commit after archive")
+    p_archive.add_argument(
+        "--no-commit", action="store_true", help="Skip auto git commit after archive"
+    )
     p_archive.add_argument(
         "--skip-branch-validation",
         action="store_true",
@@ -748,7 +792,9 @@ def main() -> int:
     p_list = subparsers.add_parser("list", help="List tasks")
     p_list.add_argument("--mine", "-m", action="store_true", help="My tasks only")
     p_list.add_argument("--status", "-s", help="Filter by status")
-    p_list.add_argument("--json", action="store_true", help="Output machine-readable JSON")
+    p_list.add_argument(
+        "--json", action="store_true", help="Output machine-readable JSON"
+    )
 
     # add-subtask
     p_addsub = subparsers.add_parser("add-subtask", help="Link child task to parent")
@@ -756,7 +802,9 @@ def main() -> int:
     p_addsub.add_argument("child_dir", help="Child task directory")
 
     # remove-subtask
-    p_rmsub = subparsers.add_parser("remove-subtask", help="Unlink child task from parent")
+    p_rmsub = subparsers.add_parser(
+        "remove-subtask", help="Unlink child task from parent"
+    )
     p_rmsub.add_argument("parent_dir", help="Parent task directory")
     p_rmsub.add_argument("child_dir", help="Child task directory")
 

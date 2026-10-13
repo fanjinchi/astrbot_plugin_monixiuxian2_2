@@ -48,9 +48,7 @@ from .paths import (
 
 _PACKAGE_NAME = "@mindfoldhq/trellis"
 _UPDATE_CHECK_TIMEOUT_SECONDS = 1.0
-_VERSION_RE = re.compile(
-    r"^\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?\s*$"
-)
+_VERSION_RE = re.compile(r"^\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?\s*$")
 _VERSION_TOKEN_RE = re.compile(r"\b\d+(?:\.\d+){1,2}(?:-[0-9A-Za-z.-]+)?\b")
 _POLYREPO_IGNORED_DIRS = {
     "node_modules",
@@ -320,9 +318,9 @@ def _append_package_git_context(lines: list[str], package_git_info: list[dict]) 
 
 def _read_project_version(repo_root: Path) -> str | None:
     try:
-        version = (repo_root / DIR_WORKFLOW / ".version").read_text(
-            encoding="utf-8"
-        ).strip()
+        version = (
+            (repo_root / DIR_WORKFLOW / ".version").read_text(encoding="utf-8").strip()
+        )
     except OSError:
         return None
     return version or None
@@ -366,7 +364,9 @@ def _resolve_available_update_version() -> str | None:
     return _extract_available_update_version(output)
 
 
-def _parse_version(version: str) -> tuple[tuple[int, int, int], tuple[str, ...] | None] | None:
+def _parse_version(
+    version: str,
+) -> tuple[tuple[int, int, int], tuple[str, ...] | None] | None:
     match = _VERSION_RE.match(version)
     if not match:
         return None
@@ -435,10 +435,7 @@ def _update_marker_path(repo_root: Path, context_key: str | None = None) -> Path
     if not safe_key:
         safe_key = "session"
     return (
-        repo_root
-        / DIR_WORKFLOW
-        / ".runtime"
-        / f"update-check-{safe_key[:160]}.marker"
+        repo_root / DIR_WORKFLOW / ".runtime" / f"update-check-{safe_key[:160]}.marker"
     )
 
 
@@ -490,6 +487,7 @@ def get_update_hint(repo_root: Path, context_key: str | None = None) -> str | No
 # =============================================================================
 # JSON Output
 # =============================================================================
+
 
 def get_context_json(repo_root: Path | None = None) -> dict:
     """Get context as a dictionary.
@@ -574,6 +572,7 @@ def output_json(repo_root: Path | None = None) -> None:
 # =============================================================================
 # Text Output
 # =============================================================================
+
 
 def get_context_text(repo_root: Path | None = None) -> str:
     """Get context as formatted text.
@@ -725,6 +724,7 @@ def get_context_text(repo_root: Path | None = None) -> str:
 # Record Mode
 # =============================================================================
 
+
 def get_context_record_json(repo_root: Path | None = None) -> dict:
     """Get record-mode context as a dictionary.
 
@@ -746,19 +746,20 @@ def get_context_record_json(repo_root: Path | None = None) -> dict:
     for t in all_tasks_list:
         if t.assignee == developer:
             done = sum(
-                1 for c in t.children
-                if all_statuses.get(c) in ("completed", "done")
+                1 for c in t.children if all_statuses.get(c) in ("completed", "done")
             )
-            my_tasks.append({
-                "dir": t.dir_name,
-                "title": t.title,
-                "status": t.status,
-                "priority": t.priority,
-                "children": list(t.children),
-                "childrenDone": done,
-                "parent": t.parent,
-                "meta": t.meta,
-            })
+            my_tasks.append(
+                {
+                    "dir": t.dir_name,
+                    "title": t.title,
+                    "status": t.status,
+                    "priority": t.priority,
+                    "children": list(t.children),
+                    "childrenDone": done,
+                    "parent": t.parent,
+                    "meta": t.meta,
+                }
+            )
 
     # Current task
     current_task_info = None
@@ -824,7 +825,9 @@ def get_context_text_record(repo_root: Path | None = None) -> str:
 
     # MY ACTIVE TASKS — first and prominent
     lines.append(f"## [!!!] MY ACTIVE TASKS (Assigned to {developer})")
-    lines.append("[!] Review whether any should be archived before recording this session.")
+    lines.append(
+        "[!] Review whether any should be archived before recording this session."
+    )
     lines.append("")
 
     tasks_dir = get_tasks_dir(repo_root)
@@ -836,7 +839,9 @@ def get_context_text_record(repo_root: Path | None = None) -> str:
     for t in iter_active_tasks(tasks_dir):
         if t.assignee == developer:
             progress = children_progress(t.children, all_statuses)
-            lines.append(f"- [{t.priority}] {t.title} ({t.status}){progress} — {t.dir_name}")
+            lines.append(
+                f"- [{t.priority}] {t.title} ({t.status}){progress} — {t.dir_name}"
+            )
             my_task_count += 1
 
     if my_task_count == 0:
