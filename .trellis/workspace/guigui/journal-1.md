@@ -52,3 +52,26 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 3: child P：PVE 持久化与事务基座（Batch 2）完成 + 评审闭环
+<!-- trellis-session: v=2 fp=73b8ce9f5e8c8e7e -->
+
+**Date**: 2026-10-13
+**Task**: child P：PVE 持久化与事务基座（Batch 2）完成 + 评审闭环
+**Branch**: `main`
+
+### Summary
+
+落地迁移链 v36–v38（11 张 PVE 域表，fresh==upgrade 共享 DDL）、data/ 层 20 处裸 commit 事务叶子门控、pve_repository 幂等/CAS/claim/封顶/外发表达原语、时间快进注册 14 条目/13 域；两轴 code-review（0 项 P0/P1）后修正 docstring 契约、cas_version 缺键显式报错、补 foreign_key_check 与 gather 真并发测试、metadata/README 同步 v3.20.0；pytest 1097 passed、ruff format/check 含 tests 全绿；bd qbo 登记 data/ 外 6 处裸 commit 遗留，归 children C/D/E。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a4ddaed` | feat(data): 冻结 PVE 持久化版本链并落地事务与幂等基座 |
+| `44cd8e0` | fix(pve): 评审修正——cas_version 严格校验、事务契约文档与并发/FK 验证补强 |
+
+### Status
+
+[OK] **Completed**
