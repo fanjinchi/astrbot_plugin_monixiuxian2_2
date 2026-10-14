@@ -1494,7 +1494,7 @@ def test_time_skip_excludes_health_anchor_and_pve_history():
         assert forbidden not in joined, f"时间快进不得覆盖 {forbidden}"
     # 正向：§5 要求的三个冷却域必须登记，且各为单语句列式 UPDATE
     for label, fragment in (
-        ("历练路线疲劳到期时间", "adventure_fatigue set fatigue_until"),
+        ("历练休整到期时间", "adventure_fatigue set fatigue_until"),
         ("世界Boss实例到期时间", "world_boss_instances set expires_at"),
         ("世界Boss下次再生时间", "world_boss_instances set next_spawn_at"),
     ):

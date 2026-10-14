@@ -133,7 +133,12 @@ def mock_managers():
     return {
         "storage_ring_manager": MagicMock(),
         "equipment_manager": MagicMock(),
-        "adventure_manager": MagicMock(),
+        # GM 休整清理 await manager API，普通 MagicMock 不可 await
+        "adventure_manager": MagicMock(
+            clear_fatigue=AsyncMock(return_value=True),
+            finish_adventure=AsyncMock(return_value=(True, "历练完成", {})),
+            awaits_combat_choice=AsyncMock(return_value=False),
+        ),
         "rift_manager": MagicMock(),
         "boss_manager": MagicMock(),
         "bounty_manager": MagicMock(),
@@ -544,6 +549,8 @@ class TestForceSettlement:
         mock_managers["bounty_manager"].add_bounty_progress = AsyncMock(
             return_value=(True, "\n悬赏进度+2")
         )
+        sect = MagicMock(advance_master_progress=AsyncMock(return_value="\n师承历练+1"))
+        gm_manager.sect_manager = sect
 
         event = make_event(sender_id="gm_001")
         success, msg = await gm_manager.cmd_force_adventure(event, "12345")
@@ -551,15 +558,25 @@ class TestForceSettlement:
         assert success is True
         assert "历练完成" in msg
         assert "悬赏进度+2" in msg
+        # 真实结算（reward_data 非空）才推进跨系统进度：悬赏与师承一起
+        assert "师承历练+1" in msg
         mock_managers["bounty_manager"].add_bounty_progress.assert_awaited_once_with(
             player, "adventure_scout", 2
+        )
+        sect.advance_master_progress.assert_awaited_once_with(
+            "12345", "adventure_complete"
         )
         mock_db.ext.update_user_cd.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_force_adventure_no_bounty_when_no_reward_data(
+    async def test_force_adventure_replay_advances_no_progress(
         self, gm_manager, mock_db, mock_managers
     ):
+        """重放（reward_data 为空）零进度：悬赏与师承都不推进（PRD AC5）.
+
+        GM 与玩家指令同刻并发、GM 的 CAS 落败时走的就是这条路：结算事实已由
+        赢家推进过，再推一次就是双份进度。与 ``main.py`` 同名方法逐字同口径。
+        """
         player = make_player(user_id="12345")
         mock_db.get_player_by_id.return_value = player
 
@@ -572,12 +589,104 @@ class TestForceSettlement:
         mock_managers["adventure_manager"].finish_adventure = AsyncMock(
             return_value=(True, "历练完成", None)
         )
+        sect = MagicMock(advance_master_progress=AsyncMock(return_value="\n师承历练+1"))
+        gm_manager.sect_manager = sect
 
         event = make_event(sender_id="gm_001")
         success, msg = await gm_manager.cmd_force_adventure(event, "12345")
 
         assert success is True
+        assert "师承历练+1" not in msg
         mock_managers["bounty_manager"].add_bounty_progress.assert_not_called()
+        sect.advance_master_progress.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_force_adventure_refuses_pending_choice(
+        self, gm_manager, mock_db, mock_managers
+    ):
+        """挂战前抉择时「触发历练结算」诚实拒绝：不 bump 时间、不报假成功."""
+        player = make_player(user_id="12345")
+        mock_db.get_player_by_id.return_value = player
+
+        user_cd = MagicMock()
+        user_cd.type = 2
+        user_cd.create_time = 0
+        user_cd.scheduled_time = 9999999999
+        mock_db.ext.get_user_cd.return_value = user_cd
+
+        adventure = mock_managers["adventure_manager"]
+        adventure.awaits_combat_choice = AsyncMock(return_value=True)
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_force_adventure(event, "12345")
+
+        assert success is False
+        assert "强制历练迎战" in msg
+        adventure.finish_adventure.assert_not_awaited()
+        # 拒绝必须发生在任何写之前（不动 scheduled_time、不清冷却）
+        mock_db.ext.update_user_cd.assert_not_awaited()
+        adventure.clear_fatigue.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_force_adventure_fight_resolves_and_settles(
+        self, gm_manager, mock_db, mock_managers
+    ):
+        """「强制历练迎战」代玩家应战：走同一抉择入口，结算后清休整."""
+        player = make_player(user_id="12345")
+        mock_db.get_player_by_id.return_value = player
+
+        user_cd = MagicMock()
+        user_cd.type = 2
+        mock_db.ext.get_user_cd.return_value = user_cd
+
+        adventure = mock_managers["adventure_manager"]
+        adventure.awaits_combat_choice = AsyncMock(return_value=True)
+        adventure.resolve_adventure_choice = AsyncMock(
+            return_value=(True, "💥 你击败了对手", {"bounty_progress": 1})
+        )
+        mock_managers["bounty_manager"].add_bounty_progress = AsyncMock(
+            return_value=(True, "\n悬赏进度+1")
+        )
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_force_adventure_fight(event, "12345")
+
+        assert success is True
+        assert "已代" in msg and "你击败了对手" in msg and "悬赏进度+1" in msg
+        adventure.resolve_adventure_choice.assert_awaited_once_with("12345", flee=False)
+        # 败场事实由 manager 落账，GM 只清休整（2026-10-12 拍板）
+        adventure.clear_fatigue.assert_awaited_once_with("12345")
+
+    @pytest.mark.asyncio
+    async def test_force_adventure_fight_requires_open_choice(
+        self, gm_manager, mock_db, mock_managers
+    ):
+        """没有待应战的单子时不凭空开打，并指路回「触发历练结算」."""
+        player = make_player(user_id="12345")
+        mock_db.get_player_by_id.return_value = player
+
+        user_cd = MagicMock()
+        user_cd.type = 2
+        mock_db.ext.get_user_cd.return_value = user_cd
+
+        adventure = mock_managers["adventure_manager"]
+        adventure.awaits_combat_choice = AsyncMock(return_value=False)
+        adventure.resolve_adventure_choice = AsyncMock()
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_force_adventure_fight(event, "12345")
+
+        assert success is False
+        assert "触发历练结算" in msg
+        adventure.resolve_adventure_choice.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_force_adventure_fight_registered_and_documented(self, gm_manager):
+        """新子命令已进注册表并出现在 GM 帮助里（漏登记 = 命令永远打不到）."""
+        handler = gm_manager._commands["强制历练迎战"]
+        assert handler.__func__ is GMManager.cmd_force_adventure_fight
+        _, text = await gm_manager.cmd_help(None, "")
+        assert "强制历练迎战" in text
 
     @pytest.mark.asyncio
     async def test_force_rift_updates_bounty_progress(
@@ -967,7 +1076,9 @@ async def real_db():
 async def gm_real_db(real_db, mock_config_manager, plugin_data_dir):
     """GMManager backed by a real in-memory DB; peripheral managers stay mocked."""
     adventure = MagicMock()
-    adventure._route_cooldowns = {}
+    # GM 休整清理走 manager API（v39 起 fatigue 落库），MagicMock 需显式可 await。
+    # 默认「没有休整可清」，只有真种了 fatigue 行的用例才让它返回 True。
+    adventure.clear_fatigue = AsyncMock(return_value=False)
     return GMManager(
         db=real_db,
         config_manager=mock_config_manager,
@@ -1179,6 +1290,14 @@ class TestTimeSkip:
         assert gm_manager._commands["随机种子"] == gm_manager.cmd_seed
 
 
+async def _fatigue_row(db, uid):
+    """Read the persisted 休整 row (adventure_fatigue) of one player."""
+    async with db.conn.execute(
+        "SELECT fatigue_until FROM adventure_fatigue WHERE user_id = ?", (uid,)
+    ) as cur:
+        return await cur.fetchone()
+
+
 async def _seed_clear_all_domains(db, uid, now):
     """Preset every clearable cooldown domain for the target player."""
     await db.conn.execute(
@@ -1197,6 +1316,11 @@ async def _seed_clear_all_domains(db, uid, now):
     )
     await db.ext.create_bounty(uid, 301, "后山巡视", "adventure", 3, "{}", now + 7200)
     await db.ext.set_system_config(f"bounty_abandon_cd_{uid}", str(now + 1800))
+    await db.conn.execute(
+        "INSERT INTO adventure_fatigue (user_id, route_id, fatigue_until) "
+        "VALUES (?, 'route_a', ?)",
+        (uid, now + 300),
+    )
     await db.ext.upsert_impart_pk_cooldown(uid, "someone", now - 60)
     await db.ext.upsert_impart_snatch_protection(uid, now - 120)
     await db.conn.commit()
@@ -1212,7 +1336,6 @@ class TestClearAllCooldowns:
         uid = "900000002"
         now = int(time.time())
         await _seed_clear_all_domains(real_db, uid, now)
-        gm_real_db.adventure_manager._route_cooldowns[uid] = {"route_a": now + 300}
 
         event = make_event(sender_id="gm_001")
         success, msg = await gm_real_db.cmd_clear_all_cooldowns(event, uid)
@@ -1222,14 +1345,16 @@ class TestClearAllCooldowns:
         cd = await real_db.ext.get_user_cd(uid)
         assert cd.type != 0
         assert (await real_db.ext.get_active_bounty(uid)) is not None
-        assert uid in gm_real_db.adventure_manager._route_cooldowns
+        # 休整已落库：未确认时Adventure_fatigue 行不得被触碰
+        assert await _fatigue_row(real_db, uid) is not None
 
     @pytest.mark.asyncio
     async def test_clears_all_domains(self, gm_real_db, real_db):
         uid = "900000002"
         now = int(time.time())
         await _seed_clear_all_domains(real_db, uid, now)
-        gm_real_db.adventure_manager._route_cooldowns[uid] = {"route_a": now + 300}
+        gm_real_db.adventure_manager.clear_fatigue.reset_mock()
+        gm_real_db.adventure_manager.clear_fatigue.return_value = True
 
         event = make_event(sender_id="gm_001")
         success, msg = await gm_real_db.cmd_clear_all_cooldowns(event, f"{uid} 确认")
@@ -1265,8 +1390,8 @@ class TestClearAllCooldowns:
         assert (await real_db.ext.get_impart_pk_cooldown(uid, "someone")) is None
         assert (await real_db.ext.get_impart_snatch_protection(uid)) is None
 
-        # 历练路线休整冷却（内存）弹出
-        assert uid not in gm_real_db.adventure_manager._route_cooldowns
+        # 历练休整：GM 走 manager 的持久化清理入口（v39 起 fatigue 落库）
+        gm_real_db.adventure_manager.clear_fatigue.assert_awaited_once_with(uid)
 
         for fragment in (
             "忙碌状态：1 条",
@@ -1276,7 +1401,7 @@ class TestClearAllCooldowns:
             "悬赏放弃冷却：1 条",
             "传承挑战冷却：1 条",
             "传承被夺保护期：1 条",
-            "历练路线休整冷却：1 条",
+            "历练休整冷却：1 条",
         ):
             assert fragment in msg
 

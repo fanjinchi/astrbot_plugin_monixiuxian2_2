@@ -271,9 +271,24 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **收益**：
   `exp = (minutes × base_exp_per_min + level_index × level_bonus_exp + 完成奖励exp) × 事件exp_mult`
   `gold = (minutes × base_gold_per_min + level_index × level_bonus_gold + 完成奖励gold) × 事件gold_mult`
-  - 默认路线：1800s，45 修为/分，10 灵石/分，境界加成 12/3，完成奖励 300/120，疲劳 300s
-- 事件组：safe 1.1×/掉率60%；standard 1.2×/50%；risky 0.7×/15% + 受伤
-- 休整 = 路线疲劳 300s（+600 受伤 / +600 PvE 战败）
+  - 默认路线：1800s，45 修为/分，10 灵石/分，境界加成 12/3，完成奖励 300/120，休整 300s
+- 事件组：safe 1.1×/掉率60%；standard 1.2×/50%；risky 0.7×/15%（`injury` 自 2026-10-12 起只是内容标记，不再直接扣血/加疲劳）
+- **结算状态机（v39，Trellis child C）**：`adventure_settlements.state` 为唯一权威——
+  `adventuring → resolved_win | pending_choice → resolved_win|resolved_loss|resolved_fled`；完成时刻一次性把
+  敌人/事件/基础收益/`rng_seed` 锁进不可变 `snapshot`，此后迎战、逃跑、重启找回都只读这份快照（同种子同敌人，绝不重掷；重放时的实时气血可能因全时段恢复而高于锁定值，故战报文本不承诺逐字相同）
+- **战前抉择**（仅 high/extreme 风险路线）：`pending_choice` 期间保留历练忙碌、不发任何奖励，玩家须发
+  「迎战」或「逃跑」；抉择**只认当前这次历练的单据**（忙碌已不在历练中、或忙碌属于另一次历练时按「没有待抉择的历练遭遇」拒绝，GM「清除CD」留下的孤儿单不会被下一次忙碌消费）；逃跑成功→`resolved_fled`（不进战斗、气血不因战斗下降——账本 `hp_after` 记结算时刻的实时气血，抉择期全时段恢复照常，故 `hp_after` 可以高于 `hp_before`，两者之差不作"损耗"口径使用；基础收益照常、无败场追加休整），
+  逃跑失败或迎战→用同一只锁定敌人立即开打且不给第二次退路；`flee.enabled=false` 为 kill switch（不产生待选择态）
+  - 逃跑成功率（身法比 `ratio` 两段式）：`p = clamp(ratio≥1 ? base_rate+(ratio−1)×slope_up : base_rate−(1/ratio−1)×slope_down, floor, cap)`，`agility_enemy≤0` 取 `cap`、`agility_self≤0` 取 `floor`
+  - 临时默认（**未封板**，bd `-9hq`）：`base_rate=0.95 / slope_up=0.05 / slope_down=0.35 / floor=0.60 / cap=1.00`
+    → 同身法 95%、我快一倍 100%、敌快一倍 60% 保底
+- **败场口径**：战败不掉落保留（`hp_penalty` 走掉落闸门），当前气血地板 `ceil(max_hp × 1%)`
+- **休整 = 全局窗口**：`adventure_fatigue.fatigue_until`（跨路线通用，非按路线分别计），
+  时长 = 本次路线 `fatigue_cooldown`，败场追加 600s；写入取 `max(现有值, now+时长)` 不回退已生效休整；
+  期内任何路线的「开始历练」被拦（文案「⚠️ 你刚历练回来，还需休整 X 分钟」），GM 可经 `clear_fatigue` 清除
+- **原子性与幂等**：终态+气血+休整+清忙在一笔短事务内（`state`+`cas_version` 双条件 CAS，并发双击只有一份成立）；
+  三项效果（基础收益/路线掉落/传承机缘）在提交后的第二笔短事务逐项 `claim_effect` 守护，重放不重复发奖，
+  「完成历练」同时是「终态已提交、效果未 claim」的唯一补发入口
 - 纯收益玩法，不依赖境界基础属性，不受 pve.enabled 开关影响
 
 ### 4.12 秘境（managers/rift_manager.py）

@@ -28,7 +28,8 @@ class AdventureHandlers:
             "  /开始历练 巡山问道\n"
             "  /开始历练 猎魔肃清\n"
             "  /历练状态 → 查看当前进度\n"
-            "  /完成历练 → 领取奖励"
+            "  /完成历练 → 领取奖励\n"
+            "  /迎战 或 /逃跑 → 强敌拦路时的两个出口（仅高、极高风险路线）"
         )
         lines.append("━━━━━━━━━━━━━━━")
         yield event.plain_result("\n".join(lines))

@@ -593,6 +593,17 @@ ADVENTURE_CONFIG = {
             {"name": "灵石碎片", "weight": 20, "min": 2, "max": 5},
         ]
     },
+    # 战前脱身判定（高/极高风险遇敌时提供「迎战/逃跑」）。数值未封板，
+    # 正式概率表等敌人花名册导入后回归（bd monixiuxian2-9hq）；缺段时
+    # managers/adventure_manager.py 的 DEFAULT_FLEE_PARAMS 兜底同一组值。
+    "flee": {
+        "enabled": True,
+        "base_rate": 0.95,
+        "slope_up": 0.05,
+        "slope_down": 0.35,
+        "floor": 0.60,
+        "cap": 1.00,
+    },
 }
 
 BOUNTY_CONFIG = {

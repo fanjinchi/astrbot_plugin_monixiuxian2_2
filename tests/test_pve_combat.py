@@ -24,8 +24,6 @@ _model_mod = load_module("models", "models.py")
 Player = _model_mod.Player
 
 # Managers that depend on DataBase/StorageRingManager (loaded with fallback imports)
-_adv_mod = load_module("adventure_manager", "managers/adventure_manager.py")
-AdventureManager = _adv_mod.AdventureManager
 
 _rift_mod = load_module("rift_manager", "managers/rift_manager.py")
 RiftManager = _rift_mod.RiftManager
@@ -588,17 +586,6 @@ def mock_pve_combat_mgr():
 
 
 @pytest.fixture
-def adventure_manager(mock_db, mock_storage_ring_manager, mock_pve_combat_mgr):
-    """AdventureManager with mocked dependencies."""
-    return AdventureManager(
-        mock_db,
-        mock_storage_ring_manager,
-        mock_pve_combat_mgr,
-        busy_state=make_busy_state(mock_db),
-    )
-
-
-@pytest.fixture
 def rift_manager(mock_db, mock_storage_ring_manager, mock_pve_combat_mgr):
     """RiftManager with mocked dependencies."""
     return RiftManager(
@@ -608,19 +595,6 @@ def rift_manager(mock_db, mock_storage_ring_manager, mock_pve_combat_mgr):
         mock_pve_combat_mgr,
         busy_state=make_busy_state(mock_db),
     )
-
-
-@pytest.fixture
-def finished_user_cd_adventure():
-    """UserCd for a finished adventure on the default 'scout' route."""
-    from models_extended import UserStatus
-
-    cd = MagicMock()
-    cd.type = UserStatus.ADVENTURING
-    cd.scheduled_time = 0
-    cd.create_time = 0
-    cd.get_extra_data.return_value = {"route_key": "scout"}
-    return cd
 
 
 @pytest.fixture
@@ -634,70 +608,6 @@ def finished_user_cd_rift():
     cd.create_time = 0
     cd.get_extra_data.return_value = {"rift_id": 1, "rift_level": 1}
     return cd
-
-
-class TestAdventureDropSkipping:
-    """AdventureManager skips _handle_drops when combat rewards carry hp_penalty."""
-
-    @pytest.mark.asyncio
-    async def test_skips_drops_on_defeat(
-        self,
-        adventure_manager,
-        mock_db,
-        mock_pve_combat_mgr,
-        mock_player,
-        finished_user_cd_adventure,
-    ):
-        """hp_penalty=True means _handle_drops is not awaited and no items drop."""
-        mock_db.ext.get_user_cd.return_value = finished_user_cd_adventure
-        mock_db.get_player_by_id.return_value = mock_player
-        mock_player.experience = 0
-        mock_player.gold = 0
-        mock_pve_combat_mgr.trigger_pve_combat = AsyncMock(
-            return_value=("战败", {"exp": 60, "gold": 0, "hp_penalty": True})
-        )
-
-        with patch.object(
-            adventure_manager, "_handle_drops", new=AsyncMock(return_value=([], ""))
-        ) as mock_handle:
-            success, _msg, reward_data = await adventure_manager.finish_adventure(
-                "player_001"
-            )
-
-        assert success
-        mock_handle.assert_not_awaited()
-        assert reward_data["items"] == []
-
-    @pytest.mark.asyncio
-    async def test_proceeds_drops_on_victory(
-        self,
-        adventure_manager,
-        mock_db,
-        mock_pve_combat_mgr,
-        mock_player,
-        finished_user_cd_adventure,
-    ):
-        """hp_penalty=False means _handle_drops is awaited normally."""
-        mock_db.ext.get_user_cd.return_value = finished_user_cd_adventure
-        mock_db.get_player_by_id.return_value = mock_player
-        mock_player.experience = 0
-        mock_player.gold = 0
-        mock_pve_combat_mgr.trigger_pve_combat = AsyncMock(
-            return_value=("胜利", {"exp": 200, "gold": 100, "hp_penalty": False})
-        )
-
-        with patch.object(
-            adventure_manager,
-            "_handle_drops",
-            new=AsyncMock(return_value=([("灵草", 2)], "\n\n📦 获得物品")),
-        ) as mock_handle:
-            success, _msg, reward_data = await adventure_manager.finish_adventure(
-                "player_001"
-            )
-
-        assert success
-        mock_handle.assert_awaited_once()
-        assert reward_data["items"] == [("灵草", 2)]
 
 
 class TestRiftSettlementNoAutoPve:

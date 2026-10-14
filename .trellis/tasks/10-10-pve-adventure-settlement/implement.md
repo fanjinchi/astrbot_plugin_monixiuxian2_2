@@ -6,7 +6,7 @@
 2. 固定敌人目录 child（B）已完成 preview 链路与单一 Enemy→Fighter mapper；**正式名册 sync 不是本 child 的门**——名册未获批期间按 PRD R3 的 legacy 身份口径落库（`profile_id` 留空），不得为填字段手改 `config/`。
 3. 持久化/事务基座 child（P）的 v36/v37/v38 schema、repository、commit 审计、fatigue time-skip provider 已过 Gate 2；本 child 在此之上**授权新增 v39 增量列**（PRD Dependencies），不改写 v36 已发布定义。
 4. `handlers/combat_handlers.py:75` 裸 `conn.commit()`（bd `astrbot_plugin_monixiuxian2_2-qbo`）必须在把战斗结算包进 `db.transaction()` 之前门控为按 `conn._txn_depth` 叶子提交；与 world-boss child 共享，先接入方负责。
-5. 逃跑**启用**门：系数经地板/标模/天花板模拟并回写 `design_docs/content-design/pve-enemy-design.md` §Q4 之后才允许打开；未封板时 fail-closed（只呈现迎战）。
+5. 逃跑**启用**门（2026-10-12 用户拍板已改）：本 child **不等**正式封板模拟，直接带**临时默认成功率**交付（`flee.enabled=true`，锚点 95%/100%/60%），使功能可被单测与真实用例验证；正式封板（三档模拟 + 回写 §Q4）另由 bd `astrbot_plugin_monixiuxian2_2-9hq` 追踪，**必须在敌人名册导入前完成**，届时只改两处配置、不改代码。`enabled=false` 保留为人工 kill switch（关闭时不产生 `pending_choice`，等同现网）。
 
 ## Steps
 
@@ -24,6 +24,21 @@
 9. **AGENTS.md §7 文档同步**：`metadata.yaml` version、`README.md` 更新日志、`handlers/misc_handler.py` 的 `/修仙帮助`、`design_docs/api-overview.md`（新指令/新服务链路）、`design_docs/project-architecture.md`（settlement 状态机与 v39 列；:74「休整=疲劳 300s」需改为新口径）、`design_docs/current-design-report.md:276`（「休整 = 路线疲劳 300s（+600 受伤 / +600 PvE 战败）」——受伤 +600 已取消、粒度改全局，描述现实现的两处必须与代码同步改）、`pve-enemy-design.md` §Q4（疲劳构成 + 全局粒度 + 逃跑契约 + 回血全时段；规划阶段已先行改毕，实现时核对与代码一致）。
 10. **测试**：pending 两处出路提示（结算内联 + 拦截文案含迎战/逃跑，其它忙碌文案不变）、状态机全路径与非法跳转、run 唯一性、并发双击迎战/逃跑、计算前/计算后/CAS 前三个崩溃点恢复、replay 不重掷、三类 effect 的 claim 冲突与「已提交未 claim」注入、异常全回滚、疲劳构成（含 `max` 不回退、**一条路线的休整会挡住另一条路线**＝全局一份的有意语义）与 time-skip、休整闸门跨重启、休整提示与收益提示的输出文案为全局表述、R6 回血（历练/闭关/pending 期间均恢复）、1% 战败保底与胜场不保底、`迎战`/`逃跑` 在 busy 下可达、v39 fresh==upgrade parity、逃跑函数单调性/上下界/未封板 fail-closed。
 11. **质量门**：`uv run ruff format . && uv run ruff check .`；`uv run python -m pytest tests/ -v`（插件目录内用 AstrBot uv 环境）。
+
+## Step Status（2026-10-12 收口时回填）
+
+- Step 1–11：**已完成**（`pytest tests/` 1138 passed；`ruff format --check` 与插件范围 `ruff check handlers managers core data main.py` 干净；`.trellis/scripts/**` 的 70 条 lint 为存量债务，不在本 child 范围）。
+- Step 4 的两处**实现期修正**已写进 design §2.4：效果写必须落在提交后的**第二笔短事务**（否则撞上 `cannot start a transaction within a transaction`）；「完成历练」是崩溃点 3 的唯一补发入口；`clear_fatigue` 只认**生效中**的窗口。
+- Step 8 的甲案②落点做了**集中化收敛**（见 design §1 实现期修正）：提示常量与查询在 `core/busy_state.py`，由 `assert_idle` 在 `ADVENTURING` 分支追加，覆盖 18 处自定义 `assert_idle(template=)` 守卫 + `@player_required` 拦截器；`handlers/utils.py` 复用同一常量，不再本地复制。
+- **Step 12（复核后由用户新增，PRD R1 末条 / AC12）**：GM「强制历练迎战 `<ID>`」代玩家应战（`resolve_adventure_choice(flee=False)`，真实胜负入账后清休整），「触发历练结算」在 `pending_choice`/`ready_combat` 上诚实拒绝并指路；两条历练强制命令共用 `_advance_adventure_progress`，`clear_fatigue` 调用包进 `db.transaction()`。**已完成**（`tests/test_gm_manager.py` 4 条新用例）。
+- **Step 15（第二轮复核修正，2026-10-12）**：三条已确认问题全部修复并各配回归用例——
+  ① **P1 单据归属**：`resolve_adventure_choice` 增加 `ADVENTURING` + `adventure_run_id` 双闸门，孤儿 `pending_choice` 不再被后来的忙碌消费（旧行为：打一场无关战斗、发旧单奖励、抹掉玩家当前闭关）；`handlers/utils.py` 拦截器的出路提示同样只在历练忙碌时查库，与 `assert_idle` 逐字同口径（AC11 这才真正成立）。回归用例 `test_orphan_pending_choice_is_not_consumable`、`test_interceptor_hint_only_for_adventuring_busy`。
+  ② **P2 GM 重放零推进**：`_advance_adventure_progress` 与 `main.py` 同名方法对齐为 `reward_data` 为空即整体早退（原先师承 `adventure_complete` 无门，CAS 落败走重放时会把师承链推两次，违反 AC5；docstring 与实现矛盾）。用例改写为正反两条：`test_force_adventure_updates_bounty_progress`（含师承断言）+ `test_force_adventure_replay_advances_no_progress`。
+  ③ **P2 轻微**：`start_adventure` 首行 docstring 补齐本轮多做两件事（落 `adventuring` 单 + 全局休整闸门），英文 Google 风格与本 child 新代码一致。
+  相关事实回写：design §2.4 由「两处」扩为六处（新增归属闸门、`settled_at` 排序依赖、重放零推进），PRD R1 新增绑定条，`current-design-report` §4.11 补「抉择只认当前历练单据」与「`hp_after` 可高于 `hp_before`，之差不作损耗口径」。
+- **Step 16（第三轮复核修正，2026-10-12）**：第二轮那道归属闸门反过来把「升级那一刻就在途的历练」锁死（P1，真库探针复现，根因与三层后果见 design §2.4-7）。修法：`_ensure_run_row` 补建分支在**同一笔事务**里把 `{"route_key", "adventure_run_id"}` 经新增的 `BusyState.stamp_extra` 落回 `user_cd.extra_data`（不裸写 `update_user_cd`，守 AGENTS §2），`settlement_id` 统一为 `settlement:{run_id}`；归属判定抽成 `_owned_open_run`，由 `resolve_adventure_choice` 与 `awaits_combat_choice` 共用，GM 两条命令的自相矛盾文案随之消失。回归用例 `test_legacy_in_flight_run_recovers_choice` 做过**突变验证**（把落回改成 `if False:` 即红，还原后全绿）。**第四轮复核**判这次修法「正确且可用」（同事务原子性、事务外单用、GM 口径一致都经真库探针核实），并给出一条建议级残留：补建分支的 run id 用 uuid 时，升级窗口的并发双击会各 mint 一张单、各发一份掉落与传承（实测 4 路 → 4 行/12 claim）；已按最小改法把 mint 改为 `adventure:{user_id}:legacy:{create_time}` 确定性 id，靠 `adventure_run_id` UNIQUE + 冲突回读收敛成一条事实（实测 4 路 → 1 行/3 claim/单份奖励，落败方走重放不推进度），配 `test_legacy_in_flight_concurrent_finish_creates_single_fact` 同样做了突变验证（换回 uuid 即红）。`stamp_extra` 的 docstring 与 api-overview 口径按实现改正为「按调用方快照整行回写、只改写 extra_data」（不给这一微秒窗口加事务内重读——一次性的升级路径，被覆盖的取值仍自洽，多一次查库换不来实际安全）。文档同步：api-overview 新增 `BusyState` 索引行与 AdventureManager 归属条，README v3.21.0 补「单据归属与升级窗口」，PRD R1/AC13 补升级窗口与确定性 id 口径。收口门：`pytest tests/` **1142 passed**（状态机 40 + GM 65），`ruff format --check .` = 127 files already formatted，插件范围 `ruff check` All checks passed。
+- Step 13 **真实环境回归**：按 AGENTS.md「真实环境功能测试由用户手动发起」，本轮未执行；`functional_tests/cases/` 的 `pve/pve-smoke.json`、`gm/gm-time-tools.json` 已核对不受影响（走低/中风险路线，不产生 pending）。迎战/逃跑的专用用例待 bd `-9hq` 封板后再补（bd `-2v2`，已补记「升级即在途历练」这条第三轮踩到的路径）。
+- Step 14 收口：bd 记账 + 质量门 + 本地 commit（不 push）。
 
 ## Rollback Point
 

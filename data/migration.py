@@ -480,7 +480,7 @@ async def _event_outbox_v38(conn: aiosqlite.Connection, config_manager: ConfigMa
 async def _adventure_settlement_state_machine_v39(
     conn: aiosqlite.Connection, config_manager: ConfigManager
 ):
-    """v39（child C 历练结算）：adventure_settlements 增状态机三列 + 状态索引。
+    """Add the child C settlement state machine: three columns + a state index (v39).
 
     纯增量，不改写 v36 已发布定义、不新建平行表、不重建（ADD COLUMN 在
     SQLite 里允许带 CHECK 与非空默认值，取值域因此留在 schema 层，无需退化

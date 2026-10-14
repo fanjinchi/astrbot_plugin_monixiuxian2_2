@@ -7,6 +7,7 @@ from functools import wraps
 
 from astrbot.api.event import AstrMessageEvent
 
+from ..core.busy_state import pending_choice_hint
 from ..models import Player
 from ..models_extended import UserStatus
 
@@ -62,9 +63,14 @@ BUSY_STATE_ALLOWED_COMMANDS = [
     "战报条数",
     "我的技能",
     # 历练/秘境结算
-    "结束历练",
-    "结束秘境",
     "结束任务",
+    # 历练战前抉择（design §1 甲案）：PRD R2 明令把两条出路登记进白名单。
+    # 口径要说清楚：迎战/逃跑 在 main.py 只挂 @require_whitelist、不挂
+    # @player_required，因此本白名单对它们**当前不参与判定**（忙碌下天然可达）。
+    # 登记是防御性冗余——一旦将来给它们补上 @player_required（或新增走该装饰器
+    # 的别名指令），漏登记就会把唯一的出口拦掉，把玩家锁死在 pending 里。
+    "迎战",
+    "逃跑",
 ]
 
 
@@ -107,8 +113,14 @@ def player_required(
 
             if not is_allowed:
                 status_name = UserStatus.get_name(user_cd.type)
+                # 只有历练才可能挂战前抉择，其余忙碌状态：文案逐字不变、零额外
+                # 查库（AC11 + design §1）。口径与 BusyState.assert_idle 一致，
+                # 否则闭关玩家会被我们主动引导去发「迎战」，而那张单据并不属于他。
+                hint = ""
+                if user_cd.type == UserStatus.ADVENTURING:
+                    hint = await pending_choice_hint(self.db, player.user_id)
                 yield event.plain_result(
-                    f"道友当前正在「{status_name}」，无法分心他顾。\n💡 可使用「我的信息」「签到」「银行」等基础指令。"
+                    f"道友当前正在「{status_name}」，无法分心他顾。\n💡 可使用「我的信息」「签到」「银行」等基础指令。{hint}"
                 )
                 return
 

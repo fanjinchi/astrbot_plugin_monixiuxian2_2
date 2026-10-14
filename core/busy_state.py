@@ -18,6 +18,7 @@ import sys
 
 try:
     from ..data import DataBase
+    from ..data.pve_repository import STATE_PENDING_CHOICE, AdventureRepository
     from ..models import Player
     from ..models_extended import UserStatus
 except ImportError:
@@ -40,6 +41,11 @@ except ImportError:
     _models_extended = _load_module("models_extended", "models_extended.py")
     UserStatus = _models_extended.UserStatus
 
+    # 历练结算状态机（child C）：忙碌拒绝文案需要发现「挂战前抉择」的单子。
+    _pve_repository = _load_module("pve_repository", "data/pve_repository.py")
+    AdventureRepository = _pve_repository.AdventureRepository
+    STATE_PENDING_CHOICE = _pve_repository.STATE_PENDING_CHOICE
+
 # GM「时间快进」覆盖条目（openspec change: gm-time-skip-registry）：声明即覆盖，
 # 只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py 装配汇总。
 TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
@@ -53,6 +59,40 @@ TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
 # 默认忙碌报错模板（sect 系守卫的支配文案，10+ 站点的原文；"你当前正{status}"）。
 # assert_idle 的 template 形参默认值；战斗/炼丹/双修等站点在调用处传专属模板。
 DEFAULT = "❌ 你当前正{status}，无法进行此操作！"
+
+# 挂战前抉择（pending_choice）时忙碌文案追加的出路提示（design §1 甲案②、
+# PRD AC11）。pending 是唯一「被锁住却看不见出口」的窗口：玩家既不发送「迎战」
+# 也不发送「逃跑」，本次历练就无限期不结算，所以**每一条**忙碌拒绝都必须自带
+# 两条出路。两条渲染路径（本类 assert_idle 的 18 处自定义模板 + handlers/utils
+# 的 @player_required 拦截器）共用这个常量，测试逐字钉住防漂移。
+PENDING_CHOICE_HINT = "\n💡 可发送「迎战」或「逃跑」结束本次历练。"
+
+
+async def pending_choice_hint(db, user_id: str) -> str:
+    """Return :data:`PENDING_CHOICE_HINT` when that player is stuck on a choice.
+
+    只有「数据库里真有一张挂着待抉择的结算单」才追加提示：非历练忙碌、还在
+    战斗中（``adventuring``/``ready_combat``）或已结算的玩家拿到空串，原有
+    忙碌文案逐字不变（PRD AC11 后半句）。
+
+    本函数**只看账本，不看忙碌**：调用方必须自己确认 ``user_cd.type ==
+    UserStatus.ADVENTURING`` 再调用。管理员「清除CD」只复位忙碌、不终结结算
+    单，孤儿 pending 行会留在账上；不加门控就会给闭关/修炼玩家递上一句
+    「发迎战吧」，而那次迎战并不属于他当前的历练。
+
+    Args:
+        db: The plugin DataBase (``self.db``); only ``db.conn`` is used.
+        user_id: Player being blocked by the busy gate.
+
+    Returns:
+        以换行开头的提示片段，或空串。
+    """
+    # 每次现建仓储：DataBase.connect() 会替换 conn，持有实例会拿到死连接，
+    # 所以这里（以及全项目）都不把 AdventureRepository 缓存成单例。
+    row = await AdventureRepository(db.conn).get_open_settlement(user_id)
+    if row and row["state"] == STATE_PENDING_CHOICE:
+        return PENDING_CHOICE_HINT
+    return ""
 
 
 class BusyState:
@@ -176,6 +216,26 @@ class BusyState:
                 await self._health.settle(user_id)
             await self._db.ext.set_user_busy(user_id, int(status), scheduled_time)
 
+    async def stamp_extra(self, user_cd, extra_data: dict) -> None:
+        """Rewrite ``extra_data`` on a busy row the player already holds.
+
+        身份字段补写，不是常态忙碌写入：``type``/``create_time``/``scheduled_time``
+        一律按**调用方持有的那份快照**整行回写，只换 ``extra_data``。不在事务内
+        重读：这一路径只在升级那一刻被走到（老忙碌行没有 run id），而真在那个微秒
+        间隙被别的任务清了忙碌、或被管理员 bump 过到期时间，盖回原值同样自洽
+        ——extra 与单据始终一致，「迎战/逃跑」或再点「完成历练」都能收尾，多一次
+        查库换不来实际安全。走 owner（本类）而不是让业务模块裸调
+        ``db.ext.update_user_cd``，是为了守住 AGENTS.md §2「忙碌读写由 BusyState
+        承接」——GM 强制结算的 ``scheduled_time`` bump 是文档里唯一的例外。
+
+        Args:
+            user_cd: 调用方已读到的忙碌行（对象本身会被就地更新）。
+            extra_data: 新的 extra 载荷（如 ``{"route_key", "adventure_run_id"}``）。
+        """
+        async with self._db.transaction():
+            user_cd.set_extra_data(extra_data)
+            await self._db.ext.update_user_cd(user_cd)
+
     async def clear(self, player: Player) -> None:
         """Unconditionally reset a player to idle (user_cd + mirror).
 
@@ -211,9 +271,15 @@ class BusyState:
                 (default: the generic sect-family message).
 
         Returns:
-            None when idle; the formatted busy message otherwise.
+            None when idle; the formatted busy message otherwise.  历练忙碌且
+            挂战前抉择时，消息尾部自带「迎战/逃跑」出路提示（PRD AC11）；其它
+            忙碌状态逐字不变。
         """
         user_cd = await self._db.ext.get_user_cd(user_id)
         if user_cd is None or user_cd.type == UserStatus.IDLE:
             return None
-        return template.format(status=UserStatus.get_name(user_cd.type))
+        message = template.format(status=UserStatus.get_name(user_cd.type))
+        if user_cd.type == UserStatus.ADVENTURING:
+            # 只有历练才可能挂 pending：其余忙碌状态不额外查库，文案零变化。
+            message += await pending_choice_hint(self._db, user_id)
+        return message

@@ -40,6 +40,9 @@ _shop_mod = load_package_module(
 )
 ShopHandler = _shop_mod.ShopHandler
 
+_repo_mod = load_package_module(
+    "data/pve_repository.py", "astrbot_plugin_monixiuxian2_2.data.pve_repository"
+)
 _data_pkg = sys.modules["astrbot_plugin_monixiuxian2_2.data"]
 DataBase = _data_pkg.DataBase
 MigrationManager = _data_pkg.MigrationManager
@@ -1387,19 +1390,44 @@ async def _seed_clear_all_cooldowns_state(db: DataBase, user_id: str = "u1") -> 
         (user_id, now - 200),
     )
     await _seed_active_bounty(db, user_id)
+    await db.conn.execute(
+        "INSERT INTO adventure_fatigue (user_id, route_id, fatigue_until) "
+        "VALUES (?, 'route_a', ?)",
+        (user_id, now + 300),
+    )
+    # 末笔走叶子 helper：standalone 时自带提交，不给后续 BEGIN 留隐式事务
     await db.ext.set_system_config(f"bounty_abandon_cd_{user_id}", str(now + 1800))
     return now - 100
 
 
+class _FatigueClearer:
+    """Stand-in for AdventureManager clearing the persisted 休整 row.
+
+    GM 只用到 ``clear_fatigue``，这里保留真实语义：走仓储 CAS 清理且**不自行提交**
+    （叶子按 ``_txn_depth`` 门控），所以休整行的消失与调用方事务同生死。
+    """
+
+    def __init__(self, db):
+        self._db = db
+        self.calls: list[str] = []
+
+    async def clear_fatigue(self, user_id: str) -> bool:
+        self.calls.append(user_id)
+        repo = _repo_mod.AdventureRepository(self._db.conn)
+        row = await repo.get_fatigue(user_id)
+        if not row:
+            return False
+        return await repo.cas_clear_fatigue(
+            user_id, expected_cas_version=int(row["cas_version"])
+        )
+
+
 @pytest.mark.asyncio
-async def test_clear_all_cooldowns_rolls_back_and_keeps_route_cooldowns(
-    db, monkeypatch
-):
-    """S9: step-3 failure -> earlier steps roll back AND the in-memory route cooldown stays."""
+async def test_clear_all_cooldowns_rolls_back_and_keeps_fatigue(db, monkeypatch):
+    """S9: step-3 failure -> earlier steps roll back AND the fatigue row stays."""
     uid = "u1"
     duel_before = await _seed_clear_all_cooldowns_state(db, uid)
-    adventure = MagicMock()
-    adventure._route_cooldowns = {uid: {"route_a": int(time.time()) + 300}}
+    adventure = _FatigueClearer(db)
     gm = GMManager(
         db=db,
         config_manager=MagicMock(),
@@ -1429,18 +1457,23 @@ async def test_clear_all_cooldowns_rolls_back_and_keeps_route_cooldowns(
     assert (
         row[0] == 1
     )  # 仍为忙碌（_seed_clear_all_cooldowns_state 的 set_user_busy 种子值）
-    # 步骤 6 未执行：内存态冷却不可回滚，必须在 CM 退出后才弹出
-    assert uid in adventure._route_cooldowns
+    # 步骤 3 抛错，休整清理根本没跑；就算跑了也在同一事务里，回滚照样保留
+    assert adventure.calls == []
+    row = await _fetchone(
+        db, "SELECT fatigue_until FROM adventure_fatigue WHERE user_id = ?", (uid,)
+    )
+    assert row[0] > 0  # 休整窗口原样保留
     _assert_committed_and_idle(db)
 
 
 @pytest.mark.asyncio
-async def test_clear_all_cooldowns_commits_everything_then_pops_memory(db, monkeypatch):
-    """S9 success path: all domains cleared, message unchanged, memory popped after commit."""
+async def test_clear_all_cooldowns_clears_fatigue_in_same_transaction(
+    db, monkeypatch
+):
+    """S9 success path: all domains cleared, 休整 window cleared inside the CM."""
     uid = "u1"
     await _seed_clear_all_cooldowns_state(db, uid)
-    adventure = MagicMock()
-    adventure._route_cooldowns = {uid: {"route_a": int(time.time()) + 300}}
+    adventure = _FatigueClearer(db)
     gm = GMManager(
         db=db,
         config_manager=MagicMock(),
@@ -1468,7 +1501,7 @@ async def test_clear_all_cooldowns_commits_everything_then_pops_memory(db, monke
     assert "双修冷却：1 条" in msg
     assert "进行中悬赏：1 条（后山巡视）" in msg
     assert "悬赏放弃冷却：1 条" in msg
-    assert "历练路线休整冷却：1 条" in msg
+    assert "历练休整冷却：1 条" in msg
 
     assert (await db.get_player_by_id(uid)).state == "空闲"
     assert (await db.ext.get_user_cd(uid)).type == 0
@@ -1484,7 +1517,11 @@ async def test_clear_all_cooldowns_commits_everything_then_pops_memory(db, monke
     assert dual[0] == 0
     assert await db.ext.get_active_bounty(uid) is None
     assert await db.ext.get_system_config(f"bounty_abandon_cd_{uid}") == "0"
-    assert uid not in adventure._route_cooldowns  # 内存态在提交后弹出
+    assert adventure.calls == [uid]
+    row = await _fetchone(
+        db, "SELECT fatigue_until FROM adventure_fatigue WHERE user_id = ?", (uid,)
+    )
+    assert row[0] == 0  # 清理与其余域同事务提交
     assert all(in_tx and depth > 0 for _, in_tx, depth in states), states
     _assert_committed_and_idle(db)
 

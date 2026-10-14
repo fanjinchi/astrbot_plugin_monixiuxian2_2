@@ -17,9 +17,11 @@ stateDiagram-v2
 - 低/中风险跳过 `pending_choice`，但**绝不跳过持久 settlement**；不允许无记录的同步旁路。
 - **仅当人工关掉开关时（`flee.enabled=false`，kill switch）**：高/极高风险也直接 `adventuring -> ready_combat`，不产生 `pending_choice`，避免玩家多发一条「迎战」却没有任何选择收益。默认状态是 `enabled=true` + 临时默认系数（见 §3），因此正常流程会产生 pending。
 - **pending 的两处出路提示（甲案，必做）**：① 进入 `pending_choice` 的结算回复内联敌人 + 「迎战/逃跑」指令说明；② 挂 pending 期间被忙碌拦截时，回复追加「可发送「迎战」或「逃跑」结束本次历练」。落点在拦截器 status 分支或 `assert_idle(template=)`，不新增 API、不改 `UserStatus`、不动其它状态文案。理由同 §1 锁死决定：全玩法锁的可用性下限是玩家看得见出口。
+  - **实现期修正（2026-10-12，复核后收敛）**：②不能只挂在拦截器上——`修炼/闭关/历练/秘境/炼丹` 等主指令在 `main.py` 只挂 `@require_whitelist`、不经 `@player_required`，它们的拒绝文案来自 18 处 `assert_idle(template=...)`。因此提示常量与查询函数落在 `core/busy_state.py`（`PENDING_CHOICE_HINT` + `pending_choice_hint(db, user_id)`），`assert_idle` **仅当**忙碌类型为 `ADVENTURING` 时追加提示（其余状态逐字不变、零额外查询），拦截器复用同一常量，杜绝两处文案漂移。
 - **不做 pending 超时、不做「取消历练」指令**（2026-10-12 用户拍板）：`迎战`/`逃跑` 就是全部出口，`逃跑` 即玩家的后路。设计上由上一条的 disabled 语义保证「有 pending 就一定有逃跑」，所以无限期挂起不会锁死；`busy_state.clear` 只在终态提交边界发生，无需任何到期扫描、不新增 `scheduled_time` 语义、不进 time-skip 注册表（pending 不是冷却）。
+- **GM 代打子命令（2026-10-12 复核后由用户新增）**：`#修仙GM 强制历练迎战 <ID>` → `GMManager.cmd_force_adventure_fight` → `AdventureManager.resolve_adventure_choice(id, flee=False)`，与玩家本人点「迎战」共用同一入口（同一 snapshot、同一 CAS、同一 claim），只多两处 GM 语义：清休整窗口（败场额外休整也被抹掉，但**账本仍记 `resolved_loss` 与 1% 地板**）与推送悬赏/师承进度（与 `触发历练结算` 共用 `_advance_adventure_progress`）。GM 无「代逃跑」：逃跑的风险判断属于玩家。`触发历练结算` 在 `awaits_combat_choice` 为真时诚实拒绝——旧代码照 bump `scheduled_time` 再收下一张抉择面板并回 `✅ 已强制结算`，是假成功。
 - 终态 = `resolved_win | resolved_loss | resolved_fled`；`pending_choice` 首版不过期。
-- `adventure_settlements.outcome` 保留为人类可读终态标签（`'' / win / loss / fled`），由 `state` 派生写入；**读取一律以 `state` 为权威**，不得两处各自判断，避免双真相。
+- `adventure_settlements.outcome` 保留为人类可读终态标签，由 `state` 派生写入（`STATE_OUTCOMES` 映射：`resolved_win→win`、`resolved_loss→lose`、`resolved_fled→flee`，非终态为 `''`）；**读取一律以 `state` 为权威**，不得两处各自判断，避免双真相。
 
 ## 2. Persistence and transaction
 
@@ -56,16 +58,29 @@ v36 的 `adventure_settlements` 是事后事实账本，缺状态机字段。v39
 - 崩溃窗口 = 「终态已提交但效果未 claim」：重放时读同一 settlement 终态，claim 保证不重复发放；必须用故障注入测试证明。
 - 悬赏进度与师承 `adventure_complete`/`win_pve` 保持在 `main.py:1418-1460` 的结算外推进，**不进**本表（现状即如此）。
 
+### 2.4 实现期修正（2026-10-12，并发用例与三轮复核逼出的七处）
+
+写在前面：前三条是**跑真实并发测试才发现的事实**，后四条来自三轮独立复核；都已落地为代码注释与回归测试，不是设计期推演。
+
+1. **效果写入必须是第二笔短事务，不能留成"提交后逐条裸写"**。原 §2.3 的"提交成功后逐项 `claim_effect`"如果用叶子写（`_commit_if_standalone` 按 `conn._txn_depth` 门控）执行，在并发双击下会炸：赢家写完 claim 与本体之间的 commit 门控，可能被输家刚好抢到的事务归属读成非 0 而**跳过提交**，sqlite 隐式事务就此悬空，输家随后 `BEGIN IMMEDIATE` 直接 `cannot start a transaction within a transaction`（`tests/test_adventure_settlement_state_machine.py::test_concurrent_double_click_grants_once` 首跑即复现）。收进 CM 后两路只在事务上排队，claim 语义与「失败不回滚终态」均不变（本体异常仍逐项吞掉并转成玩家可见提示，故这笔事务不会因失败效果回滚）。同一竞态对 `_advance_state`（pending→ready 的 CAS）与落单/补建插入同样成立，一并收进 CM；结算路径不再留任何叶子裸写。
+2. **「完成历练」新增崩溃点 3 的补发入口**。忙碌行与终态在同一事务里清掉，因此"终态已提交、效果未 claim"之后玩家再发「完成历练」会撞上 `user_cd` 闸门被普通拒绝——那条奖励就再没有任何入口能补发（「迎战/逃跑」只查未终结的单子）。修正：`finish_adventure` 在无历练忙碌行时查该玩家最新一张结算单，**仅当它是终态且三项 claim 不全**时走 `_replay_terminal` 补发（`reward_data=None`，不推悬赏/师承，AC5 不破），其余情形照旧返回「❌ 你当前不在历练中！」。附带把 `resolve_adventure_choice` 里那段"终态→本次历练已经结算过了"的死分支删除（`get_open_settlement` 本就不返回终态行），重复点击听到的是「当前没有待抉择的历练遭遇」。
+3. **GM 休整清除只认生效中的窗口**：`AdventureManager.clear_fatigue` 对 `fatigue_until <= now` 的残行返回 `False`，避免「一键清除冷却」把已自然到期的休整报成一条战果（v39 语义：`clear_fatigue` = 清掉一次**还没结束**的休整）。
+4. **战前抉择必须校验单据归属**（第二轮复核 P1）。`resolve_adventure_choice` 在 `get_open_settlement` 之后追加两道闸门：`user_cd.type == ADVENTURING` 且 `extra_data.adventure_run_id == row.adventure_run_id`，否则与普通拒绝同文案。起因是 GM「清除CD/清除全部冷却」**只复位忙碌、不终结结算单**，账上必然留下孤儿 `pending_choice` 行；而「迎战/逃跑」在 `main.py` 只挂 `@require_whitelist`（忙碌下天然可达、不经 `@player_required`），没有归属校验时玩家之后的**任一次**忙碌都可能被这次抉择消费掉——真打一场、按旧单发一份奖，并由 `_finalize` 结尾的 `busy_state.clear` 把闭关/修炼抹成空闲。同口径下 `handlers/utils.py` 拦截器的出路提示也改为**仅 `ADVENTURING` 时**才查库，两条渲染路径逐字一致（AC11 的「其余忙碌状态文案不变、零额外查询」这才真正成立，否则我们等于主动给闭关玩家递一句「发迎战吧」）。孤儿行本身不致命：新历练的单按 `settled_at DESC` 遮蔽它，「完成历练」的补发入口只认终态，都不受影响。
+5. **「取最新一张未终结单」依赖开单即写 `settled_at`**（v39 起 `insert_settlement` 落单时就写时间戳，终态 CAS 覆写）。若将来去掉开单时间戳或改 `get_open_settlement` 的排序，孤儿行会反客为主顶掉当前历练。判断"这张单是不是玩家当前历练"一律用 `adventure_run_id` 比对，别用时间。
+6. **GM 与玩家指令共用「重放零推进」口径**：`core/gm_manager.py` 的 `_advance_adventure_progress` 与 `main.py` 同名方法一致，`reward_data` 为空即整体早退（含师承 `adventure_complete`）。若只门住悬赏与 `win_pve`、师承照推，GM 与玩家同刻结算而 GM 的 CAS 落败走重放时，师承链会被推进两次（违反 AC5）。
+7. **归属闸门反过来把「升级那一刻在途的历练」锁死**（第三轮复核 P1，真库探针复现）。v39 是新增列，发布/热重载时任何正在历练中的玩家，其 `user_cd.extra_data` 里都只有 `route_key`、没有 run id；`_ensure_run_row` 的补建分支 mint 一个新 run id 落单却**不落回 extra**，于是第 4 条那道闸门永远比不中等。后果三层：① 迎战/逃跑双双被拒而忙碌解不开，修炼/闭关/炼丹/秘境全程被拦，而每一次拒绝尾部都自带「💡 可发送「迎战」或「逃跑」结束本次历练」——AC11 的出路提示在这个窗口里是句谎话；② GM 两条命令自相矛盾（`触发历练结算` 说「正等待战前抉择」并指路「强制历练迎战」，后者守卫通过、`resolve` 又回「没有待抉择的历练遭遇」），唯一出路是 `清除CD` 弃单，收益与账本事实永久丢失；③ 每点一次「完成历练」都再补建一张新单并重掷敌人，与本节和 PRD 自己写的「绝不产生第二条事实」直接冲突。修法：补建分支在**同一笔事务**里把 `{"route_key", "adventure_run_id"}` 经 `BusyState.stamp_extra` 落回 extra（不裸写 `update_user_cd`，守住 AGENTS §2），`settlement_id` 同步统一为 `settlement:{run_id}` 与 `_open_run_row` 同形；归属判定抽成 `_owned_open_run` 供 `resolve_adventure_choice` 与 `awaits_combat_choice` 共用，GM 的矛盾文案随之消失。回归用例 `test_legacy_in_flight_run_recovers_choice`（突变验证：去掉落回该用例即红）。
+   第四轮复核核实这次修法**正确且可用**（同事务原子性、`stamp_extra` 事务外单用、GM 两侧口径一致都跑了真库探针），并指出补建分支仍有一条窄缝：run id 若用 uuid，升级窗口的**并发双击**会各 mint 一张单（实测 4 路并发 → 4 行结算单 / 12 条 claim，四个回复全部带 reward；exp/gold 没翻倍只是丢失更新掩盖，不是防线），于是 mint 改为 `adventure:{user_id}:legacy:{create_time}` **确定性 id**，靠 `adventure_run_id` UNIQUE + `_insert_or_read` 回读收敛（实测 4 路 → 1 行 / 3 claim / 单份奖励，落败方读到终态走重放、`reward_data=None` 不推悬赏与师承）。比「事务内重读 extra」的写法好：赢家终态会 `clear` 忙碌把 extra 抹成 `{}`，重读照样 mint，还会给玩家回「❌ 结算记录写入失败」这种假故障文案。用例 `test_legacy_in_flight_concurrent_finish_creates_single_fact`（换回 uuid 即红）。
+
 ## 3. Flee function
 
 - 输入是玩家/敌人的 `FighterState.agility`（代码里 身法=`agility`、迅捷=`speed`，见 `managers/combat_manager.py:330`），输出带上下界的概率；性质测试断言敌我 `agility` 差增大时成功率不下降。
 - 系数走配置段 `config/adventure_config.json` 的 `flee`（同文件 `routes`/`events` 已是配置权威；自动创建默认配置的路径 `data/default_configs.py` 一并带上，AGENTS.md §5）。公式（`ratio = agility_self / agility_enemy`，`agility` 取 `FighterState.agility` 身法）：
   `p = clamp(ratio >= 1 ? base_rate + (ratio − 1) * slope_up : base_rate − (1/ratio − 1) * slope_down, floor, cap)`
-  领先段与落后段各自斜率：单一直线无法同时满足「同速 95%」「领先一倍 100%」「落后保底 60%」——前两点定出斜率 0.05 后，落后侧要 `ratio ≤ −6` 才碰得到地板，`floor` 会退化成死参数；故落后侧用 `1/ratio − 1`（＝敌快我几倍）独立设 `slope_down`。`agility_enemy <= 0` 时直接取 `cap`（名册里低/零身法怪合法存在，除法必须有确定分支，注释写明理由）。
+  领先段与落后段各自斜率：单一直线无法同时满足「同速 95%」「领先一倍 100%」「落后保底 60%」——前两点定出斜率 0.05 后，落后侧要 `ratio ≤ −6` 才碰得到地板，`floor` 会退化成死参数；故落后侧用 `1/ratio − 1`（＝敌快我几倍）独立设 `slope_down`。`agility_enemy <= 0` 时直接取 `cap`（名册里低/零身法怪合法存在，除法必须有确定分支，注释写明理由）；`agility_self <= 0`（负数装备/心法把身法压到 0 以下）时直接取 `floor`——落后段是 `1/ratio`，自身为 0 会除零。
 - **临时默认值（2026-10-12 用户拍板：先给默认值做过渡 + 验证功能，未上线内容不必顾虑玩家体验）**：`enabled=true`、`base_rate=0.95`、`slope_up=0.05`、`slope_down=0.35`、`floor=0.60`、`cap=1.00`。语义＝身法与敌相当 95%；我快敌一倍 100%（封顶）；敌快我一倍 60%（保底）；再慢也不破 60%。**这组数不是封板值**，正式数值仍由 bd `-9hq` 的三档模拟替换；本轮标为「临时默认」并写进 `design_docs` §Q4 与代码注释，禁止将来当成已定平衡。已知副作用（用户认可为过渡期代价）：95%/60% 意味着高/极高风险几乎总能主动脱身，败场税与「打完被迫迎战」的纹理在过渡期基本不成立，封板首要任务即回调此区间。
 - **disabled 仍保留为 kill switch**：`enabled=false`（人工关）→ 完成时直接 `adventuring -> ready_combat`，不写 `pending_choice`、不出现「只能迎战」的空转步骤；配置段整体缺失 → 回退到上述临时默认并写一条 warning 日志，**不**按 disabled 处理、也不报错给玩家。不做部分启用（任一数值槽缺失即整段回默认）。
-- **配置形状（本 child 交付即以此为准）**：`flee.enabled`（布尔，默认 `true`）、`flee.base_rate`、`flee.slope`、`flee.floor`、`flee.cap`（浮点，取上述临时默认）。本 child **要填这组临时值**（与旧口径的区别：不再留空、不再以 disabled 起步），使逃跑分支在单测与功能用例里可跑通。
-- **导入前确认提醒（同步登记 §Q4）**：临时默认值只用于过渡与功能验证；正式封板仍必须在**敌人名册/内容同步导入前**完成——名册固定了怪物 `agility` 分布，三档模拟才有确定输入（bd `-9hq`）。封板后只改 `config/adventure_config.json` 与 `default_configs.py` 的两个数，代码不动。
+- **配置形状（本 child 交付即以此为准）**：`flee.enabled`（布尔，默认 `true`）、`flee.base_rate`、`flee.slope_up`、`flee.slope_down`、`flee.floor`、`flee.cap`（浮点，取上述临时默认）。本 child **要填这组临时值**（与旧口径的区别：不再留空、不再以 disabled 起步），使逃跑分支在单测与功能用例里可跑通。
+- **导入前确认提醒（同步登记 §Q4）**：临时默认值只用于过渡与功能验证；正式封板仍必须在**敌人名册/内容同步导入前**完成——名册固定了怪物 `agility` 分布，三档模拟才有确定输入（bd `-9hq`）。封板要动的数是**三处**：`config/adventure_config.json` 的 `flee` 段、`data/default_configs.py` 的默认副本、`managers/adventure_manager.py` 的 `DEFAULT_FLEE_PARAMS`（配置段缺失时的整段回退值，漏改会让「缺配置」与「封板值」不一致）；公式与代码逻辑不动。
 - 逃跑 roll 与 combat roll 一样来自 `snapshot.rng_seed`，使 replay 确定性。
 
 ## 4. Fatigue and time

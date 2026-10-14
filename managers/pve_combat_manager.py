@@ -8,6 +8,7 @@ import importlib.util
 import os
 import random
 import sys
+from dataclasses import asdict
 from typing import NamedTuple
 
 
@@ -68,6 +69,37 @@ class RiftBeastResult(NamedTuple):
     draw: bool  # 平局单列：调用方视同挑战失败
     battle_msg: str  # 战报（无奖励结算内容）
     enemy_exp: int  # 敌人修为，胜利时由调用方入账
+
+
+class PreparedEncounter(NamedTuple):
+    """An encounter whose enemy is locked but not yet fought (child C R1).
+
+    ``enemy`` is the spawned :class:`Enemy`; the adventure settlement serializes
+    it into ``adventure_settlements.snapshot`` (``dataclasses.asdict`` is
+    JSON-safe here: every field is a number, string or list of dicts) so a
+    later 迎战 — even after a process restart — fights *this* enemy instead of
+    re-rolling a new one.
+    """
+
+    enemy: Enemy
+    category: str  # normal / elite / boss（审计与文案用）
+    difficulty: str  # low / mid / high / extreme
+
+
+class EncounterOutcome(NamedTuple):
+    """Result of running the engine over a locked encounter (child C design §2.2).
+
+    ``rewards``/``message`` are the same shapes ``trigger_pve_combat`` has always
+    returned; ``player_final_hp`` is exposed separately because the adventure
+    settlement writes it back through the Health Domain inside its own short
+    transaction (defeat floor included), not here.
+    """
+
+    message: str  # 战报文案
+    rewards: dict  # 含 exp/gold/bonus_exp/hp_penalty/pve_won
+    player_final_hp: int  # 引擎给出的玩家终值气血（未套败场地板）
+    winner: str  # 引擎胜者 user_id，平局为 "draw"
+    enemy_defeated: bool  # 敌方被击败（写 adventure_settlements.defeated）
 
 
 class PVECombatManager:
@@ -303,10 +335,12 @@ class PVECombatManager:
         base_rewards: dict | None = None,
     ) -> tuple[str, dict] | None:
         """
-        触发PVE战斗的主入口
+        触发PVE战斗的主入口（一次性同步路径：秘境以外的旧调用方）
 
         完整的战斗流程：判定触发 → 选择敌人 → 生成敌人 → 构建双方 FighterState
-        → 调用统一 CombatEngine → 计算奖励 → 格式化结果
+        → 调用统一 CombatEngine → 计算奖励 → 格式化结果。历练结算不再走这里：
+        它需要把「锁定敌人」与「开打」拆到两个时刻，见 :meth:`prepare_encounter`
+        与 :meth:`fight_prepared`。
 
         Args:
             player: 玩家对象
@@ -317,40 +351,105 @@ class PVECombatManager:
         Returns:
             战斗结果消息字符串，未触发战斗时返回None
         """
-        from astrbot.api import logger
-
-        # 1. 检查是否触发战斗
-        if not self._should_trigger_combat(scene, difficulty):
+        prepared = self.prepare_encounter(player, scene, difficulty)
+        if prepared is None:
             return None
 
-        # 2. 选择敌人类别
-        category = self._select_enemy_category(scene, difficulty)
-
-        # 3. 生成敌人
-        try:
-            enemy = self.enemy_mgr.spawn_enemy(player.level_index, category)
-        except Exception as e:
-            logger.error(f"生成敌人失败: {e}")
-            return None
-
-        # 4. 构建玩家与敌人的 FighterState
-        player_fighter = await self.combat_engine.build_fighter_from_player(player)
-        enemy_fighter = self._build_enemy_fighter(enemy)
-
-        # 5. 执行统一战斗引擎
-        result = self.combat_engine.resolve_combat(
-            player_fighter, enemy_fighter, combat_type="pve"
-        )
-
+        outcome = await self.fight_prepared(player, prepared.enemy, base_rewards)
         # 6. 将战斗后的当前 HP 写回玩家对象
         # child A：写回的是 current_hp 层（引擎已在 fighter 动态上限内给出终值）
-        player.current_hp = int(result.fighter1_final_hp)
+        player.current_hp = outcome.player_final_hp
+        return outcome.message, outcome.rewards
 
-        # 7. 计算奖励
+    def prepare_encounter(
+        self, player: Player, scene: str, difficulty: str
+    ) -> PreparedEncounter | None:
+        """Lock an encounter without rolling any combat randomness.
+
+        历练结算状态机（child C）在「完成历练」那一刻调用本方法：敌人身份必须
+        与战斗分开持久化，之后迎战/逃跑失败/replay 都复用同一只敌人，绝不重掷
+        （PRD R1）。本方法只消耗触发判定与类别选择的随机数，不打战斗。
+
+        Args:
+            player: 参战玩家（用其境界决定怪物档位）.
+            scene: ``"adventure"`` / ``"rift"``.
+            difficulty: ``low`` / ``mid`` / ``high`` / ``extreme``.
+
+        Returns:
+            :class:`PreparedEncounter`；未触发战斗或敌人生成失败时 ``None``。
+        """
+        from astrbot.api import logger
+
+        if not self._should_trigger_combat(scene, difficulty):
+            return None
+        category = self._select_enemy_category(scene, difficulty)
+        try:
+            enemy = self.enemy_mgr.spawn_enemy(player.level_index, category)
+        except Exception as exc:
+            logger.error(f"生成敌人失败: {exc}")
+            return None
+        return PreparedEncounter(enemy=enemy, category=category, difficulty=difficulty)
+
+    @staticmethod
+    def enemy_to_record(enemy: Enemy) -> dict:
+        """Serialize a locked enemy into JSON-safe snapshot form.
+
+        Enemy 是扁平 dataclass，字段全是数字/字符串/list[dict]，``asdict`` 可直接
+        JSON 往返；历练结算把它塞进 ``adventure_settlements.snapshot``，重启后仍能
+        重建同一只怪（PRD R1「锁定一次」）。序列化形状属于战斗层，故由本模块提供，
+        历练层不 import ``Enemy``。
+
+        Args:
+            enemy: 已生成的敌人。
+
+        Returns:
+            可 JSON 序列化的字段字典。
+        """
+        return asdict(enemy)
+
+    @staticmethod
+    def enemy_from_record(record: dict) -> Enemy:
+        """Rebuild a locked enemy from its snapshot record.
+
+        Args:
+            record: :meth:`enemy_to_record` 写出的字典。
+
+        Returns:
+            等价于锁定时刻的 :class:`Enemy`。
+        """
+        return Enemy(**record)
+
+    async def fight_prepared(
+        self,
+        player: Player,
+        enemy: Enemy,
+        base_rewards: dict | None = None,
+        *,
+        rng_seed: int | None = None,
+    ) -> EncounterOutcome:
+        """Run the combat engine over a locked enemy and shape its rewards.
+
+        纯计算侧：不写回玩家气血（那是调用方结算边界的事，child C 要在同一个短
+        事务里经 Health Domain 写，见 design §2.2）。
+
+        Args:
+            player: 参战玩家；只读，不写 ``current_hp``。
+            enemy: 已锁定的敌人（可来自 settlement snapshot 重建）。
+            base_rewards: 路线基础收益，缺省 ``{"exp": 100, "gold": 50}``。
+            rng_seed: 确定性重算用的种子（settlement ``snapshot.rng_seed``）。
+                给定时在引擎计算前后保存/还原全局 RNG 状态，使同一 snapshot 重放
+                出同一结果；省略时沿用现网的全局随机流（秘境等一次性路径）。
+
+        Returns:
+            :class:`EncounterOutcome`（战报文案、奖励、引擎终值气血、胜负）。
+        """
         if base_rewards is None:
             base_rewards = {"exp": 100, "gold": 50}
 
-        # Build the legacy-style result dict used by reward calculation
+        player_fighter = await self.combat_engine.build_fighter_from_player(player)
+        enemy_fighter = self._build_enemy_fighter(enemy)
+        result = self._roll_combat(player_fighter, enemy_fighter, rng_seed)
+
         legacy_result = {
             "winner": result.winner_id if result.winner_side != "draw" else "draw",
             "combat_log": result.combat_log,
@@ -359,10 +458,48 @@ class PVECombatManager:
             "reward": 0,
         }
         rewards = self._calculate_rewards(legacy_result, base_rewards, enemy)
-
-        # 8. 格式化并返回结果
         msg = self._format_combat_result(legacy_result, enemy, rewards)
-        return msg, rewards
+        return EncounterOutcome(
+            message=msg,
+            rewards=rewards,
+            player_final_hp=int(result.fighter1_final_hp),
+            winner=legacy_result["winner"],
+            enemy_defeated=result.winner_side == "fighter1",
+        )
+
+    def _roll_combat(
+        self,
+        player_fighter: FighterState,
+        enemy_fighter: FighterState,
+        rng_seed: int | None,
+    ):
+        """Call the engine, optionally pinned to a reproducible RNG stream.
+
+        CombatEngine 用的是进程全局 ``random``（不改引擎签名，那是 child D/E 的
+        共享面），所以确定性重放靠「保存→按 seed 重置→计算→还原」实现。整段
+        没有 await 点，单线程事件循环内不会被别的协程插入，restore 之后全局流与
+        结算前一致（与 :meth:`CombatEngine._narrative` 同一手法）。
+
+        Args:
+            player_fighter: 玩家战斗对象。
+            enemy_fighter: 敌方战斗对象。
+            rng_seed: 锁定在 snapshot 里的种子；None 表示不干预全局流。
+
+        Returns:
+            ``CombatResult``。
+        """
+        if rng_seed is None:
+            return self.combat_engine.resolve_combat(
+                player_fighter, enemy_fighter, combat_type="pve"
+            )
+        saved = random.getstate()
+        try:
+            random.seed(rng_seed)
+            return self.combat_engine.resolve_combat(
+                player_fighter, enemy_fighter, combat_type="pve"
+            )
+        finally:
+            random.setstate(saved)
 
     async def challenge_rift_beast(
         self, player: Player, enemy_group_key: str | None = None

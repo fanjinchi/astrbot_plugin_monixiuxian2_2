@@ -22,10 +22,12 @@
 - **敌人锁定时点统一**：开始时只登记 run 与 `route_key`（现网 `managers/adventure_manager.py:233` 就只存 `route_key`）；敌人与 RNG 在**历练完成、进入结算的那一刻**锁定一次，之后迎战/逃跑/replay 一律复用该快照，不得重掷。
 - 低/中风险不提供选择，但历练完成时仍先持久化已选定 enemy id/profile version、路线基础收益快照、RNG seed 和可消费状态，再运行战斗；不得走无记录的同步旁路。
 - 高/极高风险在历练完成时进入 `pending_choice`，记录同样的稳定快照；**首版不设自动过期，也不新增「退出/取消历练」出口**（2026-10-12 用户拍板：无限期挂起本身就是设计，`逃跑` 就是留给玩家的后路）。
-- **锁死不成立的闭环（必须照此理解，别再提出口指令）**：pending 只在高/极高风险出现，而这两档一旦出现 pending 就必然同时提供 `迎战` 与 `逃跑` 两条消费路径（逃跑默认开启，用临时默认值；人工 `enabled=false` 时则根本不产生 pending，见 R2）。因此「单据永久锁住活动」在任一时刻都不可能发生，无需期限、无需第三个出口、无需 GM 特判。
-- **锁定范围是刻意的全玩法锁，不是缺陷**：忙碌拦截器（`handlers/utils.py:106-113`）对非白名单指令一律回「道友当前正在「历练中」，无法分心他顾」，挂 pending 期间修炼/采集/宗门等全部停摆。这是设计意图——战前决断必须当场做完，唯一出路就是 `迎战` 或 `逃跑`（后者即留给玩家的后路）。**禁止**为此再加超时、取消指令或 GM 特判。
+- **锁死不成立的闭环（必须照此理解，别再提玩家侧出口指令）**：pending 只在高/极高风险出现，而这两档一旦出现 pending 就必然同时提供 `迎战` 与 `逃跑` 两条消费路径（逃跑默认开启，用临时默认值；人工 `enabled=false` 时则根本不产生 pending，见 R2）。因此「单据永久锁住活动」在任一时刻都不可能发生，无需期限、无需玩家侧第三个出口。
+- **锁定范围是刻意的全玩法锁，不是缺陷**：忙碌拦截器（`handlers/utils.py:106-113`）对非白名单指令一律回「道友当前正在「历练中」，无法分心他顾」，挂 pending 期间修炼/采集/宗门等全部停摆。这是设计意图——战前决断必须当场做完，唯一出路就是 `迎战` 或 `逃跑`（后者即留给玩家的后路）。**禁止**为此再加超时或玩家侧「取消历练」指令（2026-10-12 拍板）。
+- **GM 代打出口（2026-10-12 复核后由用户新增，取代原先「禁止 GM 特判」的一条）**：`#修仙GM 强制历练迎战 <ID>` 代玩家选「迎战」——用快照里锁定的那只敌人真打一场，胜败如实入账（含 1% 气血地板与败场额外休整），随后照旧清掉休整窗口供测试脚本续跑。GM **不得**替玩家选逃跑，也不得跳过抉择不战而结：`触发历练结算` 遇到 `pending_choice`/`ready_combat` 必须诚实拒绝并指路到该子命令（旧行为是假报 `✅ 已强制结算` 而单据仍开着，属 bug）。
 - settlement 在重启后可查询；迎战/逃跑只能消费一次，并发或重试不得重复收益、重掷敌人或重复战斗。
 - 非终态 settlement 保留本次历练 `ADVENTURING` busy，作用**仅是挡住「开始历练」**；终态提交时必须在同一结算边界 clear busy。busy 期间的气血恢复照常计时（见 R6），因此本 child **不需要**改写 `user_cd.scheduled_time`，也不得为此在 `BusyState` 之外手写忙碌行（AGENTS.md §2）。
+- **抉择与忙碌互相绑定（2026-10-12 第二轮复核补，AC11 的前置）**：`迎战`/`逃跑` 消费的不是「账上任意一张未终结单」，而是**当前这次历练**的那一张——`user_cd.type` 必须为 `ADVENTURING`，且其 `extra_data.adventure_run_id` 必须与单据一致。GM「清除CD / 清除全部冷却」只复位忙碌、**不终结结算单**，孤儿 `pending_choice` 行会留在账上；缺这道绑定时，玩家后来的任一次忙碌（闭关等）会被旧单消费掉：真打一场无关的战斗、按旧单发一份奖，并被结算边界的 clear 抹掉当前忙碌。出路提示同口径：只在历练忙碌时出现，其余忙碌状态文案逐字不变、不额外查库。**升级窗口同样要成立**：v39 前创建、`extra_data` 里还没有 run id 的在途历练忙碌行，补建单据时必须把 mint 的 run id 同事务落回 extra（`BusyState.stamp_extra`），否则这道绑定把该玩家永久锁死——迎战/逃跑全被拒、忙碌解不开、出路提示变谎话，且每点一次「完成历练」多补建一张事实；该 run id 取 `create_time` 派生的确定性形式（非 uuid），并发双击靠 `adventure_run_id` UNIQUE + 冲突回读也只落一条事实（见 design §2.4-7）。
 - 不得复用进程内、零惩罚语义的 `EncounterStore`。
 
 ### R2. 逃跑契约
@@ -84,17 +86,21 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1：所有风险档都以唯一 `adventure_run_id` 持久化 settlement；高/极高风险 pending 可跨重启恢复，任意档完成/迎战/逃跑的并发重试只产生一个终态和一次路线收益。
-- [ ] AC2：逃跑成功完整满足“无战斗、血量不变、基础收益、无击败/疲劳”；失败锁定同敌人且只战斗一次。
-- [ ] AC3：概率函数对 `ratio` 单调不减（领先段与落后段各自单调、交界处连续）、夹在 `[floor, cap]` 内，只消费稳定快照中的 `agility`；`agility_enemy <= 0` 时走确定的 `cap` 分支不抛异常；三个锚点值有测试断言（`ratio=1.0→95%`、`ratio=2.0→100%`、`ratio=0.5→60%`）；`flee` 段临时默认值已写入 `config/adventure_config.json` 与 `data/default_configs.py` 且两处一致；配置段缺失时整段回退默认 + warning 日志（不按 disabled、不向玩家报错）；人工设 `enabled=false` 时不产生 `pending_choice`。
-- [ ] AC4：胜负均只经 Health Domain 写 `current_hp`；战败保底 `ceil(1% * 动态 max_hp)` 生效、旧绝对 `hp=1` 路径已移除（`managers/adventure_manager.py:306`），且**胜场不保底**（按引擎实际剩余写回，可低于 25%）。
-- [ ] AC5：重启、stale resolution 恢复、GM time-skip、事务异常和终态重复请求不造成路线收益、掉落、传承、击败事实、悬赏/师承进度或疲劳重复；`effect_type` 三个取值各有 claim 冲突测试；claim 划账后执行失败时结算仍进终态、玩家看到「部分奖励发放失败」提示且 error 日志可定位（不回滚 claim、不自动重发）。
+- [x] AC1：所有风险档都以唯一 `adventure_run_id` 持久化 settlement；高/极高风险 pending 可跨重启恢复，任意档完成/迎战/逃跑的并发重试只产生一个终态和一次路线收益。
+- [x] AC2：逃跑成功完整满足“无战斗、气血不因战斗下降、基础收益、无击败/疲劳”；失败锁定同敌人且只战斗一次。账本 `hp_after` 记**结算时刻的实时气血**（R6 全时段恢复已落定），不是锁定值——「气血不变」指的是零损耗，不是数值等于 `hp_before`。
+- [x] AC3：概率函数对 `ratio` 单调不减（领先段与落后段各自单调、交界处连续）、夹在 `[floor, cap]` 内，只消费稳定快照中的 `agility`；`agility_enemy <= 0` 时走确定的 `cap` 分支、`agility_self <= 0`（负数装备/心法把身法压到 0 以下）时走确定的 `floor` 分支，两者都不抛异常；三个锚点值有测试断言（`ratio=1.0→95%`、`ratio=2.0→100%`、`ratio=0.5→60%`）；`flee` 段临时默认值已写入 `config/adventure_config.json`、`data/default_configs.py` 与 `DEFAULT_FLEE_PARAMS` 且三处一致；配置段缺失时整段回退默认 + warning 日志（不按 disabled、不向玩家报错）；人工设 `enabled=false` 时不产生 `pending_choice`。
+- [x] AC4：胜负均只经 Health Domain 写 `current_hp`；战败保底 `ceil(1% * 动态 max_hp)` 生效、旧绝对 `hp=1` 路径已移除（`managers/adventure_manager.py:306`），且**胜场不保底**（按引擎实际剩余写回，可低于 25%）。
+- [x] AC5：重启、stale resolution 恢复、GM time-skip、事务异常和终态重复请求不造成路线收益、掉落、传承、击败事实、悬赏/师承进度或疲劳重复；`effect_type` 三个取值各有 claim 冲突测试；claim 划账后执行失败时结算仍进终态、玩家看到「部分奖励发放失败」提示且 error 日志可定位（不回滚 claim、不自动重发）。
 - [ ] AC6：普通/精英/组内 Boss 回归与设计 TTK/胜率/资源税口径一致；秘境兽/守护者 current HP 回归通过。
-- [ ] AC7：无 Step 7 新经济数值；定向及完整 ruff/pytest 质量门通过。
-- [ ] AC8：疲劳构成为「路线 `fatigue_cooldown` 300/600/900/1200 恒定 + 仅真实战败 +600，写入取 `max` 不回退」，injury 分支已移除；休整闸门读端已切 `adventure_fatigue`（**每人一份全局窗口，休整期内任何路线都不能开**，基座表与单行 API 不改），重启后仍生效，GM time-skip 能跳过；两处「该路线」玩家文案已改为全局表述并有测试/输出证据。
-- [ ] AC9：`迎战`/`逃跑` 已注册并进入 `BUSY_STATE_ALLOWED_COMMANDS`（死条目已清理），`历练状态` 能显示待选择态；`/修仙帮助`、`metadata.yaml` version、README 日志按 AGENTS.md §7 同步。
-- [ ] AC10：气血恢复不再判断忙碌（`_is_busy` 已删除），历练/闭关/pending 期间按 1% 动态 `max_hp`/分钟持续恢复；父 PRD R2、`pve-enemy-design.md` §Q4 与附录 C.6 口径已同步。
-- [ ] AC11：pending 的出路提示两处齐备——进入 `pending_choice` 的结算回复含遭遇对象 + 「迎战/逃跑」两条指令；挂 pending 时发任意非白名单指令，回复文案出现「迎战」「逃跑」出路提示。其它忙碌状态（修炼/闭关等）的拦截文案逐字不变。
+- [x] AC7：无 Step 7 新经济数值；定向及完整 ruff/pytest 质量门通过。
+- [x] AC8：疲劳构成为「路线 `fatigue_cooldown` 300/600/900/1200 恒定 + 仅真实战败 +600，写入取 `max` 不回退」，injury 分支已移除；休整闸门读端已切 `adventure_fatigue`（**每人一份全局窗口，休整期内任何路线都不能开**，基座表与单行 API 不改），重启后仍生效，GM time-skip 能跳过；两处「该路线」玩家文案已改为全局表述并有测试/输出证据。
+- [x] AC9：`迎战`/`逃跑` 已注册并进入 `BUSY_STATE_ALLOWED_COMMANDS`（死条目已清理），`历练状态` 能显示待选择态；`/修仙帮助`、`metadata.yaml` version、README 日志按 AGENTS.md §7 同步。
+- [x] AC10：气血恢复不再判断忙碌（`_is_busy` 已删除），历练/闭关/pending 期间按 1% 动态 `max_hp`/分钟持续恢复；父 PRD R2、`pve-enemy-design.md` §Q4 与附录 C.6 口径已同步。
+- [x] AC11：pending 的出路提示两处齐备——进入 `pending_choice` 的结算回复含遭遇对象 + 「迎战/逃跑」两条指令；挂 pending 时发任意非白名单指令，回复文案出现「迎战」「逃跑」出路提示。其它忙碌状态（修炼/闭关等）的拦截文案逐字不变、不额外查库（两条渲染路径同口径，2026-10-12 第二轮复核补齐拦截器一侧）。
+- [x] AC12（2026-10-12 复核追加）：GM「触发历练结算」在单据挂 `pending_choice`/`ready_combat` 时返回失败并指路「强制历练迎战」，**不得**报 `✅ 已强制结算`；GM「强制历练迎战 <ID>」代玩家应战，走 `resolve_adventure_choice(flee=False)` 同一入口，真实胜负入账（败场含 1% 地板与 `resolved_loss`）后清休整窗口，重复调用不双发奖励。
+- [x] AC13（2026-10-12 第二轮复核追加）：`迎战`/`逃跑` 只消费**当前这次历练**的单据（`user_cd` 为 `ADVENTURING` 且 `adventure_run_id` 与单据一致）；GM「清除CD/清除全部冷却」留下的孤儿 `pending_choice` 既不发奖、也不抹掉玩家当前忙碌。**升级窗口**：v39 前就在途、extra 没有 run id 的历练忙碌，补建单据后迎战/逃跑照常可用、重复点「完成历练」不再产生第二条事实；补建的 run id 由 `create_time` 派生（非 uuid），故**并发双击也只落一条事实**（落败方按重放走，不推悬赏/师承）。用例：`test_orphan_pending_choice_is_not_consumable`、`test_legacy_in_flight_run_recovers_choice`、`test_legacy_in_flight_concurrent_finish_creates_single_fact`（后两条对修复做了突变验证：去掉 extra 落回 / 换成 uuid，用例即红）。
+
+> AC6 **故意不勾**：普通/精英/组内 Boss 的 TTK/胜率/资源税回归是**真实环境**核对（按 AGENTS.md 由用户发起，本会话未执行）；秘境兽/守护者 current HP 地板归 child E（bd `-8oh`），本 child 不动。其余 AC 均有 `tests/` 内断言证据（状态机 40 条 + GM 65 条，全套 1142 passed）。
 
 ## Decisions (2026-10-12 用户拍板)
 

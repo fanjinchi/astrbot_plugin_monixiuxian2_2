@@ -681,6 +681,14 @@
       }
     ]
   },
+  "flee": {
+    "enabled": true,
+    "base_rate": 0.95,
+    "slope_up": 0.05,
+    "slope_down": 0.35,
+    "floor": 0.60,
+    "cap": 1.00
+  },
   "legacy_chance": 0.05,
   "legacy_type": "adventure"
 }

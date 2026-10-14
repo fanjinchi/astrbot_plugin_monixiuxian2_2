@@ -141,6 +141,10 @@ CMD_ADVENTURE_START = "开始历练"
 CMD_ADVENTURE_COMPLETE = "完成历练"
 CMD_ADVENTURE_STATUS = "历练状态"
 CMD_ADVENTURE_INFO = "历练信息"
+# 战前抉择出口（高/极高风险遇敌后的 pending_choice 状态）：只有这两条指令
+# 能把挂起的历练推到终态，没有超时也没有「取消历练」（2026-10-12 拍板）
+CMD_ADVENTURE_FIGHT = "迎战"
+CMD_ADVENTURE_FLEE = "逃跑"
 
 # 炼丹系统指令
 CMD_ALCHEMY_RECIPES = "丹药配方"
@@ -353,6 +357,8 @@ class XiuXianPlugin(Star):
             config_manager=self.config_manager,
             encounter_store=encounter_store,
             busy_state=busy_state,
+            # 历练气血写回一律走 Health Domain 权威（AGENTS §13：core 服务由此装配段注入）
+            health_service=health_service,
         )
         alchemy_mgr = AlchemyManager(
             self.db, self.config_manager, storage_ring_mgr, busy_state=busy_state
@@ -1413,6 +1419,62 @@ class XiuXianPlugin(Star):
         async for r in self.adventure_handlers.handle_start_adventure(event, route):
             yield r
 
+    async def _advance_adventure_progress(
+        self, user_id: str, reward_data: dict | None
+    ) -> str:
+        """Advance cross-system progress (悬赏 + 师承任务链) after a 历练 settlement and return the reply suffix.
+
+        结算本体（状态机、气血、休整、掉落、机缘）由 AdventureManager 在事务边界内
+        完成并自带幂等 claim；悬赏/师承进度按 design §2.3 有意留在结算之外，因此
+        重放路径（``reward_data is None``）不会重复推进——三条入口（完成历练/迎战/
+        逃跑）共用本方法，避免进度语义分叉。
+
+        Args:
+            user_id: 完成结算的玩家 id。
+            reward_data: manager 返回的结算数据；``None`` 表示本次没有新事实。
+
+        Returns:
+            追加到结算消息尾部的片段（可能为空串）。
+        """
+        if not reward_data:
+            return ""
+        extra = ""
+        player = await self.db.get_player_by_id(user_id)
+        if player:
+            bounty_tag = reward_data.get("bounty_tag", "adventure")
+            bounty_value = reward_data.get("bounty_progress", 1)
+            has_progress, bounty_msg = await self.bounty_mgr.add_bounty_progress(
+                player, bounty_tag, bounty_value
+            )
+            if has_progress:
+                extra += bounty_msg
+        # 师承任务链：历练完成 + PvE 胜利计数（各自独立 try/except，
+        # 任一失败不影响另一条的反馈消息，也不影响历练主流程）
+        master_msg = None
+        try:
+            master_msg = await self.sect_mgr.advance_master_progress(
+                user_id, "adventure_complete"
+            )
+        except Exception:
+            logger.warning(
+                "【修仙插件】师承任务进度推进失败（历练完成）", exc_info=True
+            )
+        if reward_data.get("pve_won"):
+            try:
+                win_msg = await self.sect_mgr.advance_master_progress(
+                    user_id, "win_pve"
+                )
+                if win_msg:
+                    master_msg = (master_msg or "") + win_msg
+            except Exception:
+                logger.warning(
+                    "【修仙插件】师承任务进度推进失败（历练PvE胜利）",
+                    exc_info=True,
+                )
+        if master_msg:
+            extra += master_msg
+        return extra
+
     @filter.command(CMD_ADVENTURE_COMPLETE, "完成历练")
     @require_whitelist
     async def handle_adventure_complete(self, event: AstrMessageEvent):
@@ -1421,42 +1483,36 @@ class XiuXianPlugin(Star):
         success, msg, reward_data = await self.adventure_mgr.finish_adventure(user_id)
 
         # 如果历练成功完成，更新悬赏进度
-        if success and reward_data:
-            player = await self.db.get_player_by_id(user_id)
-            if player:
-                bounty_tag = reward_data.get("bounty_tag", "adventure")
-                bounty_value = reward_data.get("bounty_progress", 1)
-                has_progress, bounty_msg = await self.bounty_mgr.add_bounty_progress(
-                    player, bounty_tag, bounty_value
-                )
-                if has_progress:
-                    msg += bounty_msg
-            # 师承任务链：历练完成 + PvE 胜利计数（各自独立 try/except，
-            # 任一失败不影响另一条的反馈消息，也不影响历练主流程）
-            master_msg = None
-            try:
-                master_msg = await self.sect_mgr.advance_master_progress(
-                    user_id, "adventure_complete"
-                )
-            except Exception:
-                logger.warning(
-                    "【修仙插件】师承任务进度推进失败（历练完成）", exc_info=True
-                )
-            if reward_data.get("pve_won"):
-                try:
-                    win_msg = await self.sect_mgr.advance_master_progress(
-                        user_id, "win_pve"
-                    )
-                    if win_msg:
-                        master_msg = (master_msg or "") + win_msg
-                except Exception:
-                    logger.warning(
-                        "【修仙插件】师承任务进度推进失败（历练PvE胜利）",
-                        exc_info=True,
-                    )
-            if master_msg:
-                msg += master_msg
+        if success:
+            msg += await self._advance_adventure_progress(user_id, reward_data)
 
+        yield event.plain_result(msg)
+
+    @filter.command(CMD_ADVENTURE_FIGHT, "迎战历练强敌")
+    @require_whitelist
+    async def handle_adventure_fight(self, event: AstrMessageEvent):
+        """Command 「迎战」- 迎战历练锁定的强敌; routes to adventure_mgr.resolve_adventure_choice (with bounty progress updates)."""
+        # 与「完成历练」同形：结算结果要在本层消费 pve_won/悬赏标签，
+        # 故直调 manager（秘境「探索秘境 迎战」子命令是同一先例）。
+        user_id = event.get_sender_id()
+        success, msg, reward_data = await self.adventure_mgr.resolve_adventure_choice(
+            user_id, flee=False
+        )
+        if success:
+            msg += await self._advance_adventure_progress(user_id, reward_data)
+        yield event.plain_result(msg)
+
+    @filter.command(CMD_ADVENTURE_FLEE, "尝试脱离历练强敌")
+    @require_whitelist
+    async def handle_adventure_flee(self, event: AstrMessageEvent):
+        """Command 「逃跑」- 尝试脱身历练强敌; routes to adventure_mgr.resolve_adventure_choice (with bounty progress updates)."""
+        # 逃跑成功同样产生结算事实（基础收益照常发放），进度推进与迎战/完成历练一致。
+        user_id = event.get_sender_id()
+        success, msg, reward_data = await self.adventure_mgr.resolve_adventure_choice(
+            user_id, flee=True
+        )
+        if success:
+            msg += await self._advance_adventure_progress(user_id, reward_data)
         yield event.plain_result(msg)
 
     @filter.command(CMD_ADVENTURE_STATUS, "查看历练状态")

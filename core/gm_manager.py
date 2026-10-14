@@ -138,6 +138,7 @@ class GMManager:
             "清除CD": self.cmd_clear_cd,
             "清除悬赏": self.cmd_clear_bounty,
             "触发历练结算": self.cmd_force_adventure,
+            "强制历练迎战": self.cmd_force_adventure_fight,
             "触发秘境结算": self.cmd_force_rift,
             "触发秘境谜题": self.cmd_force_rift_puzzle,
             "触发秘境妖兽": self.cmd_force_rift_beast,
@@ -375,7 +376,8 @@ class GMManager:
             "⏱ 状态与结算\n"
             "  清除CD [@玩家/ID] 确认\n"
             "  清除悬赏 [@玩家/ID] 确认 （进行中悬赏+放弃冷却）\n"
-            "  触发历练结算 [@玩家/ID]\n"
+            "  触发历练结算 [@玩家/ID] （不战而结；挂在战前抉择时请改用下条）\n"
+            "  强制历练迎战 [@玩家/ID] （代玩家应战锁定的强敌，真实胜负入账）\n"
             "  触发秘境结算 [@玩家/ID]\n"
             "\n"
             "🌀 秘境遭遇（功能测试）\n"
@@ -948,17 +950,86 @@ class GMManager:
             f"✅ 已清除【{player.user_name or target_id}】的{'、'.join(cleared)}",
         )
 
+    def _resolve_force_target(self, event: "AstrMessageEvent", args: str) -> str | None:
+        """Resolve the target id of a force-settle subcommand (a lone number is the id).
+
+        通用 ``_resolve_target`` 只在 ≥2 token 时才把首个数字当目标 ID，而强制结算
+        类子命令的参数只可能是目标（``触发历练结算 900000002`` 只有一个 token），
+        因此这里额外放行单个数字 token。
+        """
+        tokens = args.split() if args else []
+        if tokens and tokens[0].lstrip("@").isdigit():
+            return tokens[0].lstrip("@")
+        target_id, _ = self._resolve_target(event, args)
+        return target_id
+
+    async def _advance_adventure_progress(
+        self, player: Player, target_id: str, reward_data: dict | None
+    ) -> str:
+        """Advance cross-system progress (悬赏 + 师承链) after a 历练 settlement.
+
+        与 ``main.py`` 的同名方法同口径（玩家指令与 GM 代结算共用一份进度语义）；
+        ``reward_data`` 为 ``None`` 表示本次没有新事实（重放），什么都不推进。
+        师承链两处调用各自独立吞异常：进度反馈失败不该让结算结果消失。
+
+        Args:
+            player: 目标玩家对象（悬赏进度需要）。
+            target_id: 目标玩家 id。
+            reward_data: manager 返回的结算数据。
+
+        Returns:
+            待拼接到结算文案末尾的进度文本（可能为空串）。
+        """
+        # 与 main.py 同名方法逐字同口径：重放（reward_data 为空）没有新事实，
+        # 悬赏与师承一起不推进——否则 GM 与玩家指令并发、GM 的 CAS 落败走重放
+        # 时，会把师承「历练完成」阶段推两次（PRD AC5）。
+        if not reward_data:
+            return ""
+
+        parts: list[str] = []
+
+        if self.bounty_manager:
+            bounty_tag = reward_data.get("bounty_tag", "adventure")
+            bounty_value = reward_data.get("bounty_progress", 1)
+            has_progress, bounty_msg = await self.bounty_manager.add_bounty_progress(
+                player, bounty_tag, bounty_value
+            )
+            if has_progress:
+                parts.append(bounty_msg)
+
+        # 历练完成与 PvE 胜利各自独立推进，任一失败不影响另一条反馈。
+        try:
+            master_msg = await self.sect_manager.advance_master_progress(
+                target_id, "adventure_complete"
+            )
+        except Exception:
+            logger.warning(
+                "【修仙插件】师承任务进度推进失败（强制历练完成）", exc_info=True
+            )
+            master_msg = None
+        if master_msg:
+            parts.append(master_msg)
+
+        if (reward_data or {}).get("pve_won"):
+            try:
+                win_msg = await self.sect_manager.advance_master_progress(
+                    target_id, "win_pve"
+                )
+            except Exception:
+                logger.warning(
+                    "【修仙插件】师承任务进度推进失败（强制历练PvE胜利）", exc_info=True
+                )
+                win_msg = None
+            if win_msg:
+                parts.append(win_msg)
+
+        return "".join(parts)
+
     async def cmd_force_adventure(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
-        """强制历练结算。"""
-        # 强制结算类命令的参数即目标 ID：单个数字也视为目标（
-        # 通用规则会将单个数字当作命令自身数值参数而回落到发送者）。
-        tokens = args.split() if args else []
-        if tokens and tokens[0].lstrip("@").isdigit():
-            target_id = tokens[0].lstrip("@")
-        else:
-            target_id, _ = self._resolve_target(event, args)
+        """强制历练结算——不战而结；挂在战前抉择的单子必须走「强制历练迎战」。"""
+        target_id = self._resolve_force_target(event, args)
         player = await self._get_player(target_id)
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"
@@ -969,6 +1040,17 @@ class GMManager:
 
         if not self.adventure_manager:
             return False, "❌ 历练管理器未初始化！"
+
+        # 战前抉择是玩家本人的选择，GM 不能替玩家「不战而结」：早期版本在这里
+        # 照样 bump 时间并报告 ✅，实际 finish_adventure 只回了一张抉择面板
+        # （reward_data=None），玩家仍被锁着——假成功。2026-10-12 拍板改为诚实
+        # 拒绝，代打另走「强制历练迎战」子命令。
+        if await self.adventure_manager.awaits_combat_choice(target_id):
+            return False, (
+                "❌ 该历练已锁定强敌，正等待战前抉择，无法不战而结！\n"
+                "💡 代玩家应战请发送「强制历练迎战 "
+                f"{target_id}」，或由玩家本人发送「迎战」/「逃跑」。"
+            )
 
         # 将计划完成时间提前到当前时间，立即结算
         # force-settle 例外（design §D3）：仅上移 scheduled_time，保留直写
@@ -988,59 +1070,80 @@ class GMManager:
             # manager 失败消息自带 ❌（如路线配置缺失），嵌入包装头前先去重，避免 "❌ ❌"
             return False, f"❌ 历练结算失败：{msg.removeprefix('❌ ')}"
 
-        # 强制结算即"立即完成"：同时清除该玩家的历练路线休整冷却，
-        # 允许测试脚本连续开启同一路线（正常流程仍按配置冷却）。
-        if self.adventure_manager:
-            self.adventure_manager._route_cooldowns.pop(target_id, None)
+        # 兜底：上面查过之后再被玩家自己的「迎战」插进来也可能挂住抉择，
+        # 此时同样不能报成功（终态判定以结算单为权威）。
+        if await self.adventure_manager.awaits_combat_choice(target_id):
+            return False, (
+                "❌ 历练已推进到战前抉择，未能不战而结！\n"
+                "💡 代玩家应战请发送「强制历练迎战 "
+                f"{target_id}」，或由玩家本人发送「迎战」/「逃跑」。"
+            )
 
-        # 更新悬赏进度（与正常 /完成历练 保持一致）
-        if reward_data and self.bounty_manager:
-            bounty_tag = reward_data.get("bounty_tag", "adventure")
-            bounty_value = reward_data.get("bounty_progress", 1)
-            has_progress, bounty_msg = await self.bounty_manager.add_bounty_progress(
-                player, bounty_tag, bounty_value
-            )
-            if has_progress:
-                msg += bounty_msg
+        # 强制结算即"立即完成"：同时清除该玩家的历练休整窗口，
+        # 允许测试脚本连续开启历练（正常流程仍按配置休整）。休整已落库（v39），
+        # 清理走 manager 的 CAS 入口，GM 层不直接持有仓储。
+        # 必须包 CM：clear_fatigue 是「读疲劳行 + 一条 CAS UPDATE」两次写，
+        # 裸叶子写在并发下可能撞上别处的 BEGIN IMMEDIATE（design §2.4-1）。
+        async with self.db.transaction():
+            await self.adventure_manager.clear_fatigue(target_id)
 
-        # 师承任务链：与 main.py handle_adventure_complete 保持一致——
-        # 历练完成与 PvE 胜利各自独立推进，任一失败不影响另一条反馈。
-        master_msg = None
-        try:
-            master_msg = await self.sect_manager.advance_master_progress(
-                target_id, "adventure_complete"
-            )
-        except Exception:
-            logger.warning(
-                "【修仙插件】师承任务进度推进失败（强制历练完成）", exc_info=True
-            )
-        if (reward_data or {}).get("pve_won"):
-            try:
-                win_msg = await self.sect_manager.advance_master_progress(
-                    target_id, "win_pve"
-                )
-                if win_msg:
-                    master_msg = (master_msg or "") + win_msg
-            except Exception:
-                logger.warning(
-                    "【修仙插件】师承任务进度推进失败（强制历练PvE胜利）", exc_info=True
-                )
-        if master_msg:
-            msg += master_msg
+        msg += await self._advance_adventure_progress(player, target_id, reward_data)
 
         return True, f"✅ 已强制结算【{player.user_name or target_id}】的历练\n{msg}"
+
+    async def cmd_force_adventure_fight(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """Force the locked enemy to be fought on the target's behalf (test tool).
+
+        代玩家做「迎战」选择：用 snapshot 里锁定的那只敌人真打一场，胜则
+        ``resolved_win``、败则按败场规则落 ``resolved_loss``（气血 1% 地板 +
+        额外休整），随后清掉休整窗口让测试脚本能继续跑。败场事实保留——
+        GM 只抹冷却，不抹账本（2026-10-12 拍板）。
+
+        Args:
+            event: 消息事件（解析 @mention 与发送者）。
+            args: 子命令参数，目标 ID 可省略。
+
+        Returns:
+            (是否成功, 面向 GM 的完整中文文案)。
+        """
+        target_id = self._resolve_force_target(event, args)
+        player = await self._get_player(target_id)
+        if not player:
+            return False, "❌ 目标玩家尚未踏入修仙之路！"
+
+        if not self.adventure_manager:
+            return False, "❌ 历练管理器未初始化！"
+
+        if not await self.adventure_manager.awaits_combat_choice(target_id):
+            return False, (
+                "❌ 目标玩家当前没有等待应战的历练遭遇！\n"
+                "💡 未遇敌的历练用「触发历练结算」，正常流程让玩家发送「迎战」。"
+            )
+
+        (
+            success,
+            msg,
+            reward_data,
+        ) = await self.adventure_manager.resolve_adventure_choice(target_id, flee=False)
+        if not success:
+            return False, f"❌ 强制迎战失败：{msg.removeprefix('❌ ')}"
+
+        async with self.db.transaction():
+            await self.adventure_manager.clear_fatigue(target_id)
+
+        msg += await self._advance_adventure_progress(player, target_id, reward_data)
+
+        return True, f"✅ 已代【{player.user_name or target_id}】应战并结算历练\n{msg}"
 
     async def cmd_force_rift(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
         """强制秘境结算。"""
-        # 强制结算类命令的参数即目标 ID：单个数字也视为目标（
-        # 通用规则会将单个数字当作命令自身数值参数而回落到发送者）。
-        tokens = args.split() if args else []
-        if tokens and tokens[0].lstrip("@").isdigit():
-            target_id = tokens[0].lstrip("@")
-        else:
-            target_id, _ = self._resolve_target(event, args)
+        # 强制结算类命令的参数即目标 ID（单个数字也视为目标，见
+        # _resolve_force_target）。
+        target_id = self._resolve_force_target(event, args)
         player = await self._get_player(target_id)
         if not player:
             return False, "❌ 目标玩家尚未踏入修仙之路！"
@@ -1289,17 +1392,15 @@ class GMManager:
             )
             if protection_deleted:
                 cleared.append(f"传承被夺保护期：{protection_deleted} 条")
-        # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
 
-        # 6. 历练路线休整冷却（内存态不落库，同 cmd_force_adventure 的弹出方式）
-        # 必须在 CM 退出后执行：内存态无法回滚，事务回滚时不得弹出（否则回滚了
-        # 数据库却把冷却清掉了，玩家可重复刷取历练）
-        # 提交与 pop 之间是 await 点、事件循环可切走；窗口方向保守——最坏多保留
-        # 一次历练冷却（不会造成重复刷取），GM 命令幂等可重跑，故不加同步
-        if self.adventure_manager:
-            popped = self.adventure_manager._route_cooldowns.pop(target_id, None)
-            if popped:
-                cleared.append(f"历练路线休整冷却：{len(popped)} 条")
+            # 6. 历练休整窗口（v39 起落库 adventure_fatigue，不再是内存字典）：
+            # 放进同一事务，回滚时休整原样保留，不会出现「库回滚了、冷却清掉了」
+            # 这种可重复刷历练的混合状态
+            if self.adventure_manager and await self.adventure_manager.clear_fatigue(
+                target_id
+            ):
+                cleared.append("历练休整冷却：1 条")
+        # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
 
         if not cleared:
             return (

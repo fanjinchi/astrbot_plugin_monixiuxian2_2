@@ -39,7 +39,7 @@ from astrbot.api import logger
 # 回复明细行序非契约，spec 无顺序保证）。Boss/灵眼按 design D2a 拆为
 # 两条单键 UPDATE、共享同一域标签，展开后相邻（boss 在前）。
 # child P（pve-persistence-transaction-foundation design §5）：世界Boss 到期/
-# 再生两条落属主 boss_manager（聚合位不变）；「历练路线疲劳到期时间」新属主
+# 再生两条落属主 boss_manager（聚合位不变）；「历练休整到期时间」新属主（v39 起休整为全局窗口）
 # adventure_manager 追加表尾，既有行序零位移。
 _PROVIDER_MODULES: tuple[str, ...] = (
     "core.busy_state",

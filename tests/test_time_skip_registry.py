@@ -44,7 +44,7 @@ EXPECTED_LABELS: tuple[str, ...] = (
     "Boss/灵眼下次刷新时间",  # 11 spirit_eye (spirit_eye_manager)
     "传承挑战冷却",  # 12 impart_pk
     "传承被夺保护期",  # 13 impart_snatch
-    "历练路线疲劳到期时间",  # 14 adventure_fatigue (adventure_manager)
+    "历练休整到期时间",  # 14 adventure_fatigue (adventure_manager)
 )
 
 # 覆盖域行 = label 去重（14 条目仅 Boss/灵眼同 label 合并 → 13 项；

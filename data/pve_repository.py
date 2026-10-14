@@ -40,6 +40,69 @@ _SHANGHAI = ZoneInfo("Asia/Shanghai")
 # 列名会被拼进 SQL（SET/WHERE 片段），只允许迁移文件里出现的纯小写下划线标识符。
 _IDENTIFIER_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
 
+# 历练结算状态机的取值域（child C，design §1）。schema 层已带 CHECK 兜住非法
+# 值，这里的常量是给服务层写状态转移用的单一命名来源，避免散落的裸字符串。
+STATE_ADVENTURING = "adventuring"
+STATE_PENDING_CHOICE = "pending_choice"
+STATE_READY_COMBAT = "ready_combat"
+STATE_RESOLVED_WIN = "resolved_win"
+STATE_RESOLVED_LOSS = "resolved_loss"
+STATE_RESOLVED_FLED = "resolved_fled"
+SETTLEMENT_STATES = (
+    STATE_ADVENTURING,
+    STATE_PENDING_CHOICE,
+    STATE_READY_COMBAT,
+    STATE_RESOLVED_WIN,
+    STATE_RESOLVED_LOSS,
+    STATE_RESOLVED_FLED,
+)
+# 终态：进入后只能被读取渲染，不得再被任何转移改写（重放路径的判据）
+TERMINAL_STATES = frozenset(
+    {STATE_RESOLVED_WIN, STATE_RESOLVED_LOSS, STATE_RESOLVED_FLED}
+)
+# 非终态：玩家名下「还挂着」的结算行，用于迎战/逃跑入口与重启找回
+OPEN_STATES = frozenset({STATE_ADVENTURING, STATE_PENDING_CHOICE, STATE_READY_COMBAT})
+# 效果类型封闭取值（design §2.3）：历练消费者的三类副作用，claim 幂等键的一部分
+EFFECT_BASE_REWARD = "base_reward"
+EFFECT_ROUTE_DROPS = "route_drops"
+EFFECT_LEGACY_TRIGGER = "legacy_trigger"
+# 消费者身份：历练结算本身，写死一处避免各处拼字符串
+CONSUMER_ADVENTURE_SETTLEMENT = "adventure_settlement"
+# state → outcome 派生标签（design §1：outcome 只是人类可读标签，
+# 读取一律以 state 为权威，禁止两处各自判断）
+STATE_OUTCOMES = {
+    "resolved_win": "win",
+    "resolved_loss": "lose",
+    "resolved_fled": "flee",
+}
+
+
+def settlement_outcome(state: str) -> str:
+    """Return the human-readable ``outcome`` label derived from ``state``.
+
+    Args:
+        state: A settlement state value from ``SETTLEMENT_STATES``.
+
+    Returns:
+        ``"win"``/``"lose"``/``"flee"`` for terminal states, ``""`` while the
+        run is still open. 只作派生标签：读取一律以 ``state`` 为权威。
+    """
+    return STATE_OUTCOMES.get(state, "")
+
+
+def snapshot_text(snapshot: Mapping[str, Any] | str) -> str:
+    """Serialize a settlement snapshot for the ``snapshot`` TEXT column.
+
+    Args:
+        snapshot: Mapping to encode, or already-encoded JSON text.
+
+    Returns:
+        Compact JSON string (empty mapping yields ``"{}"``).
+    """
+    if isinstance(snapshot, str):
+        return snapshot or "{}"
+    return json.dumps(snapshot or {}, ensure_ascii=False, separators=(",", ":"))
+
 
 def shanghai_date_key(now: float | int | datetime) -> str:
     """Convert a timestamp to the ``Asia/Shanghai`` natural-day key ``YYYY-MM-DD``.
@@ -296,6 +359,46 @@ class AdventureRepository(BaseRepository):
             (adventure_run_id,),
         )
 
+    async def get_open_settlement(self, user_id: str) -> dict | None:
+        """Fetch the player's newest settlement still open (not a terminal state).
+
+        迎战/逃跑入口和进程重启后的找回都以此为权威：查数据库，不查内存字典。
+
+        Args:
+            user_id: Player whose open settlement is looked up.
+
+        Returns:
+            The newest row whose ``state`` is in ``OPEN_STATES``, else ``None``.
+        """
+        placeholders = ", ".join("?" for _ in OPEN_STATES)
+        return await self._fetchone(
+            f"SELECT * FROM adventure_settlements "
+            f"WHERE user_id = ? AND state IN ({placeholders}) "
+            f"ORDER BY settled_at DESC, rowid DESC LIMIT 1",
+            (user_id, *sorted(OPEN_STATES)),
+        )
+
+    async def get_latest_settlement(self, user_id: str) -> dict | None:
+        """Fetch the player's most recently created settlement, any state.
+
+        「完成历练」在忙碌行已清之后仍要能发现「终态已提交、效果未 claim 完」
+        的单子（崩溃点 3 唯一的补发入口），所以这里不按状态过滤；取最新一张用
+        ``rowid`` 插入序，不用 ``settled_at``：child C 起结算行在开局就落单，
+        该列此时写的是**落单时刻**，要到终态 CAS 才被覆写成真正的结算时刻，
+        所以它对在途/终态行都非零、不表示先后（见 :meth:`insert_settlement`）。
+
+        Args:
+            user_id: Player whose newest settlement is looked up.
+
+        Returns:
+            The newest row of that player, or ``None`` when never settled.
+        """
+        return await self._fetchone(
+            "SELECT * FROM adventure_settlements WHERE user_id = ? "
+            "ORDER BY rowid DESC LIMIT 1",
+            (user_id,),
+        )
+
     async def insert_settlement(
         self,
         *,
@@ -312,17 +415,27 @@ class AdventureRepository(BaseRepository):
         hp_after: int = 0,
         fled: bool = False,
         defeated: bool = False,
+        state: str = STATE_ADVENTURING,
+        route_key: str = "",
+        snapshot: Mapping[str, Any] | str = "",
     ) -> tuple[dict, bool]:
         """Insert one adventure settlement fact, or read back the existing row.
 
         ``adventure_run_id`` 带 UNIQUE 约束：同一 run 重放（重试/重复结算）返回
         既有行且 ``created=False``，绝不产生第二条事实。
 
+        v39 状态机三列（child C）：``state`` 是权威状态、``route_key`` 记归属
+        路线、``snapshot`` 记锁定时刻的不可变输入（dict 自动序列化成 JSON）。
+        非法 ``state`` 由 schema 的 CHECK 直接拒绝（抛 IntegrityError），不在
+        仓储层静默纠正——取值域留在 schema 层是 v39 的有意选择。
+
         Args:
             settlement_id: Caller-generated primary key for the fact.
             adventure_run_id: Idempotency key of the adventure run.
             user_id: Owner of the run（外键引用 ``players``）.
-            now: Settlement timestamp (unix seconds, caller clock).
+            now: Timestamp written into ``settled_at``. child C 起结算行在开局
+                就落单，故对非终态行它是**落单时刻**；终态 CAS 会把该列覆写
+                成真正的结算时刻（判断是否已结算一律看 ``state``，别拿它比 0）。
             encounter_id: Encounter definition being settled.
             profile_id: Enemy profile id from the content design.
             profile_version: Pinned profile version of that encounter.
@@ -332,6 +445,9 @@ class AdventureRepository(BaseRepository):
             hp_after: Player 气血 after the fight（真实气血差 = before - after）。
             fled: Whether the player fled.
             defeated: Whether the enemy was defeated.
+            state: One of ``SETTLEMENT_STATES``（开始历练时通常是 adventuring）。
+            route_key: Route this settlement belongs to.
+            snapshot: Locked combat inputs as a mapping or JSON text.
 
         Returns:
             ``(row, created)``。
@@ -352,6 +468,9 @@ class AdventureRepository(BaseRepository):
                 "fled",
                 "defeated",
                 "settled_at",
+                "state",
+                "route_key",
+                "snapshot",
             ),
             (
                 settlement_id,
@@ -367,6 +486,9 @@ class AdventureRepository(BaseRepository):
                 int(bool(fled)),
                 int(bool(defeated)),
                 int(now),
+                state,
+                route_key,
+                snapshot_text(snapshot),
             ),
             key_where="adventure_run_id = ?",
             key_params=(adventure_run_id,),
@@ -379,6 +501,7 @@ class AdventureRepository(BaseRepository):
         settlement_id: str,
         *,
         expected_cas_version: int,
+        expected_state: str | None = None,
         **values: Any,
     ) -> bool:
         """Conditionally update a settlement fact guarded by its CAS version.
@@ -386,14 +509,20 @@ class AdventureRepository(BaseRepository):
         Args:
             settlement_id: Row to update.
             expected_cas_version: Version read in the caller's short read.
+            expected_state: 可选前态守护（design §2.2）：状态机推进必须
+                ``WHERE state = <前态>``，双击「迎战」的败者才不会把同一场战斗
+                结算第二次。省略时退化为纯版本 CAS。
             **values: Columns to write (keyword args; ``cas_version`` 由原语管理).
 
         Returns:
             ``True`` if updated, ``False`` on version conflict.
         """
+        keys = {"settlement_id": settlement_id}
+        if expected_state is not None:
+            keys["state"] = expected_state
         moved = await self._update_where(
             "adventure_settlements",
-            keys={"settlement_id": settlement_id},
+            keys=keys,
             expected_cas_version=expected_cas_version,
             values=values,
         )
