@@ -1300,3 +1300,8 @@ async def test_legacy_in_flight_concurrent_finish_creates_single_fact(env):
     assert len(await env.claims()) == 3
     assert (await env.player()).experience == WIN_EXP  # 不是两倍
     assert (await env.row())["state"] == STATE_RESOLVED_WIN
+    # 忙碌必须收尾。落败方若也拿旧快照 stamp 一次，这次写入会排在赢家 `_finalize`
+    # 的 clear 之后，把忙碌**复活成历练中**；而落败方只走 `_replay_terminal`（全
+    # 文件唯一清忙碌点在 `_finalize`），迎战/逃跑又被归属闸门拒绝 → 玩家永久卡死、
+    # 重启不自愈，只能管理员「清除CD」弃单（第五轮实测 20/20）。
+    assert await env.user_cd_type() == int(UserStatus.IDLE)

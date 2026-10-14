@@ -220,13 +220,18 @@ class BusyState:
         """Rewrite ``extra_data`` on a busy row the player already holds.
 
         身份字段补写，不是常态忙碌写入：``type``/``create_time``/``scheduled_time``
-        一律按**调用方持有的那份快照**整行回写，只换 ``extra_data``。不在事务内
-        重读：这一路径只在升级那一刻被走到（老忙碌行没有 run id），而真在那个微秒
-        间隙被别的任务清了忙碌、或被管理员 bump 过到期时间，盖回原值同样自洽
-        ——extra 与单据始终一致，「迎战/逃跑」或再点「完成历练」都能收尾，多一次
-        查库换不来实际安全。走 owner（本类）而不是让业务模块裸调
-        ``db.ext.update_user_cd``，是为了守住 AGENTS.md §2「忙碌读写由 BusyState
-        承接」——GM 强制结算的 ``scheduled_time`` bump 是文档里唯一的例外。
+        按**调用方持有的那份快照**整行回写（底层 ``update_user_cd`` 是全列
+        UPDATE），只把 ``extra_data`` 换成新载荷。
+
+        **调用方契约**：只在「本次写入仍确定持有该忙碌行」时调用。并发下拿旧快照
+        晚写一步，就会把别人已经 :meth:`clear` 掉的忙碌**复活成原状态**，而复活后
+        可能没有任何收尾出口——历练结算的并发落败方只走 ``_replay_terminal``（不
+        清忙碌），实测 20/20 把玩家永久锁在「历练中」，重启不自愈，只能管理员
+        「清除CD」弃单。故 :meth:`AdventureManager._ensure_run_row` 用 insert 的
+        ``created`` 闸门保证只有真正落单那一路才 stamp。走 owner（本类）而不是让
+        业务模块裸调 ``db.ext.update_user_cd``，是为了守住 AGENTS.md §2「忙碌读写
+        由 BusyState 承接」——GM 强制结算的 ``scheduled_time`` bump 是文档里唯一
+        的例外。
 
         Args:
             user_cd: 调用方已读到的忙碌行（对象本身会被就地更新）。

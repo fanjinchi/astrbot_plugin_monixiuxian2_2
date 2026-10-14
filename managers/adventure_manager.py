@@ -656,7 +656,8 @@ class AdventureManager:
 
         mint 出的 run id 是**确定性**的（由 ``user_cd.create_time`` 派生），并且
         **必须与落单在同一笔事务里写回** ``user_cd.extra_data``（经
-        ``BusyState.stamp_extra``）：归属校验
+        ``BusyState.stamp_extra``，且只有**真正插入成功**那一路才写回——见该方法
+        的调用方契约）：归属校验
         （:meth:`awaits_combat_choice` / :meth:`resolve_adventure_choice`）比对
         的就是 extra 里的 run id 与单据的 run id，不落回则永远对不上——升级那一刻
         就在途的历练会被永久锁死（「迎战/逃跑」全被拒、忙碌解不开、AC11 的出路
@@ -690,7 +691,7 @@ class AdventureManager:
             run_id = f"adventure:{user_id}:legacy:{int(user_cd.create_time or 0)}"
             minted = True
         async with self.db.transaction():
-            row, _ = await self.settlements.insert_settlement(
+            row, created = await self.settlements.insert_settlement(
                 settlement_id=f"settlement:{run_id}",
                 adventure_run_id=run_id,
                 user_id=user_id,
@@ -698,7 +699,13 @@ class AdventureManager:
                 route_key=route["key"],
                 state=STATE_ADVENTURING,
             )
-            if minted:
+            # 只有**真正插入成功**那一路才落回 extra。`update_user_cd` 按调用方
+            # 对象整行回写（含 type），并发落败方若也拿旧 stamp 写一次，会排在赢家
+            # `_finalize` 的 clear 之后，把已结束的忙碌**复活成历练中**——而落败方
+            # 随后只走 `_replay_terminal`（不清忙碌），玩家就永久卡死、只能靠 GM
+            # 「清除CD」弃单。赢家这笔 stamp 与 insert 同事务，任何 clear 都只能在
+            # 该行存在之后发生（跨事务串行），所以 stamp 永远排在 clear 之前。
+            if minted and created:
                 await self.busy_state.stamp_extra(
                     user_cd,
                     {"route_key": route["key"], "adventure_run_id": run_id},
