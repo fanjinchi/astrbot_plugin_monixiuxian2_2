@@ -15,7 +15,7 @@ stateDiagram-v2
 
 - 锁定时点唯一：**历练完成、进入结算那一刻**锁定敌人 + RNG；开始时只落 `adventuring` 行（现网 `managers/adventure_manager.py:233` 只存 `route_key`，与之一致）。
 - 低/中风险跳过 `pending_choice`，但**绝不跳过持久 settlement**；不允许无记录的同步旁路。
-- **逃跑未封板时（配置 disabled）**：高/极高风险也直接 `adventuring -> ready_combat`，不产生 `pending_choice`，避免玩家多发一条「迎战」却没有任何选择收益；状态机与 v39 列照常就位，封板后只翻开关。
+- **仅当人工关掉开关时（`flee.enabled=false`，kill switch）**：高/极高风险也直接 `adventuring -> ready_combat`，不产生 `pending_choice`，避免玩家多发一条「迎战」却没有任何选择收益。默认状态是 `enabled=true` + 临时默认系数（见 §3），因此正常流程会产生 pending。
 - **pending 的两处出路提示（甲案，必做）**：① 进入 `pending_choice` 的结算回复内联敌人 + 「迎战/逃跑」指令说明；② 挂 pending 期间被忙碌拦截时，回复追加「可发送「迎战」或「逃跑」结束本次历练」。落点在拦截器 status 分支或 `assert_idle(template=)`，不新增 API、不改 `UserStatus`、不动其它状态文案。理由同 §1 锁死决定：全玩法锁的可用性下限是玩家看得见出口。
 - **不做 pending 超时、不做「取消历练」指令**（2026-10-12 用户拍板）：`迎战`/`逃跑` 就是全部出口，`逃跑` 即玩家的后路。设计上由上一条的 disabled 语义保证「有 pending 就一定有逃跑」，所以无限期挂起不会锁死；`busy_state.clear` 只在终态提交边界发生，无需任何到期扫描、不新增 `scheduled_time` 语义、不进 time-skip 注册表（pending 不是冷却）。
 - 终态 = `resolved_win | resolved_loss | resolved_fled`；`pending_choice` 首版不过期。
@@ -59,9 +59,11 @@ v36 的 `adventure_settlements` 是事后事实账本，缺状态机字段。v39
 ## 3. Flee function
 
 - 输入是玩家/敌人的 `FighterState.agility`（代码里 身法=`agility`、迅捷=`speed`，见 `managers/combat_manager.py:330`），输出带上下界的概率；性质测试断言敌我 `agility` 差增大时成功率不下降。
-- 系数走配置槽（`config/adventure_config.json` 或新增 flee 配置段），先在设计模拟器跑地板/标模/天花板；参数未回写 `design_docs/content-design/pve-enemy-design.md` §Q4 之前**整个战前选择面 disabled**：完成时直接 `adventuring -> ready_combat`，不写 `pending_choice`、不出现「只能迎战」的空转步骤。禁止在工程代码里手拍默认常数；配置缺失即按 disabled 处理，而不是运行时报错给玩家。
-- **配置形状（本 child 交付即以此为准，数值留空）**：`flee.enabled`（布尔，默认关）+ `flee.base_rate` / `flee.agility_ratio_floor` / `flee.agility_ratio_cap` 等槽位；`enabled=false` 或任一数值槽缺失 → 直接按 disabled 分支结算，**不做部分启用**。数值本身由后续模拟决策填，本 child 不填、也不给「能跑的临时值」。
-- **导入前确认提醒（同步登记 §Q4）**：逃跑参数必须在**敌人名册/内容同步导入前**封板确认——名册固定了怪物 `agility` 分布，三档模拟才有确定输入；先切名册后定参数，等于高风险组长期没有止损键。
+- 系数走配置段 `config/adventure_config.json` 的 `flee`（同文件 `routes`/`events` 已是配置权威；自动创建默认配置的路径 `data/default_configs.py` 一并带上，AGENTS.md §5）。公式：`p = clamp(base_rate + (agility_self / agility_enemy - 1) * slope, floor, cap)`，其中 `p` 为逃跑成功率，`agility` 取 `FighterState.agility`（身法）。
+- **临时默认值（2026-10-12 用户拍板：先给默认值做过渡 + 验证功能，未上线内容不必顾虑玩家体验）**：`enabled=true`、`base_rate=0.35`、`slope=0.20`、`floor=0.10`、`cap=0.70`。语义＝身法与敌相当时 35%，每领先敌身法 100% 加 20 个百分点，夹在 10%-70%。**这组数不是封板值**，正式数值仍由 bd `-9hq` 的三档模拟替换；本轮把它标为「临时默认」并写进 `design_docs` §Q4，代码注释同样标注，禁止将来当成已定平衡。
+- **disabled 仍保留为 kill switch**：`enabled=false`（人工关）→ 完成时直接 `adventuring -> ready_combat`，不写 `pending_choice`、不出现「只能迎战」的空转步骤；配置段整体缺失 → 回退到上述临时默认并写一条 warning 日志，**不**按 disabled 处理、也不报错给玩家。不做部分启用（任一数值槽缺失即整段回默认）。
+- **配置形状（本 child 交付即以此为准）**：`flee.enabled`（布尔，默认 `true`）、`flee.base_rate`、`flee.slope`、`flee.floor`、`flee.cap`（浮点，取上述临时默认）。本 child **要填这组临时值**（与旧口径的区别：不再留空、不再以 disabled 起步），使逃跑分支在单测与功能用例里可跑通。
+- **导入前确认提醒（同步登记 §Q4）**：临时默认值只用于过渡与功能验证；正式封板仍必须在**敌人名册/内容同步导入前**完成——名册固定了怪物 `agility` 分布，三档模拟才有确定输入（bd `-9hq`）。封板后只改 `config/adventure_config.json` 与 `default_configs.py` 的两个数，代码不动。
 - 逃跑 roll 与 combat roll 一样来自 `snapshot.rng_seed`，使 replay 确定性。
 
 ## 4. Fatigue and time
