@@ -1301,7 +1301,36 @@ async def test_legacy_in_flight_concurrent_finish_creates_single_fact(env):
     assert (await env.player()).experience == WIN_EXP  # 不是两倍
     assert (await env.row())["state"] == STATE_RESOLVED_WIN
     # 忙碌必须收尾。落败方若也拿旧快照 stamp 一次，这次写入会排在赢家 `_finalize`
-    # 的 clear 之后，把忙碌**复活成历练中**；而落败方只走 `_replay_terminal`（全
-    # 文件唯一清忙碌点在 `_finalize`），迎战/逃跑又被归属闸门拒绝 → 玩家永久卡死、
-    # 重启不自愈，只能管理员「清除CD」弃单（第五轮实测 20/20）。
+    # 的 clear 之后，把忙碌**复活成历练中**；修复前重放分支不收尾（当时全文件唯一
+    # 清忙碌点在 `_finalize`）、迎战/逃跑又被归属闸门拒绝 → 玩家永久卡死、重启不自
+    # 愈，只能管理员「清除CD」弃单。突变验证：把 `if minted and created:` 还原成
+    # `if minted:` 跑本用例 20 轮 = 20/20 红（真并发 gather 才复现，人类慢点击在
+    # 头部检查就被「不在历练中」挡掉）。
     assert await env.user_cd_type() == int(UserStatus.IDLE)
+
+
+@pytest.mark.asyncio
+async def test_revived_busy_self_heals_on_replay(env):
+    """被陈旧整行快照复活的忙碌，必须在再点「完成历练」时收尾（第六轮 P2）。
+
+    复刻 core/gm_manager.py:1059-1064 的既有写法：拿**事务前**读到的 user_cd 整行
+    回写（``update_user_cd`` 是全列 UPDATE，含 ``type``），会把已经收尾的忙碌复活成
+    「历练中」。修复前这是永久锁死：单据已终态 → 迎战/逃跑被归属闸门正确拒绝，重放
+    不碰忙碌，而 assert_idle / @player_required 都不看 ``scheduled_time``。
+    """
+    await start_run(env.mgr, LOW_ROUTE)
+    stale = await env.db.ext.get_user_cd(USER)  # GM 事务前持有的那份快照
+    ok, msg, reward_data = await env.mgr.finish_adventure(USER)
+    assert ok, msg
+    assert reward_data is not None
+    assert await env.user_cd_type() == int(UserStatus.IDLE)
+
+    await env.db.ext.update_user_cd(stale)  # 陈旧整行回写 → 忙碌被复活
+    assert await env.user_cd_type() == int(UserStatus.ADVENTURING)
+
+    ok2, msg2, reward_data2 = await env.mgr.finish_adventure(USER)
+    assert ok2, msg2
+    assert "本次历练此前已结算" in msg2
+    assert reward_data2 is None  # 重放不推进悬赏/师承
+    assert await env.user_cd_type() == int(UserStatus.IDLE)  # 一次点击即自愈
+    assert len(await env.claims()) == 3  # 也不重复发奖

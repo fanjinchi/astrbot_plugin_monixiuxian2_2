@@ -702,9 +702,11 @@ class AdventureManager:
             # 只有**真正插入成功**那一路才落回 extra。`update_user_cd` 按调用方
             # 对象整行回写（含 type），并发落败方若也拿旧 stamp 写一次，会排在赢家
             # `_finalize` 的 clear 之后，把已结束的忙碌**复活成历练中**——而落败方
-            # 随后只走 `_replay_terminal`（不清忙碌），玩家就永久卡死、只能靠 GM
-            # 「清除CD」弃单。赢家这笔 stamp 与 insert 同事务，任何 clear 都只能在
-            # 该行存在之后发生（跨事务串行），所以 stamp 永远排在 clear 之前。
+            # 随后只走 `_replay_terminal`，修复前该分支不收尾忙碌，玩家就永久卡死、
+            # 只能靠 GM「清除CD」弃单（第六轮把「终态 ⇒ 不持有该场忙碌」补成重放
+            # 的兜底收尾，见 design §2.4-8；闸门仍是第一道防线）。赢家这笔 stamp 与
+            # insert 同事务，任何 clear 都只能在该行存在之后发生（跨事务串行），所以
+            # stamp 永远排在 clear 之前。
             if minted and created:
                 await self.busy_state.stamp_extra(
                     user_cd,
@@ -1319,8 +1321,10 @@ class AdventureManager:
 
         崩溃/重连后的找回路径：终态行是既成事实，这里只补发「已提交但未 claim」
         的效果（claim 保证不重复），并按快照数字重述结果。战斗会用同一份
-        ``rng_seed`` 确定性重演一次**只为你看到同样的数字**——气血与状态一律不
-        再写回（``_finalize`` 的 CAS 才是唯一写入口），所以不存在二次扣血。
+        ``rng_seed`` 确定性重演一次**只为你看到同样的数字**——气血一律不再写回
+        （``_finalize`` 的 CAS 才是唯一写入口），所以不存在二次扣血；忙碌则**必须
+        收尾**：能走到这里说明玩家仍持着这张**已结束**历练的忙碌（只可能是别处拿
+        陈旧整行快照把它复活了），见返回前的注释与归属判定。
 
         Args:
             player: 玩家对象。
@@ -1331,7 +1335,8 @@ class AdventureManager:
 
         Returns:
             ``(成功, 消息, reward_data)``；重放不返回 ``reward_data``，避免悬赏/
-            师承进度被重复推进（design §2.3）。
+            师承进度被重复推进（design §2.3）。副作用：把被复活的历练忙碌清回空闲
+            （不变式「终态 ⇒ 不持有该场忙碌」）。
         """
         snapshot = self._read_snapshot(row)
         state = row["state"]
@@ -1359,6 +1364,25 @@ class AdventureManager:
             duration=int(snapshot.get("effective_duration") or 0),
             replayed=True,
         )
+        # 终态即收尾（不变式：**单据终态 ⇒ 不持有该场历练的忙碌**）。正常流程到
+        # 不了这里——`_finalize` 在提交终态的同笔事务里就 clear 了；能走进重放分支
+        # 说明 `user_cd` 仍是 `ADVENTURING`，只可能是别处拿**陈旧整行快照**把忙碌
+        # 复活了（`update_user_cd` 是全列 UPDATE；GM「触发历练结算」
+        # core/gm_manager.py:1059-1064 是 AGENTS §2 记录的既有直写例外）。复活态下
+        # 三个出口原本全断：迎战/逃跑被归属闸门正确拒绝、重放不碰忙碌，而
+        # `assert_idle` 与 `@player_required` 都不看 `scheduled_time` ⇒ 永久「历练
+        # 中」、重启不自愈，只能管理员「清除CD」弃单。补这一次收尾让玩家点一次
+        # 「完成历练」即自愈；重复发奖由 claim 挡着，与重放语义一致。
+        # 判定读**库里当下**的忙碌行而非调用方快照（同 `_owned_open_run`）：若本次
+        # 调用期间玩家已经开了**更新的一场**历练（extra 是别的 run id），绝不能把
+        # 新忙碌清掉——那正是本轮刚修掉的那类陈旧写入。extra 没有 run id 的行属于
+        # 升级前的老忙碌（就是本场），照常收尾。
+        fresh = await self.db.ext.get_user_cd(player.user_id)
+        if fresh and int(fresh.type) == int(UserStatus.ADVENTURING):
+            current_run = self._read_extra(fresh).get("adventure_run_id")
+            if not current_run or current_run == row["adventure_run_id"]:
+                await self.busy_state.clear(player)
+                await self.db.update_player(player)
         return True, msg, None
 
     def _render_pending(self, row: dict, route: dict, player: Player) -> str:
