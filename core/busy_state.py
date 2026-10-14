@@ -224,10 +224,13 @@ class BusyState:
         UPDATE），只把 ``extra_data`` 换成新载荷。
 
         **调用方契约**：只在「本次写入仍确定持有该忙碌行」时调用。并发下拿旧快照
-        晚写一步，就会把别人已经 :meth:`clear` 掉的忙碌**复活成原状态**，而复活后
-        可能没有任何收尾出口——历练结算的并发落败方只走 ``_replay_terminal``（不
-        清忙碌），实测 20/20 把玩家永久锁在「历练中」，重启不自愈，只能管理员
-        「清除CD」弃单。故 :meth:`AdventureManager._ensure_run_row` 用 insert 的
+        晚写一步，就会把别人已经 :meth:`clear` 掉的忙碌**复活成原状态**；而忙碌
+        判定不看 ``scheduled_time``（:meth:`assert_idle` 与拦截器只读 ``type``），
+        复活后所有忙碌指令照旧被拒，实测 20/20 永久锁死、重启不自愈，只能管理员
+        「清除CD」弃单。历练结算这一条路自第六轮起有一张兜底网——
+        ``_replay_terminal`` 按「单据终态 ⇒ 不持有该场忙碌」收尾，玩家再点一次
+        「完成历练」即自愈；**别的需求没有这张网**，所以任何调用方都不得把兜底
+        当成依赖。故 :meth:`AdventureManager._ensure_run_row` 用 insert 的
         ``created`` 闸门保证只有真正落单那一路才 stamp。走 owner（本类）而不是让
         业务模块裸调 ``db.ext.update_user_cd``，是为了守住 AGENTS.md §2「忙碌读写
         由 BusyState 承接」——GM 强制结算的 ``scheduled_time`` bump 是文档里唯一
