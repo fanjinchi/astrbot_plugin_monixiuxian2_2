@@ -35,8 +35,8 @@
 - 失败：使用 pending 内同一 enemy id 立即开战；不得再次逃跑或重掷。
 - 成功率是玩家/敌人身法关系的单调有界函数（身法 = `FighterState.agility`，代码里 身法/迅捷 已分别对应 `agility`/`speed`，见 `managers/combat_manager.py:330`）。先以配置槽和模拟收口参数，参数写回 `design_docs/content-design/pve-enemy-design.md` §Q4 后才允许启用；禁止工程手拍常数。
 - **未封板时的 fail-closed 形态**：逃跑参数未获批则**整个战前选择面保持 disabled**——高/极高风险与低/中风险一样在完成时直接进入战斗结算（等同现网行为），不创建 `pending_choice`，不出现「只能发迎战」的空转步骤。状态机与列照常存在并待命，激活与否由配置开关决定（对齐父任务「新入口保持 disabled」的既有决议）。
-- **交付边界（2026-10-12 两次拍板合并口径）**：本 child **不负责封板逃跑概率**（正式数值另开三档模拟决策，bd `-9hq`），但**必须交付一组临时默认成功率**用于过渡与功能验证：`config/adventure_config.json` 新增 `flee` 段 `enabled=true / base_rate=0.35 / slope=0.20 / floor=0.10 / cap=0.70`，公式 `p = clamp(base_rate + (身法_自 / 身法_敌 − 1) × slope, floor, cap)`（身法 = `FighterState.agility`）；同一组默认值同步进 `data/default_configs.py`（AGENTS.md §5 自动建配置路径）。用户口径原话：玩家体验不需要考虑还没上线的内容，功能要先能验证。临时值必须在 §Q4 与代码注释标注「未封板」，禁止当成已定平衡。`flee.enabled=false` 保留为人工 kill switch（关闭时走 disabled 分支：不产生 `pending_choice`）。
-- **导入前必须确认项（写进设计提醒）**：本 child 交付的是**临时默认**成功率（0.35/0.20/0.10/0.70，已可用、可验证）；**正式封板仍须在敌人名册/内容同步导入前完成**——名册一固定，怪物 `agility` 分布就定了，地板/标模/天花板三档模拟才有确定输入，才能替换这两个配置点的数值（bd `-9hq`）。封板前玩家已有止损键，只是数值未经模拟。此提醒同步登记 §Q4。
+- **交付边界（2026-10-12 两次拍板合并口径）**：本 child **不负责封板逃跑概率**（正式数值另开三档模拟决策，bd `-9hq`），但**必须交付一组临时默认成功率**用于过渡与功能验证：`config/adventure_config.json` 新增 `flee` 段 `enabled=true / base_rate=0.95 / slope_up=0.05 / slope_down=0.35 / floor=0.60 / cap=1.00`；公式（身法 = `FighterState.agility`，`ratio = 身法_自 / 身法_敌`）：`p = clamp(ratio >= 1 ? base_rate + (ratio − 1) × slope_up : base_rate − (1/ratio − 1) × slope_down, floor, cap)`。**为什么是两段而非一条直线**：用户锚点是「同速 95% / 我快敌一倍 100% / 慢很多保底 60%」，单一直线由前两点定出斜率仅 0.05，落后侧永远触不到 60% 地板（要 ratio ≤ −6 才生效，属死参数），故落后侧改用 `1/ratio` 度量「敌快我几倍」独立设斜率。同一组默认值同步进 `data/default_configs.py`（AGENTS.md §5）。用户口径：玩家体验不需要考虑还没上线的内容，功能要先能验证。临时值必须在 §Q4 与代码注释标注「未封板」，禁止当成已定平衡。`flee.enabled=false` 保留为人工 kill switch（关闭时不产生 `pending_choice`）。
+- **导入前必须确认项（写进设计提醒）**：本 child 交付的是**临时默认**成功率（95% / 领先封顶 100% / 落后保底 60%，已可用、可验证）；**正式封板仍须在敌人名册/内容同步导入前完成**——名册一固定，怪物 `agility` 分布就定了，地板/标模/天花板三档模拟才有确定输入，才能替换这两个配置点的数值（bd `-9hq`）。⚠️ 当前默认值等于「高/极高风险几乎总能跑掉」，会直接绕开 22-30% 场败率的败场税，**封板时的首要任务就是把它压回有痛感的区间**（用户 2026-10-12 明确：过渡阶段先不管）。此提醒同步登记 §Q4。
 - **入口指令（2026-10-12 定名）**：新增两个顶层指令 `迎战` / `逃跑`，按 AGENTS.md §1 走 `main.py` 的 `CMD_ADVENTURE_FIGHT` / `CMD_ADVENTURE_FLEE` 常量 + `@filter.command(...)` 外层 / `@require_whitelist` 内层 + 路由 docstring 格式。指令名无空格、纯中文。与秘境的「迎战」不冲突——后者是 `探索秘境 迎战` 传进来的 action 参数（`main.py:1336-1346`），不是注册指令。
 - 两者必须登记进 `handlers/utils.py:22` 的 `BUSY_STATE_ALLOWED_COMMANDS`，否则 pending 期间被 `@player_required` 挡死。
 - **两处出路提示（2026-10-12 用户拍板甲案，非可选项）**：
@@ -86,7 +86,7 @@
 
 - [ ] AC1：所有风险档都以唯一 `adventure_run_id` 持久化 settlement；高/极高风险 pending 可跨重启恢复，任意档完成/迎战/逃跑的并发重试只产生一个终态和一次路线收益。
 - [ ] AC2：逃跑成功完整满足“无战斗、血量不变、基础收益、无击败/疲劳”；失败锁定同敌人且只战斗一次。
-- [ ] AC3：概率函数在 `clamp` 上下界内对身法比单调不减、只消费稳定快照中的 `agility`；`flee` 段临时默认值已写入 `config/adventure_config.json` 与 `data/default_configs.py` 且两处一致；配置段缺失时整段回退默认 + warning 日志（不按 disabled、不向玩家报错）；人工设 `enabled=false` 时不产生 `pending_choice`。
+- [ ] AC3：概率函数对 `ratio` 单调不减（领先段与落后段各自单调、交界处连续）、夹在 `[floor, cap]` 内，只消费稳定快照中的 `agility`；`agility_enemy <= 0` 时走确定的 `cap` 分支不抛异常；三个锚点值有测试断言（`ratio=1.0→95%`、`ratio=2.0→100%`、`ratio=0.5→60%`）；`flee` 段临时默认值已写入 `config/adventure_config.json` 与 `data/default_configs.py` 且两处一致；配置段缺失时整段回退默认 + warning 日志（不按 disabled、不向玩家报错）；人工设 `enabled=false` 时不产生 `pending_choice`。
 - [ ] AC4：胜负均只经 Health Domain 写 `current_hp`；战败保底 `ceil(1% * 动态 max_hp)` 生效、旧绝对 `hp=1` 路径已移除（`managers/adventure_manager.py:306`），且**胜场不保底**（按引擎实际剩余写回，可低于 25%）。
 - [ ] AC5：重启、stale resolution 恢复、GM time-skip、事务异常和终态重复请求不造成路线收益、掉落、传承、击败事实、悬赏/师承进度或疲劳重复；`effect_type` 三个取值各有 claim 冲突测试；claim 划账后执行失败时结算仍进终态、玩家看到「部分奖励发放失败」提示且 error 日志可定位（不回滚 claim、不自动重发）。
 - [ ] AC6：普通/精英/组内 Boss 回归与设计 TTK/胜率/资源税口径一致；秘境兽/守护者 current HP 回归通过。
@@ -104,7 +104,7 @@
 - v39 增列承载状态机、inline claim 消费、profile 留空的 legacy 身份口径：按本 PRD/design 推荐落地。
 - 疲劳粒度取**乙案**：每人一份全局休整窗口（见 R4），不重建 `adventure_fatigue` 主键、不改基座仓储签名。
 - pending **不设自动过期、不加取消指令**：全玩法锁是设计意图，`迎战`/`逃跑` 即全部出口（→ R1）。
-- 逃跑参数**先给临时默认值过渡**（`enabled=true`，0.35 / 0.20 / 0.10 / 0.70）以便跑通功能与用例；正式封板另开模拟（bd `-9hq`），**玩家体验不考虑尚未上线的内容**（2026-10-12 用户拍板，取代此前「不留默认值、以 disabled 起步」口径）。
+- 逃跑参数**先给临时默认值过渡**（`enabled=true`，`base_rate=0.95 / slope_up=0.05 / slope_down=0.35 / floor=0.60 / cap=1.00`；同速 95%、我快敌一倍 100%、敌快我一倍 60%）以便跑通功能与用例；因三点无法由单一直线同时满足，公式定为**领先/落后两段**。正式封板另开模拟（bd `-9hq`），**玩家体验不考虑尚未上线的内容**（2026-10-12 用户拍板，取代此前「不留默认值、以 disabled 起步」口径）。
 - claim 划账后执行失败：不重发、不回滚，但**前台必须有玩家可见提示** + error 日志（→ R5）。
 - 败场气血地板由 25% 改为 **1%**（`ceil(1% * 动态 max_hp)`），**胜场不保底**（→ R3）。
 - 悬赏/师承继续留在结算外推进，崩溃窗口允许丢一次（→ R5）。

@@ -59,8 +59,10 @@ v36 的 `adventure_settlements` 是事后事实账本，缺状态机字段。v39
 ## 3. Flee function
 
 - 输入是玩家/敌人的 `FighterState.agility`（代码里 身法=`agility`、迅捷=`speed`，见 `managers/combat_manager.py:330`），输出带上下界的概率；性质测试断言敌我 `agility` 差增大时成功率不下降。
-- 系数走配置段 `config/adventure_config.json` 的 `flee`（同文件 `routes`/`events` 已是配置权威；自动创建默认配置的路径 `data/default_configs.py` 一并带上，AGENTS.md §5）。公式：`p = clamp(base_rate + (agility_self / agility_enemy - 1) * slope, floor, cap)`，其中 `p` 为逃跑成功率，`agility` 取 `FighterState.agility`（身法）。
-- **临时默认值（2026-10-12 用户拍板：先给默认值做过渡 + 验证功能，未上线内容不必顾虑玩家体验）**：`enabled=true`、`base_rate=0.35`、`slope=0.20`、`floor=0.10`、`cap=0.70`。语义＝身法与敌相当时 35%，每领先敌身法 100% 加 20 个百分点，夹在 10%-70%。**这组数不是封板值**，正式数值仍由 bd `-9hq` 的三档模拟替换；本轮把它标为「临时默认」并写进 `design_docs` §Q4，代码注释同样标注，禁止将来当成已定平衡。
+- 系数走配置段 `config/adventure_config.json` 的 `flee`（同文件 `routes`/`events` 已是配置权威；自动创建默认配置的路径 `data/default_configs.py` 一并带上，AGENTS.md §5）。公式（`ratio = agility_self / agility_enemy`，`agility` 取 `FighterState.agility` 身法）：
+  `p = clamp(ratio >= 1 ? base_rate + (ratio − 1) * slope_up : base_rate − (1/ratio − 1) * slope_down, floor, cap)`
+  领先段与落后段各自斜率：单一直线无法同时满足「同速 95%」「领先一倍 100%」「落后保底 60%」——前两点定出斜率 0.05 后，落后侧要 `ratio ≤ −6` 才碰得到地板，`floor` 会退化成死参数；故落后侧用 `1/ratio − 1`（＝敌快我几倍）独立设 `slope_down`。`agility_enemy <= 0` 时直接取 `cap`（名册里低/零身法怪合法存在，除法必须有确定分支，注释写明理由）。
+- **临时默认值（2026-10-12 用户拍板：先给默认值做过渡 + 验证功能，未上线内容不必顾虑玩家体验）**：`enabled=true`、`base_rate=0.95`、`slope_up=0.05`、`slope_down=0.35`、`floor=0.60`、`cap=1.00`。语义＝身法与敌相当 95%；我快敌一倍 100%（封顶）；敌快我一倍 60%（保底）；再慢也不破 60%。**这组数不是封板值**，正式数值仍由 bd `-9hq` 的三档模拟替换；本轮标为「临时默认」并写进 `design_docs` §Q4 与代码注释，禁止将来当成已定平衡。已知副作用（用户认可为过渡期代价）：95%/60% 意味着高/极高风险几乎总能主动脱身，败场税与「打完被迫迎战」的纹理在过渡期基本不成立，封板首要任务即回调此区间。
 - **disabled 仍保留为 kill switch**：`enabled=false`（人工关）→ 完成时直接 `adventuring -> ready_combat`，不写 `pending_choice`、不出现「只能迎战」的空转步骤；配置段整体缺失 → 回退到上述临时默认并写一条 warning 日志，**不**按 disabled 处理、也不报错给玩家。不做部分启用（任一数值槽缺失即整段回默认）。
 - **配置形状（本 child 交付即以此为准）**：`flee.enabled`（布尔，默认 `true`）、`flee.base_rate`、`flee.slope`、`flee.floor`、`flee.cap`（浮点，取上述临时默认）。本 child **要填这组临时值**（与旧口径的区别：不再留空、不再以 disabled 起步），使逃跑分支在单测与功能用例里可跑通。
 - **导入前确认提醒（同步登记 §Q4）**：临时默认值只用于过渡与功能验证；正式封板仍必须在**敌人名册/内容同步导入前**完成——名册固定了怪物 `agility` 分布，三档模拟才有确定输入（bd `-9hq`）。封板后只改 `config/adventure_config.json` 与 `default_configs.py` 的两个数，代码不动。
