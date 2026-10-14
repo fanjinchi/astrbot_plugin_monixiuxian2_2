@@ -35,10 +35,10 @@
 
 ### R4. 原子挑战与真实伤害
 
-- Combat engine 的纯计算不得在 SQLite `BEGIN IMMEDIATE` 写事务内运行。先用短读取得带 `instance_version` / player health version 的不可变 Boss/玩家快照与固定 RNG seed，在事务外计算战斗；再在单个短 `async with db.transaction() as txn:` 中重新校验 active/expiry/次数和版本，以 CAS 写 Boss HP、玩家 `current_hp`、次数、挑战记录、贡献、阶段、末击和事件。
+- Combat engine 的纯计算不得在 SQLite `BEGIN IMMEDIATE` 写事务内运行。先用短读取得不可变 Boss/玩家快照与固定 RNG seed——**列名以基座实际为准**：Boss 侧是 `world_boss_instances.cas_version`（挑战行记录为 `world_boss_challenges.instance_cas_version`），玩家侧没有 `health_version` 列，版本号就是健康前像 `(current_hp, health_recovered_at)`（见 `data/pve_repository.py::cas_update_player_health`）。在事务外计算战斗；再在单个短 `async with db.transaction() as txn:` 中重新校验 active/expiry/次数和这些版本，以 CAS 写 Boss HP、玩家 `current_hp`、次数、挑战记录、贡献、阶段、末击和事件。
 - 版本/CAS 冲突不得把旧战报强行套到新 HP；从最新快照使用同一 challenge id 的确定性 RNG 重新计算并重试，或返回明确冲突。只有成功 CAS 的尝试消耗次数。
 - 本场伤害只等于成功写事务中的 `hp_before - hp_after`，不可用 `max_hp - final_hp` 重算历史损血；Boss HP 不得为负。
-- 每场只结算玩家战斗 HP 损耗，写回 `current_hp = max(engine_remaining_hp, ceil(0.25 * dynamic_max_hp))`；不得复用普通 PVE 的 600 秒疲劳，不得收取灵石入场费或新增其他挑战税。每日 3 次就是本玩法的稀缺闸门。
+- 每场只结算玩家战斗 HP 损耗，写回 `current_hp = max(engine_remaining_hp, ceil(0.01 * dynamic_max_hp))`；不得复用普通 PVE 的 600 秒疲劳，不得收取灵石入场费或新增其他挑战税。每日 3 次就是本玩法的稀缺闸门。
 - 并发挑战至多一个事务把实例变为 defeated，末击者唯一；事务异常全回滚。
 - 使用持久化基座已重构的 transaction-joining Boss repository；本 child 必须沿 challenge 调用图复验无中间 commit，但不重复拥有共享 commit 基础改造。
 
@@ -51,6 +51,7 @@
 
 - 持久化 challenge 明细、按玩家累计真实伤害、profile version、阶段变化和唯一末击事实，支持 Step 7 后续幂等消费。
 - 本任务不发明材料/丹药/掉落/分账数值，不调用旧即时灵石奖励作为临时替代。
+- `world_boss_challenges.fled` 是基座与历练结算表对称留下的列：世界 Boss **没有逃跑通道**（本玩法的闸门是每日 3 次），该列一律写 0，不得据此推断存在战前选择。
 
 ### R7. 提交后事件
 

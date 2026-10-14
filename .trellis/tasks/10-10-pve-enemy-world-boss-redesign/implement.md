@@ -13,8 +13,8 @@
 | A | `10-10-pve-player-health-foundation` | R2；AC2 基座 | v35、`base_hp/current_hp/max_hp`、全 HP 消费者、Health Domain、空闲恢复 | schema 切换前 DB 备份 |
 | B | `10-10-pve-enemy-catalog-runtime` | R1/R3；AC3 | 内容 validator/adapter、固定 catalog、统一 profile/Fighter mapper | 正式 sync 前 config 不变 |
 | P | `10-10-pve-persistence-transaction-foundation` | R4–R7 的共享数据基座 | v36…vN、fresh parity、事务叶子审计、settlement/Boss/outbox schema、time-skip matrix | 领域 handler/poller 接线前 |
-| C | `10-10-pve-adventure-settlement` | R4；AC4 | pending、逃跑、current HP、25%保底、持久疲劳、settlement facts | Adventure handler 切流前 |
-| D | `10-10-pve-world-boss-domain` | R5/R6；AC5/AC6 | 四段全随机固定实例、生命周期、北京日次数、25% HP保底且无疲劳/入场费、原子挑战/台账、outbox | Boss poller/handler 切流前 |
+| C | `10-10-pve-adventure-settlement` | R4；AC4 | pending、逃跑、current HP、1%战败保底（胜场不保底）、全局疲劳、settlement facts | Adventure handler 切流前 |
+| D | `10-10-pve-world-boss-domain` | R5/R6；AC5/AC6 | 四段全随机固定实例、生命周期、北京日次数、HP 地板保底 1%（Q4 统一下调）且无疲劳/入场费、原子挑战/台账、outbox | Boss poller/handler 切流前 |
 | E | `10-10-pve-cross-system-integration` | R7；AC1/AC7 及全部跨层关闭 | 组合复核、旧路径退役、poller/time-skip/广播/文档/上线门 | PVE/Boss/sync 四级检查点 |
 
 Step 7 奖励经济不是 child；只由 C/D 输出稳定事实，待正式秘境设计完成后另建 Trellis 任务。
@@ -87,8 +87,8 @@ A 与 B 可并行；A 的 v35/Health 契约稳定后执行 P，P 与 B 均通过
 | AC1 拆分/依赖/回滚 | 父任务 + E | 6 children 完整工件、依赖图、4级 rollback checklist |
 | AC2 HP 迁移 | A + E | v34/fresh/idempotent migration，全消费者静态清零与回归 |
 | AC3 28只四层一致 | B + E | B：真实 CSV→临时 preview→profile→Fighter golden；Batch 5：正式 generated config 同链路复验；专项组回归 |
-| AC4 普通 PVE | C + E | 统计口径、pending/逃跑、25%保底、600s/time-skip、restart |
-| AC5 Boss 状态/并发 | D + E | 四段全随机且不按玩家适配/不重掷、北京日3次、48h/12h/24h、玩家25% HP保底且无疲劳/入场费、真实damage、唯一末击、并发/重启 |
+| AC4 普通 PVE | C + E | 统计口径、pending/逃跑、1%战败保底、600s/time-skip、restart |
+| AC5 Boss 状态/并发 | D + E | 四段全随机且不按玩家适配/不重掷、北京日3次、48h/12h/24h、玩家 HP 地板保底 1%（Q4 统一下调）且无疲劳/入场费、真实damage、唯一末击、并发/重启 |
 | AC6 广播/奖励边界 | D + E | 唯一 business event、per-destination partial-success/uncertain 证据、贡献/末击事实、无 Step 7 数值 |
 | AC7 质量/治理/文档 | 全部，E 汇总 | 定向+完整ruff/pytest、sync双闸门、文档一致 |
 

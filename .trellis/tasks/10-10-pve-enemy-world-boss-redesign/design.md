@@ -89,7 +89,7 @@ Health Domain 提供单一入口完成：动态上限计算、`current_hp` clamp
 4. 逃跑成功不创建战斗/击败/失败事实，保留 `current_hp`，路线基础收益照常；逃跑失败使用 pending 中同一 enemy id 立即开战，不可重掷或重试；
 5. 逃跑概率实现为单调有界、可配置且可独立模拟的身法关系函数，参数只有在地板/标模/天花板模拟回写权威设计后才进入配置。
 
-疲劳从 `AdventureManager._route_cooldowns` 搬到持久字段/表。只有实际战败追加 600 秒；战败后 `current_hp = max(current_hp_after_battle, ceil(0.25 * max_hp))`。pending 首版无自动过期；疲劳结束登记 GM time-skip。恢复锚点不是 expiry、不登记 SQL 字段快进；当前 `/时间快进` 只前移注册字段，不改变业务时钟，因此不会额外制造空闲恢复。恢复经过量与跨日行为分别用可注入业务时钟测试。
+疲劳从 `AdventureManager._route_cooldowns` 搬到持久字段/表。只有实际战败追加 600 秒；战败后 `current_hp = max(current_hp_after_battle, ceil(0.01 * max_hp))`（2026-10-12 由 0.25 下调；胜场不保底）。pending 首版无自动过期、也不加取消出口（用户拍板：全玩法锁即设计，`逃跑` 就是后路）；疲劳结束登记 GM time-skip。恢复锚点不是 expiry、不登记 SQL 字段快进；当前 `/时间快进` 只前移注册字段，不改变业务时钟，因此不会额外制造空闲恢复。恢复经过量与跨日行为分别用可注入业务时钟测试。
 
 路线上收益与战斗事实通过明确的 settlement result 传回；本次只保留现有路线基础收益，不引入 Step 7 新奖励。
 

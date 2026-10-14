@@ -53,7 +53,8 @@ python3 ./.trellis/scripts/task.py list-archive
 
 # Code-spec context (injected into implement/check agents via JSONL).
 # `implement.jsonl` / `check.jsonl` are seeded (empty) on `task create` for sub-agent-capable
-# platforms; the AI curates real spec + research entries during planning. `validate` fails
+# platforms; the AI registers context pointers (spec / tickets / research paths from the Matt
+# `to-spec` → `to-tickets` flow) during planning. `validate` fails
 # and `start` refuses while a seeded manifest is still empty — sub-agents would run with
 # zero spec context. Pass `start --allow-empty-context` when that is intentional.
 python3 ./.trellis/scripts/task.py add-context <name> <action> <file> <reason>
@@ -157,7 +158,7 @@ Phase 3: Finish  → verify, update spec, commit, and wrap up
 - Inline task (read-only Q&A, code explanation, local config or copy tweak, single-file or root-cause-clear fix): handle directly with minimal verification — do not ask to create a Trellis task. Inline work never gets a task card (host global rule: only durable / multi-decision work enters the board).
 - Simple conversation or small task (not clearly inline): ask only whether this turn should create a Trellis task. If the user says no, skip Trellis for this session.
 - Complex task: ask whether you may create a Trellis task and enter planning. If the user says no, do not do broad inline implementation; explain, clarify scope, or suggest a smaller split.
-- User approval to create a task is not approval to start implementation. Planning still happens first.
+- User approval to create a task is not approval to start implementation. Planning still happens first — and planning starts by grilling: load `grill-me` / `grilling` (installed at `~/.agents/skills/`) and interrogate the user until requirements, scope, acceptance criteria, and key decisions are agreed before any planning artifact is written.
 
 ### Planning Artifacts
 
@@ -193,7 +194,7 @@ Preserve existing task fields and artifacts. If the correct status cannot be det
 
 ### Phase 1: Plan
 - 1.0 Create task `[required · once]` (only after task-creation consent)
-- 1.1 Requirement exploration `[required · repeatable]` (`prd.md`; complex tasks also need `design.md` + `implement.md`)
+- 1.1 Requirement exploration `[required · repeatable]` (grill-first: interrogate the user via `grill-me` before writing artifacts; `prd.md`; complex tasks also need `design.md` + `implement.md`)
 - 1.2 Research `[optional · repeatable]`
 - 1.3 Configure context `[required · once]` — Claude Code, Cursor, OpenCode, Codex, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Grok, Kimi Code (sub-agent-dispatch platforms only; inline platforms skip)
 - 1.4 Activate task `[required · once]` (review gate, then `task.py start`; status → in_progress)
@@ -202,10 +203,10 @@ Preserve existing task fields and artifacts. If the correct status cannot be det
 <!-- Per-turn breadcrumb: shown throughout Phase 1 (status='planning') -->
 
 [workflow-state:planning]
-Load `grill-with-docs`; stay in planning.
+Load `trellis-brainstorm`; grill the plan with the user via `grill-me` until details, scope, and key decisions are agreed before writing artifacts; stay in planning.
 Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; ask for review before `task.py start`.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
-Sub-agent mode: curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start.
+Sub-agent mode: `to-spec` wrote the spec and `to-tickets` split it into child tasks with blocking edges; register spec/research paths as context pointers in `implement.jsonl` / `check.jsonl` before start.
 [/workflow-state:planning]
 
 <!-- Per-turn breadcrumb: shown throughout Phase 1 when codex.dispatch_mode=inline.
@@ -215,10 +216,10 @@ Sub-agent mode: curate `implement.jsonl` and `check.jsonl` as spec/research mani
      into a sub-agent. -->
 
 [workflow-state:planning-inline]
-Load `grill-with-docs`; stay in planning.
+Load `trellis-brainstorm`; grill the plan with the user via `grill-me` until details, scope, and key decisions are agreed before writing artifacts; stay in planning.
 Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; ask for review before `task.py start`.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
-Inline mode: skip jsonl curation; Phase 2 reads artifacts/specs via `trellis-before-dev`.
+Inline mode: skip jsonl curation; `to-spec` / `to-tickets` still run and child tasks carry the ticket graph; Phase 2 reads artifacts/specs via `trellis-before-dev` and Matt skills.
 [/workflow-state:planning-inline]
 
 ### Phase 2: Execute
@@ -232,13 +233,13 @@ Inline mode: skip jsonl curation; Phase 2 reads artifacts/specs via `trellis-bef
      therefore must cover every required step from implementation through
      commit, including Phase 3.3 spec update and Phase 3.4 commit. -->
 
-Sub-agent dispatch protocol applies to all platforms and all sub-agents, including native Codex `SubagentStart` context injection with child-side pull fallback, class-2 Gemini/Qoder/Copilot/Reasonix/Trae/Grok/Kimi Code, hook-backed ZCode/Snow, and `trellis-research`: every dispatch prompt starts with `Active task: <task path from task.py current>` before role-specific instructions. On Grok Build, use `spawn_subagent` with `subagent_type` set to the Trellis agent name (e.g. `trellis-check`). On Kimi Code, dispatch the built-in `coder` / `explore` sub-agent with the matching `.kimi-code/skills/trellis-<role>/SKILL.md` instructions.
+Sub-agent dispatch protocol applies to all platforms and all sub-agents, including native Codex `SubagentStart` context injection with child-side pull fallback, class-2 Gemini/Qoder/Copilot/Reasonix/Trae/Grok/Kimi Code, hook-backed ZCode/Snow, and `trellis-research`: every dispatch prompt starts with `Active task: <task path from task.py current>` before role-specific instructions. On Grok Build, use `spawn_subagent` with `subagent_type` set to the Trellis agent name (e.g. `trellis-implement`). On Kimi Code, dispatch the built-in `coder` / `explore` sub-agent with the matching `.kimi-code/skills/trellis-<role>/SKILL.md` instructions.
 
 [workflow-state:in_progress]
-Tools: `trellis-research` and `trellis-check` are sub-agent types (Task/Agent tool, NOT Skill); `trellis-check` also exists as a skill — prefer the Agent form when verifying after code changes. `trellis-update-spec` is a skill. Implementation is NOT a sub-agent any more: it runs in the main session through the `implement` skill.
-Flow: `implement` skill -> `trellis-check` -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
-Main-session default: implement inline via the `implement` skill; dispatch only the `trellis-check` sub-agent. Sub-agent self-exemption: if already running as `trellis-check`, do NOT spawn another `trellis-check`. Dispatch is main session only.
-Dispatch prompt starts with `Active task: <task path from task.py current>`. Read context: jsonl entries -> `prd.md` -> `design.md if present` -> `implement.md if present`.
+Tools: `trellis-research` is a sub-agent type; `trellis-update-spec` is a skill. Implementation and review are Matt skills (`implement` / `implement-spec` + `tdd` / `code-review`) loaded from the skill catalog.
+Flow: Matt implement (`implement` / `implement-spec` on the ticket frontier) + `tdd` -> `code-review` -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
+Parallel dispatch is allowed (the host rule exempts `implement-spec`); pick frontier-ready tickets and dispatch implementers concurrently. Sub-agent self-exemption: a spawned implementer must not spawn further implement/review agents — dispatch is main-session only.
+Dispatch prompt starts with `Active task: <task path from task.py current>`. Read context: jsonl pointer entries -> `prd.md` -> `design.md if present` -> `implement.md if present`.
 [/workflow-state:in_progress]
 
 <!-- Per-turn breadcrumb: shown while status='in_progress' when
@@ -247,8 +248,8 @@ Dispatch prompt starts with `Active task: <task path from task.py current>`. Rea
      instead of dispatching sub-agents. -->
 
 [workflow-state:in_progress-inline]
-Flow: `trellis-before-dev` -> `implement` skill -> `trellis-check` -> validation -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
-Do not dispatch check sub-agents in inline mode.
+Flow: `trellis-before-dev` -> Matt implement (`implement` / `implement-spec` + `tdd`) -> `code-review` -> validation -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
+Do not dispatch implement/check sub-agents in inline mode (parallel `implement-spec` still allowed under the host exemption).
 Read context: `prd.md` -> `design.md if present` -> `implement.md if present`, plus relevant spec/research loaded by skills.
 [/workflow-state:in_progress-inline]
 
@@ -286,8 +287,8 @@ When a user request matches one of these intents inside an active task, route fi
 
 [Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
 
-- Planning or unclear requirements -> `grill-with-docs` (Matt's; drives `grilling` + `domain-modeling`).
-- `in_progress` implementation -> the `implement` skill in the main session; check -> dispatch `trellis-check`.
+- Planning or unclear requirements -> `trellis-brainstorm` (grill first: load `grill-me` and interrogate the user until the plan's details, scope, and key decisions are agreed before any task is created).
+- `in_progress` implementation/check -> Matt: `implement` / `implement-spec` (ticket frontier) + `tdd`; review via `code-review`.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
 - Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; installed at `~/.agents/skills/`).
 
@@ -295,8 +296,8 @@ When a user request matches one of these intents inside an active task, route fi
 
 [codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
-- Planning or unclear requirements -> `grill-with-docs` (Matt's; drives `grilling` + `domain-modeling`).
-- Implementation -> the `implement` skill, which loads `trellis-before-dev` for project guidelines; after editing -> `trellis-check`.
+- Planning or unclear requirements -> `trellis-brainstorm` (grill first: load `grill-me` and interrogate the user until the plan's details, scope, and key decisions are agreed before any task is created).
+- Before editing -> `trellis-before-dev`; implement via Matt (`implement` / `implement-spec` + `tdd`); after editing -> `code-review`.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
 - Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; shipped on DeepSeek Harness at `~/.agents/skills/`).
 - Host task board: cards with host-managed lifecycle (prompt/description/resume/archive) stay under host control; a Trellis task provides the engineering method for the same work. Do not duplicate card bookkeeping into `.trellis/tasks/` and do not fight the host card state.
@@ -346,23 +347,20 @@ Skip when `python3 ./.trellis/scripts/task.py current --source` already points t
 
 #### 1.1 Requirement exploration `[required · repeatable]`
 
-Load Matt's `grill-with-docs` skill (`~/.agents/skills/grill-with-docs`, which drives `grilling` + `domain-modeling`) and explore requirements with the user per its guidance.
+Load the `trellis-brainstorm` skill and explore requirements interactively with the user per the skill's guidance.
 
-`grilling` drives the conversation:
-- Treat the design as a **design tree** and work it in **rounds**. Each round asks the whole **frontier** — every decision whose prerequisites are already settled — numbered, each with your recommended answer, and worded so "yes" accepts it. Then wait for the answers before recomputing the frontier.
-- Finding *facts* is your job, never the user's: look them up yourself, or use Phase 1.2 research. Never ask the user something you could find. The *decisions* stay with the user — put each to them and wait.
-- A question whose answer depends on a question still open this round belongs to a later round.
-- You are done when the frontier is empty. Do not act on it until the user confirms shared understanding — that confirmation is the Phase 1.4 review gate.
+**Grill gate (all platforms)**: before `task.py create` and before writing or updating planning artifacts, load `grill-me` / `grilling` (installed at `~/.agents/skills/`) and interrogate the user one question at a time until requirements, scope, acceptance criteria, and key decisions are explicitly agreed — never persist `prd.md` from assumptions. Update artifacts immediately after each confirmed answer.
 
-`domain-modeling` keeps the vocabulary honest:
-- Resolved terms go into `GLOSSARY.md` as they settle (repo root; per-context files when a `GLOSSARY-MAP.md` exists). `GLOSSARY.md` is vocabulary only — never implementation details, a spec, or a scratch pad.
-- Offer an ADR (`docs/adr/NNNN-*.md`) only when the decision is hard to reverse, surprising without context, and the result of a real trade-off. Missing any one of the three → skip it.
+**Matt spec & tickets (all platforms)**: once the grill has converged, load `to-spec` to synthesize the agreed conversation into a spec and persist it as `prd.md` (complex tasks: also `design.md`). Then load `to-tickets` to split the spec into tracer-bullet tickets, each declaring its blocking edges, and materialize each ticket as a child task (`task.py create --parent`) with its blocking edges written into the child's `prd.md` / `implement.md`. Tickets are the task graph: implement in frontier order — a ticket whose blockers are all done is ready.
 
-Trellis still owns the task artifacts:
-- Update `prd.md` as decisions land — requirements and acceptance criteria, not a transcript of the interview.
-- Split large scopes into a parent task plus child tasks when the deliverables can be verified independently (see below).
-- For complex tasks, produce `design.md` and `implement.md` before implementation starts.
-- `GLOSSARY.md` and ADRs are repo-level documents, not task artifacts; reference them from `prd.md` / `design.md` instead of copying them in.
+The brainstorm skill will guide you to:
+- Ask one question at a time
+- Prefer researching over asking the user
+- Prefer offering options over open-ended questions
+- Update `prd.md` immediately after each user answer
+- Split large scopes into a parent task plus child tasks when the deliverables can be verified independently
+- Keep `prd.md` focused on requirements and acceptance criteria
+- For complex tasks, produce `design.md` and `implement.md` before implementation starts
 
 When considering a parent/child split:
 - Use a parent task when one request contains several independently verifiable deliverables.
@@ -398,7 +396,7 @@ Do the research in the main session directly and write findings into `{TASK_DIR}
 - Record third-party library usage examples, API references, version constraints in files
 - Note relevant spec file paths you discovered for later reference
 
-Grilling and research can interleave freely — pause to research a technical question, then return to talk with the user.
+Brainstorm and research can interleave freely — pause to research a technical question, then return to talk with the user.
 
 **Key principle**: Research output must be written to files, not left only in the chat. Conversations get compacted; files don't.
 
@@ -406,7 +404,7 @@ Grilling and research can interleave freely — pause to research a technical qu
 
 [Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
 
-Curate `implement.jsonl` and `check.jsonl` so the Phase 2 sub-agents get the right spec/research context. These files were seeded on `task create` with a single self-describing `_example` line; your job here is to fill in real entries.
+Curate `implement.jsonl` and `check.jsonl` so the Phase 2 implementers get the right spec/tickets/research context — these entries are exactly the Matt context-pointer list. These files were seeded on `task create` with a single self-describing `_example` line; register real entries produced by the `to-spec` / `to-tickets` flow (spec files, ticket child tasks, research notes).
 
 **Location**: `{TASK_DIR}/implement.jsonl` and `{TASK_DIR}/check.jsonl` (already exist).
 
@@ -414,6 +412,7 @@ Curate `implement.jsonl` and `check.jsonl` so the Phase 2 sub-agents get the rig
 
 **What to put in**:
 - **Spec files** — `.trellis/spec/<package>/<layer>/index.md` and any specific guideline files (`error-handling.md`, `conventions.md`, etc.) relevant to this task
+- **Ticket graph** — the child-task list from `to-tickets` (paths + blocking edges), so implementers see which tickets are frontier-ready
 - **Research files** — `{TASK_DIR}/research/*.md` that the sub-agent will need to consult
 
 **What NOT to put in**:
@@ -496,26 +495,73 @@ Goal: turn reviewed planning artifacts into code that passes quality checks.
 
 #### 2.1 Implement `[required · repeatable]`
 
-Implementation is carried by Matt's `implement` skill on every platform: Trellis owns the task lifecycle and artifacts, the skill supplies the engineering method. No platform dispatches an implement sub-agent any more — the `trellis-implement` agent/skill definitions stay installed (they are toolchain-owned files and `trellis update` would restore them), but nothing routes to them.
+[Claude Code, Cursor, OpenCode, codex-sub-agent, CodeBuddy, Droid, Pi, ZCode, Snow, Oh My Pi]
 
-1. Load the `implement` skill (`~/.agents/skills/implement`). Where the host forbids model-initiated invocation (the skill declares `disable-model-invocation: true`), ask the user to run `/skill:implement` and wait — do not quietly hand-roll the implementation instead.
-2. Load the `trellis-before-dev` skill to read project guidelines and specs.
-3. Put the curated context in hand: the files listed in `{TASK_DIR}/implement.jsonl`, then `{TASK_DIR}/prd.md`, then `design.md` if present, then `implement.md` if present, plus materials under `{TASK_DIR}/research/`. Platforms whose hook injects these (Pi, Codex, Kiro, ...) already have them in context; elsewhere, read them.
-4. Implement the code per the reviewed artifacts, working test-first at the seams agreed in Phase 1.1 (`tdd`).
-5. Run project lint and type-check.
-6. Do **not** commit here. The skill's closing "commit your work" step is discharged by Phase 3.4, which is the only step that commits and needs explicit user confirmation.
+Spawn the implement sub-agent:
 
-The `implement` skill ends by calling `code-review`. That review is the pre-check for 2.2, not a replacement for it: 2.2 still runs `trellis-check` against the specs and task artifacts.
+- **Method**: Matt — `implement-spec` (whole ticket graph, frontier-parallel implementers, one integration branch) or `implement` per ticket; each implementer drives `tdd` red-green per slice
+- **Agent type**: `trellis-implement`
+- **Task description**: Implement the reviewed task artifacts, consulting materials under `{TASK_DIR}/research/`; finish by running project lint and type-check
+- **Dispatch prompt guard**: The prompt MUST start with `Active task: <task path>`, then tell the spawned agent it is already the `trellis-implement` sub-agent and must implement directly, not spawn another `trellis-implement` / `trellis-check`.
+
+The platform hook/plugin auto-handles:
+- Reads `implement.jsonl` and injects referenced spec/research files into the agent prompt
+- Injects `prd.md`, `design.md` if present, and `implement.md` if present
+- For Codex, `SubagentStart` supplies native context injection; the agent profile keeps child-side loading as the fallback
+
+[/Claude Code, Cursor, OpenCode, codex-sub-agent, CodeBuddy, Droid, Pi, ZCode, Snow, Oh My Pi]
+
+[Gemini, Qoder, Copilot, Reasonix, Trae, Grok, Kimi Code]
+
+Spawn the implement sub-agent:
+
+- **Method**: Matt — `implement-spec` (whole ticket graph, frontier-parallel implementers, one integration branch) or `implement` per ticket; each implementer drives `tdd` red-green per slice
+- **Agent type**: `trellis-implement`
+- **Task description**: Implement the reviewed task artifacts, consulting materials under `{TASK_DIR}/research/`; finish by running project lint and type-check
+- **Dispatch prompt guard**: The prompt MUST start with `Active task: <task path>`, then explicitly say the spawned agent is already `trellis-implement` and must implement directly without spawning another `trellis-implement` / `trellis-check`.
+
+The pull-based sub-agent definition auto-handles the context load requirement:
+- Resolves the active task with `task.py current --source`, then reads `prd.md`, `design.md` if present, and `implement.md` if present
+- Reads `implement.jsonl` and requires the agent to load each referenced spec/research file before coding
+
+[/Gemini, Qoder, Copilot, Reasonix, Trae, Grok, Kimi Code]
+
+[Kiro]
+
+Spawn the implement sub-agent:
+
+- **Method**: Matt — `implement-spec` (whole ticket graph, frontier-parallel implementers, one integration branch) or `implement` per ticket; each implementer drives `tdd` red-green per slice
+- **Agent type**: `trellis-implement`
+- **Task description**: Implement the reviewed task artifacts, consulting materials under `{TASK_DIR}/research/`; finish by running project lint and type-check
+- **Dispatch prompt guard**: Tell the spawned agent it is already the `trellis-implement` sub-agent and must implement directly, not spawn another `trellis-implement` / `trellis-check`.
+
+The platform prelude auto-handles the context load requirement:
+- Reads `implement.jsonl` and injects referenced spec/research files into the agent prompt
+- Injects `prd.md`, `design.md` if present, and `implement.md` if present
+
+[/Kiro]
+
+[codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
+
+1. Load the `trellis-before-dev` skill to read project guidelines
+2. Load the Matt flow: `implement-spec` (whole ticket graph: frontier-parallel implementers, one integration branch) or `implement` per ticket; drive `tdd` red-green per slice
+3. Read `{TASK_DIR}/prd.md`, then `design.md` if present, then `implement.md` if present, plus materials under `{TASK_DIR}/research/`
+4. Parallel implementers are allowed: the host global rule treats choosing `implement-spec` as explicit opt-in for sub-agents — no extra confirmation needed
+5. Implement the code per reviewed artifacts, then run project lint and type-check
+
+[/codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
 #### 2.2 Quality check `[required · repeatable]`
 
 [Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
 
-Spawn the check sub-agent:
+Spawn the review sub-agent:
 
+- **Method**: Matt `code-review` — two axes: Standards (project specs) + Spec (does the change match `prd.md` / `design.md` / tickets)
 - **Agent type**: `trellis-check`
 - **Task description**: Review all code changes against specs and task artifacts; fix any findings directly; ensure lint and type-check pass
-- **Dispatch prompt guard**: The prompt MUST start with `Active task: <task path>`, then tell the spawned agent it is already the `trellis-check` sub-agent and must review/fix directly, not spawn another `trellis-check` / `trellis-implement`.
+- **Dispatch prompt guard**: The prompt MUST start with `Active task: <task path>`, then tell the spawned agent it reviews/fixes directly, not spawn another review or implement agent.
+- **Host review protocol**: give the reviewer detailed file paths, ask it to write temporary verification scripts, and pass the pragmatic principle (only real-world problems, no theoretical edge cases).
 
 The check agent's job:
 - Review code changes against specs
@@ -527,12 +573,12 @@ The check agent's job:
 
 [codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
-Load the `trellis-check` skill and verify the code per its guidance:
-- Spec compliance
+Load the `code-review` skill and review the diff on both axes (Standards + Spec):
+- Spec compliance (`prd.md` / `design.md` / tickets)
 - lint / type-check / tests
 - Cross-layer consistency (when changes span layers)
 
-If issues are found → fix → re-check, until green.
+If issues are found → fix → re-check, until green. `trellis-check` is retired; legacy references may be treated as an alias for `code-review`.
 
 [/codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 

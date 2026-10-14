@@ -39,7 +39,7 @@ sequenceDiagram
     O-->>H: external broadcast (outside transaction)
 ```
 
-combat 对短读得到的不可变快照和 challenge 派生的固定 RNG 做事务外纯计算。写事务重新读取版本与状态，只有 `instance_version`、玩家 health version、active/expiry 和次数条件全部成立时才 CAS 提交；冲突后加载最新快照并以同一 challenge id 确定性重算，设置有界重试/明确冲突错误。Boss damage 为成功提交时的 `hp_before - max(0, hp_after)`；玩家写回值为 `max(engine_remaining_hp, ceil(0.25 * dynamic_max_hp))`，且挑战事务不写 fatigue、不扣灵石入场费。challenge idempotency key 的重复请求返回已提交结果，不再扣次数。这样避免最多 200 回合战报计算长期占用 SQLite 全局写锁。
+combat 对短读得到的不可变快照和 challenge 派生的固定 RNG 做事务外纯计算。写事务重新读取版本与状态，只有 `instance_version`、玩家 health version、active/expiry 和次数条件全部成立时才 CAS 提交；冲突后加载最新快照并以同一 challenge id 确定性重算，设置有界重试/明确冲突错误。Boss damage 为成功提交时的 `hp_before - max(0, hp_after)`；`max(engine_remaining_hp, ceil(0.01 * dynamic_max_hp))`，且挑战事务不写 fatigue、不扣灵石入场费。challenge idempotency key 的重复请求返回已提交结果，不再扣次数。这样避免最多 200 回合战报计算长期占用 SQLite 全局写锁。
 
 ## 3. Lifecycle and phases
 
@@ -57,4 +57,4 @@ combat 对短读得到的不可变快照和 challenge 派生的固定 RNG 做事
 
 ## 6. Tests
 
-shared-schema contract、4 段全随机且不按玩家适配、固定 spawn seed 可复现/重复 poll 不重掷、snapshot immutable、lifecycle/time-skip、Beijing date、3次并发、同幂等键、事务外战斗/版本 CAS/有界重算、玩家 25% maxHP floor、无 fatigue/灵石入场费、多人并发击杀、真实 damage、唯一末击、phase1→3 两事件顺序、事务注错回滚、新 renderer 不读取旧奖励字段，以及多平台/多群 delivery partial success、claim 崩溃、uncertain 人工处置。
+shared-schema contract、4 段全随机且不按玩家适配、固定 spawn seed 可复现/重复 poll 不重掷、snapshot immutable、lifecycle/time-skip、Beijing date、3次并发、同幂等键、事务外战斗/版本 CAS/有界重算、玩家 maxHP 地板 1%（Q4 统一下调）、无 fatigue/灵石入场费、多人并发击杀、真实 damage、唯一末击、phase1→3 两事件顺序、事务注错回滚、新 renderer 不读取旧奖励字段，以及多平台/多群 delivery partial success、claim 崩溃、uncertain 人工处置。
