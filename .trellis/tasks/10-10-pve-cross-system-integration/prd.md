@@ -21,6 +21,12 @@
 - 静态清零范围含 `data/` 之外遗留的事务叶子门控（bd `astrbot_plugin_monixiuxian2_2-qbo`）：`managers/spirit_farm_manager.py:144`、`managers/spirit_eye_manager.py:79` 与 `:187`、`managers/bounty_manager.py:671`、`managers/dual_cultivation_manager.py:164` 的裸 `conn.commit()` 在本 child 门控为按 `conn._txn_depth` 叶子提交；`handlers/combat_handlers.py:75` 已由 adventure/world-boss child 按「谁接入谁修」处理，本 child 仅复核静态审计为空。
 - 产品代码和测试不得遗留 `Player.hp`、含混属性键或“战败写1”语义。
 - 属性变化、购买/使用药品和跨玩法战斗均维护 current clamp。
+- **PVE 气血地板收口（2026-10-12 用户拍板甲案，由本 child 负责，child C 明确不碰）**：历练结算在 child C 已按 `ceil(1% * 动态 max_hp)` 战败保底、胜场不保底收口；**秘境兽与传承守护者仍是裸写引擎终值**，必须在本 child 接线新 PVE 流程时一并切到同一 Health Domain 地板口径，消除「同一游戏两套败场惩罚」：
+  - `managers/pve_combat_manager.py:416` `challenge_rift_beast`（秘境兽）；
+  - `managers/pve_combat_manager.py:469` `challenge_legacy_guardian`（传承守护者）；
+  - `managers/pve_combat_manager.py:347` `trigger_pve_combat` 与 `managers/boss_manager.py:533` `challenge_boss` 属 R2 退役的旧即时路径：新入口激活后不可达即可，**不**在此处补地板（避免双真相源）；
+  - PvP 写回点 `handlers/combat_handlers.py:169/170/231/232`（切磋/决斗，双方均为玩家）**不适用** PVE 地板，保持引擎终值原样，本 child 只复核其 clamp 正确。
+  收口后四处口径写入 `design_docs/content-design/pve-enemy-design.md` §Q4 与 `design_docs/current-design-report.md`。
 
 ### R2. 旧路径退役
 
@@ -51,6 +57,7 @@
 - [ ] AC1：全仓静态搜索和定向测试证明无含混 `Player.hp`/属性键/战败写1；所有消费者使用正确层级。
 - [ ] AC2：旧普通怪派生和旧 Boss 生成/即时奖励路径从运行入口不可达，专项组兼容仍通过。
 - [ ] AC3：普通 PVE 与 Boss 端到端均维护 current HP、幂等事实和重启恢复；time-skip 全字段集成测试通过。
+- [ ] AC3b：秘境兽（`challenge_rift_beast`）与传承守护者（`challenge_legacy_guardian`）战败走与历练一致的 `ceil(1% * 动态 max_hp)` 地板、胜场不保底；PvP 写回点不带 PVE 地板；静态搜索确认产品代码不再有裸写引擎终值的 PVE 结算点。
 - [ ] AC4：Boss 广播提交后按 destination 执行，partial success 不重播已 sent 目标、uncertain 可审计人工处置，事务测试证明没有持锁网络发送且文档不伪称 exactly-once。
 - [ ] AC5：combat/narrative 独立确认、manifest/hash/列范围、sync/启用 checklist 可执行；draft/未确认/不匹配时不会修改正式 config。
 - [ ] AC6：迁移、定向、功能用例和完整 `uv run ruff format .`、`uv run ruff check .`、`uv run python -m pytest tests/ -v` 通过。
@@ -61,3 +68,4 @@
 - 未经用户要求的真实 webtest。
 - Step 7 奖励经济、正式秘境生态和叙事创作。
 - 战斗引擎通用公式再平衡。
+- 秘境/守护者的奖励、疲劳、逃跑与 pending 语义（本 child 只收口气血地板；2026-10-12 甲案：child C 不做，边界见 C 的 design §6）。

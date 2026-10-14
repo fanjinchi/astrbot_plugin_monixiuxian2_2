@@ -2,7 +2,7 @@
 
 ## 1. Integration responsibility
 
-本 child 不重建 Health、Catalog、Persistence、Adventure、Boss 五个前置模块，也不接手基础 HP 消费者迁移；它关闭旧入口、接线新流程并证明组合系统满足父 AC。采用静态清单 + 端到端测试双重核对：每个旧 `hp` 命中必须已由 Health 归类/移除，每个旧 enemy/Boss 调用点必须被替换或注明专项兼容。
+本 child 不重建 Health、Catalog、Persistence、Adventure、Boss 五个前置模块，也不接手基础 HP 消费者迁移；它关闭旧入口、接线新流程并证明组合系统满足父 AC。**唯一新增的领域职责是 PVE 气血地板收口**（2026-10-12 甲案：秘境兽 `challenge_rift_beast` 与传承守护者 `challenge_legacy_guardian` 沿用历练已定的 `ceil(1% * 动态 max_hp)` 战败地板、胜场不保底；PvP 不加地板；旧 `trigger_pve_combat`/`challenge_boss` 走退役不补），其余一律不新建。采用静态清单 + 端到端测试双重核对：每个旧 `hp` 命中必须已由 Health 归类/移除，每个旧 enemy/Boss 调用点必须被替换或注明专项兼容。
 
 ## 2. Cutover sequence
 
@@ -23,7 +23,7 @@ backup/fixtures
 ## 3. Verification matrix
 
 - Health: create/breakthrough/equipment/technique/pill/shop/GM/PvP/PVE/rift/Boss/display；
-- Enemy: ordinary categories + rift beast + legacy guardian；
+- Enemy: ordinary categories + rift beast + legacy guardian；**floor 收口**：秘境兽/守护者战败残血 ≥ `ceil(1% * 动态 max_hp)`、胜场按引擎终值，且与历练走同一 Health Domain 入口（不得在 handler 侧另写一遍公式）；
 - Ordinary PVE: direct/choice/flee success/flee failure/win/loss/restart/fatigue；
 - Boss: spawn/stage/cross-day/3-attempt/concurrent kill/dissipate/respawn/per-destination outbox failure；旧 `boss_next_spawn_time` 不再生效，旧/new poller 不可同时运行；
 - Time skip: fatigue、Boss expiry/respawn 到期字段走 registry；recovery anchor、pending、北京日期键不登记。GM 字段快进不改变恢复量/当日次数；经过量与跨日分别用可注入业务时钟验证。另验证 pending 无自动过期且 busy 可跨重启恢复/终态清除；

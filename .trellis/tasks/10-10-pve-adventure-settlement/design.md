@@ -84,7 +84,7 @@ v36 的 `adventure_settlements` 是事后事实账本，缺状态机字段。v39
 ## 6. Compatibility
 
 - 名册未获批期间 `profile_id/profile_version` 留空/0，`encounter_id` + `snapshot.enemy` 记 legacy 身份；Batch 5 切流后同一张表自然填上，**不得**为此手改 `config/`（AGENTS.md §15）。
-- 秘境兽/传承守护只共享 Health Domain 与 Enemy→Fighter mapper（`managers/enemy_catalog.py`），保持现有显式交互，不自动获得历练 pending/逃跑/路线收益。
+- 秘境兽/传承守护只共享 Health Domain 与 Enemy→Fighter mapper（`managers/enemy_catalog.py`），保持现有显式交互，不自动获得历练 pending/逃跑/路线收益。**气血地板也不由本 child 收口**（2026-10-12 甲案）：秘境兽 `managers/pve_combat_manager.py:416`、传承守护者 `:469` 仍裸写引擎终值，连同口径统一交给 child E 的「PVE 气血地板收口」步骤；本 child 只把 `hp=1` 从历练路径移除。过渡期「历练有 1% 地板、秘境/守护者无地板」是已知且被接受的不一致，不是缺陷。
 - 旧 `_route_cooldowns` 内存字典在读写两端都切完后删除，不留长期双写。
 
 ## 7. Tests
