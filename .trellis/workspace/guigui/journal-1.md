@@ -100,3 +100,58 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 5: child C 第七轮复核收口 + 真实环境回归（结算链路全通，AC6 Boss 侧未做）
+<!-- trellis-session: v=2 fp=d11b4ad1f3fd1f70 -->
+
+**Date**: 2026-10-14
+**Task**: child C 第七轮复核收口 + 真实环境回归（结算链路全通，AC6 Boss 侧未做）
+**Branch**: `main`
+
+### Summary
+
+第七轮专查第六轮新增的忙碌收尾：无 P0/P1；原地还原式突变复核 20/20 为真、守卫非纸面防御、真 GM 入口复现同命令内自愈；对称交错探针证明 update_player 丢失更新是既有架构口径而非本轮新引入，另建档 -546。修两条文字与实现不符的 P2（stamp_extra 契约、_replay_terminal 气血口径）。用户发起的真实管线回归跑完本 child 范围内那一半（含逃跑成功、GM 强制迎战、AC11 负向、复活自愈），正式库只读核对账目一致。1143 passed，树干净，未 push。
+
+### Main Changes
+
+# 会话 5（2026-10-14）：第七轮复核收口 + 真实环境回归（child C 保持 in_progress）
+
+## 第七轮专查 Step 18 那处忙碌收尾（子代理只读，结论：无 P0/P1，可收手）
+
+- 独立核实本会话的「20/20」口径为真：用整份插件复制件做**原地还原式**突变 `if minted:` → `test_legacy_in_flight_concurrent_finish_creates_single_fact` 20/20 红，还原后 5/5 绿；第六轮报的 0/20 来自它「包装 `insert_settlement` 强制 `created=True`」多了一次 await、把 stamp 挤到 clear 之前——**突变方式改变时序就不可信**，这条方法论已写进 Step 19。
+- 守卫条件改 `if False:` → 只有 `test_revived_busy_self_heals_on_replay` 红：`created` 闸门与兜底收尾各被一条用例独立钉住，互不掩盖。
+- 跑真 `GMManager` 入口复现「玩家在 GM 读库与写库之间自结 → 陈旧整行回写复活忙碌 → 同一条命令内收尾」：`type=0 / extra={} / 1 行 / 3 claim / 单份奖励`，design §2.4-8 那句成立。
+- 我最担心的 `update_player` 丢失更新：对称交错探针显示**既有正常结算路径同样覆盖**并发写入（1500→1200 / 1700→1200），本次新增的写不是新种类的覆盖，且是 AGENTS §2 双写所必需（`clear()` 不落 `players.state`）。按务实原则不加事务内重读，架构债另建档 `astrbot_plugin_monixiuxian2_2-546`（p3），并在 `-aue` 里挂上同源指针。
+
+## 两条 P2（文字与实现不符，AGENTS 视为 bug）已修
+
+- `core/busy_state.py` `stamp_extra` 调用方契约：删除「重放不清忙碌 / 永久锁」的旧口径，改为「历练这一条路自第六轮起有兜底网（再点一次即自愈），**别的需求没有这张网**，故任何调用方都不得依赖兜底」；补上「忙碌判定不看 `scheduled_time`，只读 `type`」这条复活即永久阻塞的根因。
+- `managers/adventure_manager.py` `_replay_terminal` docstring：「气血一律不再写回」不准——生产接线（`main.py:296` 带 `health_service`）下 `BusyState.clear` 会把到此刻的分钟级时间恢复落定并同步进内存、随清忙落库。改为「**战斗气血**不再写回（`_finalize` 的 CAS 是战斗结果唯一写入口），时间恢复照常落定」。测试装配不接 `health_service`，所以 41 条用例看不见这个差异。
+
+## 真实环境回归（用户 2026-10-14 发起「由我发起真实环境回归」，本 child 范围内那一半已跑完）
+
+webtest 真实消息管线 + GM「时间快进」，固定测试 ID `900000002`（GM `900000001`），逐项拿到真实回复：到期前拒绝、到期后挂 `⚔️ 劲敌`（身法 50 vs 4642 → 落 **60% 保底**，印证 AC3）、挂起时忙碌文案自带迎战/逃跑出路（AC11 甲案）、闭关中拒绝文案逐字不含该提示（AC11 负向）、`#迎战` 真实胜负、`#逃跑` 失败即直接开打（败场休整 30 分＝20 基础＋10 败场）、**逃跑成功**路径（`💨 历练脱身`、收益照常、休整只算基础 15 分、气血 10→30 印证取消恢复闸门）、GM「触发历练结算」在挂起时诚实拒绝并指路、「强制历练迎战」代战并结算、收尾后「迎战」被归属闸门拒绝。
+
+正式库只读核对：4 场＝4 条单据（uuid run id、无重复事实）、`adventure_effects` 恰 12 条（每场 3 项，多次重入零重复发奖）、`cas_version` 3/4 与状态机阶梯一致、时间快进命中「历练休整到期时间」（AGENTS §3 注册表生效）。Step 18 的复活自愈经平台 `pre_run_hook` 造复活态验证 **passed**（回 `ℹ️ 本次历练此前已结算`、修为灵石不动、随后「闭关」成功证明忙碌已清）；一次性用例与探针会话跑完即删，测试 ID 复位空闲。
+
+**AC6 未完成的部分**：普通/精英/组内 Boss 的 TTK/胜率/资源税对照需要按境界配齐 build 的样本——裸装 fixture 会得到「1 回合暴毙、逃跑永远贴保底」的误导性数字，不能据此判档位配错。
+
+## 质量门与记账
+
+`pytest tests/` **1143 passed**（状态机 41 + GM 65）；`ruff format --check .` = 127 files left unchanged；插件范围 `ruff check` All checks passed；`grep -rn MUTANT managers/ core/ tests/` 空。本地 commit `2eff166`（未 push），工作树干净。文档同步：implement.md 新增 Step 19、Step 13 改为「已由用户发起并执行完本 child 范围内那一半（AC6 Boss 侧未做）」、Step 14 记本地提交链与开放项。
+
+## 自伤事故与纠正（记录以免重犯）
+
+用 `bd get --json` 读 `-aue` 描述时取错键（顶层不是 `issue`），拿到空串后 `bd update --description=` **覆盖了原描述**；已用 `git show HEAD:.beads/issues.jsonl` 的快照原文恢复并追加指针，`bd show` 逐条核对四个要点齐全。教训：写 bd 描述前先确认读回的字符串非空，程序化改描述一律用「读原文 → 断言非空 → 拼接 → 写回 → 复读核对」五步。另一次失误是 `edit` 时用下一条目的整行做锚点替换，把 `## Rollback Point` 标题和 Step 13/14 行覆盖掉，随即补回——**编辑长列表时锚点要落在目标行自身，不要落在邻居行**。
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2eff166` | docs(pve): 校正 stamp_extra 忙碌契约与终态重放气血口径，登记全列回写架构债 |
+
+### Status
+
+[OK] **Completed**
