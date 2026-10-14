@@ -72,7 +72,12 @@ class CombatHandlers:
                     """,
                     (user_id, now, now),
                 )
-            await self.db.conn.commit()
+            # bd qbo / D2 ownership gate: 裸 conn.commit() 会在外层
+            # db.transaction() 里提前提交别人的 unit-of-work。按 _txn_depth
+            # 门控，只有叶子（无活动事务）才自己提交，与 data_manager 的
+            # update_player/delete_player 同一 idiom。
+            if getattr(self.db.conn, "_txn_depth", 0) == 0:
+                await self.db.conn.commit()
         except Exception as e:
             from astrbot.api import logger
 

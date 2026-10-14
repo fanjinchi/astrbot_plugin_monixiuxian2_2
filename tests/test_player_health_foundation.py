@@ -9,9 +9,10 @@ Covers the PRD/acceptance criteria of the health-foundation split:
   failure rollback that keeps the database at v34.
 - AC3  three-layer ownership: breakthrough-style base growth never heals
   current; combat-style current changes never move base; clamp on ceiling drop.
-- AC4  lazy recovery: 1% of the dynamic max per elapsed minute, busy windows
-  advance the anchor without healing (authoritative user_cd, never the
-  players.state display mirror), settle+anchor rides inside the caller
+- AC4  lazy recovery: 1% of the dynamic max per elapsed minute, purely
+  time-based — the busy gate was removed on 2026-10-12 (用户拍板), so
+  闭关/修炼/历练 pending windows heal exactly like idle ones; settle+anchor
+  still rides inside the caller
   transaction, and GM 时间快进 (TIME_SKIP_ENTRIES) never touches
   health_recovered_at.
 - AC5  the HealthService snapshot API has no reward/platform side effects.
@@ -145,7 +146,7 @@ async def test_fresh_schema_has_three_layer_health_columns():
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
             row = await cursor.fetchone()
         # 钉住链条末端版本；新增迁移版本时同步更新（见 child P design §1）
-        assert row[0] == LATEST_DB_VERSION == 38
+        assert row[0] == LATEST_DB_VERSION == 39
     finally:
         await db_conn.close()
 
@@ -353,7 +354,7 @@ async def test_clamp_when_ceiling_drops(db):
 
 
 # ----------------------------------------------------------------------
-# AC4 — lazy recovery & busy semantics
+# AC4 — lazy recovery (time-based; 忙碌不再参与判定)
 # ----------------------------------------------------------------------
 
 
@@ -388,35 +389,42 @@ async def test_anchor_zero_adopts_clock_without_retro_heal(db):
 
 
 @pytest.mark.asyncio
-async def test_busy_window_advances_anchor_without_healing(db):
+async def test_busy_window_heals_exactly_like_idle(db):
+    """2026-10-12 R6：恢复不再看 user_cd。忙碌（未到期）窗口按分钟照常回血，
+    锚点推进的是真实经过的整分钟，而不是跳到 now 吞掉窗口。"""
     health = make_service(db)
     await put_player(db, "u_busy", base=1000, current=400, anchor=T0)
     await db.ext.set_user_busy("u_busy", int(UserStatus.CULTIVATING), T0 + 60000)
-    cur = await health.settle("u_busy", now=T0 + 600)
-    assert cur == 400, "busy player never heals"
+    cur = await health.settle("u_busy", now=T0 + 300)
+    assert cur == 450, "忙碌窗口必须回血：5 min * 10（max 1000 的 1%）"
     row = await health_row(db.conn, "u_busy")
-    assert row[1] == 400 and row[2] == T0 + 600, "busy time consumed by anchor jump"
-    # 明确解除忙碌后的空闲时间才恢复
+    assert row[1] == 450 and row[2] == T0 + 300, "锚点按整分钟推进，不跳 now"
+    # 继续挂在该忙碌状态里：仍然持续恢复，直到动态上限封顶
+    cur = await health.settle("u_busy", now=T0 + 6300)
+    assert cur == 1000, "长时间忙碌后封顶在动态 max_hp，不会过恢复"
     await db.ext.set_user_free("u_busy")
-    # 空闲 300s（锚点已在忙碌进入时跳到 T0+600）-> 5 min * 10 = 450
-    cur = await health.settle("u_busy", now=T0 + 900)
-    assert cur == 450
+    cur = await health.settle("u_busy", now=T0 + 6900)
+    assert cur == 1000, "解除忙碌后不产生任何额外补偿"
 
 
 @pytest.mark.asyncio
-async def test_expired_scheduled_cd_counts_idle(db):
-    """Stale busy rows must not hold recovery hostage (settle re-reads user_cd)."""
+async def test_indefinite_busy_still_heals(db):
+    """闭关式 indefinite busy（scheduled_time == 0）曾经是闸门最硬的分支
+    （“blocks healing until explicitly cleared”）；R6 取消后必须同样回血。"""
     health = make_service(db)
-    await put_player(db, "u_stale", base=1000, current=500, anchor=T0)
-    await db.ext.set_user_busy("u_stale", int(UserStatus.ADVENTURING), T0 + 120)
-    cur = await health.settle("u_stale", now=T0 + 300)  # scheduled expired -> idle
+    await put_player(db, "u_closed", base=1000, current=500, anchor=T0)
+    await db.ext.set_user_busy("u_closed", int(UserStatus.CULTIVATING), 0)
+    cur = await health.settle("u_closed", now=T0 + 300)
     assert cur == 550  # 5 min * 10/min of max 1000
+    row = await health_row(db.conn, "u_closed")
+    assert row[2] == T0 + 300, "锚点仍在推进，忙碌期未被吞掉"
 
 
 @pytest.mark.asyncio
 async def test_set_busy_settles_old_state_in_same_transaction(db):
-    """AC4: entering busy heals the idle elapsed time first, atomically with the
-    user_cd write — and a losing set_busy writes nothing at all."""
+    """AC4: entering busy settles the elapsed time first, atomically with the
+    user_cd write — and a losing set_busy writes nothing at all. 忙碌期间同样
+    持续回血（R6 取消闸门），所以 clear 结算出的是整段窗口的血。"""
     now = {"t": T0}
     health = make_service(db, clock_value=lambda: now["t"])
     player = await put_player(db, "u_tx", base=1000, current=300, anchor=T0)
@@ -432,15 +440,15 @@ async def test_set_busy_settles_old_state_in_same_transaction(db):
     assert not ok2
     row2 = await health_row(db.conn, "u_tx")
     assert row2 == row, "loser path must not settle"
-    # 忙碌 600s 后 clear：不补恢复，锚点跳到 now
+    # 忙碌 600s 后 clear：窗口内 10 分钟照样回血（+100），锚点推进到结算时刻
     now["t"] = T0 + 780
     await busy.clear(player)
     row3 = await health_row(db.conn, "u_tx")
-    assert row3[1] == 330, "busy window must not heal retroactively"
-    assert row3[2] == T0 + 780, "busy time consumed: anchor jumps, no catch-up"
-    # 空闲后再读：恢复从锚点起算（3 分钟 -> +30）
+    assert row3[1] == 430, "busy window heals too: 330 + 10 min * 10"
+    assert row3[2] == T0 + 780, "anchor advances by whole elapsed minutes"
+    # 空闲后再读：恢复继续从锚点起算（3 分钟 -> +30）
     cur = await health.settle("u_tx", now=T0 + 960)
-    assert cur == 360
+    assert cur == 460
 
 
 @pytest.mark.asyncio
@@ -480,9 +488,10 @@ async def test_update_player_never_reverts_settled_anchor(db):
 
 
 @pytest.mark.asyncio
-async def test_set_busy_syncs_current_hp_and_busy_window_stays_unhealed(db):
+async def test_set_busy_syncs_current_hp_and_busy_window_heals(db):
     """P0/AC4 regression: set_busy 结算后同步内存 current_hp，随后的
-    update_player 既不丢回血，也不复活忙碌窗口（锚点不回退）。"""
+    update_player 既不丢已结算的回血，也不复活窗口（锚点不回退）。忙碌期
+    本身照常回血（R6），所以 clear 后 DB 与内存都必须是结算后的值。"""
     now = {"t": T0}
     health = make_service(db, clock_value=lambda: now["t"])
     player = await put_player(db, "u_busysync", base=1000, current=300, anchor=T0)
@@ -495,12 +504,13 @@ async def test_set_busy_syncs_current_hp_and_busy_window_stays_unhealed(db):
     await db.update_player(player)
     row = await health_row(db.conn, "u_busysync")
     assert (row[1], row[2]) == (330, T0 + 180)
-    # 忙碌 10 分钟后回来：忙碌窗口不得回血，锚点绝不回退
+    # 忙碌 10 分钟后回来：窗口内回血入账，锚点绝不回退
     now["t"] = T0 + 780
     await busy.clear(player)
+    assert player.current_hp == 430, "clear 必须把结算值同步回内存，防陈旧回写"
     await db.update_player(player)
     row = await health_row(db.conn, "u_busysync")
-    assert (row[1], row[2]) == (330, T0 + 780)
+    assert (row[1], row[2]) == (430, T0 + 780)
 
 
 @pytest.mark.asyncio

@@ -89,9 +89,11 @@ class BusyState:
         health_service: Optional HealthService (child A player-health
             foundation).  Every authoritative user_cd write settles the OLD
             state and advances the recovery anchor inside the SAME outer
-            transaction before the new status is written — busy time never
-            heals (design: lazy recovery).  None only in unit-test fixtures
-            that do not wire the health domain.
+            transaction before the new status is written.  Recovery itself is
+            time-based and ignores the busy flag (2026-10-12: the busy gate
+            was removed, so a busy player keeps healing); the settle here only
+            keeps anchor + status atomic and syncs the in-memory mirror.
+            None only in unit-test fixtures that do not wire the health domain.
     """
 
     def __init__(self, db: "DataBase", health_service=None):
@@ -187,9 +189,10 @@ class BusyState:
         """
         async with self._db.transaction():
             if self._health is not None:
-                # 转空闲前结算：忙碌期间的不补恢复，锚点跳到现在
-                # （下一次恢复自 clear 起算，AC4）。返回值同步内存
-                # current_hp，避免调用方后续 update_player 陈旧回写。
+                # 转空闲前结算：把到此刻为止的分钟级恢复入账并前移锚点。
+                # 忙碌期不再冻结回血（2026-10-12 取消闸门），所以这里结算的
+                # 就是整段窗口内应得的血。返回值同步内存 current_hp，避免
+                # 调用方后续 update_player 陈旧回写。
                 player.current_hp = await self._health.settle(player.user_id)
             await self._db.ext.set_user_free(player.user_id)
             player.state = "空闲"

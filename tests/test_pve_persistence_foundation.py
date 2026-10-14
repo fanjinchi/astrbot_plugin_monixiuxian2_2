@@ -2,7 +2,7 @@
 
 覆盖 PRD AC1–AC6 与 design §1–§6：
 
-- 版本矩阵：v36–v38 注册齐全、表归属正确、fresh install 建齐 10 张新表；
+- 版本矩阵：v36–v39 注册齐全、表归属正确、fresh install 建齐 10 张新表；
 - schema 一致性：fresh install == 逐版本升级链（参数化 N ∈ {36,37,38}）；
 - v34 → 最新走任务链升级（数据保留、不触发 reset 备份）；
 - 迁移失败回滚停在 N-1，且修复后可续跑；任务重放幂等；
@@ -77,6 +77,8 @@ NEW_TABLES = {
         "world_boss_contributions",
     },
     38: {"business_events", "event_deliveries"},
+    # v39 不拥有新表，只给 v36 的表增列（见 data/migration.py 注释）
+    39: set(),
 }
 
 # 回退 DROP 必须子表先于父表（FK 引用方向见 data/migration.py DDL）
@@ -247,16 +249,21 @@ async def _seed_event_and_delivery(outbox, event_id="ev-1", group_id="100"):
 
 
 def test_version_matrix_chain_registration():
-    """v36–v38 均已注册迁移任务，链条末端 == LATEST_DB_VERSION。"""
+    """v36–v39 均已注册迁移任务，链条末端 == LATEST_DB_VERSION。"""
     versions = set(MIGRATION_TASKS)
-    assert LATEST_DB_VERSION == max(versions) == 38
-    assert {36, 37, 38} <= versions
+    assert LATEST_DB_VERSION == max(versions) == 39
+    assert {36, 37, 38, 39} <= versions
     assert TASK_CHAIN_MIN_VERSION <= 36
 
 
 def test_version_matrix_table_ownership():
-    """VERSION_SCHEMA_TABLES 与 PRD 表清单逐版本一致且互不重叠。"""
-    assert sorted(VERSION_SCHEMA_TABLES) == [36, 37, 38]
+    """VERSION_SCHEMA_TABLES 与 PRD 表清单逐版本一致且互不重叠。
+
+    v39 拥有空表集合（child C 只给 v36 的 adventure_settlements 增列），
+    登记它是为了版本矩阵逐版可复现；增列路径的 parity 由
+    ``test_v39_adds_state_columns_to_published_v36_table`` 负责。
+    """
+    assert sorted(VERSION_SCHEMA_TABLES) == [36, 37, 38, 39]
     seen = set()
     for version, tables in NEW_TABLES.items():
         assert set(VERSION_SCHEMA_TABLES[version]) == tables
@@ -277,7 +284,7 @@ async def test_fresh_install_creates_all_pve_tables(db):
 # ----------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("n", [36, 37, 38])
+@pytest.mark.parametrize("n", [36, 37, 38, 39])
 @pytest.mark.asyncio
 async def test_upgraded_schema_equals_fresh_install(tmp_path, n):
     """回退到 v{n}-1 后沿任务链升上来，schema 与全新安装逐表一致。"""
@@ -305,6 +312,130 @@ async def test_upgraded_schema_equals_fresh_install(tmp_path, n):
 
     assert upgraded == fresh_snap
     assert not list(tmp_path.glob("*.pre-reset.bak"))
+
+
+# ----------------------------------------------------------------------
+# v39 增列路径 — 已发布 v36 表结构的老库（ADD COLUMN 唯一真实覆盖）
+# ----------------------------------------------------------------------
+
+# 逐字抄自本 child 之前的 _create_adventure_persistence_tables（v36 已发布
+# 定义）。上面那组 parity 用例靠 DROP+重建构造「升级前」，重建用的是**新版**
+# DDL，永远摸不到 ADD COLUMN；真实用户库里那张表就是下面这个形状，所以
+# 老库升级只能由这条用例覆盖。
+_LEGACY_V36_SETTLEMENT_DDL = """
+CREATE TABLE players (user_id TEXT PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS adventure_settlements (
+    settlement_id TEXT PRIMARY KEY,
+    adventure_run_id TEXT NOT NULL UNIQUE,
+    user_id TEXT NOT NULL
+        REFERENCES players(user_id) ON DELETE CASCADE,
+    encounter_id TEXT NOT NULL DEFAULT '',
+    profile_id TEXT NOT NULL DEFAULT '',
+    profile_version INTEGER NOT NULL DEFAULT 0,
+    risk_level INTEGER NOT NULL DEFAULT 0,
+    outcome TEXT NOT NULL DEFAULT '',
+    hp_before INTEGER NOT NULL DEFAULT 0,
+    hp_after INTEGER NOT NULL DEFAULT 0,
+    fled INTEGER NOT NULL DEFAULT 0 CHECK (fled IN (0, 1)),
+    defeated INTEGER NOT NULL DEFAULT 0 CHECK (defeated IN (0, 1)),
+    settled_at INTEGER NOT NULL DEFAULT 0,
+    cas_version INTEGER NOT NULL DEFAULT 1
+);
+INSERT INTO players VALUES ('u_old');
+INSERT INTO adventure_settlements
+    (settlement_id, adventure_run_id, user_id, outcome, hp_before, hp_after,
+     defeated, settled_at)
+VALUES ('s_old', 'r_old', 'u_old', 'win', 500, 420, 1, 1700000000);
+"""
+
+_V39_COLUMNS = ("state", "route_key", "snapshot")
+
+
+async def _column_defs(conn):
+    """PRAGMA table_info 的 (name, type, notnull, dflt_value, pk) 视图。"""
+    rows = await _pragma_rows(conn, "PRAGMA table_info(adventure_settlements)")
+    # row = (cid, name, type, notnull, dflt_value, pk)
+    return {row[1]: (row[2], row[3], row[4], row[5]) for row in rows}
+
+
+@pytest.mark.asyncio
+async def test_v39_adds_state_columns_to_published_v36_table(tmp_path):
+    """老库（v36 原表 + 已有事实行）升到 v39：补三列、历史行落合法终态。"""
+    conn = await aiosqlite.connect(str(tmp_path / "at_v36_with_data.db"))
+    try:
+        await conn.executescript(_LEGACY_V36_SETTLEMENT_DDL)
+        await conn.commit()
+        # 前置：确认构造出的确实是增列前的形状
+        assert not set(_V39_COLUMNS) & set(await _column_defs(conn))
+
+        await MIGRATION_TASKS[39](conn, StubConfigManager())
+        await conn.commit()
+
+        defs = await _column_defs(conn)
+        assert set(_V39_COLUMNS) <= set(defs), "v39 必须补齐状态机三列"
+        # 三列追加在 cas_version 之后：与 fresh 路径的列序一致（cid 也一致）
+        names = [
+            row[1]
+            for row in await _pragma_rows(
+                conn, "PRAGMA table_info(adventure_settlements)"
+            )
+        ]
+        assert names[-3:] == list(_V39_COLUMNS)
+
+        # 历史行不能被新代码读成「进行中/待选择」：默认值必须是合法终态
+        assert (
+            await _scalar(
+                conn, "SELECT state FROM adventure_settlements WHERE settlement_id='s_old'"
+            )
+            == "resolved_win"
+        )
+        assert (
+            await _scalar(
+                conn,
+                "SELECT route_key || '|' || snapshot FROM adventure_settlements "
+                "WHERE settlement_id='s_old'",
+            )
+            == "|{}"
+        )
+
+        # CHECK 取值域留在 schema 层（ADD COLUMN 带约束在 SQLite 里真能拦截），
+        # 不退化成仓储层校验
+        with pytest.raises(sqlite3.IntegrityError):
+            await conn.execute(
+                "UPDATE adventure_settlements SET state='in_fight' "
+                "WHERE settlement_id='s_old'"
+            )
+
+        # 状态索引随增列补齐
+        idx = {
+            row[1]
+            for row in await _pragma_rows(conn, "PRAGMA index_list(adventure_settlements)")
+        }
+        assert "idx_adventure_settlements_user_state" in idx
+
+        # 幂等重放：v35→v39 一路升上来的库，表是新版 DDL 建的，列已存在，
+        # 二次执行不得 duplicate column 报错
+        await MIGRATION_TASKS[39](conn, StubConfigManager())
+        assert (await _column_defs(conn)) == defs
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_v39_legacy_columns_equal_fresh_install(tmp_path, db):
+    """增列后的列定义与全新安装逐字段一致（fresh==upgrade 的增列版证明）。"""
+    conn = await aiosqlite.connect(str(tmp_path / "legacy_parity.db"))
+    try:
+        await conn.executescript(_LEGACY_V36_SETTLEMENT_DDL)
+        await conn.commit()
+        await MIGRATION_TASKS[39](conn, StubConfigManager())
+        await conn.commit()
+        upgraded = await _column_defs(conn)
+        fresh = await _column_defs(db.conn)
+        for name in _V39_COLUMNS:
+            assert upgraded[name] == fresh[name], f"{name} 列定义漂移"
+    finally:
+        await conn.close()
 
 
 # ----------------------------------------------------------------------

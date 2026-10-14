@@ -20,10 +20,15 @@ The health model has three layers with disjoint ownership:
 
 Lazy recovery (parent design 气血战后自然恢复): 1% of the dynamic max per
 elapsed minute, settled lazily on any authoritative read — never a
-per-player timer. Whether the player heals is decided by the authoritative
-cooldown (user_cd), not the players.state display mirror. Busy windows
-advance the anchor without healing; players.health_recovered_at is
-deliberately NOT registered in core/time_skip_registry.TIME_SKIP_ENTRIES
+per-player timer. Recovery is purely time-based: it does NOT consult
+user_cd/players.state, so a player keeps healing through 闭关/修炼/历练
+pending windows as well (2026-10-12 用户拍板：取消恢复的忙碌判定，战斗结束
+扣完血立刻开始回血；口径见 design_docs/content-design/pve-enemy-design.md
+轴三 2 与 §Q4，Trellis task 10-10-pve-adventure-settlement R6). The old gate
+consumed busy time (anchor jump without healing); it is gone, so no
+retro-active catch-up special case is needed — elapsed time simply heals.
+players.health_recovered_at is deliberately NOT registered in
+core/time_skip_registry.TIME_SKIP_ENTRIES
 (GM 时间快进 must not fast-forward recovery —
 tests/test_player_health_foundation.py pins this boundary).
 
@@ -101,27 +106,17 @@ class HealthService:
     # lazy recovery settlement
     # ------------------------------------------------------------------
 
-    async def _is_busy(self, user_id: str, now: int) -> bool:
-        """Authoritative busy check via user_cd (never the display mirror).
-
-        Scheduled activity past its scheduled_time counts as idle (the
-        settlement flows clear it on the next player action; recovery must
-        not be hostage to a stale flag). scheduled_time == 0 = indefinite
-        busy (闭关-style) and blocks healing until explicitly cleared.
-        """
-        user_cd = await self._db.ext.get_user_cd(user_id)
-        if user_cd is None or user_cd.type == 0:
-            return False
-        return user_cd.scheduled_time == 0 or user_cd.scheduled_time > now
-
     async def settle(self, user_id: str, now: int | None = None) -> int:
         """Advance lazy recovery for user_id, persist it, return settled current_hp.
 
-        Called by every normal health read and by the busy-state write path
-        (inside the caller outer db.transaction() — the same-transaction
-        join is what makes settle + anchor-advance and the new status atomic
-        together, design D3). anchor == 0 adopts now without retroactive
-        healing, so the migration checkpoint and legacy rows start clean.
+        Recovery is time-based only — 忙碌状态（user_cd）不参与判定，
+        闭关/修炼/历练 pending 期间同样按分钟回血（2026-10-12 用户拍板，
+        见模块头与 §Q4）。Called by every normal health read and by the
+        busy-state write path (inside the caller outer db.transaction() — the
+        same-transaction join is what makes settle + anchor-advance and the
+        new status atomic together, design D3). anchor == 0 adopts now without
+        retroactive healing, so the migration checkpoint and legacy rows start
+        clean.
         """
         now = int(now if now is not None else self._clock())
         conn = self._db.conn
@@ -144,13 +139,6 @@ class HealthService:
             return current
 
         max_hp = self._max_from_row(data)
-        if await self._is_busy(user_id, now):
-            # Busy window: no healing, and the elapsed busy time is consumed
-            # so it can never be healed later (anchor jumps to now).
-            if anchor != now:
-                await self._write_anchor(user_id, min(current, max_hp), now)
-            return min(current, max_hp)
-
         elapsed = max(0, now - anchor)
         minutes = elapsed // SECONDS_PER_MINUTE
         if minutes <= 0:

@@ -23,11 +23,13 @@ if TYPE_CHECKING:
 # v36: 历练结算事实 + 效果消费幂等 + 持久疲劳（adventure_*）
 # v37: 世界 Boss 实例/出生快照版本/挑战/每日次数/台账/贡献（world_boss_*）
 # v38: 业务事件 outbox + 逐目标投递 claim（business_events / event_deliveries）
+# v39: 历练结算状态机增量列（adventure_settlements.state/route_key/snapshot，
+#      child C 授权；纯 ADD COLUMN + 索引，不改写 v36 已发布定义、不重建表）
 # 每版 migration task 与 _create_all_tables 共用同一建表函数（单一真源，
 # 全新安装与逐版升级不可能漂移）；VERSION_SCHEMA_TABLES 声明每版拥有的表，
 # 供 schema parity 测试构造「升级前」库存档。只有 SQLite 约束要求时才允许
 # 继续拆连续 v39…，不得复用已发布版本做别的结构。
-LATEST_DB_VERSION = 38
+LATEST_DB_VERSION = 39
 
 # 增量任务链的适用下限：v32 是 _create_all_tables 冻结的完整 schema 基线，
 # 只有达到该版本的库才具备迁移任务依赖的全部表结构；更早的旧库必须走
@@ -60,6 +62,11 @@ VERSION_SCHEMA_TABLES: dict[int, tuple[str, ...]] = {
         "business_events",
         "event_deliveries",
     ),
+    # v39 不拥有新表：它只给 v36 的 adventure_settlements 增列（child C）。
+    # 空集合是有意登记——版本矩阵必须逐版可复现，缺一条就等于承认
+    # 「有一版升级无法构造升级前状态」。列增动的 parity 由
+    # tests/test_pve_persistence_foundation.py 的 v39 专门用例负责。
+    39: (),
 }
 
 
@@ -181,6 +188,13 @@ async def _create_adventure_persistence_tables(conn: aiosqlite.Connection):
     单一真源：v36 migration task 与 _create_all_tables 都调用本函数，
     全新安装与逐版升级因此不可能漂移（PRD R1 的 fresh/upgrade 同构要求）。
     child P 只建「可被幂等消费的事实」，不实现逃跑判定、战斗结算或奖励发放。
+
+    v39（child C 历练结算）新增的三列在**本函数内同源声明**：v35 及更早的库
+    经 v36 任务建表时就直接带上这三列，已发布过 v36 表结构的老库则由
+    ``_adventure_settlement_state_machine_v39`` 守卫式 ADD COLUMN 追加，两条
+    路径的列定义必须逐字一致（tests/test_pve_persistence_foundation.py 用
+    PRAGMA table_info 比对锁定）。三列排在 ``cas_version`` 之后，与 ALTER
+    追加的列序一致。
     """
     # 历练结算事实：一次 adventure run 至多一条，字段是后续奖励服务的
     # 幂等消费输入（真实气血差、结局、档案版本），不含任何奖励声明。
@@ -200,12 +214,33 @@ async def _create_adventure_persistence_tables(conn: aiosqlite.Connection):
             fled INTEGER NOT NULL DEFAULT 0 CHECK (fled IN (0, 1)),
             defeated INTEGER NOT NULL DEFAULT 0 CHECK (defeated IN (0, 1)),
             settled_at INTEGER NOT NULL DEFAULT 0,
-            cas_version INTEGER NOT NULL DEFAULT 1
+            cas_version INTEGER NOT NULL DEFAULT 1,
+            -- v39（child C 历练结算）状态机三列。state 是唯一权威，
+            -- outcome 降级为它派生的人类可读标签，避免两处各自判断。
+            -- 默认值必须是合法终态：v36 历史行是「事后账本」，不能因为
+            -- 新增列就被读成进行中/待选择。取值域写在 schema 层（SQLite
+            -- 实测允许 ADD COLUMN 带 CHECK 并真的拦截非法值）。
+            -- 与 data/pve_repository.SETTLEMENT_STATES 逐值一致，由
+            -- tests/test_pve_persistence_foundation.py 钉住。
+            state TEXT NOT NULL DEFAULT 'resolved_win'
+                CHECK (state IN ('adventuring', 'pending_choice', 'ready_combat',
+                                 'resolved_win', 'resolved_loss', 'resolved_fled')),
+            -- 结算事实归属哪条历练路线（疲劳/收益审计，不再是内存字典）
+            route_key TEXT NOT NULL DEFAULT '',
+            -- 锁定时刻的不可变快照 JSON：敌人身份 + rng_seed + 基础收益 +
+            -- 双方战斗输入。重放/崩溃恢复只读它，绝不重掷 RNG
+            snapshot TEXT NOT NULL DEFAULT '{}'
         )
     """)
     await conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_adventure_settlements_user "
         "ON adventure_settlements(user_id, settled_at DESC)"
+    )
+    # v39：结算状态机的真实读取形态是「这人有没有挂着的选择/进行中」，
+    # 按 (user_id, state) 建索引，不能靠扫 settled_at。
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_adventure_settlements_user_state "
+        "ON adventure_settlements(user_id, state)"
     )
 
     # 效果消费 claim 表：消费者按 (consumer_name, settlement_id, effect_type)
@@ -441,8 +476,48 @@ async def _event_outbox_v38(conn: aiosqlite.Connection, config_manager: ConfigMa
     await _create_event_outbox_tables(conn)
 
 
+@migration(39)
+async def _adventure_settlement_state_machine_v39(
+    conn: aiosqlite.Connection, config_manager: ConfigManager
+):
+    """v39（child C 历练结算）：adventure_settlements 增状态机三列 + 状态索引。
+
+    纯增量，不改写 v36 已发布定义、不新建平行表、不重建（ADD COLUMN 在
+    SQLite 里允许带 CHECK 与非空默认值，取值域因此留在 schema 层，无需退化
+    成仓储层校验）。历史行无需回填：默认值 ``'resolved_win'`` 本身是合法终态，
+    老账本不会被新代码误读成 ``adventuring``/``pending_choice``。
+
+    守卫式判断让两条路径都幂等：已发布过 v36 表结构的库在此追加列；而 v35 及
+    更早的库经本函数的新版 DDL 建表后，到这一版时列已存在，必须跳过而不是
+    duplicate column 报错（fresh==upgrade parity 的前提）。
+
+    ``adventure_fatigue`` 有意不动（乙案 2026-10-12：休整窗口每人一行，基座
+    单行 API 已够，见 design §2.1）。
+    """
+    cursor = await conn.execute("PRAGMA table_info(adventure_settlements)")
+    existing = {row[1] for row in await cursor.fetchall()}
+    additive = (
+        (
+            "state",
+            "TEXT NOT NULL DEFAULT 'resolved_win' CHECK (state IN "
+            "('adventuring', 'pending_choice', 'ready_combat', "
+            "'resolved_win', 'resolved_loss', 'resolved_fled'))",
+        ),
+        ("route_key", "TEXT NOT NULL DEFAULT ''"),
+        ("snapshot", "TEXT NOT NULL DEFAULT '{}'"),
+    )
+    for name, ddl in additive:
+        if name in existing:
+            continue
+        await conn.execute(f"ALTER TABLE adventure_settlements ADD COLUMN {name} {ddl}")
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_adventure_settlements_user_state "
+        "ON adventure_settlements(user_id, state)"
+    )
+
+
 async def _create_all_tables(conn: aiosqlite.Connection):
-    """Create the current (v38) schema for a fresh database.
+    """Create the current (v39) schema for a fresh database.
 
     唯一的建表入口：全新安装与旧库重建都走这里，保证两条路径 schema
     完全一致（不再存在多套历史建表函数漂移的问题）。v36 起新增的 PVE
