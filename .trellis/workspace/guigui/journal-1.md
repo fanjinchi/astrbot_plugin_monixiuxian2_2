@@ -155,3 +155,26 @@ webtest 真实消息管线 + GM「时间快进」，固定测试 ID `900000002`�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 6: child C（历练结算状态机）归档收口：第七轮无阻塞问题、真实环境回归定稿、AC6 剩余移交 -9u2
+<!-- trellis-session: v=2 fp=3ace4acddf66be89 -->
+
+**Date**: 2026-10-14
+**Task**: child C（历练结算状态机）归档收口：第七轮无阻塞问题、真实环境回归定稿、AC6 剩余移交 -9u2
+**Branch**: `main`
+
+### Summary
+
+第七轮专查第六轮新增的忙碌收尾，判无 P0/P1 并独立复核三件事（20/20 原地突变为真、归属守卫非纸面防御、真 GM 入口同命令内自愈）；对称交错探针证明 update_player 丢失更新属既有全列回写架构口径，另建档 -546。修两条文字与实现不符的 P2（stamp_extra 契约、_replay_terminal 气血口径）。用户发起的真实管线回归跑完本 child 范围内那一半（含逃跑成功路径、GM 强制迎战、AC11 正反文案、复活自愈），正式库账目只读核对一致。归档前定稿 PRD AC6「故意不勾」口径并把 Boss 侧 TTK/胜率/资源税对照移交 -9u2、开放项移交 -9hq/-2v2/-aue/-546/-dfb。门：1143 passed、ruff format/check 干净。任务已归档至 archive/2026-10/，工作树干净，未 push。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2eff166` | docs(pve): 校正 stamp_extra 忙碌契约与终态重放气血口径，登记全列回写架构债 |
+| `706d7c9` | docs(trellis): 定稿 child C 归档口径并把 AC6 剩余范围移交 -9u2 |
+
+### Status
+
+[OK] **Completed**

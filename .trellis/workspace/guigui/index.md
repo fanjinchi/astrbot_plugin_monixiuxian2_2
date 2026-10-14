@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
+- **Total Sessions**: 6
 - **Last Active**: 2026-10-14
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~157 | Active |
+| `journal-1.md` | ~180 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-10-14 | child C（历练结算状态机）归档收口：第七轮无阻塞问题、真实环境回归定稿、AC6 剩余移交 -9u2 | `2eff166`, `706d7c9` | `main` |
 | 5 | 2026-10-14 | child C 第七轮复核收口 + 真实环境回归（结算链路全通，AC6 Boss 侧未做） | `2eff166` | `main` |
 | 4 | 2026-10-14 | child C 历练结算状态机：六轮复核逼出的四处永久锁死/发奖漏洞与并发收尾收口 | `2dc1b70`, `d1c5190`, `a1ea995`, `aac9a98` | `main` |
 | 3 | 2026-10-13 | child P：PVE 持久化与事务基座（Batch 2）完成 + 评审闭环 | `a4ddaed`, `44cd8e0` | `main` |
