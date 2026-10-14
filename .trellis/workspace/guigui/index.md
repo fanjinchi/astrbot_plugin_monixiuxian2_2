@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 3
-- **Last Active**: 2026-10-13
+- **Total Sessions**: 4
+- **Last Active**: 2026-10-14
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~77 | Active |
+| `journal-1.md` | ~102 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 4 | 2026-10-14 | child C 历练结算状态机：六轮复核逼出的四处永久锁死/发奖漏洞与并发收尾收口 | `2dc1b70`, `d1c5190`, `a1ea995`, `aac9a98` | `main` |
 | 3 | 2026-10-13 | child P：PVE 持久化与事务基座（Batch 2）完成 + 评审闭环 | `a4ddaed`, `44cd8e0` | `main` |
 | 2 | 2026-10-12 | PVE Child B：固定名册内容管线与敌人运行时基座（含双轴评审整改） | `35a9df6`, `d840258`, `6ae7ab3` | `main` |
 | 1 | 2026-10-12 | 气血基座：评审-修复-归档闭环 | `3883670`, `04d87b2` | `main` |
