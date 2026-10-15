@@ -63,7 +63,6 @@ BUSY_STATE_ALLOWED_COMMANDS = [
     "战报条数",
     "我的技能",
     # 历练/秘境结算
-    "结束任务",
     # 历练战前抉择（design §1 甲案）：PRD R2 明令把两条出路登记进白名单。
     # 口径要说清楚：迎战/逃跑 在 main.py 只挂 @require_whitelist、不挂
     # @player_required，因此本白名单对它们**当前不参与判定**（忙碌下天然可达）。

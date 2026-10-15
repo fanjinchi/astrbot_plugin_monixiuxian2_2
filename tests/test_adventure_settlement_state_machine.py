@@ -44,6 +44,7 @@ PVECombatManager = _pve_mod.PVECombatManager
 _combat_mod = load_module("combat_manager_settle", "managers/combat_manager.py")
 CombatResult = _combat_mod.CombatResult
 FighterState = _combat_mod.FighterState
+CombatEngine = _combat_mod.CombatEngine
 
 _enemy_mod = load_module("enemy_manager_settle", "managers/enemy_manager.py")
 Enemy = _enemy_mod.Enemy
@@ -119,6 +120,8 @@ class StubConfigManager:
         self.items_data = {}
         self.weapons_data = {}
         self.heart_methods_data = {}
+        # CombatEngine 构造时读这两段（真实引擎用例要用）；空段即全部走默认值。
+        self.game_config: dict = {}
 
 
 class ScriptedEngine:
@@ -951,6 +954,151 @@ async def test_concurrent_double_click_grants_once(env):
 
 
 @pytest.mark.asyncio
+async def test_concurrent_choice_does_not_rewrite_terminal(env):
+    """并发「迎战」：终态 CAS 只跳一级，败者走重放而不是二次覆写（P1 回归钉子）.
+
+    复刻的是 `_advance_state` 的 CAS 输家：它拿到赢家已提交的行，若赢家已打完落终态，
+    它会带着这张**终态**行走到 `_finalize`。那里 `expected_state=row["state"]` 是同态
+    覆盖，`cas_version` 也已被读成最新值，于是双条件 CAS 失效、同一行被再写一遍。
+    修复前实测 6/6：cas_version 多跳一级、hp_after 被覆写、两个调用方都收到「全新结算」
+    文案（没有重放提示）。上面那条 `test_concurrent_double_click_grants_once` 的三项
+    断言在 bug 存在时**全绿**，所以本用例专门钉 `cas_version` 增量。
+    """
+    for _ in range(6):
+        await start_run(env.mgr, HIGH_ROUTE)
+        await env.mgr.finish_adventure(USER)
+        pre = int((await env.row())["cas_version"])
+
+        results = await asyncio.gather(
+            env.mgr.resolve_adventure_choice(USER, flee=False),
+            env.mgr.resolve_adventure_choice(USER, flee=False),
+            return_exceptions=True,
+        )
+        assert not any(isinstance(r, Exception) for r in results), results
+        assert all(ok for ok, _, _ in results)
+
+        row = await env.row()
+        assert row["state"] == STATE_RESOLVED_WIN
+        # 恰好两级：pending_choice →(CAS)→ ready_combat →(CAS)→ 终态。
+        assert int(row["cas_version"]) - pre == 2, (
+            f"终态被二次覆写：cas_version 跳了 {int(row['cas_version']) - pre} 级"
+        )
+        # 只有一份事实、一份收益（覆写路径会多跑一次战斗引擎与发奖路径）
+        rows = await env.db.conn.execute_fetchall(
+            "SELECT COUNT(*) FROM adventure_settlements WHERE user_id = ?", (USER,)
+        )
+        assert rows[0][0] == 1
+        assert len(await env.claims()) == 3
+        # 复位，下一轮重新开一场
+        await env.db.conn.execute("DELETE FROM adventure_settlements")
+        await env.db.conn.execute("DELETE FROM adventure_effects")
+        await env.db.conn.execute("DELETE FROM user_cd")
+        await env.db.conn.commit()
+
+
+@pytest.mark.asyncio
+async def test_real_engine_starts_the_fight_from_recovered_hp(db):
+    """真实战斗引擎必须以**回血后**的气血参战（钉 settle 契约，非脚本替身）.
+
+    这条口径容易两头都搞错，所以用**真实 CombatEngine**（接线 health_service）钉死：
+    R6 起恢复与忙碌无关，挂 pending 到满血的玩家参战时应当已经是满血
+    （`build_fighter_from_player` → `get_health_snapshot` 会先 settle）。引擎终值是
+    真实战后剩余，胜场可以远低于战前（打到残血也是赢），所以**不得**对终值取 max
+    去「保底」，那与 AC4「胜场按引擎实际剩余写回」冲突。
+
+    为什么不用本文件的 `ScriptedEngine`：它的 `build_fighter_from_player` 直接读
+    `player.current_hp`，**没有** `get_health_snapshot`，所以这条契约在替身上验不了
+    （删掉真实引擎里的 settle，用例照样绿 = 假钉子）。另外，取「期望值」的那次
+    `get_health_snapshot` 会**就地改写** `player.current_hp`，若拿它当期望再让替身
+    去读同一个对象，断言就成了自证；因此这里改用**独立读库**拿期望值。
+    """
+    engine = CombatEngine(StubConfigManager(), health_service=None)
+    health = HealthService(
+        db, StubConfigManager(), equipment_manager=EquipmentManager(db=None)
+    )
+    engine.health_service = health  # 接线后才具备 settle 语义
+
+    player = await db.get_player_by_id(USER)
+    now = int(time.time())
+    await db.conn.execute(
+        "UPDATE players SET current_hp = ?, health_recovered_at = ? WHERE user_id = ?",
+        (100, now - 6000, USER),
+    )
+    await db.conn.commit()
+    # 期望值独立从库里取（不经过会被就地改写的 player 对象）
+    rows = await db.conn.execute_fetchall(
+        "SELECT current_hp FROM players WHERE user_id = ?", (USER,)
+    )
+    assert int(rows[0][0]) == 100, "前置条件：库里此刻是残血"
+    # 把内存对象按库里现值摆成「陈旧残血」：这样只有**真的 settle** 才能算出回血，
+    # 否则「直接读 player.current_hp」的退化实现会拿到 100 而被本用例抓住。
+    player.current_hp = 100
+
+    fighter = await engine.build_fighter_from_player(player)
+    # 真实引擎应当把「100 + 等待期恢复」算出来（1% × max_hp/分钟，回拨 6000s）
+    assert fighter.hp > 100, (
+        f"真实引擎没有按回血后的气血参战：fighter.hp={fighter.hp}（期望 > 100）"
+    )
+    assert fighter.hp == fighter.max_hp, (
+        f"回拨 6000s 应回满：fighter.hp={fighter.hp} max_hp={fighter.max_hp}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_replay_renders_authoritative_hp(env):
+    """重放/并发败者必须显示**账本里的**气血，而不是调用方手里的陈旧对象.
+
+    并发迎战时败者的 `player` 是进函数前读的，早于赢家 `_write_hp`；直接拿去渲染会
+    显示陈旧气血（修复前实测并发迎战 10 次命中 1 次：消息显示 1,000 而库与账本都是
+    500）。终态行的 `hp_after` 才是权威事实列，重放前先对齐。
+    """
+    import re
+
+    await start_run(env.mgr, HIGH_ROUTE)
+    assert (await env.mgr.finish_adventure(USER))[0]
+    await env.mgr.resolve_adventure_choice(USER, flee=False)
+    row = await env.row()
+    truth = int(row["hp_after"])
+
+    # 刻意把内存对象摆成陈旧值：只有从账本同步才能渲染出真值
+    stale = await env.player()
+    stale.current_hp = truth + 12345
+    ok, msg, _ = await env.mgr._replay_terminal(
+        stale, row, env.mgr.routes[HIGH_ROUTE], None, int(time.time())
+    )
+    assert ok
+    shown = int(re.search(r"当前气血：([\d,]+)", msg).group(1).replace(",", ""))
+    assert shown == truth, f"重放显示了陈旧气血 {shown}，账本真值 {truth}"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_finish_cas_is_exactly_two(env):
+    """并发「完成历练」（低风险）CAS 恰好两级，不产生第二份事实.
+
+    注意这条**不是**终态覆写的回归钉子：低风险路线 `_offers_choice=False`，直接进
+    `ready_combat`，并发败者在 `finish_adventure` 的重放分支（:527 附近）就被分流，
+    **根本走不到 `_finalize`**，所以那条路径原本就没有二次覆写问题（实测删掉
+    `_finalize` 的终态守护，本用例照样绿）。它守的是「低风险完成路径恰好一次锁敌人 +
+    一次结算、只有一份事实」这个更宽的不变式。终态覆写的钉子见
+    `test_concurrent_choice_does_not_rewrite_terminal`。"""
+    await start_run(env.mgr, LOW_ROUTE)
+    pre = int((await env.row())["cas_version"])
+    results = await asyncio.gather(
+        env.mgr.finish_adventure(USER),
+        env.mgr.finish_adventure(USER),
+        return_exceptions=True,
+    )
+    assert not any(isinstance(r, Exception) for r in results), results
+    row = await env.row()
+    assert row["state"] == STATE_RESOLVED_WIN
+    # 恰好两级：adventuring →(锁敌人 CAS)→ ready_combat →(结算 CAS)→ 终态
+    assert int(row["cas_version"]) - pre == 2, (
+        f"低风险完成路径 CAS 跳了 {int(row['cas_version']) - pre} 级（应为 2）"
+    )
+    assert (await env.player()).experience == WIN_EXP  # 只有一份收益
+
+
+@pytest.mark.asyncio
 async def test_crash_after_state_advance_resumes_locked_combat(env):
     """崩溃点「推进到 ready_combat 后」重启：迎战续算同一份 snapshot，不重掷."""
     await start_run(env.mgr, HIGH_ROUTE)
@@ -1178,6 +1326,57 @@ async def test_orphan_pending_choice_is_not_consumable(env):
     assert after.experience == before.experience
     assert after.current_hp == before.current_hp
     assert await env.user_cd_type() == UserStatus.CULTIVATING
+    assert (await env.row())["state"] == STATE_PENDING_CHOICE
+
+
+@pytest.mark.asyncio
+async def test_choice_gate_rejects_mismatched_run_id(env):
+    """归属闸门的 run-id 比对必须承重（AC13 的核心防线，P2 回归钉子）.
+
+    上一条用例靠 `user_cd.type != ADVENTURING` 就能拒绝，run-id 那一半从未被走到——
+    实测把 `_owned_open_run` 里的 run-id 比对整行删掉，41 条用例**全绿**。这条补上
+    那一半：`get_open_settlement` 按 `settled_at DESC, rowid DESC` 取最新未终结单，
+    把孤儿单的 `settled_at` 顶到未来即可让它排到新单前面，此时玩家正持有**另一场**
+    历练的忙碌。缺 run-id 闸门就会消费掉那张不属于本次历练的旧单：真打一场、按旧单
+    发奖，并由结算边界的 `busy_state.clear` 抹掉当前忙碌（AC13 明令禁止）。
+    """
+    # 第 1 场：走成孤儿 pending 单（模拟 GM 清冷却只复位忙碌、不终结单据）
+    await start_run(env.mgr, HIGH_ROUTE)
+    assert (await env.mgr.finish_adventure(USER))[0]
+    orphan = await env.row()
+    assert orphan["state"] == STATE_PENDING_CHOICE
+
+    # 第 2 场：玩家开始并完成一场**新的**历练，持有新忙碌
+    player = await env.player()
+    await env.mgr.busy_state.clear(player)
+    await start_run(env.mgr, HIGH_ROUTE)
+    assert (await env.mgr.finish_adventure(USER))[0]
+    current = await env.row()
+    assert current["adventure_run_id"] != orphan["adventure_run_id"]
+
+    # 把孤儿行的 settled_at 顶到未来 → 它成为 get_open_settlement 的返回项
+    await env.db.conn.execute(
+        "UPDATE adventure_settlements SET settled_at = ? WHERE settlement_id = ?",
+        (int(time.time()) + 10_000, orphan["settlement_id"]),
+    )
+    await env.db.conn.commit()
+    fetched = await env.repo.get_open_settlement(USER)
+    assert fetched["settlement_id"] == orphan["settlement_id"], (
+        "前置条件：孤儿单必须排在最前，否则本用例没验到 run-id 闸门"
+    )
+
+    busy_before = await env.user_cd_type()
+    exp_before = (await env.player()).experience
+    for flee in (False, True):
+        success, msg, rewards = await env.mgr.resolve_adventure_choice(USER, flee=flee)
+        assert not success, "run-id 闸门失效：孤儿单被当成本次历练消费了"
+        assert rewards is None
+        assert "没有待抉择的历练遭遇" in msg
+
+    # 当前忙碌与本场单据都必须原样保留
+    assert (await env.user_cd_type()) == busy_before == UserStatus.ADVENTURING
+    assert (await env.player()).experience == exp_before
+    assert (await env.row())["settlement_id"] == current["settlement_id"]
     assert (await env.row())["state"] == STATE_PENDING_CHOICE
 
 

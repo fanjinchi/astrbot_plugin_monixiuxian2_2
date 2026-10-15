@@ -57,7 +57,7 @@
 | `CombatHandlers` | 切磋/决斗 | `_get_target_id` 解析 @提及/数字目标；各自冷却 |
 | `BossHandlers` | 世界Boss/挑战Boss/生成Boss | 挑战走 `BossManager.challenge_boss` |
 | `RiftHandlers` | 秘境列表/探索秘境（子命令分发：数字ID进入/破阵 <答案>/传承；迎战由 main.py 拦截直调 manager）/完成探索/退出秘境 | |
-| `AdventureHandlers` | 历练信息/开始历练/完成历练/历练状态 | 顶层指令「迎战」「逃跑」（战前抉择）由 main.py 直接拦截调 `AdventureManager.resolve_adventure_choice`，不经本 handler（与秘境子命令「迎战」同惯例）；`handle_complete_adventure` 为历史遗留死代码，完成历练的实际入口在 main.py |
+| `AdventureHandlers` | 历练信息/开始历练/完成历练/历练状态 | 顶层指令「迎战」「逃跑」（战前抉择）由 main.py 直接拦截调 `AdventureManager.resolve_adventure_choice`，不经本 handler（与秘境子命令「迎战」同惯例）；`handle_complete_adventure` 未被 main.py 路由引用（实际入口在 main.py），保留仅为兼容旧调用方、删除前请先确认无引用 |
 | `BountyHandlers` | 悬赏令/接取/状态/完成/放弃悬赏 | 全部薄委托，渲染与编号防御统一走 handlers/bounty_handlers 模块级共享函数（`scope='global'`）；宗门专属悬赏走「宗门 悬赏」子命令组（scope='sect'）；两路行为由共享函数保持同位素一致 |
 | `AlchemyHandlers` | 丹药配方/炼丹 | |
 | `BankHandlers` | 银行/存取/利息/贷款/还款/流水/突破贷款 | |

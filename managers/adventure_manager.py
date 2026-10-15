@@ -991,6 +991,15 @@ class AdventureManager:
         Returns:
             ``(成功, 消息, reward_data)``。
         """
+        # 前态守护：**已是终态的行一律不得二次写入**。并发败者（`_advance_state`
+        # 的 CAS 输家）拿到的是赢家已提交的行，若赢家已打完并落终态，败者会带着
+        # 这张终态行走到这里；`expected_state=row["state"]` 那时是同态覆盖，双条件
+        # CAS 拦不住——实测 6/6 命中：cas_version 多跳一级（3 步而非 2 步）、
+        # settled_at/hp_after/outcome 被二次覆写、两个调用方都收到「全新结算」文案。
+        # 终态即既成事实，这里与 `if not moved` 分支同语义，直接走重放。
+        if row["state"] in TERMINAL_STATES:
+            return await self._replay_terminal(player, row, route, user_cd, now)
+
         settlements = self.settlements
         hp_before = int(snapshot.get("hp_before") or player.current_hp or 0)
         fatigue_seconds = self._fatigue_seconds(route, state)
@@ -1001,6 +1010,12 @@ class AdventureManager:
                 # 等于锁定值」：R6 起恢复全时段按真实时间走，挂 pending 那几分钟
                 # 照样在回血。所以先落定恢复，事实列的 hp_after 记**结算时刻的
                 # 真实气血**，child E/报表读它才不会拿到锁定时的过期数字。
+                #
+                # 战斗路径**不需要**这一步：`build_fighter_from_player` 内部走
+                # `get_health_snapshot`（同样会 settle），所以引擎本来就是拿回血后的
+                # 值参战，终值是真实的战后剩余；胜场可以远低于战前（打到残血也是赢），
+                # 不能再对终值取 max 去「保底」（那会与 AC4「胜场按引擎实际剩余写回」
+                # 冲突，tests 的 win/final_hp=7 用例正是钉这条）。
                 if self.health_service is not None:
                     hp_final = await self.health_service.settle(player.user_id, now)
                 else:
@@ -1344,6 +1359,16 @@ class AdventureManager:
         snapshot = self._read_snapshot(row)
         state = row["state"]
         event = snapshot.get("event") or {}
+        # 重放读的是**已提交的权威事实列**：调用方的 `player` 是进函数前读的，并发败者
+        # 手里那份早于赢家 `_write_hp`。不只用它渲染会显示陈旧气血（实测并发迎战 10 次
+        # 命中 1 次：消息显示 1,000 而库/账本是 500）——更要紧的是本方法末尾会
+        # `busy_state.clear` + `db.update_player`（Player 全列回写），这份陈旧值会**真的
+        # 落库**（对照探针：陈旧 10499 被写进 players.current_hp，账本真值 500）。
+        # 先对齐终态行的 hp_after，随后 clear 内的 settle 再从库里推进，结果恒等于账本。
+        # 真值判断而非 `is not None`：`hp_after` 列是 NOT NULL DEFAULT 0，用真值顺带跳过
+        # 0（终态行 hp_after=0 经代码路径分析不可达，这里只是零成本的顺带保险）。
+        if row.get("hp_after"):
+            player.current_hp = int(row["hp_after"])
         combat_msg = ""
         if state == STATE_RESOLVED_FLED:
             # 逃跑没打：收益就是锁定的基础收益
