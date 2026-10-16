@@ -178,3 +178,44 @@ webtest 真实消息管线 + GM「时间快进」，固定测试 ID `900000002`�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: 全列回写收口：忙碌行窄写 + 经济写点锁内重读（Trellis 10-15 + 两轴评审与修复轮）
+<!-- trellis-session: v=2 fp=df326ce7b075a88a -->
+
+**Date**: 2026-10-16
+**Task**: 全列回写收口：忙碌行窄写 + 经济写点锁内重读（Trellis 10-15 + 两轴评审与修复轮）
+**Branch**: `main`
+
+### Summary
+
+写入端止血（bd -546）：user_cd 三个全列写点收窄为窄写（新增 db.ext.update_user_cd_fields 白名单入口），11 处碰灵石的写点改「写锁内重读 → 再校验 → 再计算 → 再写回」，契约落盘 AGENTS §3 与 .trellis/spec/backend/database-guidelines.md，版本升至 v3.21.2。随后两轴独立评审（Standards / Spec，各带真内存库探针）发现 2 条 P1（重放补发的掉落被收尾整行写抹掉；并发服药抛 KeyError）与 3 条 P2，全部修复并补 4 条真钉子用例；第二轮独立复看确认修复成立、无 P0/P1。范围外发现另开 bd -hbz（使用丹药 会静默消耗破境丹）。
+
+### Main Changes
+
+- 数据层新增 db.ext.update_user_cd_fields(user_id, **cols)（列白名单 + positional-only）；BusyState.stamp_extra 只写 extra_data；GM 两处强制结算只写 scheduled_time；update_user_cd 全列语义保留
+- 11 处经济写点改写锁内重读：签到、历练效果发放（三效果共用重读结果）、福地买/升/收、灵田开/收/升、储物戒升级、突破自动还贷、瞬回丹（包装层锁内复核背包）
+- 契约落盘：AGENTS.md §3 原则 + backend/database-guidelines.md「陈旧快照回写」一节（判据/两种改法/常见错误），api-overview 两行同步
+- 评审修复轮：_grant_effects 回拷补 storage_ring_items（重放补发的掉落不再被收尾整行写抹掉）、签到提前 return 的 yield 移出事务、7 处过时文档修正
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5e9c169` | fix(db): 收口全列回写丢失更新（忙碌行窄写 + 经济写点锁内重读） |
+
+### Testing
+
+- [OK] pytest 全量 1157 passed（原 1148，+9 条用例）
+- [OK] 突变验证 5 处：删 storage_ring_items 回拷 / 删锁内背包复核 / 洞天·灵田·签到退回入口快照 → 对应用例各自变红
+- [OK] ruff check 源码目录 All checks passed
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- bd -546 剩余：update_player 列级/diff API；_replay_terminal 收尾写仍会回退并发写入的非效果列
+- bd -hbz：use_pill 缺 breakthrough 守卫，破境丹被「使用丹药」静默消耗
+- 真实 AstrBot 管线回归由用户发起（项目约定）
