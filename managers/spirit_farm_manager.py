@@ -86,12 +86,20 @@ class SpiritFarmManager:
         if player.gold < cost:
             return False, f"❌ 开垦灵田需要 {cost:,} 灵石。"
 
-        player.gold -= cost
-
         # 扣费与建田必须同生共死：分开提交时扣费已落库、建田失败会重复扣费。
         # CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
         async with self.db.transaction():
-            await self.db.update_player(player)
+            # 写锁内重读 + 复核（bd -546）：余额与「是否已有灵田」都以最新行为准，
+            # 避免入口快照在并发窗口里重复扣费 / 重复开垦。
+            fresh = await self.db.get_player_by_id(player.user_id)
+            if fresh is None:
+                return False, "❌ 玩家不存在或已被删除。"
+            if await self.get_user_farm(player.user_id):
+                return False, "❌ 你已经拥有灵田了！"
+            if fresh.gold < cost:
+                return False, f"❌ 开垦灵田需要 {cost:,} 灵石。"
+            fresh.gold -= cost
+            await self.db.update_player(fresh)
 
             await self.db.conn.execute(
                 """
@@ -101,6 +109,7 @@ class SpiritFarmManager:
                 (player.user_id,),
             )
         # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
+        player.gold = fresh.gold  # 内存对齐最新账本
 
         return True, (
             "🌱 灵田开垦成功！\n"
@@ -156,60 +165,69 @@ class SpiritFarmManager:
         if not farm:
             return False, "❌ 你还没有灵田！"
 
-        crops = farm["crops"]
-        if not crops:
+        if not farm["crops"]:
             return False, "❌ 灵田里没有种植任何灵草。"
-
-        now = int(time.time())
-        mature_crops = []
-        withered_crops = []
-        remaining_crops = []
-
-        for crop in crops:
-            if now >= crop["mature_time"]:
-                herb_config = SPIRIT_HERBS.get(crop["name"], SPIRIT_HERBS["灵草"])
-                wither_time = herb_config.get("wither_time", 172800)
-                wither_deadline = crop["mature_time"] + wither_time
-                if now >= wither_deadline:
-                    withered_crops.append(crop)
-                else:
-                    mature_crops.append(crop)
-            else:
-                remaining_crops.append(crop)
-
-        if not mature_crops and not withered_crops:
-            return False, "❌ 没有成熟的灵草可以收获。"
-
-        # 计算奖励（只有成熟未枯萎的才有收益）
-        total_exp = 0
-        total_gold = 0
-        harvest_details = []
-        herb_counts = {}
-
-        for crop in mature_crops:
-            herb_name = crop["name"]
-            herb_config = SPIRIT_HERBS.get(herb_name, SPIRIT_HERBS["灵草"])
-            total_exp += herb_config["exp_yield"]
-            total_gold += herb_config["gold_yield"]
-            harvest_details.append(herb_name)
-            herb_counts[herb_name] = herb_counts.get(herb_name, 0) + 1
 
         # 发奖 / 入储物戒 / 清 crops 三段写必须同生共死：任一步失败整体回滚，
         # 否则已发的收益或已入库的灵草会随玩家重试重复生效。
         # CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
         async with self.db.transaction():
+            # 写锁内重读 + 复核（bd -546）：灵田行与玩家行都在写锁内重取——并发
+            # 双击时后到者读到的是已被清空的 crops，不会把同一批成熟灵草发两遍。
+            farm = await self.get_user_farm(player.user_id)
+            fresh = await self.db.get_player_by_id(player.user_id)
+            if not farm or fresh is None:
+                return False, "❌ 你还没有灵田！"
+            crops = farm["crops"]
+            if not crops:
+                return False, "❌ 灵田里没有种植任何灵草。"
+
+            now = int(time.time())
+            mature_crops = []
+            withered_crops = []
+            remaining_crops = []
+
+            for crop in crops:
+                if now >= crop["mature_time"]:
+                    herb_config = SPIRIT_HERBS.get(crop["name"], SPIRIT_HERBS["灵草"])
+                    wither_time = herb_config.get("wither_time", 172800)
+                    wither_deadline = crop["mature_time"] + wither_time
+                    if now >= wither_deadline:
+                        withered_crops.append(crop)
+                    else:
+                        mature_crops.append(crop)
+                else:
+                    remaining_crops.append(crop)
+
+            if not mature_crops and not withered_crops:
+                return False, "❌ 没有成熟的灵草可以收获。"
+
+            # 计算奖励（只有成熟未枯萎的才有收益）
+            total_exp = 0
+            total_gold = 0
+            harvest_details = []
+            herb_counts = {}
+
+            for crop in mature_crops:
+                herb_name = crop["name"]
+                herb_config = SPIRIT_HERBS.get(herb_name, SPIRIT_HERBS["灵草"])
+                total_exp += herb_config["exp_yield"]
+                total_gold += herb_config["gold_yield"]
+                harvest_details.append(herb_name)
+                herb_counts[herb_name] = herb_counts.get(herb_name, 0) + 1
+
             # 应用奖励
             if total_exp > 0 or total_gold > 0:
-                player.experience += total_exp
-                player.gold += total_gold
-                await self.db.update_player(player)
+                fresh.experience += total_exp
+                fresh.gold += total_gold
+                await self.db.update_player(fresh)
 
             # 将灵草存入储物戒（已门控叶子：CM 内 join，不自行提交）
             stored_items = []
             if self.storage_ring_manager:
                 for herb_name, count in herb_counts.items():
                     success, _ = await self.storage_ring_manager.store_item(
-                        player, herb_name, count, silent=True
+                        fresh, herb_name, count, silent=True
                     )
                     if success:
                         stored_items.append(f"{herb_name}×{count}")
@@ -219,9 +237,15 @@ class SpiritFarmManager:
             # 更新灵田
             await self.db.conn.execute(
                 "UPDATE spirit_farms SET crops = ? WHERE user_id = ?",
-                (json.dumps(remaining_crops), player.user_id),
+                (json.dumps(remaining_crops), fresh.user_id),
             )
         # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
+        # 内存对齐最新账本（含入库的灵草）：本清单须覆盖效果改过的所有 Player 列，
+        # 否则调用方后续的整行回写会把它们刷掉（同 adventure 的 _grant_effects）。
+        player.gold = fresh.gold
+        player.experience = fresh.experience
+        player.storage_ring = fresh.storage_ring
+        player.storage_ring_items = fresh.storage_ring_items
 
         # 构建返回消息
         msg_lines = ["🌾 收获结果", "━━━━━━━━━━━━━━━"]
@@ -262,12 +286,24 @@ class SpiritFarmManager:
         if player.gold < cost:
             return False, f"❌ 升级需要 {cost:,} 灵石。"
 
-        player.gold -= cost
-
         # 扣费与升级必须同生共死：分开提交时扣费已落库、升级失败会重复扣费。
         # CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
         async with self.db.transaction():
-            await self.db.update_player(player)
+            # 写锁内重读 + 复核（bd -546）：等级与余额都取最新行，并发双击不会
+            # 互相覆盖等级，也不会按过期快照重复扣费。
+            farm = await self.get_user_farm(player.user_id)
+            fresh = await self.db.get_player_by_id(player.user_id)
+            if not farm or fresh is None:
+                return False, "❌ 你还没有灵田！"
+            current_level = farm["level"]
+            if current_level >= 5:
+                return False, "❌ 灵田已达最高等级！"
+            level_config = FARM_LEVELS.get(current_level, FARM_LEVELS[1])
+            cost = level_config["upgrade_cost"]
+            if fresh.gold < cost:
+                return False, f"❌ 升级需要 {cost:,} 灵石。"
+            fresh.gold -= cost
+            await self.db.update_player(fresh)
 
             new_level = current_level + 1
             await self.db.conn.execute(
@@ -275,6 +311,7 @@ class SpiritFarmManager:
                 (new_level, player.user_id),
             )
         # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
+        player.gold = fresh.gold  # 内存对齐最新账本
 
         new_slots = FARM_LEVELS[new_level]["slots"]
         return True, f"🎉 灵田升级到 Lv.{new_level}！格数增加到 {new_slots}"

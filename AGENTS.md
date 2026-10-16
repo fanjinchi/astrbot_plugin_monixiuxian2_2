@@ -53,7 +53,7 @@ AstrBot 插件（文字修仙游戏），Python 插件。作为 AstrBot 的子�
 
 - 处理器默认用 `@player_required` 装饰器（`handlers/utils.py`；白名单命令在 `BUSY_STATE_ALLOWED_COMMANDS`）；自定义守卫用 `BusyState.assert_idle(user_id, template=...)`，不要手写 user_cd/state 判断
 - 新增"进行中"活动系统：`UserStatus` 加枚举值 → 按需更新 `BUSY_STATE_ALLOWED_COMMANDS` → 开始/结束走 `BusyState.set_busy(player, status, scheduled_time, extra_data=...)` / `clear(player)`，双写（user_cd + 待落库 player 字段）包在调用方同一 `async with db.transaction():` 内
-- 例外：GM force-settle（`core/gm_manager.py` 的 `update_user_cd` 直写）仅 bump `scheduled_time`、非常态忙碌写入，保留直连
+- 例外：GM force-settle（`core/gm_manager.py`）仅上移 `scheduled_time`、非常态忙碌写入，走 `db.ext.update_user_cd_fields` **窄写**直连（`BusyState` 的断言/镜像语义不适用于该路径）；全列 `update_user_cd` 仅供按整行语义书写的调用方/测试使用
 - 新增**等待类冷却域**（任何参与到期/冷却判定的时间戳字段，如新的周期活动、冷却表、system_config 到期键）必须登记 GM「时间快进」字段覆盖清单（`core/time_skip_registry.py` 注册表：属主模块声明 `TIME_SKIP_ENTRIES` 并在 `_PROVIDER_MODULES` 登记，见 openspec change gm-time-skip-registry）——否则新冷却不被快进覆盖，冷却类测试会隐性失败。覆盖域字符串由注册表 label 去重自动生成，新增域无需手改 GM 帮助
 
 ### 3. 数据库操作规范
@@ -62,6 +62,7 @@ AstrBot 插件（文字修仙游戏），Python 插件。作为 AstrBot 的子�
 - 多语句事务（unit-of-work）统一使用 `async with db.transaction() as txn:`（`DataBase.transaction()`，seam 在 data/data_manager.py 返回 `_TransactionCM`）；BEGIN/COMMIT/ROLLBACK 由 CM 管理，业务模块不自管事务；单语句写操作可直接 `await db.execute(...)`（叶子 helper 按 `conn._txn_depth` 门控自动提交）
 - 任何手工提交点未来包进 CM 时，必须删除块内裸 `conn.commit()`（残留 = 提前提交 bug）；CM 不得进入 raw `BEGIN IMMEDIATE` 块内部
 - 并发语义：同任务嵌套 = no-op join（仅 owner 提交）；跨任务互斥——事务归属 `conn._txn_owner_task`，后到者等待串行，禁止静默共享事务（详见 design D1.2）
+- **持快照跨 await 后不得整行回写**：`db.update_player` / `db.ext.update_user_cd` 都是全列 UPDATE，凡「读一次 → await 若干次 → 整行写回」的写法都会把并发窗口里别人写入的列静默覆盖（丢失更新，见 bd `-546`）。写钱/血/忙碌一律二选一：**写锁内重读**（`async with db.transaction():` 内重新 `get_player_by_id`，再校验、再计算、再写；范式见 `managers/bank_manager.py` 的 deposit/withdraw）或**窄写**（`db.ext.update_user_cd_fields(user_id, **cols)` 只写指定列；或把该列登记进 `data/data_manager.py` 的 `_DOMAIN_OWNED_FIELDS` 交给领域服务独占）。用户级后果示例：陈旧忙碌行晚写一步会把玩家永久锁死、重启不自愈（`core/busy_state.py` 的 `stamp_extra` 注释），所以忙碌行的三个全列写点已收窄为窄写
 - 定时任务中先 `await db.ensure_connection()` 再操作
 - 数据库路径由 `StarTools.get_data_dir("astrbot_plugin_monixiuxian2_2")` 决定，不要写死；新增表在 `data/migration.py` 写迁移脚本（`migrate()` 自动按版本执行）
 

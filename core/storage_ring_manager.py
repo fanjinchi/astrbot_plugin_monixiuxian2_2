@@ -305,23 +305,34 @@ class StorageRingManager:
             return False, error_msg
 
         ring_config = self.get_storage_ring_config(new_ring_name)
-        old_ring = player.storage_ring
-        old_capacity = self.get_ring_capacity(old_ring)
         new_capacity = ring_config.get("capacity", 20)
-
-        # 检查价格并扣除灵石
         price = ring_config.get("price", 0)
-        if price > 0:
-            if player.gold < price:
+
+        # 写锁内重读 + 复核（bd -546）：品级要求与余额都以最新行为准——并发双击
+        # 不会跳过品级、也不会按过期快照重复扣费。
+        async with self.db.transaction():
+            fresh = await self.db.get_player_by_id(player.user_id)
+            if fresh is None:
+                return False, "❌ 玩家不存在或已被删除。"
+            can_upgrade, error_msg = self.check_upgrade_requirement(
+                fresh, new_ring_name
+            )
+            if not can_upgrade:
+                return False, error_msg
+            if price > 0 and fresh.gold < price:
                 return False, (
                     f"❌ 灵石不足！\n"
                     f"【{new_ring_name}】需要 {price:,} 灵石\n"
-                    f"你当前拥有：{player.gold:,} 灵石"
+                    f"你当前拥有：{fresh.gold:,} 灵石"
                 )
-            player.gold -= price
-
-        player.storage_ring = new_ring_name
-        await self.db.update_player(player)
+            old_ring = fresh.storage_ring
+            old_capacity = self.get_ring_capacity(old_ring)
+            if price > 0:
+                fresh.gold -= price
+            fresh.storage_ring = new_ring_name
+            await self.db.update_player(fresh)
+        player.gold = fresh.gold  # 内存对齐最新账本
+        player.storage_ring = fresh.storage_ring
 
         cost_msg = f"\n消耗灵石：{price:,}" if price > 0 else ""
         return True, (

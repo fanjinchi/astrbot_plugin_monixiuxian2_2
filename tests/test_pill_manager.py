@@ -85,12 +85,16 @@ def test_pill_multipliers_apply_to_total_attributes():
 
 
 @pytest.mark.asyncio
-async def test_use_instant_pill_maps_restore_to_hp(pill_manager, config_manager):
-    """Legacy spiritual_qi/blood_qi restore keys must map to hp in new framework."""
+async def test_apply_instant_pill_maps_restore_to_hp(pill_manager, config_manager):
+    """Legacy spiritual_qi/blood_qi restore keys must map to hp in new framework.
+
+    直接测本体：外层 _use_instant_pill 已加写锁内重读（bd -546），该包装层需要
+    真实 DB 行才能跑，映射逻辑本身仍在本体里。
+    """
     player = _Player(user_id="u1", base_hp=50, current_hp=50)
     player.set_pills_inventory({"test_restore": 1})
     pill_data = {"spiritual_qi_restore": 30}
-    ok, msg = await pill_manager._use_instant_pill(player, "test_restore", pill_data)
+    ok, msg = await pill_manager._apply_instant_pill(player, "test_restore", pill_data)
     assert ok
     assert player.current_hp == 80
 

@@ -1,6 +1,7 @@
 # core/pill_manager.py
 
 import time
+from dataclasses import fields
 
 from astrbot.api import logger
 
@@ -426,7 +427,33 @@ class PillManager:
     async def _use_instant_pill(
         self, player: Player, pill_name: str, pill_data: dict
     ) -> tuple[bool, str]:
-        """使用瞬间效果丹药
+        """写锁内重读玩家行后套用瞬间效果丹药（bd -546 收口）。
+
+        本体会改气血 / 护盾 / 永久增益 / 背包 / 灵石并整行回写，用入口快照直接
+        落库会把并发窗口里别人写入的列覆盖回去；故先在写锁内重取玩家行，再交给
+        :meth:`_apply_instant_pill` 就地修改，最后逐字段同步回调用方对象。
+        """
+        async with self.db.transaction():
+            fresh = await self.db.get_player_by_id(player.user_id)
+            if fresh is None:
+                return False, "❌ 玩家不存在或已被删除。"
+            # 锁内复核背包（范式：重读 → 再校验 → 再计算）：并发抢最后一颗时，落败方
+            # 在入口快照上通过的那次校验已经过期；不复核就会在本体里
+            # `inventory[pill_name] -= 1` 抛 KeyError 穿出服务层（玩家只看到框架报错）。
+            inventory = fresh.get_pills_inventory()
+            if inventory.get(pill_name, 0) <= 0:
+                return False, f"❌ 你的背包中没有【{pill_name}】！"
+            result = await self._apply_instant_pill(fresh, pill_name, pill_data)
+        # 内存对齐：调用方随后还要用同一对象渲染。领域独占列（health_recovered_at）
+        # 只拷内存、不参与 update_player，不会被反向落库。
+        for field in fields(Player):
+            setattr(player, field.name, getattr(fresh, field.name))
+        return result
+
+    async def _apply_instant_pill(
+        self, player: Player, pill_name: str, pill_data: dict
+    ) -> tuple[bool, str]:
+        """瞬间效果丹药本体（不含事务，由 :meth:`_use_instant_pill` 调用）。
 
         Legacy spiritual_qi / blood_qi restore keys are mapped to the unified
         ``hp`` attribute in the four-main-attribute framework.

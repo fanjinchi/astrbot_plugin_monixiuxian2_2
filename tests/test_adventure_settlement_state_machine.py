@@ -89,6 +89,12 @@ _eq_mod = load_package_module(
 )
 EquipmentManager = _eq_mod.EquipmentManager
 
+_ring_mod = load_package_module(
+    "core/storage_ring_manager.py",
+    "astrbot_plugin_monixiuxian2_2.core.storage_ring_manager",
+)
+StorageRingManager = _ring_mod.StorageRingManager
+
 _utils_mod = load_package_module(
     "handlers/utils.py", "astrbot_plugin_monixiuxian2_2.handlers.utils"
 )
@@ -120,8 +126,15 @@ class StubConfigManager:
         self.items_data = {}
         self.weapons_data = {}
         self.heart_methods_data = {}
+        # 真储物戒用例要读容量配置与「丹药不入戒」判定；空段回落到默认 20 格、
+        # 恒判非丹药（本 harness 的掉落是灵草）。
+        self.storage_rings_data: dict = {}
         # CombatEngine 构造时读这两段（真实引擎用例要用）；空段即全部走默认值。
         self.game_config: dict = {}
+
+    def is_pill(self, item_name: str) -> bool:
+        """No pill names exist in this stub, so every drop is storable."""
+        return False
 
 
 class ScriptedEngine:
@@ -329,7 +342,15 @@ def _configure(mgr):
     mgr.legacy_chance = 0.0
 
 
-def build_env(db, *, outcome="win", final_hp=500, player_agility=100, enemy_agility=100):
+def build_env(
+    db,
+    *,
+    outcome="win",
+    final_hp=500,
+    player_agility=100,
+    enemy_agility=100,
+    ring=None,
+):
     """Assemble a real AdventureManager over the shared in-memory database.
 
     Args:
@@ -338,6 +359,8 @@ def build_env(db, *, outcome="win", final_hp=500, player_agility=100, enemy_agil
         final_hp: 引擎给出的玩家终值气血。
         player_agility: 玩家参战身法（逃跑概率的分子）。
         enemy_agility: 敌人身法（逃跑概率的分母）。
+        ring: 储物戒管理器替身；默认是「假装存成功」的 mock，需要验证真的落库到
+            storage_ring_items 时传真 StorageRingManager。
 
     Returns:
         :class:`Env`。
@@ -350,8 +373,11 @@ def build_env(db, *, outcome="win", final_hp=500, player_agility=100, enemy_agil
     # 遭遇必触发：让「有没有仗打」由测试决定，而不是靠随机数赌
     pve._should_trigger_combat = lambda scene, difficulty: True
     pve._select_enemy_category = lambda scene, difficulty: "normal"
-    ring = MagicMock()
-    ring.store_item = AsyncMock(return_value=(True, ""))
+    # 默认用「假装存成功」的替身（大多数用例只关心结算逻辑）；需要真的落库到
+    # 储物戒时（掉落回拷不变式）由调用方注入真 StorageRingManager。
+    if ring is None:
+        ring = MagicMock()
+        ring.store_item = AsyncMock(return_value=(True, ""))
     health = HealthService(
         db, StubConfigManager(), equipment_manager=EquipmentManager(db=None)
     )
@@ -1533,3 +1559,80 @@ async def test_revived_busy_self_heals_on_replay(env):
     assert reward_data2 is None  # 重放不推进悬赏/师承
     assert await env.user_cd_type() == int(UserStatus.IDLE)  # 一次点击即自愈
     assert len(await env.claims()) == 3  # 也不重复发奖
+
+
+# ---------------------------------------------------------------------------
+# bd -546 — 效果发放前写锁内重读（2026-10-15 收口）
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_grant_effects_rereads_player_under_lock(env):
+    """效果发放前在写锁内重读玩家行：窗口内别人写入的列不被入口快照覆盖。
+
+    复刻真实交错：`finish_adventure` 开头读到的 player 快照，在效果发放前已经
+    过期（并发命令在这段时间改了同一行）。修复前 `_grant_base_reward` 直接整行
+    回写该快照，等于把别人的写入抹掉；修复后效果事务开头重取最新行，奖励叠加在
+    最新余额上，并把结果同步回调用方对象。
+    """
+    await start_run(env.mgr)
+    row = await env.row()
+    snapshot = await env.snapshot()
+    route = env.mgr.routes[row["route_key"]]
+    # 奖励由「完成时刻」锁定，开始阶段的快照里还没有 base_reward；这里直接给
+    # 定值，测的是效果发放前的重读，不是收益口径。
+    rewards = {"exp": 100, "bonus_exp": 0, "gold": 200}
+    event = snapshot.get("event") or {}
+
+    stale = await env.player()  # 入口快照
+    # 并发窗口：别人已经提交了新的余额
+    await env.db.conn.execute(
+        "UPDATE players SET gold = 500 WHERE user_id = ?", (USER,)
+    )
+    await env.db.conn.commit()
+
+    await env.mgr._grant_effects(
+        stale, row, route, event, rewards, snapshot, int(time.time())
+    )
+
+    fresh = await env.player()
+    assert fresh.gold == 500 + int(rewards["gold"])  # 不是入口快照的 0 + gold
+    assert stale.gold == fresh.gold  # 结果同步回调用方对象
+    assert len(await env.claims()) == 3  # 三项效果照常各 claim 一次
+
+
+@pytest.mark.asyncio
+async def test_replay_reissued_drops_survive_the_self_heal_write(db):
+    """重放补发的掉落必须留在库里：收尾那次整行写不得用入口快照把效果刷掉。
+
+    场景 = design §2.2 的崩溃点 3：终态单已提交但掉落效果未 claim，玩家又因忙碌被
+    陈旧快照复活而再点一次「完成历练」走重放。修复前 `_grant_effects` 只回拷
+    gold/experience/storage_ring（漏 `storage_ring_items`），随后收尾的
+    `db.update_player(player)`（整行）把刚入库的掉落覆盖回入口快照——消息说
+    「📦 获得物品」、库里却没有。
+    """
+    env = build_env(db, ring=StorageRingManager(db, StubConfigManager()))
+    # 掉落必中：事件 item_chance=100（harness 默认 0，不掷掉落）
+    env.mgr.event_groups = {"standard": [_event(item_chance=100)]}
+    await start_run(env.mgr)
+    stale_cd = await env.db.ext.get_user_cd(USER)  # 结算前的忙碌行快照
+
+    ok, msg, _ = await env.mgr.finish_adventure(USER)
+    assert ok, msg
+    assert (await env.player()).get_storage_ring_items() == {"灵草": 1}
+
+    # 崩溃点 3：删掉掉落效果 claim，强制重放补发
+    await env.db.conn.execute(
+        "DELETE FROM adventure_effects WHERE settlement_id = ? AND effect_type = ?",
+        ((await env.row())["settlement_id"], "route_drops"),
+    )
+    await env.db.conn.commit()
+
+    # 忙碌被陈旧快照复活 —— 唯一会走到收尾整行写的分支
+    await env.db.ext.update_user_cd(stale_cd)
+    assert await env.user_cd_type() == int(UserStatus.ADVENTURING)
+
+    ok2, msg2, _ = await env.mgr.finish_adventure(USER)
+    assert ok2, msg2
+    assert "灵草" in msg2  # 消息承诺补发了掉落
+    assert (await env.player()).get_storage_ring_items() == {"灵草": 2}  # 库里也真有

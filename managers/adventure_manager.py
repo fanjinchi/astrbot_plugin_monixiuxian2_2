@@ -699,12 +699,15 @@ class AdventureManager:
                 route_key=route["key"],
                 state=STATE_ADVENTURING,
             )
-            # 只有**真正插入成功**那一路才落回 extra。`update_user_cd` 按调用方
-            # 对象整行回写（含 type），并发落败方若也拿旧 stamp 写一次，会排在赢家
-            # `_finalize` 的 clear 之后，把已结束的忙碌**复活成历练中**——而落败方
-            # 随后只走 `_replay_terminal`，修复前该分支不收尾忙碌，玩家就永久卡死、
-            # 只能靠 GM「清除CD」弃单（第六轮把「终态 ⇒ 不持有该场忙碌」补成重放
-            # 的兜底收尾，见 design §2.4-8；闸门仍是第一道防线）。赢家这笔 stamp 与
+            # 只有**真正插入成功**那一路才落回 extra。闸门是第一道防线：落败方若也
+            # stamp 一次，会把本场单据的 run id 挂到别人后来开的忙碌行上（身份串线）。
+            # 历史上它还兼防更重的一类故障：早期 `stamp_extra` 按调用方快照**整行
+            # 回写**（含 `type`），落败方晚写一步会排在赢家 `_finalize` 的 clear 之后，
+            # 把已结束的忙碌复活成「历练中」——而落败方随后只走 `_replay_terminal`，
+            # 修复前该分支不收尾忙碌，玩家就永久卡死、只能靠 GM「清除CD」弃单（第六轮
+            # 已把「终态 ⇒ 不持有该场忙碌」补成重放的兜底收尾，见 design §2.4-8）。
+            # 2026-10-15 起 `stamp_extra` 收窄为只写 `extra_data`，那条复活路径不复
+            # 存在；闸门因 run id 串线仍然保留。赢家这笔 stamp 与
             # insert 同事务，任何 clear 都只能在该行存在之后发生（跨事务串行），所以
             # stamp 永远排在 clear 之前。
             if minted and created:
@@ -1230,17 +1233,6 @@ class AdventureManager:
         dropped_items: list = []
         settlement_id = row["settlement_id"]
         settlements = self.settlements
-        effects = (
-            (EFFECT_BASE_REWARD, lambda: self._grant_base_reward(player, rewards)),
-            (
-                EFFECT_ROUTE_DROPS,
-                lambda: self._grant_route_drops(player, route, event, rewards),
-            ),
-            (
-                EFFECT_LEGACY_TRIGGER,
-                lambda: self._grant_legacy_trigger(player, snapshot),
-            ),
-        )
         # 第二笔短事务：终态事务已提交，这里把「claim + 效果本体」原子写进去。
         # 为什么不能留成一条条评论式的裸写（叶子提交）：并发双击时，另一路
         # 结算可能在这两次调用之间抢到事务归属，令本路的 ``_txn_depth`` 门控
@@ -1251,6 +1243,21 @@ class AdventureManager:
         # 效果本体抛出的异常仍被逐项吞掉（design §2.3：失败可见、不回滚终态），
         # 所以这里的 commit 不会被失败效果回滚掉。
         async with self.db.transaction():
+            # 写锁内重读（bd -546）：入口对象是 finish_adventure 开头读的，早于战斗
+            # 与终态事务；直接整行回写会把并发窗口里别人写入的列覆盖回去。三个效果
+            # 必须共用这份最新行——`_grant_route_drops` 的储物戒入库写的也是它。
+            fresh = await self.db.get_player_by_id(player.user_id) or player
+            effects = (
+                (EFFECT_BASE_REWARD, lambda: self._grant_base_reward(fresh, rewards)),
+                (
+                    EFFECT_ROUTE_DROPS,
+                    lambda: self._grant_route_drops(fresh, route, event, rewards),
+                ),
+                (
+                    EFFECT_LEGACY_TRIGGER,
+                    lambda: self._grant_legacy_trigger(fresh, snapshot),
+                ),
+            )
             for effect_type, runner in effects:
                 claimed = await settlements.claim_effect(
                     consumer_name=CONSUMER_ADVENTURE_SETTLEMENT,
@@ -1276,6 +1283,15 @@ class AdventureManager:
                     note = note[0] or ""
                 if note:
                     notes.append(note)
+            # 效果改动同步回调用方对象（只对齐内存，不额外写库）：随后
+            # `_finalize`/`_replay_terminal` 还要用同一对象渲染与**整行写回**。
+            # 不变式：本清单必须覆盖所有效果可能改动的 Player 列——漏一列，后续那次
+            # 整行回写就会用入口快照把它刷掉（storage_ring_items 漏过一次：重放补发的
+            # 掉落消息说发了、库里被抹掉）。新增效果动到别的列时必须同步加进来。
+            player.gold = fresh.gold
+            player.experience = fresh.experience
+            player.storage_ring = fresh.storage_ring
+            player.storage_ring_items = fresh.storage_ring_items
         return notes, dropped_items
 
     async def _grant_base_reward(self, player: Player, rewards: dict) -> str:
@@ -1395,8 +1411,9 @@ class AdventureManager:
         # 终态即收尾（不变式：**单据终态 ⇒ 不持有该场历练的忙碌**）。正常流程到
         # 不了这里——`_finalize` 在提交终态的同笔事务里就 clear 了；能走进重放分支
         # 说明 `user_cd` 仍是 `ADVENTURING`，只可能是别处拿**陈旧整行快照**把忙碌
-        # 复活了（`update_user_cd` 是全列 UPDATE；GM「触发历练结算」
-        # core/gm_manager.py:1059-1064 是 AGENTS §2 记录的既有直写例外）。复活态下
+        # 复活了（`update_user_cd` 是全列 UPDATE；GM 强制结算在 2026-10-15 收窄前
+        # 走的正是这条直写，现已成为只写 `scheduled_time` 的
+        # `db.ext.update_user_cd_fields`）。复活态下
         # 三个出口原本全断：迎战/逃跑被归属闸门正确拒绝、重放不碰忙碌，而
         # `assert_idle` 与 `@player_required` 都不看 `scheduled_time` ⇒ 永久「历练
         # 中」、重启不自愈，只能管理员「清除CD」弃单。补这一次收尾让玩家点一次

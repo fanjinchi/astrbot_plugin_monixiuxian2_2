@@ -93,13 +93,27 @@ class BlessedLandManager:
         if player.gold < price:
             return False, f"❌ 灵石不足！购买{land_config['name']}需要 {price:,} 灵石。"
 
-        # 扣除灵石
-        player.gold -= price
-
         # 扣费与建洞天必须同生共死：分开提交时扣费已落库、建洞天失败会重复扣费。
         # CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
         async with self.db.transaction():
-            await self.db.update_player(player)
+            # 写锁内重读 + 复核（bd -546）：余额与「是否已有洞天」都以最新行为准，
+            # 避免入口快照在并发窗口里重复扣费 / 重复建洞天。
+            fresh = await self.db.get_player_by_id(player.user_id)
+            if fresh is None:
+                return False, "❌ 玩家不存在或已被删除。"
+            existing = await self.get_user_blessed_land(player.user_id)
+            if existing:
+                return (
+                    False,
+                    f"❌ 你已拥有【{existing['land_name']}】，请先升级而非重新购买。",
+                )
+            if fresh.gold < price:
+                return (
+                    False,
+                    f"❌ 灵石不足！购买{land_config['name']}需要 {price:,} 灵石。",
+                )
+            fresh.gold -= price
+            await self.db.update_player(fresh)
 
             # 创建洞天
             await self.db.conn.execute(
@@ -118,6 +132,7 @@ class BlessedLandManager:
                 ),
             )
         # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
+        player.gold = fresh.gold  # 内存对齐最新账本，供调用方后续渲染
 
         return True, (
             f"✨ 恭喜获得【{land_config['name']}】！\n"
@@ -150,17 +165,33 @@ class BlessedLandManager:
         if player.gold < upgrade_cost:
             return False, f"❌ 灵石不足！升级需要 {upgrade_cost:,} 灵石。"
 
-        # 升级加成
-        new_level = current_level + 1
-        new_exp_bonus = config["exp_bonus"] * (1 + new_level * 0.1)
-        new_gold_per_hour = int(config["gold_per_hour"] * (1 + new_level * 0.15))
-
-        player.gold -= upgrade_cost
-
         # 扣费与升级必须同生共死：分开提交时扣费已落库、升级失败会重复扣费。
         # CM 单事务——正常退出整体提交，任何失败整体回滚（全有或全无）
         async with self.db.transaction():
-            await self.db.update_player(player)
+            # 写锁内重读 + 复核（bd -546）：等级与余额都取最新行——并发双击不会
+            # 互相覆盖等级，也不会按过期快照重复扣费。
+            land = await self.get_user_blessed_land(player.user_id)
+            fresh = await self.db.get_player_by_id(player.user_id)
+            if not land or fresh is None:
+                return False, "❌ 你还没有洞天！使用 /购买洞天 <类型> 获取。"
+            land_type = land["land_type"]
+            current_level = land["level"]
+            config = BLESSED_LANDS.get(land_type, BLESSED_LANDS[1])
+            if current_level >= config["max_level"]:
+                return (
+                    False,
+                    f"❌ 你的{land['land_name']}已达最高等级 {config['max_level']}！",
+                )
+            # 升级费用：基础价格 × 当前等级 × 0.5
+            upgrade_cost = int(config["price"] * current_level * 0.5)
+            if fresh.gold < upgrade_cost:
+                return False, f"❌ 灵石不足！升级需要 {upgrade_cost:,} 灵石。"
+            # 升级加成
+            new_level = current_level + 1
+            new_exp_bonus = config["exp_bonus"] * (1 + new_level * 0.1)
+            new_gold_per_hour = int(config["gold_per_hour"] * (1 + new_level * 0.15))
+            fresh.gold -= upgrade_cost
+            await self.db.update_player(fresh)
 
             await self.db.conn.execute(
                 """
@@ -170,6 +201,7 @@ class BlessedLandManager:
                 (new_level, new_exp_bonus, new_gold_per_hour, player.user_id),
             )
         # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
+        player.gold = fresh.gold  # 内存对齐最新账本
 
         return True, (
             f"🎉 {land['land_name']}升级到 Lv.{new_level}！\n"
@@ -194,30 +226,44 @@ class BlessedLandManager:
             minutes = remaining // 60
             return False, f"❌ 收取冷却中，还需 {minutes} 分钟。"
 
-        # 计算产出（最多24小时）
-        hours = min(24, int(hours_passed))
-        gold_income = land["gold_per_hour"] * hours
-
-        # 计算修为收益，并限制上限防止高修为玩家收益无限增长
-        land_type = land["land_type"]
-        config = BLESSED_LANDS.get(land_type, BLESSED_LANDS[1])
-        max_exp_per_hour = config.get("max_exp_per_hour", 5000)
-        exp_income = int(player.experience * land["exp_bonus"] * hours * 0.01)
-        exp_income = min(exp_income, max_exp_per_hour * hours)
-
-        player.gold += gold_income
-        player.experience += exp_income
-
         # 发产出与推进领取时间戳必须同生共死：分开提交时收益已落库、时间戳未推进
         # 会让玩家重复领取同一段产出。CM 单事务（全有或全无）
         async with self.db.transaction():
-            await self.db.update_player(player)
+            # 写锁内重读 + 复核（bd -546）：洞天行与玩家行都在写锁内重取——并发
+            # 双击时只有先拿到写锁的那一路能领，后到者读取的 last_collect_time
+            # 已被推进、hours < 1 直接拒绝，收益不会按同一窗口发两遍。
+            land = await self.get_user_blessed_land(player.user_id)
+            fresh = await self.db.get_player_by_id(player.user_id)
+            if not land or fresh is None:
+                return False, "❌ 你还没有洞天！"
+            now = int(time.time())
+            hours_passed = (now - land["last_collect_time"]) / 3600
+            if hours_passed < 1:
+                remaining = int(3600 - (now - land["last_collect_time"]))
+                return False, f"❌ 收取冷却中，还需 {remaining // 60} 分钟。"
+
+            # 计算产出（最多24小时）
+            hours = min(24, int(hours_passed))
+            gold_income = land["gold_per_hour"] * hours
+
+            # 计算修为收益，并限制上限防止高修为玩家收益无限增长
+            land_type = land["land_type"]
+            config = BLESSED_LANDS.get(land_type, BLESSED_LANDS[1])
+            max_exp_per_hour = config.get("max_exp_per_hour", 5000)
+            exp_income = int(fresh.experience * land["exp_bonus"] * hours * 0.01)
+            exp_income = min(exp_income, max_exp_per_hour * hours)
+
+            fresh.gold += gold_income
+            fresh.experience += exp_income
+            await self.db.update_player(fresh)
 
             await self.db.conn.execute(
                 "UPDATE blessed_lands SET last_collect_time = ? WHERE user_id = ?",
-                (now, player.user_id),
+                (now, fresh.user_id),
             )
         # 块内原裸 conn.commit() 随 CM 转换删除（owner 层统一提交）
+        player.gold = fresh.gold  # 内存对齐最新账本
+        player.experience = fresh.experience
 
         return True, (
             f"✅ 洞天收取成功！\n"

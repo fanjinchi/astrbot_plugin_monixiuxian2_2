@@ -124,6 +124,7 @@ def mock_db():
     ext.get_user_cd = AsyncMock()
     ext.set_user_free = AsyncMock()
     ext.update_user_cd = AsyncMock()
+    ext.update_user_cd_fields = AsyncMock()
     db.ext = ext
     return db
 
@@ -566,7 +567,9 @@ class TestForceSettlement:
         sect.advance_master_progress.assert_awaited_once_with(
             "12345", "adventure_complete"
         )
-        mock_db.ext.update_user_cd.assert_awaited_once()
+        # 窄写收口（bd -546 P0）：force-settle 只上移 scheduled_time，不得整行回写
+        mock_db.ext.update_user_cd_fields.assert_awaited_once()
+        mock_db.ext.update_user_cd.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_force_adventure_replay_advances_no_progress(
@@ -624,6 +627,7 @@ class TestForceSettlement:
         assert "强制历练迎战" in msg
         adventure.finish_adventure.assert_not_awaited()
         # 拒绝必须发生在任何写之前（不动 scheduled_time、不清冷却）
+        mock_db.ext.update_user_cd_fields.assert_not_awaited()
         mock_db.ext.update_user_cd.assert_not_awaited()
         adventure.clear_fatigue.assert_not_awaited()
 

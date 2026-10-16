@@ -9,6 +9,14 @@ import aiosqlite
 
 from ..models_extended import Boss, BuffInfo, LegacyInstance, Rift, Sect, UserCd
 
+# user_cd 允许窄写的列（update_user_cd_fields 的白名单；user_id 是主键，不参与 SET）。
+# 只想改某一列时必须走窄写入口，不要用 update_user_cd 整行回写：陈旧快照晚一步
+# 落地会把别人已经 set_user_free 的忙碌复活成原状态，而忙碌判定只看 type，复活后
+# 重启不自愈（见 core/busy_state.py 的 stamp_extra 契约与 bd -546）。
+_USER_CD_WRITABLE_FIELDS = frozenset(
+    {"type", "create_time", "scheduled_time", "extra_data"}
+)
+
 
 class DatabaseExtended:
     """数据库扩展操作类"""
@@ -740,6 +748,36 @@ class DatabaseExtended:
         # D2 ownership gate: commit only outside an active CM transaction
         # (child A step-5 audit: GM force-settle user_cd runs inside the
         # settle+anchor outer transaction).
+        if getattr(self.conn, "_txn_depth", 0) == 0:
+            await self.conn.commit()
+
+    async def update_user_cd_fields(self, user_id: str, /, **fields) -> None:
+        """窄写 user_cd：只更新显式列出的列，其余列保持库中现值。
+
+        `update_user_cd` 按调用方快照整行回写；并发下陈旧快照晚一步落地，会把
+        别人已经 `set_user_free` 的忙碌**复活成原状态**——忙碌判定只看
+        `type`，复活后玩家被永久拒绝、重启不自愈（见 core/busy_state.py 的
+        `stamp_extra` 契约）。只想改某一列的调用方必须走本入口。
+
+        Args:
+            user_id: 目标玩家 id（主键），positional-only——避免与列名同名的关键字
+                参数混淆，所有列名统一走白名单校验。
+            **fields: 要写的列与值；列名须在 `_USER_CD_WRITABLE_FIELDS` 内。
+
+        Raises:
+            ValueError: 未给字段，或给了白名单外的列名。
+        """
+        if not fields:
+            raise ValueError("update_user_cd_fields 至少需要一个字段")
+        unknown = set(fields) - _USER_CD_WRITABLE_FIELDS
+        if unknown:
+            raise ValueError(f"不可写的 user_cd 列: {sorted(unknown)}")
+        set_clause = ", ".join(f"{col} = ?" for col in fields)
+        await self.conn.execute(
+            f"UPDATE user_cd SET {set_clause} WHERE user_id = ?",
+            (*fields.values(), user_id),
+        )
+        # D2 ownership gate: commit only outside an active CM transaction.
         if getattr(self.conn, "_txn_depth", 0) == 0:
             await self.conn.commit()
 

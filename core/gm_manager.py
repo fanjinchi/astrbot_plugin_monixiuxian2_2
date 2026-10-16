@@ -1053,15 +1053,18 @@ class GMManager:
             )
 
         # 将计划完成时间提前到当前时间，立即结算
-        # force-settle 例外（design §D3）：仅上移 scheduled_time，保留直写
-        # update_user_cd——BusyState 的断言/镜像语义不适用于 GM 强制结算。
-        # child A AC4：本入口仍是权威的 user_cd 写点——同一事务内先结算
-        # 旧状态并前移恢复锚点（update_user_cd 提交已按 _txn_depth 门控）。
+        # force-settle 例外（design §D3）：仅上移 scheduled_time，走窄写直连
+        # update_user_cd_fields——BusyState 的断言/镜像语义不适用于 GM 强制结算。
+        # 用窄写而不是 update_user_cd 整行回写：陈旧快照晚一步落地会把玩家已经
+        # 收尾的忙碌复活成原状态（busy 只看 type，复活后重启不自愈）。窄写的提交
+        # 仍按 _txn_depth 门控。child A AC4：本入口仍是权威的 user_cd 写点——
+        # 同一事务内先结算旧状态并前移恢复锚点。
         async with self.db.transaction():
             if self.health_service is not None:
                 await self.health_service.settle(target_id)
-            user_cd.scheduled_time = int(time.time())
-            await self.db.ext.update_user_cd(user_cd)
+            await self.db.ext.update_user_cd_fields(
+                target_id, scheduled_time=int(time.time())
+            )
 
         success, msg, reward_data = await self.adventure_manager.finish_adventure(
             target_id
@@ -1156,15 +1159,18 @@ class GMManager:
             return False, "❌ 秘境管理器未初始化！"
 
         # 将计划完成时间提前到当前时间，立即结算
-        # force-settle 例外（design §D3）：仅上移 scheduled_time，保留直写
-        # update_user_cd——BusyState 的断言/镜像语义不适用于 GM 强制结算。
-        # child A AC4：本入口仍是权威的 user_cd 写点——同一事务内先结算
-        # 旧状态并前移恢复锚点（update_user_cd 提交已按 _txn_depth 门控）。
+        # force-settle 例外（design §D3）：仅上移 scheduled_time，走窄写直连
+        # update_user_cd_fields——BusyState 的断言/镜像语义不适用于 GM 强制结算。
+        # 用窄写而不是 update_user_cd 整行回写：陈旧快照晚一步落地会把玩家已经
+        # 收尾的忙碌复活成原状态（busy 只看 type，复活后重启不自愈）。窄写的提交
+        # 仍按 _txn_depth 门控。child A AC4：本入口仍是权威的 user_cd 写点——
+        # 同一事务内先结算旧状态并前移恢复锚点。
         async with self.db.transaction():
             if self.health_service is not None:
                 await self.health_service.settle(target_id)
-            user_cd.scheduled_time = int(time.time())
-            await self.db.ext.update_user_cd(user_cd)
+            await self.db.ext.update_user_cd_fields(
+                target_id, scheduled_time=int(time.time())
+            )
 
         success, msg, reward_data = await self.rift_manager.finish_exploration(
             target_id

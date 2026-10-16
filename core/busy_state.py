@@ -119,9 +119,10 @@ class BusyState:
     abort contract of add-transaction-unit-of-work).
 
     Explicit exception to the single-write path: GM force-settle in
-    ``core/gm_manager.py`` (:997/:1071) keeps direct ``update_user_cd`` calls
-    (scheduled_time bump only — not a regular busy-state write).  Everything
-    else must go through this class.
+    ``core/gm_manager.py`` keeps a direct ``user_cd`` write through
+    ``db.ext.update_user_cd_fields`` (scheduled_time bump only — not a regular
+    busy-state write; narrowed from the full-row ``update_user_cd`` on
+    2026-10-15).  Everything else must go through this class.
 
     Args:
         db: The plugin DataBase instance (assembly-injected; never
@@ -219,22 +220,26 @@ class BusyState:
     async def stamp_extra(self, user_cd, extra_data: dict) -> None:
         """Rewrite ``extra_data`` on a busy row the player already holds.
 
-        身份字段补写，不是常态忙碌写入：``type``/``create_time``/``scheduled_time``
-        按**调用方持有的那份快照**整行回写（底层 ``update_user_cd`` 是全列
-        UPDATE），只把 ``extra_data`` 换成新载荷。
+        身份字段补写，不是常态忙碌写入：**只写 ``extra_data`` 一列**（底层走
+        ``db.ext.update_user_cd_fields`` 的窄写入口），``type``/``create_time``/
+        ``scheduled_time`` 一律保持库中现值。
 
-        **调用方契约**：只在「本次写入仍确定持有该忙碌行」时调用。并发下拿旧快照
-        晚写一步，就会把别人已经 :meth:`clear` 掉的忙碌**复活成原状态**；而忙碌
-        判定不看 ``scheduled_time``（:meth:`assert_idle` 与拦截器只读 ``type``），
-        复活后所有忙碌指令照旧被拒，实测 20/20 永久锁死、重启不自愈，只能管理员
-        「清除CD」弃单。历练结算这一条路自第六轮起有一张兜底网——
+        为什么必须窄写（2026-10-15 收口）：本方法原先把这三列也按调用方持有的
+        快照整行回写，并发落败方晚写一步，就把赢家已经 :meth:`clear` 掉的忙碌
+        **复活成原状态**；忙碌判定不看 ``scheduled_time``（:meth:`assert_idle` 与
+        拦截器只读 ``type``），复活后所有忙碌指令照旧被拒，实测 20/20 永久锁死、
+        重启不自愈，只能管理员「清除CD」弃单。窄写后这次写入不再改变忙碌语义——
+        即便晚于别人的 clear 落地，``type`` 仍是库里的 IDLE。
+
+        **调用方契约（保留，防御性）**：只在「本次写入仍确定持有该忙碌行」时
+        调用，即 :meth:`AdventureManager._ensure_run_row` 那种 insert ``created``
+        闸门之下、只有真正落单那一路才 stamp；否则会把这次单据的 run id 挂到
+        一次无关的新忙碌上。历练结算这一条路自第六轮起另有一张兜底网——
         ``_replay_terminal`` 按「单据终态 ⇒ 不持有该场忙碌」收尾，玩家再点一次
         「完成历练」即自愈；**别的需求没有这张网**，所以任何调用方都不得把兜底
-        当成依赖。故 :meth:`AdventureManager._ensure_run_row` 用 insert 的
-        ``created`` 闸门保证只有真正落单那一路才 stamp。走 owner（本类）而不是让
-        业务模块裸调 ``db.ext.update_user_cd``，是为了守住 AGENTS.md §2「忙碌读写
-        由 BusyState 承接」——GM 强制结算的 ``scheduled_time`` bump 是文档里唯一
-        的例外。
+        当成依赖。走 owner（本类）而不是让业务模块裸调 ``db.ext``，是为了守住
+        AGENTS.md §2「忙碌读写由 BusyState 承接」——GM 强制结算的
+        ``scheduled_time`` bump 是文档里唯一的例外。
 
         Args:
             user_cd: 调用方已读到的忙碌行（对象本身会被就地更新）。
@@ -242,7 +247,9 @@ class BusyState:
         """
         async with self._db.transaction():
             user_cd.set_extra_data(extra_data)
-            await self._db.ext.update_user_cd(user_cd)
+            await self._db.ext.update_user_cd_fields(
+                user_cd.user_id, extra_data=user_cd.extra_data
+            )
 
     async def clear(self, player: Player) -> None:
         """Unconditionally reset a player to idle (user_cd + mirror).

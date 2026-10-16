@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "事务与写入规范；本任务直接改写入路径"}
+{"file": "AGENTS.md", "reason": "项目规范 §2 忙碌状态双写 / §3 数据库与事务 / §7 版本同步清单"}

@@ -612,18 +612,38 @@ class PlayerHandler:
         # 生成随机奖励
         check_in_gold = random.randint(check_in_gold_min, check_in_gold_max)
 
-        # 宗门职阶俸禄：按 benefits.daily_stones 加发
-        sect_salary = 0
-        position_name = ""
-        if self.sect_mgr and player.sect_id:
-            benefits = self.sect_mgr.get_position_benefits(player.sect_position)
-            sect_salary = benefits["daily_stones"]
-            position_name = self.sect_mgr.get_position_name(player.sect_position)
+        # 写锁内重读 + 复核（bd -546）：并发双击时只有先拿到写锁的那一路发奖，
+        # 后到者读到已提交的 last_check_in_date 便按「今日已签到」退出（幂等）；
+        # 同时避免用入口快照整行回写覆盖别的流程刚写入的列。
+        early: str | None = None
+        async with self.db.transaction():
+            fresh = await self.db.get_player_by_id(player.user_id)
+            if fresh is None:
+                early = "❌ 玩家数据不存在，签到失败。"
+            elif fresh.last_check_in_date == today:
+                early = "📅 道友今日已经签到过了\n请明日再来。"
+            else:
+                # 宗门职阶俸禄：按 benefits.daily_stones 加发（以重读后的最新职阶为准）
+                sect_salary = 0
+                position_name = ""
+                if self.sect_mgr and fresh.sect_id:
+                    benefits = self.sect_mgr.get_position_benefits(fresh.sect_position)
+                    sect_salary = benefits["daily_stones"]
+                    position_name = self.sect_mgr.get_position_name(fresh.sect_position)
 
-        # 更新玩家数据
-        player.gold += check_in_gold + sect_salary
-        player.last_check_in_date = today
-        await self.db.update_player(player)
+                fresh.gold += check_in_gold + sect_salary
+                fresh.last_check_in_date = today
+                await self.db.update_player(fresh)
+
+        # 提前返回的文案必须**出了事务再发**：yield 会让生成器挂起，而事务
+        # （BEGIN IMMEDIATE 全局写锁）会一直握到消息发送完成，平白挡住其他玩家的
+        # 写事务。这两条路都不写库，没有任何理由占着锁。
+        if early is not None:
+            yield event.plain_result(early)
+            return
+
+        # 回执用重读后的对象，显示的是最新灵石
+        player = fresh
 
         salary_line = (
             f"🏛️ 宗门俸禄（{position_name}）：+{sect_salary} 灵石\n"

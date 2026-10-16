@@ -247,3 +247,55 @@ async def test_clear_idempotent_without_row(db, player):
     assert cd is not None
     assert cd.type == UserStatus.IDLE
     assert player.state == "空闲"
+
+
+# ===== 窄写收口（bd -546 P0，2026-10-15）=====
+
+
+@pytest.mark.asyncio
+async def test_update_user_cd_fields_writes_only_named_columns(db, player):
+    """窄写入口只动显式列出的列，其余列保持库中现值。"""
+    bs = BusyState(db)
+    await bs.set_busy(
+        player, UserStatus.EXPLORING, scheduled_time=777, extra_data={"rift_id": 3}
+    )
+    await db.ext.update_user_cd_fields(player.user_id, scheduled_time=888)
+    row = await db.ext.get_user_cd(player.user_id)
+    assert row.scheduled_time == 888
+    assert row.type == UserStatus.EXPLORING
+    assert row.get_extra_data() == {"rift_id": 3}
+
+
+@pytest.mark.asyncio
+async def test_update_user_cd_fields_rejects_empty_and_unknown(db, player):
+    """空字段与白名单外的列名必须显式报错，不得拼进 SQL。"""
+    bs = BusyState(db)
+    await bs.set_busy(player, UserStatus.CULTIVATING)
+    with pytest.raises(ValueError):
+        await db.ext.update_user_cd_fields(player.user_id)
+    with pytest.raises(ValueError):
+        await db.ext.update_user_cd_fields(player.user_id, user_id="x")
+    with pytest.raises(ValueError):
+        await db.ext.update_user_cd_fields(player.user_id, nope=1)
+
+
+@pytest.mark.asyncio
+async def test_stamp_extra_cannot_resurrect_cleared_busy(db, player):
+    """陈旧快照 stamp 只改 extra_data，不得把已收尾的忙碌复活（真交错回归）。
+
+    复刻 _ensure_run_row 闸门失效那一路：调用方手里是进入结算前的 user_cd
+    快照，而赢家已经把该行 clear 成 IDLE。修复前的整行回写会把 type 恢复成
+    ADVENTURING——忙碌判定只看 type，玩家从此永久卡死、重启不自愈。
+    """
+    bs = BusyState(db)
+    await bs.set_busy(player, UserStatus.ADVENTURING, scheduled_time=999)
+    stale = await db.ext.get_user_cd(player.user_id)  # 结算前持有的快照
+    await db.ext.set_user_free(player.user_id)  # 赢家已收尾
+    assert (await db.ext.get_user_cd(player.user_id)).type == UserStatus.IDLE
+
+    await bs.stamp_extra(stale, {"route_key": "scout", "adventure_run_id": "r1"})
+
+    row = await db.ext.get_user_cd(player.user_id)
+    assert row.type == UserStatus.IDLE  # 未被复活
+    assert row.scheduled_time == 0  # 陈旧时间戳没有回写
+    assert row.get_extra_data()["adventure_run_id"] == "r1"

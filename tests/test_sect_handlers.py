@@ -6,6 +6,7 @@ H3+M8: the sect daily reset at check-in advances the date atomically and
 its failure never breaks the check-in flow.
 """
 
+import asyncio
 import sys
 import time
 from datetime import datetime
@@ -294,6 +295,33 @@ async def test_check_in_daily_reset_failure_does_not_break_check_in(monkeypatch)
     # 重置失败时日期不推进，下次签到可重试
     assert await db.ext.get_system_config("sect_daily_reset_date") != FROZEN_TODAY
 
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_check_in_grants_once(monkeypatch):
+    """并发签到只发一次奖：写锁内重读 + 复核 last_check_in_date（bd -546）。
+
+    修复前两路都按入口快照判定「今天还没签到」，各自整行回写；修复后先拿到写锁
+    的那一路发奖，后到者在锁内读到已提交的日期，按「今日已签到」退出——既不发
+    双份，也不会用过期快照覆盖窗口内别人写入的列。
+    """
+    monkeypatch.setattr(_player_handler_mod, "datetime", _FrozenDateTime)
+    db = await _make_db()
+    handler = _make_player_handler(db)
+    await _make_player(db, "u1", check_in_date="2000-01-01")
+
+    events = [_make_event("u1", "签到") for _ in range(2)]
+    await asyncio.gather(*(_collect(handler.handle_check_in(e)) for e in events))
+
+    msgs = [_last_msg(e) for e in events]
+    assert sum("签到成功" in m for m in msgs) == 1, msgs
+    assert sum("已经签到过" in m for m in msgs) == 1, msgs
+
+    player = await db.get_player_by_id("u1")
+    assert player.last_check_in_date == FROZEN_TODAY
+    # 单次签到上限 500 灵石（该玩家无宗门俸禄）：只可能发一次
+    assert 0 < player.gold <= 500
     await db.close()
 
 

@@ -637,24 +637,41 @@ class BreakthroughManager:
             if not loan or loan["loan_type"] != "breakthrough":
                 return ""
 
-            # 计算应还金额
-            import time
+            # 写锁内重读 + 复核（bd -546）：贷款仍 active 且余额足够才扣款——并发下
+            # （玩家 /还款、GM 操作、两次突破）不会重复还同一笔贷款。扣款、关贷、
+            # 流水三笔写同事务，要么全成要么全不成。
+            async with self.db.transaction():
+                loan = await self.db.ext.get_active_loan(player.user_id)
+                if not loan or loan["loan_type"] != "breakthrough":
+                    return ""
+                fresh = await self.db.get_player_by_id(player.user_id)
+                if fresh is None:
+                    return ""
 
-            now = int(time.time())
-            days_borrowed = max(1, (now - loan["borrowed_at"]) // 86400)
-            interest = int(loan["principal"] * loan["interest_rate"] * days_borrowed)
-            total_due = loan["principal"] + interest
+                # 计算应还金额
+                import time
 
-            # 检查玩家是否有足够灵石
-            if player.gold >= total_due:
-                # 自动扣款
-                player.gold -= total_due
-                await self.db.update_player(player)
+                now = int(time.time())
+                days_borrowed = max(1, (now - loan["borrowed_at"]) // 86400)
+                interest = int(
+                    loan["principal"] * loan["interest_rate"] * days_borrowed
+                )
+                total_due = loan["principal"] + interest
 
-                # 关闭贷款
+                if fresh.gold < total_due:
+                    # 灵石不足，提醒玩家
+                    return (
+                        f"⚠️ 你有未还清的突破贷款！\n"
+                        f"应还金额：{total_due:,} 灵石\n"
+                        f"当前持有：{fresh.gold:,} 灵石\n"
+                        f"请尽快使用 /还款 命令还款"
+                    )
+
+                # 自动扣款 + 关闭贷款 + 记录流水
+                fresh.gold -= total_due
+                await self.db.update_player(fresh)
                 await self.db.ext.close_loan(loan["id"])
 
-                # 记录流水
                 bank_data = await self.db.ext.get_bank_account(player.user_id)
                 balance = bank_data["balance"] if bank_data else 0
                 await self.db.ext.add_bank_transaction(
@@ -665,22 +682,15 @@ class BreakthroughManager:
                     f"突破成功自动还款：本金{loan['principal']:,}+利息{interest:,}",
                     now,
                 )
+            player.gold = fresh.gold  # 内存对齐最新账本
 
-                return (
-                    f"💰 突破贷款自动还款成功！\n"
-                    f"━━━━━━━━━━━━━━━\n"
-                    f"已还本金：{loan['principal']:,} 灵石\n"
-                    f"已还利息：{interest:,} 灵石\n"
-                    f"当前持有：{player.gold:,} 灵石"
-                )
-            else:
-                # 灵石不足，提醒玩家
-                return (
-                    f"⚠️ 你有未还清的突破贷款！\n"
-                    f"应还金额：{total_due:,} 灵石\n"
-                    f"当前持有：{player.gold:,} 灵石\n"
-                    f"请尽快使用 /还款 命令还款"
-                )
+            return (
+                f"💰 突破贷款自动还款成功！\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"已还本金：{loan['principal']:,} 灵石\n"
+                f"已还利息：{interest:,} 灵石\n"
+                f"当前持有：{player.gold:,} 灵石"
+            )
         except Exception as e:
             logger.warning(f"处理突破贷款自动还款异常: {e}")
             return ""
