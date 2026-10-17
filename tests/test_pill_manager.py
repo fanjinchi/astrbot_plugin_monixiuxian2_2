@@ -123,3 +123,102 @@ async def test_handle_resurrection_uses_new_attrs(pill_manager):
     assert player.base_hp == 100
     assert player.current_hp == 100  # 当前层被夹回新上限
     assert player.armor_value == 15
+
+
+# --- bd astrbot_plugin_monixiuxian2_2-hbz：静默吞丹防线 -------------------------
+
+
+@pytest.mark.asyncio
+async def test_use_pill_refuses_breakthrough_pill(pill_manager):
+    """「服用丹药 筑基丹」必须被拒且不扣丹、不落库（bd hbz）。
+
+    破境丹只有 breakthrough_bonus 键，旧行为是落到 _apply_instant_pill 的空转分支：
+    扣掉一颗、回「服用成功」，修为/属性/灵石全不变——筑基丹 5000 灵石，混元丹 100 亿。
+    """
+    player = _Player(user_id="u1", level_index=9)
+    player.set_pills_inventory({"筑基丹": 1})
+
+    ok, msg = await pill_manager.use_pill(player, "筑基丹")
+
+    assert not ok
+    assert "破境丹" in msg and "突破 筑基丹" in msg
+    assert player.get_pills_inventory() == {"筑基丹": 1}
+    pill_manager.db.update_player.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_every_breakthrough_pill_is_refused_by_use_pill(
+    pill_manager, config_manager
+):
+    """pills.json 全表堵死：没有任何一颗能经「服用丹药」被静默吃掉（bd hbz）。
+
+    这张表 26 条全部 subtype=breakthrough 且无任何 instant 效果键，是本次事故的
+    完整受害面。表规模变化时该用例会红，提示重新确认新条目的用法。
+    """
+    pills = list(config_manager.pills_data.values())
+    assert len(pills) == 26, "pills.json 条目数变化，请重新确认本用例的前提"
+    level_index = max(p.get("required_level_index", 0) for p in pills)
+    assert level_index > 0
+
+    for pill in pills:
+        player = _Player(user_id="u1", level_index=level_index)
+        player.set_pills_inventory({pill["name"]: 1})
+        ok, msg = await pill_manager.use_pill(player, pill["name"])
+        assert not ok, pill["name"]
+        assert "破境丹" in msg, pill["name"]
+        assert player.get_pills_inventory() == {pill["name"]: 1}, pill["name"]
+        # 逐条钉「不落库」（README 更新日志按此声明）：拒绝发生在任何写库之前。
+        pill_manager.db.update_player.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_instant_pill_without_any_effect_key_is_refused(pill_manager):
+    """通用守卫：一个可套用的效果键都没有时拒绝，不扣丹、不落库（bd hbz 防复发）。
+
+    这条挡的是「新增丹药子类漏配效果键」的将来时——不该再靠人记得加分支。
+    """
+    player = _Player(user_id="u1")
+    player.set_pills_inventory({"无名丹": 1})
+
+    ok, msg = await pill_manager._apply_instant_pill(
+        player, "无名丹", {"name": "无名丹"}
+    )
+
+    assert not ok
+    assert "未消耗" in msg
+    assert player.get_pills_inventory() == {"无名丹": 1}
+    pill_manager.db.update_player.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_debuff_shield_pill_refused_when_shield_active(pill_manager):
+    """定魂丹已有护盾时拒绝且不扣丹（bd hbz 同类，30000 灵石）。
+
+    旧行为打印「定魂护盾已存在，无需重复使用」却照样消耗一颗并回「服用成功」。
+    """
+    player = _Player(user_id="u1", has_debuff_shield=True)
+    player.set_pills_inventory({"定魂丹": 1})
+
+    ok, msg = await pill_manager._apply_instant_pill(
+        player, "定魂丹", {"name": "定魂丹", "blocks_next_debuff": True}
+    )
+
+    assert not ok
+    assert player.has_debuff_shield
+    assert player.get_pills_inventory() == {"定魂丹": 1}
+    pill_manager.db.update_player.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_debuff_shield_pill_still_applies_without_shield(pill_manager):
+    """无护盾时照常获得护盾并消耗：守住这次改动没有把正常路径一起堵掉。"""
+    player = _Player(user_id="u1")
+    player.set_pills_inventory({"定魂丹": 1})
+
+    ok, _msg = await pill_manager._apply_instant_pill(
+        player, "定魂丹", {"name": "定魂丹", "blocks_next_debuff": True}
+    )
+
+    assert ok
+    assert player.has_debuff_shield
+    assert player.get_pills_inventory() == {}

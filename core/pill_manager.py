@@ -9,6 +9,17 @@ from ..config_manager import ConfigManager
 from ..data import DataBase
 from ..models import Player
 
+# 瞬间效果丹药可套用的效果键。_apply_instant_pill 只认这几项，一个都命中不到即视为
+# 「没有可直接服用的效果」并拒绝（且不扣丹）：破境丹这类只有突破增益键的丹药若漏进
+# 本分支，旧行为是白扣一颗还回「服用成功」（bd astrbot_plugin_monixiuxian2_2-hbz）。
+_INSTANT_EFFECT_KEYS = (
+    "hp_restore",
+    "spiritual_qi_restore",
+    "blood_qi_restore",
+    "resets_permanent_pills",
+    "blocks_next_debuff",
+)
+
 
 class PillManager:
     """丹药管理器 - 处理丹药效果、属性加成和限制机制"""
@@ -101,6 +112,15 @@ class PillManager:
         # 根据丹药类型处理
         effect_type = pill_data.get("effect_type", "instant")
         subtype = pill_data.get("subtype", "")
+
+        if subtype == "breakthrough":
+            # 破境丹只在「突破 <丹药名>」里校验目标境界并参与增益判定
+            # （handlers/breakthrough_handler.py）；本入口从丹药配置里拿不到任何可
+            # 套用的效果键，旧行为是白扣一颗还回「服用成功」（bd hbz）。
+            return False, (
+                f"❌ 【{pill_name}】是破境丹，不能平时服用！\n"
+                f"💡 请在突破时使用：突破 {pill_name}"
+            )
 
         if subtype == "exp":
             # 修为丹
@@ -457,10 +477,33 @@ class PillManager:
 
         Legacy spiritual_qi / blood_qi restore keys are mapped to the unified
         ``hp`` attribute in the four-main-attribute framework.
+
+        Two guards return the failure tuple before any mutation, so the pill stays in
+        the inventory and nothing is written to the database: (1) a pill exposing none
+        of the module-level instant effect keys, and (2) a blocks_next_debuff pill
+        taken while the shield is already up.
         """
+        # 通用守卫：一个可套用的效果键都没有时拒绝，不扣丹也不落库。破境丹这类只有
+        # 突破增益键的丹药若漏进本分支，旧行为是白扣一颗还回「服用成功」（bd hbz）；
+        # 以后新增丹药子类漏配效果键也在这里被挡住，而不是静默吞丹。
+        if not any(pill_data.get(key) for key in _INSTANT_EFFECT_KEYS):
+            return False, (
+                f"❌ 【{pill_name}】没有可直接服用的效果，丹药未消耗\n"
+                f"💡 请用「丹药信息 {pill_name}」查看正确用法"
+            )
+
+        # 定魂丹已有护盾时提前拒绝：必须在任何就地修改之前 return，且不扣丹。旧行为是
+        # 提示「无需重复使用」却照样消耗一颗（bd hbz 同类，定魂丹 30000 灵石）。
+        if pill_data.get("blocks_next_debuff") and player.has_debuff_shield:
+            return False, (
+                "❌ 你已有定魂护盾，无需重复使用\n🛡️ 护盾会在下一次负面效果时自动抵消"
+            )
+
         msg_parts = [f"✨ 服用【{pill_name}】成功！", "━━━━━━━━━━━━━━━"]
 
-        # Determine restore amount (legacy keys mapped to hp)
+        # Determine restore amount (legacy keys mapped to hp).
+        # 新增任何效果键都必须同步模块级 _INSTANT_EFFECT_KEYS：入口守卫按那份清单判定
+        # 「有无可套用的效果」，漏同步会让新丹在守卫处被直接拒绝。
         restore = pill_data.get("hp_restore", 0)
         if not restore:
             restore = max(
@@ -502,13 +545,10 @@ class PillManager:
             else:
                 msg_parts.append("ℹ️ 当前没有可重置的永久增益")
 
-        # 定魂丹 - 下一次负面效果免疫
+        # 定魂丹 - 下一次负面效果免疫（「已有护盾」的情况已在函数开头拒绝）
         if pill_data.get("blocks_next_debuff"):
-            if player.has_debuff_shield:
-                msg_parts.append("🛡️ 定魂护盾已存在，无需重复使用")
-            else:
-                player.has_debuff_shield = True
-                msg_parts.append("🛡️ 获得定魂护盾：下一次负面效果将被抵消")
+            player.has_debuff_shield = True
+            msg_parts.append("🛡️ 获得定魂护盾：下一次负面效果将被抵消")
 
         # 扣除丹药
         inventory = player.get_pills_inventory()

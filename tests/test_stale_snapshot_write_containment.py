@@ -82,7 +82,7 @@ async def _make_player(db, **overrides) -> Player:
     fields = {
         "user_id": USER,
         "user_name": "并发测试",
-        "level_index": 9,  # 筑基丹 required_level_index
+        "level_index": 9,  # 高于本文件测试用丹药的 required_level_index
         "gold": 100000,
         "experience": 1000,
         "base_hp": 500,
@@ -163,15 +163,18 @@ async def test_concurrent_instant_pill_consumes_once(db):
     包装层在写锁内重读后必须**再校验背包**（重读 → 再校验 → 再计算）：否则落败方
     在入口快照上通过的那次校验已经过期，本体 `inventory[pill_name] -= 1` 会
     抛 KeyError 穿出服务层——玩家只看到框架报错，没有任何回执。
+
+    替身用「回血丹」而非「筑基丹」：破境丹自 bd hbz 起被「服用丹药」定向拒绝
+    （见 tests/test_pill_manager.py），拿它当 instant 丹药替身会先被拦在分发层。
     """
     pm = PillManager(db, ConfigManager(PLUGIN_ROOT))
-    await _make_player(db, pills_inventory=json.dumps({"筑基丹": 1}))
+    await _make_player(db, pills_inventory=json.dumps({"回血丹": 1}))
 
     p1 = await db.get_player_by_id(USER)
     p2 = await db.get_player_by_id(USER)
     results = await asyncio.gather(
-        pm.use_pill(p1, "筑基丹"),
-        pm.use_pill(p2, "筑基丹"),
+        pm.use_pill(p1, "回血丹"),
+        pm.use_pill(p2, "回血丹"),
         return_exceptions=True,
     )
 
