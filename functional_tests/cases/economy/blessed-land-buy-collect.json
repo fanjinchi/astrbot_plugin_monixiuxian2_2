@@ -1,0 +1,71 @@
+{
+  "name": "blessed-land-buy-collect",
+  "owner": "astrbot_plugin_monixiuxian2_2",
+  "description": "洞天福地：无洞天查看 → 购买小洞天 → 立即收取命中冷却。",
+  "scenario": "前置：economy fixture 复位固定 ID（清掉 blessed_lands 行），固定玩家初始 10 万灵石。覆盖 purchase_blessed_land 的写锁内重读校验与 collect_income 的冷却守卫（购买后 last_collect_time=now，不足 1 小时）。",
+  "tags": [
+    "economy"
+  ],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile economy --yes",
+    "timeout": 60
+  },
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "建角色（fixture 已建则提示已踏入）"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p1 可用"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的洞天",
+      "note": "无洞天查看（fixture 已清空）"
+    },
+    {
+      "type": "expect",
+      "match": "你还没有洞天",
+      "timeout": 30,
+      "note": "确认基线无洞天"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#购买洞天 1",
+      "note": "购买小洞天（10,000 灵石）"
+    },
+    {
+      "type": "expect",
+      "match": "恭喜获得【小洞天】",
+      "timeout": 30,
+      "note": "购买成功 = 写锁内重读后余额校验通过"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#洞天收取",
+      "note": "购买后立即收取"
+    },
+    {
+      "type": "expect",
+      "match": "re:冷却中，还需 \\d+ 分钟",
+      "timeout": 30,
+      "note": "冷却守卫（写锁内重读 land 行）"
+    }
+  ]
+}

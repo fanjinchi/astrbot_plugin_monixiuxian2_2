@@ -1,0 +1,84 @@
+{
+  "name": "storage-ring-upgrade",
+  "owner": "astrbot_plugin_monixiuxian2_2",
+  "description": "储物戒升级：容量不足被拒 → GM 抬境界与灵石 → 升级须弥储物戒成功。",
+  "scenario": "前置：economy fixture 复位固定 ID（默认乾坤储物戒 120 格 / 1 级 / 10 万灵石）。覆盖 upgrade_ring 的写锁内重读 + 容量复核早退 + 扣费升级成功。",
+  "tags": [
+    "economy",
+    "gm"
+  ],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile economy --yes",
+    "timeout": 60
+  },
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "建角色（fixture 已建则提示已踏入）"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p1 可用"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#更换储物戒 基础储物戒",
+      "note": "20 格 < 当前 120 格且需求 0 级：容量复核早退（不先撞境界闸门）"
+    },
+    {
+      "type": "expect",
+      "match": "无法替换",
+      "timeout": 30,
+      "note": "写锁内重读后的容量校验"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置境界 900000002 金丹初期",
+      "note": "抬到 20 级（须弥要求）"
+    },
+    {
+      "type": "expect",
+      "match": "境界设置为",
+      "timeout": 30,
+      "note": "GM 设置境界"
+    },
+    {
+      "type": "send",
+      "player": "gm",
+      "text": "#修仙GM 设置灵石 900000002 200000",
+      "note": "灵石恰好够须弥价格"
+    },
+    {
+      "type": "expect",
+      "match": "灵石设置为",
+      "timeout": 30,
+      "note": "GM 设置灵石"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#更换储物戒 须弥储物戒",
+      "note": "升级成功路径"
+    },
+    {
+      "type": "expect",
+      "match": "储物戒升级成功",
+      "timeout": 30,
+      "note": "重读→校验→扣费→写回"
+    }
+  ]
+}

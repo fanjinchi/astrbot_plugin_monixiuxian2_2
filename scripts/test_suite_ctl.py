@@ -1236,6 +1236,9 @@ def cmd_fixture(args: argparse.Namespace) -> int:
         ids = list(SECT_TEST_IDS)
     elif args.profile == "breakthrough":
         ids = list(BREAKTHROUGH_TEST_IDS)
+    elif args.profile == "economy":
+        # 经济域沿用 3 个固定 ID 基线（GM + 两名玩家），只是额外清掉拥有型状态。
+        ids = list(PVP_TEST_IDS)
     else:
         raise CtlError(f"不支持的 fixture profile: {args.profile}")
     if not args.yes:
@@ -1298,6 +1301,15 @@ def cmd_fixture(args: argparse.Namespace) -> int:
                 "DELETE FROM combat_cooldowns WHERE user_id IN (?,?)",
                 ("900000001", "900000002"),
             )
+        elif args.profile == "economy":
+            # 经济域（洞天 / 灵田 / 储物戒）：固定 ID 的玩家行重置 + 清掉「拥有型」
+            # 状态——否则「购买洞天 / 开垦灵田」第二次跑必然撞「你已拥有…」。
+            for user_id in ids:
+                _upsert_player(conn, user_id, names[user_id])
+                _ensure_idle_cd(conn, user_id)
+            conn.execute("DELETE FROM blessed_lands WHERE user_id IN (?,?,?)", ids)
+            conn.execute("DELETE FROM spirit_farms WHERE user_id IN (?,?,?)", ids)
+            conn.execute("DELETE FROM combat_cooldowns WHERE user_id IN (?,?,?)", ids)
         else:  # sect
             sect_row_id = _resolve_sect_row(conn)
             for user_id in ids:
@@ -1382,7 +1394,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument(
         "--fixture-profile",
-        choices=["pvp", "sect", "breakthrough"],
+        choices=["pvp", "sect", "breakthrough", "economy"],
         default="pvp",
         help="--fixture 使用的 profile（默认 pvp）",
     )
@@ -1413,7 +1425,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     fixture = sub.add_parser("fixture", help="准备测试基线数据")
     fixture.add_argument(
-        "--profile", choices=["pvp", "sect", "breakthrough"], default="pvp"
+        "--profile",
+        choices=["pvp", "sect", "breakthrough", "economy"],
+        default="pvp",
     )
     fixture.add_argument(
         "--breakthrough-streak",

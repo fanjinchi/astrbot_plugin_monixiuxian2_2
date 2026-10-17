@@ -1,0 +1,83 @@
+{
+  "name": "spirit-farm-open-plant",
+  "owner": "astrbot_plugin_monixiuxian2_2",
+  "description": "灵田：开垦 → 种植灵草 → 立刻收获命中「没有成熟」。",
+  "scenario": "前置：economy fixture 复位固定 ID（清掉 spirit_farms 行）。覆盖 create_farm 的扣费+建田、plant_herb 写入，以及 harvest 的成熟判定早退（grow_time=1 小时，当天不可能成熟）。",
+  "tags": [
+    "economy"
+  ],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile economy --yes",
+    "timeout": 60
+  },
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {
+      "gm": "900000001",
+      "p1": "900000002"
+    }
+  },
+  "steps": [
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我要修仙 灵修",
+      "note": "建角色（fixture 已建则提示已踏入）"
+    },
+    {
+      "type": "expect",
+      "match": "re:恭喜道友|已踏入仙途",
+      "timeout": 30,
+      "note": "p1 可用"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#我的灵田",
+      "note": "无灵田查看"
+    },
+    {
+      "type": "expect",
+      "match": "你还没有灵田",
+      "timeout": 30,
+      "note": "确认基线无灵田"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#开垦灵田",
+      "note": "开垦灵田（10,000 灵石）"
+    },
+    {
+      "type": "expect",
+      "match": "灵田开垦成功",
+      "timeout": 30,
+      "note": "扣费+建田（写锁内重读）"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#种植 灵草",
+      "note": "种植灵草（1 小时成熟）"
+    },
+    {
+      "type": "expect",
+      "match": "成功种植【灵草】",
+      "timeout": 30,
+      "note": "写入 crops"
+    },
+    {
+      "type": "send",
+      "player": "p1",
+      "text": "#收获",
+      "note": "立刻收获：作物未成熟"
+    },
+    {
+      "type": "expect",
+      "match": "没有成熟的灵草",
+      "timeout": 30,
+      "note": "harvest 的成熟判定早退分支"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+[
+  {
+    "id": 11753,
+    "conversation_id": 869,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1792203241.1565871
+  },
+  {
+    "id": 11754,
+    "conversation_id": 869,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1792203241.1717246
+  },
+  {
+    "id": 11755,
+    "conversation_id": 869,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#更换储物戒 基础储物戒",
+    "rich": null,
+    "created_at": 1792203241.4668365
+  },
+  {
+    "id": 11756,
+    "conversation_id": 869,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 【基础储物戒】容量（20格）不高于当前储物戒（120格），无法替换",
+    "rich": [],
+    "created_at": 1792203241.4909418
+  },
+  {
+    "id": 11757,
+    "conversation_id": 869,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000002 金丹初期",
+    "rich": null,
+    "created_at": 1792203241.786692
+  },
+  {
+    "id": 11758,
+    "conversation_id": 869,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的境界设置为「金丹初期」",
+    "rich": [],
+    "created_at": 1792203241.8154485
+  },
+  {
+    "id": 11759,
+    "conversation_id": 869,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置灵石 900000002 200000",
+    "rich": null,
+    "created_at": 1792203242.103947
+  },
+  {
+    "id": 11760,
+    "conversation_id": 869,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的灵石设置为 200,000",
+    "rich": [],
+    "created_at": 1792203242.133156
+  },
+  {
+    "id": 11761,
+    "conversation_id": 869,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#更换储物戒 须弥储物戒",
+    "rich": null,
+    "created_at": 1792203242.4222395
+  },
+  {
+    "id": 11762,
+    "conversation_id": 869,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 储物戒升级成功！\n【乾坤储物戒】(120格) → 【须弥储物戒】(200格)\n品级：圣品\n消耗灵石：200,000",
+    "rich": [],
+    "created_at": 1792203242.4577425
+  }
+]
