@@ -285,6 +285,90 @@ class TestSetNumericAttributes:
         assert player.base_hp == 500
 
     @pytest.mark.asyncio
+    async def test_set_battle_hp_with_health_service(self, gm_manager, mock_db):
+        """接线 HealthService 时：上限设 base_hp，当前气血走 set_current_hp 权威写入."""
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+        health = MagicMock()
+        # 返回值故意不等于输入：钉住回执报的是 HealthService 的权威结果
+        # （夹紧后的实际值），而不是把入参原样复述一遍。
+        health.set_current_hp = AsyncMock(return_value=7500)
+        # 上限聚合高于目标值（装备/功法加成）：回执必须报真实上限而非目标值
+        health.compute_max_hp = MagicMock(return_value=8200)
+        gm_manager.health_service = health
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_set_battle_hp(event, "8000")
+
+        assert success is True
+        assert player.base_hp == 8000
+        health.set_current_hp.assert_awaited_once_with(player, 8000)
+        assert "8,000" in msg and "7,500" in msg
+        # P2-1：目标值不等于真实上限时，必须报出真实上限（否则 GM 会误判血量）
+        assert "8,200" in msg
+
+    @pytest.mark.asyncio
+    async def test_set_battle_hp_explicit_target(self, gm_manager, mock_db):
+        """显式目标与省略目标走同一解析：base_hp 与 current_hp 必须落到同一玩家。
+
+        命令内部把 _resolve_target 解析了两次（_set_numeric_attr 一次、自己
+        一次），若后人只改其中一处的 flags，会出现「底数写 A、当前气血写 B」。
+        """
+        player = make_player(user_id="88888")
+        mock_db.get_player_by_id.return_value = player
+        health = MagicMock()
+        health.set_current_hp = AsyncMock(return_value=8000)
+        health.compute_max_hp = MagicMock(return_value=8000)
+        gm_manager.health_service = health
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_set_battle_hp(event, "88888 8000")
+
+        assert success is True
+        assert player.base_hp == 8000
+        assert {call.args[0] for call in mock_db.get_player_by_id.await_args_list} == {
+            "88888"
+        }
+        health.set_current_hp.assert_awaited_once_with(player, 8000)
+
+    @pytest.mark.asyncio
+    async def test_set_battle_hp_without_health_service(self, gm_manager, mock_db):
+        """未接线的独立测试装配：current_hp 直接写目标值（上限已抬到同值）."""
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_set_battle_hp(event, "8000")
+
+        assert success is True
+        assert player.base_hp == 8000
+        assert player.current_hp == 8000
+        # 断言写入值而非「写了几次库」：bd -546 计划中的 update_player
+        # 列级/diff API 重构会让写法变化，但落库结果必须不变。
+        assert mock_db.update_player.await_args_list[-1].args[0].current_hp == 8000
+
+    @pytest.mark.asyncio
+    async def test_set_battle_hp_invalid_value(self, gm_manager, mock_db):
+        """数值非法时沿用 _set_numeric_attr 的报错，不写库."""
+        player = make_player()
+        mock_db.get_player_by_id.return_value = player
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_set_battle_hp(event, "abc")
+
+        assert success is False
+        assert "请输入有效的气血数值" in msg
+        mock_db.update_player.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_set_battle_hp_registered_and_documented(self, gm_manager):
+        """新子命令已进注册表并出现在 GM 帮助里（漏登记 = 命令永远打不到）."""
+        handler = gm_manager._commands["设置战斗气血"]
+        assert handler.__func__ is GMManager.cmd_set_battle_hp
+        _, text = await gm_manager.cmd_help(None, "")
+        assert "设置战斗气血" in text
+
+    @pytest.mark.asyncio
     async def test_set_gold_with_at_mention(self, gm_manager, mock_db):
         player = make_player(user_id="88888")
         mock_db.get_player_by_id.return_value = player

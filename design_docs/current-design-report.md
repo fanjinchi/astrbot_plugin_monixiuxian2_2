@@ -353,7 +353,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 - 统一入口 `修仙GM <子命令> [目标玩家] [参数]` + `修仙GM帮助`；权限独立于 BOSS_ADMINS，由 `_conf_schema.json` 的 `GM_ADMINS` 配置（main.py `_check_gm_admin`）
 - 目标解析优先级：@提及 → 数字 user_id → 省略时作用于命令发送者自身
-- 子命令：设置境界（境界名 → 1-based level_index，两种修炼路线通用）/设置修为/灵石/气血/真元/攻击/精神力、给予装备/给予物品（进储物戒）、卸下装备（入戒）、清除CD（需 `确认` 参数，同步 user_cd 与 player.state）、触发历练/秘境结算（推进 scheduled_time 后调正常结算；秘境强制结算不再有战斗）、生成Boss（委托 BossManager）、触发秘境谜题/触发秘境妖兽/触发秘境传承（v3.14.0，强制挂起对应秘境遭遇供测试，目标解析 `single_token_is_target=True`）
+- 子命令：设置境界（境界名 → 1-based level_index，两种修炼路线通用）/设置修为/灵石/气血/战斗气血（v3.21.4，同时设永久底数与当前气血，供长局构造；「设置气血」仍只改底数）/真元/攻击/精神力、给予装备/给予物品（进储物戒）、卸下装备（入戒）、清除CD（需 `确认` 参数，同步 user_cd 与 player.state）、触发历练/秘境结算（推进 scheduled_time 后调正常结算；秘境强制结算不再有战斗）、生成Boss（委托 BossManager）、触发秘境谜题/触发秘境妖兽/触发秘境传承（v3.14.0，强制挂起对应秘境遭遇供测试，目标解析 `single_token_is_target=True`）
 - **审计日志**：每次调用写一行 JSON 到插件数据目录 `gm_operations.log`（时间戳/GM id/目标 id/子命令/参数/成功与否），达 500MB 滚动改名保留
 
 ### 4.20 设计表→config 同步管道（scripts/sync_content_to_config.py）

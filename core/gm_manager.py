@@ -122,6 +122,7 @@ class GMManager:
             "设置修为": self.cmd_set_experience,
             "设置灵石": self.cmd_set_gold,
             "设置气血": self.cmd_set_hp,
+            "设置战斗气血": self.cmd_set_battle_hp,
             "设置真元": self.cmd_set_mp,
             "设置攻击": self.cmd_set_atk,
             "设置精神力": self.cmd_set_mental_power,
@@ -351,7 +352,8 @@ class GMManager:
             "  设置境界 [@玩家/ID] <境界名>\n"
             "  设置修为 [@玩家/ID] <数值>\n"
             "  设置灵石 [@玩家/ID] <数值>\n"
-            "  设置气血 [@玩家/ID] <数值>\n"
+            "  设置气血 [@玩家/ID] <数值> （永久底数）\n"
+            "  设置战斗气血 [@玩家/ID] <数值> （同时设底数与当前气血）\n"
             "  设置真元 [@玩家/ID] <数值> （映射为迅捷）\n"
             "  设置攻击 [@玩家/ID] <数值> （映射为伤害）\n"
             "  设置精神力 [@玩家/ID] <数值> （映射为身法）\n"
@@ -737,6 +739,47 @@ class GMManager:
             if player:
                 await self.health_service.clamp_current_hp(player)
         return ok, msg
+
+    async def cmd_set_battle_hp(
+        self, event: "AstrMessageEvent", args: str
+    ) -> tuple[bool, str]:
+        """GM command: set the target player's battle HP (ceiling and current).
+
+        「设置气血」只改永久底数 base_hp（三层语义，current_hp 由战斗/恢复层
+        管辖）；本命令在抬高底数的同时把当前气血一并设到同一数值，用于构造
+        长局（PVP 效果用例靠 8000 血局触发低频效果）。当前气血一律走
+        HealthService.set_current_hp 权威写入（自带 settle + clamp），未接线
+        HealthService 的独立测试装配退化为直写。
+        """
+        ok, msg = await self._set_numeric_attr(event, args, "气血", "base_hp", "气血")
+        if not ok:
+            return ok, msg
+
+        target_id, remaining = self._resolve_target(event, args)
+        value = self._parse_int(remaining.strip())
+        player = await self._get_player(target_id)
+        if value is None or player is None:
+            return ok, msg
+
+        if self.health_service is not None:
+            current = await self.health_service.set_current_hp(player, value)
+            max_hp = self.health_service.compute_max_hp(player)
+        else:
+            # 无 HealthService 时退化为直写：base_hp 已在上一行设成同一值，
+            # 动态上限不低于它，故目标值必在界内。
+            player.current_hp = value
+            await self.db.update_player(player)
+            current, max_hp = value, None
+
+        # 回执只报「底数 + 当前气血」这两个真的被设成 value 的量：max_hp 是
+        # 运行时聚合（base_hp + 装备/功法/丹药加成），带装配的玩家必然高于
+        # value，把 value 说成上限会让 GM 误判真实血量（评审 P2-1）。
+        msg = f"✅ 已将【{player.user_name or target_id}】的气血底数与当前气血设置为 {value:,}"
+        if max_hp is not None and max_hp != value:
+            msg += f"（当前上限 {max_hp:,}，含装备/功法加成）"
+        if current != value:
+            msg += f"（实际当前气血 {current:,}）"
+        return True, msg
 
     async def cmd_set_mp(
         self, event: "AstrMessageEvent", args: str
