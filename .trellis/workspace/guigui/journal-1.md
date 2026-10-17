@@ -219,3 +219,45 @@ webtest 真实消息管线 + GM「时间快进」，固定测试 ID `900000002`�
 - bd -546 剩余：update_player 列级/diff API；_replay_terminal 收尾写仍会回退并发写入的非效果列
 - bd -hbz：use_pill 缺 breakthrough 守卫，破境丹被「使用丹药」静默消耗
 - 真实 AstrBot 管线回归由用户发起（项目约定）
+
+
+## Session 8: GM「设置战斗气血」+ 23 条 PvP 用例 v35 适配（bd -xtv，两轮独立评审核订）
+<!-- trellis-session: v=2 fp=19f491edff059d5e -->
+
+**Date**: 2026-10-17
+**Task**: GM「设置战斗气血」+ 23 条 PvP 用例 v35 适配（bd -xtv，两轮独立评审核订）
+**Branch**: `main`
+
+### Summary
+
+新增 GM 子命令「设置战斗气血」，一次把 base_hp 与 current_hp 设成目标值（当前气血走 HealthService.set_current_hp，自带 settle + clamp），修复 v35 气血分层后 23 条 PvP 用例靠「设置气血」构造 8000 血长局的前提失效（战斗 1~3 回合就结束，8~25% 效果单场必中口径塌掉）。两路独立评审（代码轴 / 用例轴）均无 P0/P1，6 条 P2 全部收口，其中回执措辞与测试钉子做了变异验证。
+
+### Main Changes
+
+- GM：core/gm_manager.py 新增 cmd_set_battle_hp + 路由登记 + 帮助行；回执报「气血底数与当前气血」，真实上限因装备/功法加成高于目标值时追加报出（不拿目标值冒充 max_hp）
+- 用例：functional_tests/cases/pvp 23 条迁到新子命令（46 处 send/expect），pvp-heart-passive 断言按三层语义由 8800/8800 改为 8000/8800（上限增长不回血）
+- 测试：5 条 GM 单测（接线 / 未接线 / 非法值 / 注册与帮助 / 显式目标），二次解析一致性与回执诚实均做变异验证，改坏各自变红
+- 文档：版本 v3.21.4、README 更新日志与版本行、design_docs §4.19 GM 子命令清单、20 条用例 note 清掉 v35 前「两字段同源」与「约 40 回合」旧口径
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `45ff8e9` | feat(gm): 新增设置战斗气血子命令并恢复 PvP 长血局用例 |
+
+### Testing
+
+- [OK] 平台 pvp 全矩阵 24/24 passed（run 886-909），回合行计数 190~4400，长局前提恢复；legacy-basic 另单独复跑一次排除 kill 造成的重叠影响
+- [OK] pytest 1167 passed；ruff check 源码目录 All checks passed；改动的两个文件 format 干净
+- [OK] 变异验证：第二次目标解析改回发送者 → 显式目标用例红；回执改回复述入参 → 接线用例红（均已回滚）
+- [OK] 归档：functional_tests/results/2026-10-17_pvp-v35-adaptation（24 条 run + summary.md）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- bd -546 长期债仍在：update_player 列级/diff API，_replay_terminal 收尾整行写会回退并发写入的非效果列
+- 评审可选建议：给 gm 域补一条「设置战斗气血」冒烟用例（当前由 23 条 PvP 用例间接覆盖）
+- 平台批跑不要中途 kill：会留下已启动用例与下一批重叠、撞同一套固定测试 ID
