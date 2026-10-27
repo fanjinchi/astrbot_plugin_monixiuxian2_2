@@ -481,6 +481,10 @@ async def test_adventure_faction_resolution_from_player_sect(db):
 @pytest.mark.asyncio
 async def test_adventure_settlement_marks_sect_event(db, monkeypatch):
     """Settlement prefixes 「🏯 宗门际遇 · 事件名」 for sect events; normal events unchanged."""
+    # 不注入 pve_combat_mgr：_lock_encounter 在 None 时不产出 combat 快照，于是
+    # _offers_choice 走「未遇敌直通」，本用例不受全段遇敌挂 pending 的影响（它只
+    # 关心事件文案前缀）。若将来在此注入真战斗管理器，需显式关掉战斗触发或补一步
+    # resolve_adventure_choice，否则完成历练会停在 pending_choice。
     adv_mgr = AdventureManager(db, busy_state=make_busy_state(db))
 
     async def _finish_with_event(user_id: str, event: dict) -> str:

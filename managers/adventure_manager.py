@@ -124,9 +124,10 @@ TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
     ),
 )
 
-# 逃跑成功率公式（design §3）。**系数未封板**：下面这组是 2026-10-12 用户拍板的
-# 临时默认值，用于过渡与功能验证（bd `-9hq` 的三档模拟替换正式值，届时只改配置，
-# 代码与本函数不动）。禁止把这组数当成已定平衡。
+# 逃跑成功率公式（design §3）。系数**已封板**（2026-10-19 用户拍板，bd `-9hq`
+# 零改动收口）：语义 = 后路可靠性基准，不再以「压回有痛感区间」为目标——风险纹理
+# 只由 遇敌率 × 战斗难度 × 败场代价 承载，逃跑率不进风险公式（设计权威见
+# design_docs/content-design/pve-enemy-design.md §Q4）。
 DEFAULT_FLEE_PARAMS: dict[str, object] = {
     "enabled": True,
     "base_rate": 0.95,  # 身法与敌相当
@@ -135,8 +136,11 @@ DEFAULT_FLEE_PARAMS: dict[str, object] = {
     "floor": 0.60,  # 保底（再慢也不破）
     "cap": 1.00,  # 封顶
 }
-# 高/极高风险才提供战前选择（PRD R2）
-HIGH_RISK_LEVELS = frozenset({"high", "extreme"})
+# 逃跑成功的收益系数（§Q4 2026-10-19 重拍：「白跑大半趟」——修为/灵石只留快照
+# 基础收益的 ×0.3，且不掉落、不滚传承机缘，代价全在收益侧）。取整口径对标败场
+# 修为的 int 截断（managers/pve_combat_manager.py:272）；注意口径差：败场灵石是
+# **归零**，逃跑灵石 ×0.3 比败场宽——这是「逃跑严格落在胜负之间」的原意，不是偏差。
+FLED_REWARD_RATIO = 0.3
 
 # 每张终态结算单必然产生的三项效果（claim 表按此判断「补发是否已做完」）。
 SETTLEMENT_EFFECTS: tuple[str, ...] = (
@@ -258,7 +262,7 @@ class AdventureManager:
         # 传承机缘触发概率与传承类型（config 顶层 legacy_chance/legacy_type）
         self.legacy_chance: float = 0.0
         self.legacy_type: str = "adventure"
-        # 战前逃跑系数（config 的 flee 段；缺失整段回退临时默认，见 §3）
+        # 战前逃跑系数（config 的 flee 段；缺失整段回退封板默认，见 §3）
         self.flee_params: dict[str, object] = dict(DEFAULT_FLEE_PARAMS)
         self.reload_config()
 
@@ -309,7 +313,7 @@ class AdventureManager:
     def _parse_flee_params(config: dict) -> dict:
         """Read the ``flee`` coefficient section, falling back wholesale to defaults.
 
-        任一数值槽缺失/非数值 → **整段**回退临时默认（design §3：不做部分启用，
+        任一数值槽缺失/非数值 → **整段**回退封板默认（design §3：不做部分启用，
         半套系数会让概率公式的含义不可预期）；整段缺失额外写一条 warning，但
         **不**按 disabled 处理、不报错给玩家。
 
@@ -322,8 +326,8 @@ class AdventureManager:
         section = config.get("flee")
         if not isinstance(section, dict):
             logger.warning(
-                "adventure_config.json 缺少 flee 段，战前逃跑按临时默认系数启用"
-                "（正式封板见 bd astrbot_plugin_monixiuxian2_2-9hq）"
+                "adventure_config.json 缺少 flee 段，战前逃跑按封板系数启用"
+                "（2026-10-19 拍板，见 pve-enemy-design.md §Q4）"
             )
             return dict(DEFAULT_FLEE_PARAMS)
         params: dict[str, object] = {"enabled": bool(section.get("enabled", True))}
@@ -331,7 +335,7 @@ class AdventureManager:
             value = section.get(slot)
             if not isinstance(value, (int, float)) or isinstance(value, bool):
                 logger.warning(
-                    f"adventure_config.json flee.{slot} 缺失或非数值，整段回退临时默认系数"
+                    f"adventure_config.json flee.{slot} 缺失或非数值，整段回退封板系数"
                 )
                 return dict(DEFAULT_FLEE_PARAMS)
             params[slot] = float(value)
@@ -477,7 +481,7 @@ class AdventureManager:
     async def finish_adventure(self, user_id: str) -> tuple[bool, str, dict | None]:
         """Advance the persisted settlement state machine for 「完成历练」.
 
-        一次调用可能停在两个地方：``pending_choice``（高/极高风险战前抉择，此时
+        一次调用可能停在两个地方：``pending_choice``（全风险段遇敌的战前抉择，此时
         **不发任何奖励**、保留 ``ADVENTURING`` 忙碌）或终态（``resolved_*``，奖励
         与疲劳在同一边界提交）。重复调用只会重放同一张结算单。
 
@@ -576,7 +580,8 @@ class AdventureManager:
 
         只能从 ``pending_choice`` 出发。逃跑成功 → ``resolved_fled``（不进战斗、
         气血零损耗——但按 R6 全时段恢复落定后的实时值记账，见 :meth:`_finalize`；
-        基础收益照常、不产生击败事实与败场疲劳）；逃跑失败或
+        收益只留基础收益 ×``FLED_REWARD_RATIO``、不掉落、不滚传承机缘，不产生击败事实
+        与败场疲劳——§Q4 2026-10-19 重拍）；逃跑失败或
         迎战 → ``ready_combat`` 后立即用**同一只锁定敌人**结算，不得再次逃跑。
 
         Args:
@@ -626,8 +631,11 @@ class AdventureManager:
                 state=STATE_RESOLVED_FLED,
                 fled=True,
                 defeated=False,
-                combat_msg="💨 你趁乱抽身，遁走了。",
-                rewards=dict(snapshot.get("base_reward") or {"exp": 0, "gold": 0}),
+                combat_msg=(
+                    "💨 你趁乱抽身，遁走了——这一趟白跑大半："
+                    "收益只留三成，无掉落、无传承机缘。"
+                ),
+                rewards=self._fled_rewards(snapshot),
                 # 脱身不进战斗，零气血损失；hp_after 终值由 _finalize 按结算
                 # 时刻落定后写入（pending 期间恢复照走），这里只给兜底值。
                 hp_final=int(player.current_hp or row["hp_before"]),
@@ -1053,7 +1061,7 @@ class AdventureManager:
             await self.busy_state.clear(player)
 
         notes, dropped_items = await self._grant_effects(
-            player, row, route, event, rewards, snapshot, now
+            player, row, route, event, rewards, snapshot, now, state
         )
         reward_data = {
             "route_key": route["key"],
@@ -1209,6 +1217,7 @@ class AdventureManager:
         rewards: dict,
         snapshot: dict,
         now: int,
+        state: str,
     ) -> tuple[list[str], list]:
         """Execute the three settlement effects, each behind an inline claim.
 
@@ -1224,6 +1233,11 @@ class AdventureManager:
             rewards: 修为/灵石数额。
             snapshot: 锁定快照。
             now: 当前 unix 秒。
+            state: 本次终态。**必须由调用方显式传入**：``row`` 是终态**之前**的行
+                （``_finalize`` 传的是待提交的 CAS 前态行），读 ``row["state"]``
+                只会拿到 ``ready_combat``/``pending_choice``——fled 的掉落门控因此
+                失效（逃跑照样掉落），胜场的传承 roll 也被误杀；fled/loss 的传承门控
+                恰好仍会跳过（前态≠resolved_win），别被这点掩盖真问题。
 
         Returns:
             ``(需要拼进结算消息的片段, 本次掉落清单)``；掉落清单供 ``reward_data``
@@ -1247,15 +1261,20 @@ class AdventureManager:
             # 与终态事务；直接整行回写会把并发窗口里别人写入的列覆盖回去。三个效果
             # 必须共用这份最新行——`_grant_route_drops` 的储物戒入库写的也是它。
             fresh = await self.db.get_player_by_id(player.user_id) or player
+            # 终态由两个效果本体自己门控（fled/败场不掉落、非胜场不滚传承）：claim 照记
+            # 三件套、本体按终态跳过，沿用 hp_penalty 的既有先例（见 _grant_route_drops
+            # docstring）——改成状态相关效果集会动 claim 表语义与重放路径，不值。
             effects = (
                 (EFFECT_BASE_REWARD, lambda: self._grant_base_reward(fresh, rewards)),
                 (
                     EFFECT_ROUTE_DROPS,
-                    lambda: self._grant_route_drops(fresh, route, event, rewards),
+                    lambda: self._grant_route_drops(
+                        fresh, route, event, rewards, state
+                    ),
                 ),
                 (
                     EFFECT_LEGACY_TRIGGER,
-                    lambda: self._grant_legacy_trigger(fresh, snapshot),
+                    lambda: self._grant_legacy_trigger(fresh, snapshot, state),
                 ),
             )
             for effect_type, runner in effects:
@@ -1309,34 +1328,52 @@ class AdventureManager:
         return ""
 
     async def _grant_route_drops(
-        self, player: Player, route: dict, event: dict, rewards: dict
+        self, player: Player, route: dict, event: dict, rewards: dict, state: str
     ) -> tuple[str, list]:
         """Roll route drops (claim-guarded effect body).
 
         掉落内容不追求重放一致：claim 保证的是**恰好一次**，不是同内容重发，
-        所以沿用全局随机流，与现网口径相同。战败（``hp_penalty``）照旧什么都不掉，
-        但这次机会同样被 claim 消耗掉，重放不会补发。
+        所以沿用全局随机流，与现网口径相同。战败（``hp_penalty``）与逃跑
+        （``resolved_fled``）都什么都不掉——§Q4 2026-10-19：逃跑代价全在收益侧，
+        掉落也归零。但这次机会同样被 claim 消耗掉，重放不会补发。
 
         Args:
             player: 玩家对象。
             route: 路线配置（掉落表来源）。
             event: 快照事件（``item_chance`` 加权）。
             rewards: 结算收益；``hp_penalty`` 为真表示战败。
+            state: 终态；``resolved_fled`` 不掉落。
 
         Returns:
             ``(掉落文案, 掉落清单)``。
         """
-        if rewards.get("hp_penalty"):
+        if rewards.get("hp_penalty") or state == STATE_RESOLVED_FLED:
             return "", []
         items, item_msg = await self._handle_drops(player, route, event)
         return item_msg or "", items
 
-    async def _grant_legacy_trigger(self, player: Player, snapshot: dict) -> str:
+    async def _grant_legacy_trigger(
+        self, player: Player, snapshot: dict, state: str
+    ) -> str:
         """Roll the 上古传承 chance from the locked seed (effect body).
+
+        传承机缘 = 「走完全程的人」的专属彩头：只有 ``resolved_win``（含未遇敌完成）
+        才 roll，``resolved_loss`` / ``resolved_fled`` 一律跳过（2026-10-20 拍板）。
+        连 roll 都不做，省一次子流派生。
 
         传承机会每单只可能兑现一次，判定用 ``rng_seed`` 派生的固定子流，重放不会
         重新博概率。
+
+        Args:
+            player: 玩家对象。
+            snapshot: 锁定快照。
+            state: 终态；非 ``resolved_win`` 直接跳过。
+
+        Returns:
+            传承触发文案；未触发或跳过时为空串。
         """
+        if state != STATE_RESOLVED_WIN:
+            return ""
         roll = random.Random(_seed_stream(int(snapshot.get("rng_seed") or 0), "legacy"))
         return await self._maybe_trigger_legacy(player, roll_value=roll.random())
 
@@ -1387,14 +1424,14 @@ class AdventureManager:
             player.current_hp = int(row["hp_after"])
         combat_msg = ""
         if state == STATE_RESOLVED_FLED:
-            # 逃跑没打：收益就是锁定的基础收益
-            rewards = dict(snapshot.get("base_reward") or {"exp": 0, "gold": 0})
+            # 逃跑没打：收益 = 锁定的基础收益 × FLED_REWARD_RATIO（与结算路径同源）
+            rewards = self._fled_rewards(snapshot)
         else:
             computed = await self._compute_locked(player, snapshot)
             rewards = computed["rewards"]
             combat_msg = computed["combat_msg"]
         notes, _items = await self._grant_effects(
-            player, row, route, event, rewards, snapshot, now
+            player, row, route, event, rewards, snapshot, now, state
         )
         msg = self._render_result(
             route,
@@ -1447,7 +1484,7 @@ class AdventureManager:
             f"📜 {self._select_event_desc(event, player)}\n\n"
             f"此次遭遇已经锁定，机会只能博一次：\n"
             f"· 发送「迎战」立即开打（逃跑失败后也直接开打，不再给第二次退路）\n"
-            f"· 发送「逃跑」尝试脱离，成算约 {chance * 100:.0f}%\n"
+            f"· 发送「逃跑」尝试脱离，成算约 {chance * 100:.0f}%（脱身后这趟白跑大半：收益只留三成，无掉落、无传承机缘）\n"
             f"⚠️ 未做出选择前本次历练不会结算，历练中的你无法开始新的历练。"
         )
 
@@ -1568,16 +1605,19 @@ class AdventureManager:
     def _offers_choice(self, snapshot: dict) -> bool:
         """Whether this locked encounter should stop at ``pending_choice``.
 
-        只有高/极高风险且真的遇敌才有得选；``flee.enabled=false``（人工 kill
-        switch）时不产生 pending，避免玩家多发一条「迎战」却没有任何选择收益
-        （design §1）。未遇敌的 run 直接进 ``ready_combat``，由结算阶段落
-        ``resolved_win``（未触发战斗＝无遭遇地顺利完成，PRD R4 仍加基础休整）。
+        **全风险段遇敌都给一次战前选择**（§Q4 2026-10-19 重拍：低风险也有残血玩家
+        撞普通怪败到 1% 地板的情形，后路需求由玩家状态而非敌人档位驱动）。
+        ``flee.enabled=false``（人工 kill switch）时不产生 pending，避免玩家多发一条
+        「迎战」却没有任何选择收益（design §1）。
+
+        注意 ``snapshot.get("combat")`` 的存在性判定是**承重**的，不是保险：
+        :meth:`_lock_encounter` 对每个完成的 run 都调本方法，未遇敌 run 的快照没有
+        ``combat``——「未遇敌直通 ``resolved_win``」全靠这一条。删掉它，未遇敌完成的
+        历练也会挂 pending，契约直接崩。
         """
         if not self.flee_params.get("enabled", True):
             return False
-        if not snapshot.get("combat"):
-            return False
-        return snapshot.get("difficulty") in HIGH_RISK_LEVELS
+        return bool(snapshot.get("combat"))
 
     def _flee_succeeded(self, snapshot: dict) -> bool:
         """Roll the flee check deterministically from the locked snapshot.
@@ -1601,6 +1641,26 @@ class AdventureManager:
         )
         roll = random.Random(_seed_stream(int(snapshot.get("rng_seed") or 0), "flee"))
         return roll.random() < chance
+
+    def _fled_rewards(self, snapshot: dict) -> dict:
+        """Shape the 收益 of a successful 逃跑: base_reward × ``FLED_REWARD_RATIO``.
+
+        §Q4 2026-10-19 重拍「白跑大半趟」的唯一实现点：``resolved_fled`` 的修为/灵石
+        都按快照基础收益（已含事件倍率）乘以系数后 int 截断。fled 不含 ``bonus_exp``，
+        因为快照的 ``base_reward`` 只有 exp/gold，bonus_exp 仅战胜 outcome 产生
+        （managers/pve_combat_manager.py:281），维持现状。
+
+        Args:
+            snapshot: 锁定快照。
+
+        Returns:
+            ``{"exp": int, "gold": int}``。结算与重放两条路径共用，避免两处各自算。
+        """
+        base = snapshot.get("base_reward") or {}
+        return {
+            "exp": int(int(base.get("exp", 0) or 0) * FLED_REWARD_RATIO),
+            "gold": int(int(base.get("gold", 0) or 0) * FLED_REWARD_RATIO),
+        }
 
     async def _maybe_trigger_legacy(
         self, player: Player, *, roll_value: float | None = None

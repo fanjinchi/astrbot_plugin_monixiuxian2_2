@@ -141,7 +141,7 @@ CMD_ADVENTURE_START = "开始历练"
 CMD_ADVENTURE_COMPLETE = "完成历练"
 CMD_ADVENTURE_STATUS = "历练状态"
 CMD_ADVENTURE_INFO = "历练信息"
-# 战前抉择出口（高/极高风险遇敌后的 pending_choice 状态）：只有这两条指令
+# 战前抉择出口（全风险段遇敌后的 pending_choice 状态）：只有这两条指令
 # 能把挂起的历练推到终态，没有超时也没有「取消历练」（2026-10-12 拍板）
 CMD_ADVENTURE_FIGHT = "迎战"
 CMD_ADVENTURE_FLEE = "逃跑"
@@ -1506,7 +1506,7 @@ class XiuXianPlugin(Star):
     @require_whitelist
     async def handle_adventure_flee(self, event: AstrMessageEvent):
         """Command 「逃跑」- 尝试脱身历练强敌; routes to adventure_mgr.resolve_adventure_choice (with bounty progress updates)."""
-        # 逃跑成功同样产生结算事实（基础收益照常发放），进度推进与迎战/完成历练一致。
+        # 逃跑成功同样产生结算事实（收益只留三成、不掉落不滚传承），进度推进与迎战/完成历练一致。
         user_id = event.get_sender_id()
         success, msg, reward_data = await self.adventure_mgr.resolve_adventure_choice(
             user_id, flee=True

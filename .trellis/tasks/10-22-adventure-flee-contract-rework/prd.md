@@ -31,14 +31,14 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1：低/中/高/极高风险路线遇敌均停 `pending_choice`；未遇敌完成仍直通 `resolved_win`；`flee.enabled=false` 时全段直通战斗（kill switch 语义不变）。pytest 用例钉住三种分支。
-- [ ] AC2：逃跑成功结算：修为/灵石 = 快照 base_reward ×0.3（int 截断）、无掉落、无传承 roll、气血不变、无 +600s、悬赏/师承「完成历练」进度照常；重放同一张单不重复发放、不重新博概率。
-- [ ] AC3：`resolved_loss` 不再滚传承机缘；`resolved_win`（含未遇敌完成）传承 roll 行为不变。
-- [ ] AC4：pending 提示、💨 脱身结算、历练信息、修仙帮助共 4 处文案按 design.md §4 新口径渲染，写清逃跑代价。
-- [ ] AC5：`uv run ruff format . && uv run ruff check .` 干净；`uv run python -m pytest tests/ -v` 全绿（含按新契约改写的 16 条用例与新补的反向用例）。
-- [ ] AC6：`functional_tests/cases/sect/` 的 `sect-bounty-lifecycle.json`、`sect-master-chain-gm.json`、`sect-adventure-event-marker.json` 三条用例在全段 pending 下保持确定性（GM 强制历练迎战双分支断言；真实平台回归由用户发起）。
-- [ ] AC7：父 PRD 两条首版契约条款已修订为重拍口径，子任务地图已补记本 child；README 指令表、main.py 注释、design_docs 无首版契约残留描述。
-- [ ] AC8：config **数值**零改动（`git diff config/adventure_config.json data/default_configs.py` 只允许出现注释修正，不允许任何数值/键变化）。
+- [x] AC1：低/中/高/极高风险路线遇敌均停 `pending_choice`；未遇敌完成仍直通 `resolved_win`；`flee.enabled=false` 时全段直通战斗（kill switch 语义不变）。pytest 用例钉住三种分支。
+- [x] AC2：逃跑成功结算：修为/灵石 = 快照 base_reward ×0.3（int 截断）、无掉落、无传承 roll、气血不变、无 +600s、悬赏/师承「完成历练」进度照常；重放同一张单不重复发放、不重新博概率。
+- [x] AC3：`resolved_loss` 不再滚传承机缘；`resolved_win`（含未遇敌完成）传承 roll 行为不变。
+- [x] AC4：pending 提示、💨 脱身结算、历练信息、修仙帮助共 4 处文案按 design.md §4 新口径渲染，写清逃跑代价。
+- [x] AC5：`uv run ruff format . && uv run ruff check .` 干净；`uv run python -m pytest tests/ -v` 全绿（含按新契约改写的 16 条用例与新补的反向用例）。
+- [x] AC6：`functional_tests/cases/sect/` 的 `sect-bounty-lifecycle.json`、`sect-master-chain-gm.json`、`sect-adventure-event-marker.json` 三条用例在全段 pending 下保持确定性（GM 强制历练迎战双分支断言；真实平台回归由用户发起）。
+- [x] AC7：父 PRD 两条首版契约条款已修订为重拍口径，子任务地图已补记本 child；README 指令表、main.py 注释、design_docs 无首版契约残留描述。
+- [x] AC8：config **数值**零改动（`git diff config/adventure_config.json data/default_configs.py` 只允许出现注释修正，不允许任何数值/键变化）。
 
 ## Notes
 

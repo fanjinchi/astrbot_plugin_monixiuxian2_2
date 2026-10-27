@@ -593,8 +593,8 @@ ADVENTURE_CONFIG = {
             {"name": "灵石碎片", "weight": 20, "min": 2, "max": 5},
         ]
     },
-    # 战前脱身判定（高/极高风险遇敌时提供「迎战/逃跑」）。数值未封板，
-    # 正式概率表等敌人花名册导入后回归（bd monixiuxian2-9hq）；缺段时
+    # 战前脱身判定（全风险段遇敌时提供「迎战/逃跑」，2026-10-19 重拍）。
+    # 系数已封板（bd -9hq 零改动收口，见 pve-enemy-design.md §Q4）；缺段时
     # managers/adventure_manager.py 的 DEFAULT_FLEE_PARAMS 兜底同一组值。
     "flee": {
         "enabled": True,

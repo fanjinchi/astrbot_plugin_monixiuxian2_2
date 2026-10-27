@@ -83,11 +83,11 @@ Health Domain 提供单一入口完成：动态上限计算、`current_hp` clamp
 
 普通 PVE 分成“生成稳定遭遇”与“消费结算”两段：
 
-1. 所有风险档在历练开始生成唯一 `adventure_run_id`；历练完成时都先持久化 settlement、enemy/profile、路线收益、combat snapshot 和固定 RNG。低/中风险进入 `ready_combat`，不得走无记录同步旁路；
-2. 高/极高风险进入 `pending_choice`；首版不自动过期；
+1. 所有风险档在历练开始生成唯一 `adventure_run_id`；历练完成时都先持久化 settlement、enemy/profile、路线收益、combat snapshot 和固定 RNG，不得走无记录同步旁路；
+2. **遇敌即进入 `pending_choice`（2026-10-19 重拍：全风险段给选择）**，未遇敌的完成直通 `resolved_win`；首版不自动过期；
 3. 玩家只能对该 pending 选择一次迎战或逃跑；重启后仍可恢复；pending 期间保留历练 busy 并阻止新历练和空闲回血，终态消费用条件更新或事务锁保证一次性并原子 clear busy；
-4. 逃跑成功不创建战斗/击败/失败事实，保留 `current_hp`，路线基础收益照常；逃跑失败使用 pending 中同一 enemy id 立即开战，不可重掷或重试；
-5. 逃跑概率实现为单调有界、可配置且可独立模拟的身法关系函数，参数只有在地板/标模/天花板模拟回写权威设计后才进入配置。
+4. 逃跑成功不创建战斗/击败/失败事实，保留 `current_hp`，收益只留快照基础收益 ×0.3、不掉落、不滚传承机缘（§Q4 重拍）；逃跑失败使用 pending 中同一 enemy id 立即开战，不可重掷或重试；战败同样不滚传承；
+5. 逃跑概率实现为单调有界、可配置且可独立模拟的身法关系函数；参数已封板且只存在于配置（`config/adventure_config.json` + `data/default_configs.py`），代码不另拍数值。
 
 疲劳从 `AdventureManager._route_cooldowns` 搬到持久字段/表。只有实际战败追加 600 秒；战败后 `current_hp = max(current_hp_after_battle, ceil(0.01 * max_hp))`（2026-10-12 由 0.25 下调；胜场不保底）。pending 首版无自动过期、也不加取消出口（用户拍板：全玩法锁即设计，`逃跑` 就是后路）；疲劳结束登记 GM time-skip。恢复锚点不是 expiry、不登记 SQL 字段快进；当前 `/时间快进` 只前移注册字段，不改变业务时钟，因此不会额外制造空闲恢复。恢复经过量与跨日行为分别用可注入业务时钟测试。
 

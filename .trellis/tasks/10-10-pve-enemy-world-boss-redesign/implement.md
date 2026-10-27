@@ -13,6 +13,7 @@
 | A | `10-10-pve-player-health-foundation` | R2；AC2 基座 | v35、`base_hp/current_hp/max_hp`、全 HP 消费者、Health Domain、空闲恢复 | schema 切换前 DB 备份 |
 | B | `10-10-pve-enemy-catalog-runtime` | R1/R3；AC3 | 内容 validator/adapter、固定 catalog、统一 profile/Fighter mapper | 正式 sync 前 config 不变 |
 | P | `10-10-pve-persistence-transaction-foundation` | R4–R7 的共享数据基座 | v36…vN、fresh parity、事务叶子审计、settlement/Boss/outbox schema、time-skip matrix | 领域 handler/poller 接线前 |
+| F | `10-22-adventure-flee-contract-rework` | R4 逃跑细则；AC4 | 全风险段 pending、逃跑收益 ×0.3/不掉落/不滚传承、败场不滚传承、4 处文案、sect 用例双分支适配 | 单提交 revert（无 schema / config 数值变更） |
 | C | `10-10-pve-adventure-settlement` | R4；AC4 | pending、逃跑、current HP、1%战败保底（胜场不保底）、全局疲劳、settlement facts | Adventure handler 切流前 |
 | D | `10-10-pve-world-boss-domain` | R5/R6；AC5/AC6 | 四段全随机固定实例、生命周期、北京日次数、HP 地板保底 1%（Q4 统一下调）且无疲劳/入场费、原子挑战/台账、outbox | Boss poller/handler 切流前 |
 | E | `10-10-pve-cross-system-integration` | R7；AC1/AC7 及全部跨层关闭 | 组合复核、旧路径退役、poller/time-skip/广播/文档/上线门 | PVE/Boss/sync 四级检查点 |

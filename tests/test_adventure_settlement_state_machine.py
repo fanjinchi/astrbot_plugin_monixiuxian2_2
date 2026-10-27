@@ -4,7 +4,7 @@
 
 - AC1 结算单：开始历练即落 ``adventuring`` 行、``adventure_run_id`` 每轮唯一、
   历史在途单在 ``finish_adventure`` 补建，绝不产生第二条事实。
-- AC2 高/极高风险遇敌停在 ``pending_choice``，「迎战」「逃跑」两个出口；未抉择
+- AC2 全风险段遇敌停在 ``pending_choice``（未遇敌直通终态），「迎战」「逃跑」两个出口；未抉择
   不发任何奖励、保留忙碌；``flee.enabled=false``（kill switch）时不产生 pending。
 - AC3 逃跑公式锚点（身法相当→95%、2 倍→100%、一半→60% 保底）。
 - AC4 掉落跟随胜败（战败不掉落）；气血只跟随引擎终值，战败按动态上限 1% 保底。
@@ -381,7 +381,9 @@ def build_env(
     health = HealthService(
         db, StubConfigManager(), equipment_manager=EquipmentManager(db=None)
     )
-    mgr = AdventureManager(db, ring, pve, busy_state=make_busy_state(db), health_service=health)
+    mgr = AdventureManager(
+        db, ring, pve, busy_state=make_busy_state(db), health_service=health
+    )
     _configure(mgr)
     return Env(db, mgr, engine, enemy_mgr, ring, health)
 
@@ -439,7 +441,7 @@ async def start_run(mgr, route=LOW_ROUTE):
 
 
 # ---------------------------------------------------------------------------
-# AC3 — 逃跑概率公式（design §3 锚点；数值未封板见 bd monixiuxian2-2/-9hq）
+# AC3 — 逃跑概率公式（design §3 锚点；系数已封板，bd -9hq 零改动收口）
 # ---------------------------------------------------------------------------
 
 
@@ -487,6 +489,9 @@ def test_flee_config_missing_section_keeps_temporary_defaults():
 @pytest.mark.asyncio
 async def test_start_creates_adventuring_row_with_unique_run_id(env):
     """开始历练即落 ``adventuring`` 行；每轮 run id 唯一（PRD R1）."""
+    # 本用例只关心单据身份，关掉遭遇触发走「未遇敌直通」路径（全段遇敌给选择的
+    # pending 分支由 test_low_risk_finish_parks_pending_too 专门覆盖）。
+    env.mgr.pve_combat_mgr._should_trigger_combat = lambda scene, difficulty: False
     await start_run(env.mgr, LOW_ROUTE)
     row = await env.row()
     assert row["state"] == STATE_ADVENTURING
@@ -508,8 +513,12 @@ async def test_start_creates_adventuring_row_with_unique_run_id(env):
 
 
 @pytest.mark.asyncio
-async def test_low_risk_finish_settles_win_without_pending(env):
-    """低风险不停在抉择：直接 ``resolved_win``；未触发战斗不产生击败事实."""
+async def test_no_encounter_finish_settles_win_without_pending(env):
+    """未遇敌完成直通 ``resolved_win``：不产生待选择态与击败事实.
+
+    这条与「风险档位」无关——全段遇敌都给选择之后，直通只发生在**未遇敌**的
+    run（快照里没有 ``combat``），即 ``_offers_choice`` 里那条承重判定。
+    """
     env.mgr.pve_combat_mgr._should_trigger_combat = lambda scene, difficulty: False
     await start_run(env.mgr, LOW_ROUTE)
     ok, msg, reward_data = await env.mgr.finish_adventure(USER)
@@ -548,6 +557,11 @@ async def test_finish_backfills_missing_run_row(env):
     assert await env.row() is None
 
     ok, msg, reward_data = await env.mgr.finish_adventure(USER)
+    assert ok, msg
+    # 全段遇敌给战前选择（§Q4 2026-10-19）：补建完同样停在 pending，不直接结算。
+    assert reward_data is None
+    assert (await env.row())["state"] == STATE_PENDING_CHOICE
+    ok, msg, reward_data = await env.mgr.resolve_adventure_choice(USER, flee=False)
     assert ok, msg
     assert (await env.row())["state"] == STATE_RESOLVED_WIN
     assert reward_data is not None
@@ -652,10 +666,40 @@ async def test_pending_choice_survives_restart(env):
 
 
 @pytest.mark.asyncio
-async def test_kill_switch_skips_pending_entirely(env):
-    """``flee.enabled=false`` 不产生 pending（人工 kill switch，design §1）."""
+async def test_low_risk_finish_parks_pending_too(env):
+    """低风险遇敌同样停在 ``pending_choice``（§Q4 2026-10-19 触发范围改全段）.
+
+    低风险路线全是普通怪、标模必胜，但残血玩家撞普通怪也可能败到 1% 地板——
+    后路的需求由玩家状态（当前气血）驱动，不只由敌人档位驱动，所以低/中风险
+    遇敌也要给一次选择。
+    """
+    await start_run(env.mgr, LOW_ROUTE)
+    ok, msg, reward_data = await env.mgr.finish_adventure(USER)
+    assert ok and reward_data is None
+    assert "迎战" in msg and "逃跑" in msg
+    assert "收益只留三成" in msg  # pending 提示写明逃跑代价（R4）
+    row = await env.row()
+    assert row["state"] == STATE_PENDING_CHOICE
+    assert await env.claims() == []
+    assert (await env.player()).experience == 0
+    assert await env.user_cd_type() == int(UserStatus.ADVENTURING)
+
+    ok2, msg2, _ = await env.mgr.resolve_adventure_choice(USER, flee=False)
+    assert ok2, msg2
+    assert (await env.row())["state"] == STATE_RESOLVED_WIN
+    assert (await env.player()).experience == WIN_EXP
+
+
+@pytest.mark.parametrize("route", [LOW_ROUTE, HIGH_ROUTE])
+@pytest.mark.asyncio
+async def test_kill_switch_skips_pending_entirely(env, route):
+    """``flee.enabled=false`` 不产生 pending（人工 kill switch，design §1）.
+
+    全段遇敌给选择之后，kill switch 必须在**低风险**上同样生效：关掉时所有路线
+    都直通战斗，行为回到首版（不产生待选择态）。
+    """
     env.mgr.flee_params = {**DEFAULT_FLEE_PARAMS, "enabled": False}
-    await start_run(env.mgr, HIGH_ROUTE)
+    await start_run(env.mgr, route)
     ok, msg, reward_data = await env.mgr.finish_adventure(USER)
     assert ok and reward_data is not None
     assert "迎战" not in msg
@@ -664,7 +708,7 @@ async def test_kill_switch_skips_pending_entirely(env):
 
 @pytest.mark.asyncio
 async def test_flee_success_records_fled_without_hp_loss(db):
-    """身法两倍→必定脱身：``resolved_fled``、气血原样、基础收益照常."""
+    """身法两倍→必定脱身：``resolved_fled``、气血原样、收益只留三成（§Q4 重拍）."""
     harness = build_env(
         db, outcome="lose", final_hp=0, player_agility=200, enemy_agility=100
     )
@@ -681,9 +725,13 @@ async def test_flee_success_records_fled_without_hp_loss(db):
     assert harness.engine.calls == 0  # 脱身不进战斗
     assert int(row["hp_after"]) == 1000
     assert (await harness.player()).current_hp == 1000
-    assert reward_data["exp_reward"] == BASE_EXP  # 基础收益，无胜利倍率
+    # 白跑大半趟：修为/灵石都按快照基础收益 ×0.3 截断，无胜利倍率
+    assert reward_data["exp_reward"] == int(BASE_EXP * 0.3)
+    assert reward_data["gold_reward"] == int(BASE_GOLD * 0.3)
     assert reward_data["pve_won"] is False
     assert len(await harness.claims()) == 3
+    player = await harness.player()
+    assert player.experience == 300 and player.gold == 60
     # 只有基础休整，没有战败追加休整
     remaining = await harness.fatigue_until() - int(time.time())
     assert HIGH_FATIGUE - 5 <= remaining <= HIGH_FATIGUE
@@ -817,8 +865,7 @@ async def test_legacy_encounter_id_identity(env):
     snapshot = await env.snapshot()
     assert row["profile_id"] == "" and int(row["profile_version"]) == 0
     assert row["encounter_id"] == (
-        f"legacy:噬骨妖狼@L{snapshot['enemy']['level_index']}"
-        f"#S{snapshot['rng_seed']:x}"
+        f"legacy:噬骨妖狼@L{snapshot['enemy']['level_index']}#S{snapshot['rng_seed']:x}"
     )
 
 
@@ -881,6 +928,9 @@ async def test_drops_follow_victory_and_are_skipped_on_defeat(env, db):
     env.mgr.event_groups = {"standard": [_event(item_chance=100)]}
     await start_run(env.mgr, LOW_ROUTE)
     await env.mgr.finish_adventure(USER)
+    # 全段遇敌给选择：低风险也要迎战一次才落终态（§Q4 2026-10-19）
+    ok, msg, _ = await env.mgr.resolve_adventure_choice(USER, flee=False)
+    assert ok, msg
     assert env.ring.store_item.await_count == 1
 
     loss = build_env(db, outcome="lose", final_hp=1)
@@ -899,8 +949,9 @@ async def test_injury_event_no_longer_damages_player(env):
     harness = build_env(env.db, outcome="win", final_hp=424)
     harness.mgr.event_groups = {"standard": [_event(injury=True)]}
     await start_run(harness.mgr, LOW_ROUTE)
-    ok, msg, _ = await harness.mgr.finish_adventure(USER)
-    assert ok
+    assert (await harness.mgr.finish_adventure(USER))[0]  # 先停在战前抉择
+    ok, msg, _ = await harness.mgr.resolve_adventure_choice(USER, flee=False)
+    assert ok, msg
     assert (await harness.player()).current_hp == 424
     assert "受创" not in msg
 
@@ -910,7 +961,10 @@ async def test_defeat_adds_extra_fatigue_only_on_loss(env, db):
     """败场休整 = 路线休整 + 战败追加；胜场只有路线休整（PRD R4）."""
     await start_run(env.mgr, LOW_ROUTE)
     await env.mgr.finish_adventure(USER)
-    assert LOW_FATIGUE - 5 <= await env.fatigue_until() - int(time.time()) <= LOW_FATIGUE
+    assert (await env.mgr.resolve_adventure_choice(USER, flee=False))[0]
+    assert (
+        LOW_FATIGUE - 5 <= await env.fatigue_until() - int(time.time()) <= LOW_FATIGUE
+    )
 
     loss = build_env(db, outcome="lose", final_hp=1)
     await start_run(loss.mgr, HIGH_ROUTE)
@@ -926,6 +980,7 @@ async def test_global_fatigue_blocks_cross_route(env, db):
     """乙案：休整是全局窗口，换路线同样拦，重启后照拦，GM 清完才能再开."""
     await start_run(env.mgr, LOW_ROUTE)
     await env.mgr.finish_adventure(USER)
+    assert (await env.mgr.resolve_adventure_choice(USER, flee=False))[0]
 
     ok, msg = await env.mgr.start_adventure(USER, HIGH_ROUTE)
     assert not ok and "你刚历练回来，还需休整" in msg
@@ -1099,14 +1154,14 @@ async def test_replay_renders_authoritative_hp(env):
 
 @pytest.mark.asyncio
 async def test_concurrent_finish_cas_is_exactly_two(env):
-    """并发「完成历练」（低风险）CAS 恰好两级，不产生第二份事实.
+    """并发「完成历练」只锁一次敌人、只推进一级；迎战落终态是第二级.
 
-    注意这条**不是**终态覆写的回归钉子：低风险路线 `_offers_choice=False`，直接进
-    `ready_combat`，并发败者在 `finish_adventure` 的重放分支（:527 附近）就被分流，
-    **根本走不到 `_finalize`**，所以那条路径原本就没有二次覆写问题（实测删掉
-    `_finalize` 的终态守护，本用例照样绿）。它守的是「低风险完成路径恰好一次锁敌人 +
-    一次结算、只有一份事实」这个更宽的不变式。终态覆写的钉子见
-    `test_concurrent_choice_does_not_rewrite_terminal`。"""
+    全段遇敌给选择（§Q4 2026-10-19）之后，低风险完成路径也先停在 `pending_choice`，
+    所以 CAS 语义是：并发完成只让 `adventuring → pending_choice` 成立一次（CAS
+    失败方读到赢家提交的行、按渲染 pending 分流，走不到 `_finalize`），随后一次
+    「迎战」再把 `pending_choice → 终态` 推进一级，全程只有一份事实。
+    终态覆写的钉子见 `test_concurrent_choice_does_not_rewrite_terminal`。
+    """
     await start_run(env.mgr, LOW_ROUTE)
     pre = int((await env.row())["cas_version"])
     results = await asyncio.gather(
@@ -1116,10 +1171,22 @@ async def test_concurrent_finish_cas_is_exactly_two(env):
     )
     assert not any(isinstance(r, Exception) for r in results), results
     row = await env.row()
+    assert row["state"] == STATE_PENDING_CHOICE
+    assert int(row["cas_version"]) - pre == 1  # 只锁一次敌人
+    assert await env.claims() == []
+    # 锁定只由 CAS 赢家落库：再点一次只重放同一份快照，不重掷敌人
+    locked = row["snapshot"]
+    await env.mgr.finish_adventure(USER)
+    assert (await env.row())["snapshot"] == locked
+
+    ok, msg, _ = await env.mgr.resolve_adventure_choice(USER, flee=False)
+    assert ok, msg
+    row = await env.row()
     assert row["state"] == STATE_RESOLVED_WIN
-    # 恰好两级：adventuring →(锁敌人 CAS)→ ready_combat →(结算 CAS)→ 终态
-    assert int(row["cas_version"]) - pre == 2, (
-        f"低风险完成路径 CAS 跳了 {int(row['cas_version']) - pre} 级（应为 2）"
+    # 恰好三级：adventuring →(锁敌人 CAS)→ pending_choice →(迎战 CAS)→
+    # ready_combat →(结算 CAS)→ 终态。多一级即为二次覆写（见下一条用例）。
+    assert int(row["cas_version"]) - pre == 3, (
+        f"完成历练路径 CAS 跳了 {int(row['cas_version']) - pre} 级（应为 3）"
     )
     assert (await env.player()).experience == WIN_EXP  # 只有一份收益
 
@@ -1152,6 +1219,7 @@ async def test_crash_after_commit_before_claim_backfills_once(env):
     """崩溃点「终态已提交、效果未 claim」：重放只补一次，绝不翻倍."""
     await start_run(env.mgr, LOW_ROUTE)
     await env.mgr.finish_adventure(USER)
+    assert (await env.mgr.resolve_adventure_choice(USER, flee=False))[0]
     assert (await env.player()).experience == WIN_EXP
 
     sid = await env.settlement_id()
@@ -1233,13 +1301,14 @@ async def test_transaction_rolls_back_all_domains(db, monkeypatch):
 async def test_effect_failure_is_visible_and_not_retried(db, monkeypatch):
     """效果执行失败：终态不回滚、玩家可见提示、claim 已消耗不再重试."""
 
-    async def boom(player, route, event, rewards):
+    async def boom(player, route, event, rewards, state):
         raise RuntimeError("drop grant failed")
 
     harness = build_env(db)
     monkeypatch.setattr(AdventureManager, "_grant_route_drops", boom)
     await start_run(harness.mgr, LOW_ROUTE)
-    ok, msg, reward_data = await harness.mgr.finish_adventure(USER)
+    assert (await harness.mgr.finish_adventure(USER))[0]  # 全段遇敌：先停在战前抉择
+    ok, msg, reward_data = await harness.mgr.resolve_adventure_choice(USER, flee=False)
     assert ok and reward_data is not None
     assert "部分奖励发放失败" in msg
     assert (await harness.row())["state"] == STATE_RESOLVED_WIN
@@ -1260,6 +1329,8 @@ async def test_legacy_effect_fires_exactly_once_per_settlement(env):
     store.pend = MagicMock(return_value=True)
     env.mgr.encounter_store = store
     env.mgr.legacy_chance = 1.0
+    # 传承只在胜场（含未遇敌完成）roll：关掉触发走「未遇敌直通」，保持原用例原意
+    env.mgr.pve_combat_mgr._should_trigger_combat = lambda scene, difficulty: False
     await start_run(env.mgr, LOW_ROUTE)
     ok, msg, _ = await env.mgr.finish_adventure(USER)
     assert ok and "传承" in msg
@@ -1268,6 +1339,79 @@ async def test_legacy_effect_fires_exactly_once_per_settlement(env):
     await env.mgr.finish_adventure(USER)
     assert store.pend.call_count == 1
     assert len(await env.claims()) == 3
+
+
+@pytest.mark.asyncio
+async def test_fled_keeps_claims_but_grants_no_drops_or_legacy(db):
+    """逃跑：三件效果照常 claim，但掉落与传承本体都不执行（§Q4 代价全在收益侧）.
+
+    claim 照记是刻意保留的骨架语义（design §2-D3）：改了它就要动 claim 表语义与
+    重放路径，而「claim 了但按终态跳过」对其它消费方不可见。这里同时钉住重放：
+    机会已被 claim 消耗，再点「完成历练」既不补掉落也不重博传承。
+    """
+    store = MagicMock()
+    store.pend = MagicMock(return_value=True)
+    harness = build_env(
+        db, outcome="lose", final_hp=0, player_agility=200, enemy_agility=100
+    )
+    harness.mgr.encounter_store = store
+    harness.mgr.legacy_chance = 1.0
+    harness.mgr.event_groups = {"standard": [_event(item_chance=100)]}
+    await start_run(harness.mgr, HIGH_ROUTE)
+    await harness.mgr.finish_adventure(USER)
+
+    ok, msg, _ = await harness.mgr.resolve_adventure_choice(USER, flee=True)
+    assert ok, msg
+    assert (await harness.row())["state"] == STATE_RESOLVED_FLED
+    assert len(await harness.claims()) == 3  # 三件套照常 claim
+    assert harness.ring.store_item.await_count == 0  # 不掉落
+    assert store.pend.call_count == 0  # 不滚传承
+    player = await harness.player()
+    assert player.experience == int(BASE_EXP * 0.3)
+    assert player.gold == int(BASE_GOLD * 0.3)
+    assert player.get_storage_ring_items() == {}
+
+    # 重放：普通拒绝，claim 不增，掉落与传承仍为零
+    ok2, _msg2, _ = await harness.mgr.finish_adventure(USER)
+    assert not ok2
+    assert harness.ring.store_item.await_count == 0
+    assert store.pend.call_count == 0
+    assert len(await harness.claims()) == 3
+
+
+@pytest.mark.asyncio
+async def test_loss_skips_legacy_trigger(db):
+    """败场不滚传承机缘（2026-10-20 拍板）：传承只属于走完全程的人."""
+    store = MagicMock()
+    store.pend = MagicMock(return_value=True)
+    harness = build_env(db, outcome="lose", final_hp=1)
+    harness.mgr.encounter_store = store
+    harness.mgr.legacy_chance = 1.0
+    await start_run(harness.mgr, HIGH_ROUTE)
+    await harness.mgr.finish_adventure(USER)
+
+    ok, msg, _ = await harness.mgr.resolve_adventure_choice(USER, flee=False)
+    assert ok, msg
+    assert (await harness.row())["state"] == STATE_RESOLVED_LOSS
+    assert store.pend.call_count == 0
+    assert len(await harness.claims()) == 3  # claim 照记，本体跳过
+
+
+@pytest.mark.asyncio
+async def test_win_still_rolls_legacy_once(db):
+    """胜场照常滚传承（门控只砍败场与逃跑），且每单只博一次."""
+    store = MagicMock()
+    store.pend = MagicMock(return_value=True)
+    harness = build_env(db)
+    harness.mgr.encounter_store = store
+    harness.mgr.legacy_chance = 1.0
+    await start_run(harness.mgr, HIGH_ROUTE)
+    await harness.mgr.finish_adventure(USER)
+
+    ok, msg, _ = await harness.mgr.resolve_adventure_choice(USER, flee=False)
+    assert ok, msg
+    assert (await harness.row())["state"] == STATE_RESOLVED_WIN
+    assert store.pend.call_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -1288,6 +1432,7 @@ async def test_time_skip_clears_fatigue_gate(env):
     """快进到期时间后玩家可以重新历练（冷却能被 GM 跨过）."""
     await start_run(env.mgr, LOW_ROUTE)
     await env.mgr.finish_adventure(USER)
+    assert (await env.mgr.resolve_adventure_choice(USER, flee=False))[0]
     assert not (await env.mgr.start_adventure(USER, LOW_ROUTE))[0]
 
     sql = dict(TIME_SKIP_ENTRIES)["历练休整到期时间"]
@@ -1515,13 +1660,17 @@ async def test_legacy_in_flight_concurrent_finish_creates_single_fact(env):
     )
     await env.db.conn.commit()
 
-    results = await asyncio.gather(
-        *(env.mgr.finish_adventure(USER) for _ in range(4))
-    )
+    results = await asyncio.gather(*(env.mgr.finish_adventure(USER) for _ in range(4)))
     assert all(success for success, _, _ in results)
 
     ids = await _all_settlement_ids(env)
     assert len(ids) == 1, f"并发补建只该有一条事实，实际 {ids}"
+    # 全段遇敌给选择：并发补建四路都停在同一张 pending 单上，零发奖
+    assert (await env.row())["state"] == STATE_PENDING_CHOICE
+    assert await env.claims() == []
+
+    ok, msg, _ = await env.mgr.resolve_adventure_choice(USER, flee=False)
+    assert ok, msg
     assert len(await env.claims()) == 3
     assert (await env.player()).experience == WIN_EXP  # 不是两倍
     assert (await env.row())["state"] == STATE_RESOLVED_WIN
@@ -1545,7 +1694,8 @@ async def test_revived_busy_self_heals_on_replay(env):
     """
     await start_run(env.mgr, LOW_ROUTE)
     stale = await env.db.ext.get_user_cd(USER)  # GM 事务前持有的那份快照
-    ok, msg, reward_data = await env.mgr.finish_adventure(USER)
+    assert (await env.mgr.finish_adventure(USER))[0]  # 全段遇敌：先停在战前抉择
+    ok, msg, reward_data = await env.mgr.resolve_adventure_choice(USER, flee=False)
     assert ok, msg
     assert reward_data is not None
     assert await env.user_cd_type() == int(UserStatus.IDLE)
@@ -1592,7 +1742,14 @@ async def test_grant_effects_rereads_player_under_lock(env):
     await env.db.conn.commit()
 
     await env.mgr._grant_effects(
-        stale, row, route, event, rewards, snapshot, int(time.time())
+        stale,
+        row,
+        route,
+        event,
+        rewards,
+        snapshot,
+        int(time.time()),
+        STATE_RESOLVED_WIN,
     )
 
     fresh = await env.player()
@@ -1617,7 +1774,8 @@ async def test_replay_reissued_drops_survive_the_self_heal_write(db):
     await start_run(env.mgr)
     stale_cd = await env.db.ext.get_user_cd(USER)  # 结算前的忙碌行快照
 
-    ok, msg, _ = await env.mgr.finish_adventure(USER)
+    assert (await env.mgr.finish_adventure(USER))[0]  # 全段遇敌：先停在战前抉择
+    ok, msg, _ = await env.mgr.resolve_adventure_choice(USER, flee=False)
     assert ok, msg
     assert (await env.player()).get_storage_ring_items() == {"灵草": 1}
 
