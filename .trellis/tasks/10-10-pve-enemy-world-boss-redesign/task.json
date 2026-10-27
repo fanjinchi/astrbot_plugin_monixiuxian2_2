@@ -24,7 +24,8 @@
     "10-10-pve-persistence-transaction-foundation",
     "10-10-pve-adventure-settlement",
     "10-10-pve-world-boss-domain",
-    "10-10-pve-cross-system-integration"
+    "10-10-pve-cross-system-integration",
+    "10-22-adventure-flee-contract-rework"
   ],
   "parent": null,
   "relatedFiles": [],

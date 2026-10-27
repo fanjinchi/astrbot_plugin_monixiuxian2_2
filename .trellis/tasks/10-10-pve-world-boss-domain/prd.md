@@ -64,7 +64,7 @@
 - [ ] AC1：每次新实例在 4 个境界段中全随机且不按玩家境界适配；固定 seed 可复现选择，profile/seed 持久化后重复轮询或幂等重试不重掷；4 只 profile 均可生成不可变快照，活动中配置变化不改面板，难度只改伤害。
 - [ ] AC2：active/48h/defeated/dissipated/12h/24h 状态机在重启和重复轮询下唯一合法。
 - [ ] AC3：北京日 3 次在 UTC 边界、服务器不同时区、并发和幂等重试下均正确。
-- [ ] AC4：并发挑战不超扣次数或 HP，本场/累计伤害正确且只有一个末击；玩家写回不低于 `ceil(25% * max_hp)`，挑战只产生 HP 损耗而不增加 fatigue 或收取入场费；combat 不占用写事务，版本冲突以固定 RNG 重算/CAS 处理，故障注入全回滚。
+- [ ] AC4：并发挑战不超扣次数或 HP，本场/累计伤害正确且只有一个末击；玩家写回不低于 `ceil(1% * 动态 max_hp)`（10-12 Q4 决议统一下调，与 design.md §6 一致），挑战只产生 HP 损耗而不增加 fatigue 或收取入场费；combat 不占用写事务，版本冲突以固定 RNG 重算/CAS 处理，故障注入全回滚。
 - [ ] AC5：60%/20% 阶段属性通过；阶段1一次跨两阈值时按 phase2→phase3 产生两条唯一事件且最终 phase=3。
 - [ ] AC6：spawn/stage/defeat/dissipate 外部发送均在提交后，事务不 await 网络；多平台/多群 partial success 只重试未发送 destination，uncertain 不自动重试且不伪称 exactly-once。
 - [ ] AC7：贡献/末击事实可供未来奖励消费，但无 Step 7 数值或旧即时奖励。
