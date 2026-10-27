@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 8
-- **Last Active**: 2026-10-17
+- **Total Sessions**: 9
+- **Last Active**: 2026-10-28
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~263 | Active |
+| `journal-1.md` | ~305 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 9 | 2026-10-28 | 逃跑契约重拍落地（Trellis 10-22 / bd -w07） | - | `main` |
 | 8 | 2026-10-17 | GM「设置战斗气血」+ 23 条 PvP 用例 v35 适配（bd -xtv，两轮独立评审核订） | `45ff8e9` | `main` |
 | 7 | 2026-10-16 | 全列回写收口：忙碌行窄写 + 经济写点锁内重读（Trellis 10-15 + 两轴评审与修复轮） | `5e9c169` | `main` |
 | 6 | 2026-10-14 | child C（历练结算状态机）归档收口：第七轮无阻塞问题、真实环境回归定稿、AC6 剩余移交 -9u2 | `2eff166`, `706d7c9` | `main` |

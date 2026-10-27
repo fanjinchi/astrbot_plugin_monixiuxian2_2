@@ -1,0 +1,92 @@
+[
+  {
+    "id": 13121,
+    "conversation_id": 943,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除CD 900000002 确认",
+    "rich": null,
+    "created_at": 1793122822.3439493
+  },
+  {
+    "id": 13122,
+    "conversation_id": 943,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 目标玩家当前不在任何忙碌状态！",
+    "rich": [],
+    "created_at": 1793122822.3604078
+  },
+  {
+    "id": 13123,
+    "conversation_id": 943,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000002 练气五阶",
+    "rich": null,
+    "created_at": 1793122822.6554
+  },
+  {
+    "id": 13124,
+    "conversation_id": 943,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的境界设置为「练气五阶」",
+    "rich": [],
+    "created_at": 1793122822.6824794
+  },
+  {
+    "id": 13125,
+    "conversation_id": 943,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 晋升",
+    "rich": null,
+    "created_at": 1793122822.9724853
+  },
+  {
+    "id": 13126,
+    "conversation_id": 943,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎖️ 晋升成功！你已成为【内门弟子】！\n━━━━━━━━━━━━━━━\n职阶福利：\n每日签到俸禄：+100 灵石\n商店折扣：9.5折\n传承解锁：heart_qy_001",
+    "rich": [],
+    "created_at": 1793122823.0017838
+  },
+  {
+    "id": 13127,
+    "conversation_id": 943,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 晋升",
+    "rich": null,
+    "created_at": 1793122823.289541
+  },
+  {
+    "id": 13128,
+    "conversation_id": 943,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 晋升【亲传弟子】未达门槛：\n贡献不足（2500/8000）\n境界不足（需达到练气六阶）",
+    "rich": [],
+    "created_at": 1793122823.4595876
+  },
+  {
+    "id": 13129,
+    "conversation_id": 943,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#签到",
+    "rich": null,
+    "created_at": 1793122823.7551503
+  },
+  {
+    "id": 13130,
+    "conversation_id": 943,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 签到成功！\n━━━━━━━━━━━━━━━\n💰 获得灵石：495\n🏛️ 宗门俸禄（内门弟子）：+100 灵石\n💎 当前灵石：100595\n━━━━━━━━━━━━━━━\n明日再来，莫要忘记哦~",
+    "rich": [],
+    "created_at": 1793122823.793495
+  }
+]

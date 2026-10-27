@@ -1,0 +1,92 @@
+[
+  {
+    "id": 13063,
+    "conversation_id": 940,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#储物戒",
+    "rich": null,
+    "created_at": 1793122812.22312
+  },
+  {
+    "id": 13064,
+    "conversation_id": 940,
+    "direction": "out",
+    "sender": "bot",
+    "text": "=== p1 的储物戒 ===\n【乾坤储物戒】（圣品）\n高阶储物法器，内含小型乾坤，空间广阔。\n\n容量：2/120格\n━━━━━━━━━━━━━━━\n【其他】\n  · 青云镇山剑\n  · 青铜剑\n\n============================\n存入：存入 物品名 [数量]\n取出：取出 物品名 [数量]\n搜索：搜索物品 关键词\n升级：更换储物戒 储物戒名",
+    "rich": [],
+    "created_at": 1793122812.2394571
+  },
+  {
+    "id": 13065,
+    "conversation_id": 940,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#赠予 900000003 青云镇山剑",
+    "rich": null,
+    "created_at": 1793122812.5333068
+  },
+  {
+    "id": 13066,
+    "conversation_id": 940,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 【青云镇山剑】乃宗门之物，不可外传！",
+    "rich": [],
+    "created_at": 1793122812.5497003
+  },
+  {
+    "id": 13067,
+    "conversation_id": 940,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 退出",
+    "rich": null,
+    "created_at": 1793122812.845825
+  },
+  {
+    "id": 13068,
+    "conversation_id": 940,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 你已退出宗门『青云门』！\n宗门之宝【青云镇山剑】已归还宗门。",
+    "rich": [],
+    "created_at": 1793122812.891377
+  },
+  {
+    "id": 13069,
+    "conversation_id": 940,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#宗门 信息",
+    "rich": null,
+    "created_at": 1793122813.1636324
+  },
+  {
+    "id": 13070,
+    "conversation_id": 940,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 你还未加入宗门！",
+    "rich": [],
+    "created_at": 1793122813.1793525
+  },
+  {
+    "id": 13071,
+    "conversation_id": 940,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我的技能",
+    "rich": null,
+    "created_at": 1793122813.4743197
+  },
+  {
+    "id": 13072,
+    "conversation_id": 940,
+    "direction": "out",
+    "sender": "bot",
+    "text": "📜 我的功法\n━━━━━━━━━━━━━━━\n【已激活】0/4\n  暂无激活功法\n\n【已领悟】1个\n  • 青云剑诀 | 星级：1 | 来源：master_task\n\n【修习目标】无\n━━━━━━━━━━━━━━━",
+    "rich": [],
+    "created_at": 1793122813.490228
+  }
+]

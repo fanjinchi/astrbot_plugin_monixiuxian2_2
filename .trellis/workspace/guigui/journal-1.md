@@ -261,3 +261,49 @@ webtest 真实消息管线 + GM「时间快进」，固定测试 ID `900000002`�
 - bd -546 长期债仍在：update_player 列级/diff API，_replay_terminal 收尾整行写会回退并发写入的非效果列
 - 评审可选建议：给 gm 域补一条「设置战斗气血」冒烟用例（当前由 23 条 PvP 用例间接覆盖）
 - 平台批跑不要中途 kill：会留下已启动用例与下一批重叠、撞同一套固定测试 ID
+
+
+## Session 9: 逃跑契约重拍落地（Trellis 10-22 / bd -w07）
+<!-- trellis-session: v=2 fp=ca51c9aed1885c1c -->
+
+**Date**: 2026-10-28
+**Task**: 逃跑契约重拍落地（Trellis 10-22 / bd -w07）
+**Branch**: `main`
+
+### Summary
+
+历练逃跑对齐 2026-10-19 重拍契约：全风险段遇敌给选择、逃跑收益 ×0.3/不掉落/不滚传承、败场不滚传承；15 条红用例 + 3 条 sect 用例全部适配，pytest 1172 passed
+
+### Main Changes
+
+- managers/adventure_manager.py: _offers_choice 去 HIGH_RISK_LEVELS 闸门 + FLED_REWARD_RATIO/_fled_rewards 单一实现点
+- _grant_effects 显式接收终态 state（row 是终态前的行：读 row['state'] 会让 fled 掉落门控失效、逃跑照样掉落，并误杀胜场的传承 roll；fled/loss 的传承恰好仍跳过。独立审查变异验证过）
+- 掉落/传承按终态门控；claim 三件套语义不变（claim 照记、本体跳过）
+- 文案 4 处与 flee 封板注释口径；数值零改动
+- pytest 15 条旧前提改写 + 5 条新用例；functional sect 三条用例改 GM 双分支断言
+- 文档：父 PRD/design/implement、current-design-report、README v3.21.5、metadata v3.21.5
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `434b219` | chore(trellis): 提交逃跑契约重拍规划并同步 PVE 设计口径 |
+| `1bc75e2` | feat(pve): 逃跑契约重拍落地 |
+
+### Testing
+
+- [OK] pytest tests/ 1172 passed（原 1167，+5）
+- [OK] ruff format/check 源码目录干净（.trellis/scripts 70 条为存量）
+- [OK] functional 用例正则离线对真实 GM 文案双分支验证命中
+- [OK] sync-cases：58 条用例同步到平台目录（授权放开后由主代理执行）
+- [OK] 真实平台回归：`run --tag sect --sync --reload astrbot_plugin_monixiuxian2_2` → **17 次运行全部通过**（热重载生效，跑的是新代码）；归档 `functional_tests/results/2026-10-28_sect-flee-contract/`（summary.md：17 通过 / 0 失败 / 0 不稳定 / 0 跳过）
+- [OK] 独立子代理审查（只读 + 变异验证 M1/M2/M3）：无运行时 P0/P1；提出 1 个 P1（bounty 用例第 3/4 轮断言在悬赏达标后必红，已按建议去掉悬赏分组）+ P2（3 处旧口径注释 + 2 处测试 docstring，已改）+ 1 条措辞建议（state 失效范围写准，已改）。审查期间该代理误用 git checkout 清掉未提交的 manager 改动，已用 .tmp_flee_backup 逐字节恢复
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- bd `-w07` 关闭（reason 引交付摘要）；`-2v2`（迎战/逃跑真实管线用例）因 blocks 解除自动回 ready
+- 下一张卡：世界 Boss 域（10-10-pve-world-boss-domain，前置已满足），其次是跨系统集成 E
