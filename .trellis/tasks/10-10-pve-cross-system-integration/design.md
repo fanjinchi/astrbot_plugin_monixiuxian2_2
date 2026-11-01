@@ -1,38 +1,48 @@
-# Technical Design: PVE 跨系统迁移与集成上线
+# Technical Design: PVE 跨系统收口（气血地板与消费者清零）
 
-## 1. Integration responsibility
+## 1. 边界与归属
 
-本 child 不重建 Health、Catalog、Persistence、Adventure、Boss 五个前置模块，也不接手基础 HP 消费者迁移；它关闭旧入口、接线新流程并证明组合系统满足父 AC。**唯一新增的领域职责是 PVE 气血地板收口**（2026-10-12 甲案：秘境兽 `challenge_rift_beast` 与传承守护者 `challenge_legacy_guardian` 沿用历练已定的 `ceil(1% * 动态 max_hp)` 战败地板、胜场不保底；PvP 不加地板；旧 `trigger_pve_combat`/`challenge_boss` 走退役不补），其余一律不新建。采用静态清单 + 端到端测试双重核对：每个旧 `hp` 命中必须已由 Health 归类/移除，每个旧 enemy/Boss 调用点必须被替换或注明专项兼容。
+- 本 child 不重建 Health/Catalog/Persistence/Adventure 模块；**不整删旧 Boss、不做内容 sync 与激活切流**（E2）。
+- 两项收口职责：① PVE 气血地板统一到 Health Domain（秘境兽、传承守护者，含宗门领取入口）；② 玩家侧暴击物化（设计 Step 3 定案③：`base_crit_rate` 进 config + `build_fighter_from_player` 传参）。
 
-## 2. Cutover sequence
+## 2. 地板 API（单源）
 
 ```text
-backup/fixtures
-  -> health v35 + all consumers already green
-  -> persistence v36…vN parity/repositories already green
-  -> catalog adapters validated (preview only; no draft sync)
-  -> ordinary PVE/Boss services wired but production entry remains disabled
-  -> combat/narrative approvals + manifest/hash
-  -> explicit sync + profile verification
-  -> one activation checkpoint: disable old ordinary/Boss entry + old poller/key, enable fixed roster + new poller
-  -> full regression/docs
+core/health.py
+  DEFEAT_HP_FLOOR_RATIO = 0.01
+  HealthService.defeat_hp_floor(player) -> int    # max(1, ceil(compute_max_hp(player) * ratio))
+managers/adventure_manager.py
+  _defeat_hp_floor -> 委托 health_service（standalone 无 Health Domain 时回退 base_hp）
+managers/pve_combat_manager.py
+  __init__(combat_mgr, enemy_mgr, config_manager=None, health_service=None)
+  main.py::_wire_core_services 注入 health_service
+  challenge_rift_beast / challenge_legacy_guardian:
+      won  -> engine_final
+      else -> max(engine_final, health_service.defeat_hp_floor(player))
+      写回 -> await health_service.set_current_hp(player, value)
+              （无 health_service 时回退旧内存赋值，standalone 测试夹具兼容）
 ```
 
-代码批准不自动越过“用户内容确认”门。若确认尚未发生，集成 task 可以完成到 disabled/config-fixture 状态并报告明确剩余 gate。
+- 战斗层直接落库：`rift_manager` 的 `update_player` 保留但不再是气血的权威写点（值一致、无竞态），其注释改口径；`sect_manager` 的失败分支（当前直接 return）与胜利分支（事务内重读旧快照）都不再吞掉战斗气血。
+- PvP（`handlers/combat_handlers.py` 切磋/决斗）保持引擎终值 + clamp，不加地板。
 
-## 3. Verification matrix
+暴击物化（Step 3 定案③）：`config/game_config.json` + `data/default_configs.py` 补 `combat.base_crit_rate=0.15`；`build_fighter_from_player` 传 `crit_rate=self._base_crit_rate`；怪物侧保持 `enemy_catalog.build_enemy_fighter` 的 per-enemy `crit_rate`（>0 覆盖、否则 0.15），**不读该 config 键**。
 
-- Health: create/breakthrough/equipment/technique/pill/shop/GM/PvP/PVE/rift/Boss/display；
-- Enemy: ordinary categories + rift beast + legacy guardian；**floor 收口**：秘境兽/守护者战败残血 ≥ `ceil(1% * 动态 max_hp)`、胜场按引擎终值，且与历练走同一 Health Domain 入口（不得在 handler 侧另写一遍公式）；
-- Ordinary PVE: direct/choice/flee success/flee failure/win/loss/restart/fatigue；
-- Boss: spawn/stage/cross-day/3-attempt/concurrent kill/dissipate/respawn/per-destination outbox failure；旧 `boss_next_spawn_time` 不再生效，旧/new poller 不可同时运行；
-- Time skip: fatigue、Boss expiry/respawn 到期字段走 registry；recovery anchor、pending、北京日期键不登记。GM 字段快进不改变恢复量/当日次数；经过量与跨日分别用可注入业务时钟验证。另验证 pending 无自动过期且 busy 可跨重启恢复/终态清除；
-- Governance: draft/缺 manifest/hash 漂移/列范围越权拒绝；`combat_status` 与 `narrative_status` 独立批准后 deterministic sync、运行时 profile hash/count。
+兼容：`AdventureManager` 删除本地 `DEFEAT_HP_FLOOR_RATIO` 后保留模块级 re-export（既有测试从 `_adv_mod` 导入）；`rift_manager` 的 `update_player` 保留但注释改为「非气血权威写点」。
 
-## 4. Rollback
+## 3. 事务叶子
 
-内容批准前只验证 disabled/fixture 接线，不改变生产入口。批准并完成 sync/profile 验证后，记录数据库备份、generated config hash 和旧/新入口开关位置；同一激活检查点同时停止旧普通/Boss 入口与旧 poller、删除/忽略旧 `system_config.boss_next_spawn_time` 真相源，并启用固定 roster/new lifecycle poller。任一动作失败则不启用新入口并恢复旧入口；失败时恢复代码+DB+生成配置为同一检查点，不做跨 schema 版本部分回滚或长期双运行。
+- 5 处按 `conn._txn_depth == 0` 才提交（与 `data/` 层 `_commit_if_standalone` 同一 idiom）：spirit_farm 种植、spirit_eye 生成/释放、bounty 过期扫描、dual_cultivation 发起请求。
+- 行号不写进文档，由审计脚本生成；bd `-dfb` 未修前禁止新增并发叶子路径。
 
-## 5. Documentation
+## 4. 验证矩阵
 
-架构文档描述深模块边界、事务/outbox 和字段所有权；状态报告区分“代码已就绪”“内容已确认/同步”“玩法已启用”；README/API 说明 current/max HP、逃跑和 Boss 次数/阶段，明确奖励经济仍待 Step 7。
+- 地板：历练（C 已交付）/ 秘境应邀 / 宗门领取 三入口；战败残血 ≥ `ceil(1% * 动态 max_hp)`、胜场不保底；max_hp 下降时 clamp。
+- 消费者：创角/突破/装备/功法/丹药/商店/GM/PvP/历练/秘境/传承/显示；静态搜索 `Player.hp` 归零（旧 Boss 实现白名单，E2 删除）。
+- 事务：5 处门控后静态审计为空；并发双击不提前提交。
+- 暴击：改 config `base_crit_rate` → 玩家 fighter 生效；`_base_crit_rate` 不再死读取；怪物侧不受影响；`DEFEAT_HP_FLOOR_RATIO` 旧 import 不断。
+- 质量门：完整 pytest + 产品范围 ruff。
+
+## 5. 回滚
+
+- 地板改动无 schema/config 变更，可单提交 revert；执行前备份 DB（RP1）。宗门/秘境写回变更用定向用例钉住，失败即回退该提交。

@@ -1,6 +1,6 @@
-{"file":".trellis/spec/backend/index.md","reason":"后端规范入口与总集成边界"}
-{"file":".trellis/spec/backend/database-guidelines.md","reason":"跨 schema cutover、备份与回滚检查"}
-{"file":".trellis/spec/backend/quality-guidelines.md","reason":"全量回归、文档和质量门要求"}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"全消费者、内容、领域、事件和 GM 链路验收"}
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"防止集成层重复实现四个领域模块"}
-{"file":".trellis/tasks/10-10-pve-enemy-world-boss-redesign/research/current-system-evidence.md","reason":"旧入口和消费者迁移清单的证据基线"}
+{"file":".trellis/spec/backend/index.md","reason":"后端规范入口与收口边界"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"事务叶子门控、全列回写与写回约束"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"地板/消费者/事务的测试与质量门要求"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"气血地板跨战斗/秘境/宗门/显示链路"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"地板 API 单源与 Health Domain 复用"}
+{"file":".trellis/tasks/10-10-pve-enemy-world-boss-redesign/research/current-system-evidence.md","reason":"旧语义/旧行号基线（以当日审计为准）"}

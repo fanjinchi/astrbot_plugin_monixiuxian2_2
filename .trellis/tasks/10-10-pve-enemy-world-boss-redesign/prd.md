@@ -10,12 +10,12 @@
 
 - `design_docs/content-design/pve-enemy-design.md:31-51` 已记录 Step 0–6 封板，核心范围为 28 只普通/精英/组内 Boss、3 只动态守护者和 4 只世界 Boss。
 - `design_docs/content-design/pve-enemy-design.md:346-417` 已定义地板/标模/天花板验收矩阵、胜率和 TTK；`design_docs/content-design/sim_pve_acceptance.py` 使用真实战斗引擎完成数值验收。
-- `design_docs/content-design/pve-enemy-design.md:607-614` 明确 Step 7 奖励经济总账尚未完成，因此最终掉落和世界 Boss 分账数值尚未封板。
+- `design_docs/content-design/pve-enemy-design.md:624-637` 明确 Step 7 奖励经济总账尚未完成，因此最终掉落和世界 Boss 分账数值尚未封板。
 - `design_docs/content-design/enemies.csv` 与 `design_docs/content-design/world_bosses.csv` 仍为 `status=draft`，叙事状态仍为占位；依照 `AGENTS.md:153-161`，未经用户确认不得同步进入正式配置。
 - ~~`models.py:95-167` 仍以单一 `Player.hp` 同时承载永久气血基础与战后当前气血~~ **已由 child A 关闭**：`Player` 现为 `base_hp` / `current_hp` / `health_recovered_at`（`models.py:127-129`），无 `hp` 字段；旧 `hp` 已无损迁移，未保留 alias。
-- `managers/enemy_manager.py:300-410` 的普通敌人仍按旧模板、玩家等级、经验派生和随机倍率生成；`managers/enemy_manager.py:412-503` 的定向怪物组仍服务守护者/秘境，需要保留兼容路径。（**运行时链路仍成立**：child B 交付了目录/mapper 与 preview 一致性，正式 28 只名册仍是 draft CSV、`config/enemies.json` 只有 3 条专项组，切流归 Batch 5/E 的内容门。）
-- ~~`managers/pve_combat_manager.py:193-208` 尚未把敌人境界、暴击、词缀和技能完整映射到 `FighterState`~~ **已由 child B 关闭**：映射收敛到 `managers/enemy_catalog.py::build_enemy_fighter`，`pve_combat_manager.py:200` 起只做转发；专项组也走同一 mapper。
-- `models_extended.py:104-117`、`data/migration.py:180-197`（行号已因 v36–v38 追加而漂移，现指向历练表）与 `managers/boss_manager.py:394-535` 尚不支持世界 Boss 每日次数、累计伤害、阶段、消散、幂等分账及完整出生快照；当前单场伤害计算还可能重复计入 Boss 的历史损血。（**表侧已由 child P 建好 v37/v38**，领域行为仍待 child D。）
+- `managers/enemy_manager.py:324-438`（`spawn_enemy`）的普通敌人仍按旧模板、玩家等级、经验派生和随机倍率生成；`managers/enemy_manager.py:439-552`（`spawn_enemy_from_group`）的定向怪物组仍服务守护者/秘境，需要保留兼容路径。（**运行时链路仍成立**：child B 交付了目录/mapper 与 preview 一致性，正式 28 只名册仍是 draft CSV、`config/enemies.json` 只有 3 条专项组，切流归 Batch 5/E2 的内容门。）
+- ~~`managers/pve_combat_manager.py:193-208` 尚未把敌人境界、暴击、词缀和技能完整映射到 `FighterState`~~ **已由 child B 关闭**：映射收敛到 `managers/enemy_catalog.py::build_enemy_fighter`，`pve_combat_manager.py:229-236` 只做转发；专项组也走同一 mapper。
+- `models_extended.py:104-117`、`data/migration.py:180-197`（行号已因 v36–v39 追加而漂移，现指向历练表）与 `managers/boss_manager.py:409-550` 尚不支持世界 Boss 每日次数、累计伤害、阶段、消散、幂等分账及完整出生快照；当前单场伤害计算还可能重复计入 Boss 的历史损血。（**表侧已由 child P 建好 v37/v38**，领域行为仍待 child D。）
 - 现有 `tests/test_pve_enemy.py`、`tests/test_boss.py` 固化了旧生成/结算语义；`functional_tests/cases/pve/pve-smoke.json` 仅覆盖入口可达性。
 - 已有 bd 总跟踪 `astrbot_plugin_monixiuxian2_2-9u2`；秘境生态 `-6ow` 与敌人/悬赏叙事 `-lky` 是独立后续，不应并入本轮战斗内核。
 
@@ -23,7 +23,7 @@
 
 ### R1. 规划与内容治理
 
-- 总任务必须映射为六个可独立验收的子任务（气血、固定目录、持久化/事务基座、普通 PVE、世界 Boss、集成），明确依赖顺序、集成门和回滚边界。
+- 总任务必须映射为可独立验收的子任务（当前 8 个：A 气血、B 固定目录、P 持久化/事务基座、F 逃跑契约重拍、C 普通 PVE 结算、D 世界 Boss、E1 跨系统收口、E2 内容激活与旧 Boss 整删切流），明确依赖顺序、集成门和回滚边界。
 - 已封板的数值/机制与仍为占位的叙事状态必须分别标识，不能用工程实施默认为内容定稿。
 - 正式敌人内容只能通过 `scripts/sync_content_to_config.py` 从 `design_docs/` 导入，禁止手改生成配置。
 - 守护者继续使用动态匹配兼容路径；本轮不宣称完成守护者胜率锚。
@@ -48,9 +48,9 @@
 ### R4. 普通 PVE 规则
 
 - 普通、精英和组内 Boss 的选择、胜负、TTK、当前气血回写、失败保底、疲劳及逃跑规则必须按封板设计执行。
-- 逃跑为**全部风险档**历练在战斗前给玩家的一次主动选择（2026-10-19 重拍，权威见 `design_docs/content-design/pve-enemy-design.md` §Q4）：成功则不进入战斗、`current_hp` 不变、本次历练机会消耗，收益只保留快照基础收益的 ×0.3、不掉落、不滚传承机缘，不产生击败事实或战败疲劳；失败则锁定同一只敌人立即正常开战，不得重复尝试或重掷敌人。战败同样不滚传承机缘（2026-10-20 定）。
-- 逃跑成功率必须为玩家/敌人身法关系的单调有界函数，具体系数经地板/标模/天花板模拟收口后写回权威设计；不得在工程实现中临时手拍。待选择状态必须可在重启后恢复并幂等消费，不能复用现有零惩罚、进程内的 `EncounterStore`。
-- 待选择首版不自动过期：玩家在迎战或逃跑终态提交前保持历练 busy，**用途是挡住「开始历练」**；终态必须原子清除 busy。此约束避免「放置坏遭遇后重开路线」。（原「利用等待触发空闲回血」的担忧随 R2 全时段恢复口径一并取消，pending 不需要改写 `user_cd.scheduled_time`。）
+- 逃跑为**全部风险档**历练在战斗前给玩家的一次主动选择（2026-10-19 重拍，权威见 `design_docs/content-design/pve-enemy-design.md` §Q4）：成功则不进入战斗、`current_hp` 不变、本次历练机会消耗，收益只保留快照基础收益的 ×0.3、不掉落、不滚传承机缘，不产生击败事实或战败疲劳（**不产生怪物击败事实 = `win_pve` 不推进；悬赏/师承的「完成历练」类进度照常推进**——设计 §Q4 特意保留的两个不同事实）；失败则锁定同一只敌人立即正常开战，不得重复尝试或重掷敌人。战败同样不滚传承机缘（2026-10-20 定）。
+- 逃跑成功率必须为玩家/敌人身法关系的单调有界函数；参数已于 2026-10-19 封板（`base_rate=0.95` / `slope_up=0.05` / `slope_down=0.35` / `floor=0.60` / `cap=1.00`，语义 = 后路可靠性基准，bd `-9hq` 零改动收口），只有名册 sync 后身法分布实质调整时才按同组锚点复算；不得在工程实现中临时手拍。待选择状态必须可在重启后恢复并幂等消费，不能复用现有零惩罚、进程内的 `EncounterStore`。
+- 待选择首版不自动过期：玩家在迎战或逃跑终态提交前保持历练 busy，**是全玩法锁：挡掉所有活动（不只「开始历练」），唯一出口是迎战/逃跑（设计意图，2026-10-12 与 C 归档 PRD 确认）**；终态必须原子清除 busy。此约束避免「放置坏遭遇后重开路线」。（原「利用等待触发空闲回血」的担忧随 R2 全时段恢复口径一并取消，pending 不需要改写 `user_cd.scheduled_time`。）
 - 路线疲劳必须持久化（写端与休整读端两端都切，不得继续以 `AdventureManager._route_cooldowns` 内存状态为权威）并纳入 GM 时间快进；构成为「基础休整时长按所走路线取值（scout 300 / journey 600 / hunt 900 / peril 1200 秒，胜负都追加）+ 仅真实战败再 +600 秒，写入取 `max` 不回退」，取消现网路线事件 `injury` 触发的 +600 分支。**疲劳粒度为每人一份全局窗口**（休整期内任何路线都不能开；乙案，2026-10-12 拍板）——这是对旧实现按路线独立休整的有意玩法收敛，旧语义从未成文；随之必须把「该路线尚在休整中 / 该路线休整 X 分钟」两处玩家文案改为全局表述。上述构成与粒度此前均未记录在 `design_docs`，已一并补写进 `pve-enemy-design.md` §Q4。
 - 运行时验收必须复用或等价复现设计模拟器的玩家标模和统计口径，防止“模拟通过、配置映射漂移”。
 - 在 Step 7 完成前，不得以临时奖励数字冒充正式经济设计。
@@ -59,7 +59,7 @@
 
 - 世界 Boss 从 4 只固定名册中生成，境界段随机，完整出生面板必须持久化并可在重启后无损恢复。
 - 每个实例必须具有明确的 `active -> defeated | dissipated` 状态转换、48 小时存活期，以及击杀后 12 小时/消散后 24 小时的下次生成资格。
-- 每名玩家每日最多挑战 3 次；每日按 `Asia/Shanghai`（北京时间）00:00 重置，部署机器时区不得改变规则；相关绝对时间戳必须纳入 GM 时间快进覆盖。
+- 每名玩家每日最多挑战 3 次；每日按 `Asia/Shanghai`（北京时间）00:00 重置，部署机器时区不得改变规则；实例 `expires_at`/`next_spawn_at` 等绝对时间戳必须纳入 GM 时间快进覆盖，**每日 `date_key` 不登记**（字段快进不得重置当日次数）。
 - 每场结算必须原子更新 Boss 当前气血、玩家当日次数、真实本场伤害、累计伤害和阶段；并发挑战不得超扣气血、超次数或产生多个末击者。
 - 三阶段阈值及属性变化必须按设计执行；阶段/击杀/消散先产生唯一业务事件，再按 platform/group 建 per-destination delivery。平台不支持 dedupe 时不承诺接收端 exactly-once；已 sent 目标不因其他目标失败重播，结果不确定目标进入人工处置。
 - Boss 结算必须产生可幂等消费的奖励资格/结算记录，使 Step 7 可以随后接入而不重写战斗事务。
@@ -73,9 +73,10 @@
 
 ### R7. 兼容、文档与质量
 
-- 数据库迁移必须覆盖旧玩家和已有 Boss 数据，并提供失败回滚/重试策略。
+- 数据库迁移必须覆盖旧玩家（v34→latest），并提供失败回滚/重试策略。
+- **旧 Boss 数据与结构直接放弃（2026-10-28 用户拍板）**：不迁移、不归档；旧 `boss` 表/旧 key/旧实现/旧测试的删除与新玩法启用在同一激活检查点执行（归 E2，`10-28-pve-content-activation`）。
 - 更新与实现不一致的 `design_docs/project-architecture.md`、`design_docs/current-design-report.md`、`design_docs/README.md` 及相关 API 文档。
-- 每个子任务必须包含定向单元测试；总集成必须通过 `uv run ruff format .`、`uv run ruff check .` 和 `uv run python -m pytest tests/ -v`。
+- 每个子任务必须包含定向单元测试；总集成必须通过 `uv run ruff format .`、**产品范围** ruff（`uv run ruff check core managers handlers data utils main.py models.py models_extended.py tests`；`.trellis/scripts` 的 70 条存量不属产品范围）和 `uv run python -m pytest tests/ -v`。
 - 真实 webtest 只在用户明确要求时运行；项目内功能用例应扩充次数、阶段、台账、消散、重启恢复和奖励幂等场景。
 
 ## In Scope
@@ -85,6 +86,7 @@
 - 固定普通敌人名册运行时及战斗引擎接线。
 - 普通 PVE 战后规则。
 - 世界 Boss 实例、阶段、次数、伤害台账、广播和重启恢复。
+- 旧 Boss 实现/表/键/测试整删（数据不迁移不归档，2026-10-28 拍板；随 E2 激活检查点执行）。
 - 为未来 Step 7 提供稳定的战斗结算事实与奖励消费接口，但不实施新掉落/分账数值。
 - 单元、配置一致性、迁移和功能用例补强。
 
@@ -100,13 +102,15 @@
 
 ## Acceptance Criteria
 
-- [x] AC1：总任务拆为六个有明确依赖、验收门和回滚点的子任务，且父任务不承载无法独立验证的一锅端实现。（A 气血、B 目录、P 基座已归档；C 结算、D 世界 Boss 待做，E 集成收尾。）
-- [ ] AC2：旧玩家迁移后永久气血基础不丢失，当前气血合法；所有已知 HP 消费者通过新契约及定向回归测试。（**child A 已交付迁移与 Health Domain**；全消费者组合复核归 E，且 R2 的恢复口径已按 2026-10-12 决议改为全时段，验收以变更后的口径为准。）
-- [ ] AC3：28 只名册敌人的关键战斗字段在 CSV、生成配置、Enemy 和 Fighter 四层逐项一致；旧普通怪派生路径不再生效，守护/秘境兼容测试通过。（**child B 只完成 preview 链路一致性**；正式 generated config 复验与旧派生退役明确留给父计划 Batch 5 内容门 + E。）
-- [ ] AC4（地板边界 2026-10-12 甲案）：历练侧 1% 地板由 child C 落地；秘境兽/传承守护者由 child E「PVE 气血地板收口」统一；PvP 写回点不适用 PVE 地板。普通、精英、组内 Boss 在运行时回归中满足设计胜率/TTK/资源税门，且败场气血、疲劳和逃跑行为可观察验证。（归 child C；注意 R2 全时段恢复会让实际资源税低于附录 C.6 的 14-17%，验收时须记录该口径差，不得当作模拟失败。）
-- [ ] AC5：世界 Boss 在重启、跨日、过期与并发挑战下保持单一合法状态；次数、真实伤害、累计台账、阶段和唯一末击者均可验证。
+- [x] AC1：总任务拆为有明确依赖、验收门和回滚点的子任务（8 个），且父任务不承载无法独立验证的一锅端实现。（A 气血、B 目录、P 基座、C 结算、F 逃跑重拍已归档（2026-10-12～10-28）；D 世界 Boss 规划中；E1 收口、E2 内容激活待做。）
+- [ ] AC2：旧玩家迁移后永久气血基础不丢失，当前气血合法；所有已知 HP 消费者通过新契约及定向回归测试。（**child A 已交付迁移与 Health Domain**；全消费者组合复核归 E1，且 R2 的恢复口径已按 2026-10-12 决议改为全时段，验收以变更后的口径为准。）
+- [x] AC3a（可关闭）：28 只名册敌人的关键战斗字段在 CSV、临时 preview 生成配置、Enemy 和 Fighter 四层逐项一致，守护/秘境兼容测试通过。（child B 已交付并归档：真实 CSV → preview 28+4 四层一致。）
+- [ ] AC3b（**外部门：用户内容批准**）：正式 `config/enemies.json`（schema v2）生效、**旧普通怪派生路径退役且不可达；新名册经 E2 AC2 在历练/秘境默认路径可达**。（归 E2；未批准时保持现行 config 与旧路径。）
+- [ ] AC4（地板边界 2026-10-12 甲案）：历练侧 1% 地板由 child C 落地（已归档）；秘境兽/传承守护者由 E1「PVE 气血地板收口」统一（含宗门领取入口）；PvP 写回点不适用 PVE 地板；败场气血、疲劳和逃跑行为可观察验证。（**数值回归不在本 AC**：普通/精英/组内 Boss 的胜率/TTK/资源税对照已移交 bd `astrbot_plugin_monixiuxian2_2-9u2`（open）。资源税口径以权威设计附录 C.6 为准——全时段回血下「连刷税率不需要重算、仍在 12-20% 带内」（`pve-enemy-design.md:985-993`），不得把 C.5 的 14-17% 当作递进验收线。）
+- [ ] AC5：世界 Boss 在重启、跨日、过期与并发挑战下保持单一合法状态；次数、真实伤害、累计台账、阶段和唯一末击者均可验证；世界 Boss 地板沿用 Q4 1% 口径（每场按败场口径、含末击场），HP 锚验收以 D AC9 为准并由 E2 复跑。
 - [ ] AC6：阶段/击杀/消散业务事件唯一，per-destination partial success 隔离，已 sent 目标不重播且 uncertain 可审计人工处置；本轮能持久化供未来奖励消费的贡献与末击事实，但不引入任何未经 Step 7 确认的新经济数值。
-- [ ] AC7：迁移测试、定向测试、完整 pytest、ruff 以及内容同步双闸门全部通过；玩法与架构文档和实际实现一致。
+- [ ] AC7a（可关闭）：迁移测试、定向测试、完整 pytest、**产品范围 ruff** 通过；玩法与架构文档和实际实现一致。
+- [ ] AC7b（**外部门：用户内容批准**）：内容同步双闸门（combat/narrative 独立批准、manifest/hash/列范围）通过后再激活；未批准时以「代码就绪、内容待批」记录结案。（归 E2。）
 
 ## Resolved Product Decisions
 
@@ -117,3 +121,4 @@
 - 气血采用 `base_hp` / `current_hp` / 动态 `max_hp` 三层命名，旧 `hp` 迁移后不保留兼容别名；此决定避免把永久基础值误称为会受装备变化的最终上限。
 - 逃跑采用**全风险档**战斗前一次主动判定（2026-10-19 重拍，见 §Q4）：成功跳过战斗且收益只留 ×0.3、不掉落不滚传承，失败锁定同一敌人开战；成功率参数已封板（bd `-9hq` 零改动收口，语义 = 后路可靠性基准）。
 - **2026-10-12 追加决议（C 规划审查）**：① 惰性气血恢复取消「仅空闲」闸门，改全时段计时（连带使 pending 不必改写 `user_cd.scheduled_time`，`BusyState` 不需要新 API；闭关出关接近满血是该口径的直接后果，已知情）；② 历练基础休整时长（按所走路线取 300/600/900/1200 秒）**保留**，仅取消路线事件 `injury` 的 +600 分支，战败 +600 保留；③ child C 获准用 **v39** 为 `adventure_settlements` 增 `state`/`route_key`/`snapshot` 列（走共享建表函数保持 fresh==upgrade parity），因为 v36 冻结的只是事实账本、v37 世界 Boss 表才是状态机形态，两者不对称；④ 历练副作用消费采用「提交后 inline claim」而非 v38 广播 outbox——历练消费者都是本地调用，套投递队列是过度设计；⑤ 迎战/逃跑指令定名为顶层 `迎战`、`逃跑`；⑥ 疲劳粒度定**乙案 = 每人一份全局窗口**（一条路线的休整挡住所有路线；这是对旧实现按路线独立休整的有意收敛，旧语义从未成文，随之「该路线尚在休整中」等玩家文案必须改为全局表述；`adventure_fatigue` 表与基座单行 API 不动，v39 不涉及疲劳表）；⑦ 逃跑参数未封板时**战前选择面整体 disabled**（完成时直接进战斗，不产生 `pending_choice`，避免玩家空发一条「迎战」却毫无选择收益）。（**已被 2026-10-19 重拍覆盖**：参数已封板、选择面扩至全风险段，见上文该日决议。）
+- **2026-10-28 追加决议（评审收口）**：① 旧 Boss 数据与结构直接放弃——不迁移、不归档，旧表/旧 key/旧实现/旧测试/配置三元组（`boss_config.json` + `BOSS_CONFIG` + loader）与 `lint_narrative` 脱钩在内容批准后的激活检查点整删（归 E2）；② 子任务改为 8 个，E 拆为 E1（代码收口，可关闭）与 E2（内容激活+整删+切流，外部门）；③ AC3/AC7 拆「可关闭」与「外部门」两段，AC4 的胜率/TTK/资源税数值回归移交 bd `-9u2`；④ 世界 Boss 5 个叙事文案随 profile 契约携带（B 的 `core/enemy_schema` 小扩展 + 出生快照），不在代码硬编码。

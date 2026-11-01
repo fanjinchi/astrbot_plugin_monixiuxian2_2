@@ -6,7 +6,7 @@
 
 1. 玩家 `base_hp` / `current_hp` / 动态 `max_hp` 三层气血；
 2. 28 只普通 PVE 固定名册与现有秘境兽/传承守护兼容；
-3. 普通 PVE 持续气血、持久疲劳和高/极高风险战前逃跑；
+3. 普通 PVE 持续气血、持久疲劳和全风险段战前逃跑（2026-10-19 重拍，见 §Q4）；
 4. 4 只世界 Boss 的固定出生快照、生命周期、每日次数、贡献台账和阶段；
 5. 提交后事件、迁移、质量门与集成上线。
 
@@ -17,10 +17,9 @@ Step 7 正式奖励经济不在本次实现范围。本次只产出以后可安�
 ```mermaid
 flowchart LR
     D[design_docs 已确认内容] --> S[sync_content_to_config]
-    S --> C1[config/enemies.json]
-    S --> C2[config/world_bosses.json]
+    S --> C1[config/enemies.json（v2：名册 + world_bosses 段）]
     C1 --> ER[Enemy Catalog / Resolver]
-    C2 --> BR[World Boss Catalog]
+    C1 --> BR[World Boss Catalog]
 
     PDB[(players)] --> HP[Player Health Domain]
     CD[(user_cd / health anchor)] --> HP
@@ -67,9 +66,9 @@ flowchart LR
 - 将旧 `players.hp` 的值迁至 `players.base_hp`；
 - v35 优先 rename `players.hp`→`base_hp` 并 add `current_hp`、`health_recovered_at`；现有玩家由迁移检查点的一次性 backfill 读取装备/功法等有效加成，初始化为迁移瞬间动态 `max_hp`，不得延迟到普通首次读取；
 - 新玩家 `base_hp` 和 `current_hp` 由创角契约显式初始化；
-- Persistence child 独占连续 v36…vN 及每版 fresh DDL parity；C/D 只消费共享 schema/repository。覆盖 v34→latest 不 reset、版本只在成功后推进、重复启动和旧数据加载测试。
+- Persistence child（P）独占 v36…v38；C 获准 v39（2026-10-12 决议，`adventure_settlements` 状态机列，走共享建表函数保持 fresh==upgrade parity）；D 只消费共享 schema/repository、不新增版本。覆盖 v34→latest 不 reset、版本只在成功后推进、重复启动和旧数据加载测试。
 
-Health Domain 提供单一入口完成：动态上限计算、`current_hp` clamp、空闲恢复惰性结算、战后写回和展示快照。由于 `user_cd` 每用户只有一行，不能事后重建活动区间；所有 `BusyState.set_busy(...)` / `clear(...)` 及权威旁路必须在状态转换前按旧状态结算并推进持久锚点。idle 才按每个完整/折算分钟恢复 `1% * max_hp`，busy 只推进锚点；不能用常驻 per-player 定时器，也不能只读 `players.state` 镜像。
+Health Domain 提供单一入口完成：动态上限计算、`current_hp` clamp、按经过时间的气血恢复结算、战后写回和展示快照。由于 `user_cd` 每用户只有一行，不能事后重建活动区间；所有 `BusyState.set_busy(...)` / `clear(...)` 及权威旁路必须在状态转换前按旧状态结算并推进持久锚点。按锚点到当前的完整分钟线性恢复 `1% * max_hp`，**不判断 `user_cd`/忙闲**（2026-10-12 拍板全时段计时）；不能用常驻 per-player 定时器，也不能只读 `players.state` 镜像。
 
 ### 3.2 普通敌人目录
 
@@ -85,11 +84,11 @@ Health Domain 提供单一入口完成：动态上限计算、`current_hp` clamp
 
 1. 所有风险档在历练开始生成唯一 `adventure_run_id`；历练完成时都先持久化 settlement、enemy/profile、路线收益、combat snapshot 和固定 RNG，不得走无记录同步旁路；
 2. **遇敌即进入 `pending_choice`（2026-10-19 重拍：全风险段给选择）**，未遇敌的完成直通 `resolved_win`；首版不自动过期；
-3. 玩家只能对该 pending 选择一次迎战或逃跑；重启后仍可恢复；pending 期间保留历练 busy 并阻止新历练和空闲回血，终态消费用条件更新或事务锁保证一次性并原子 clear busy；
-4. 逃跑成功不创建战斗/击败/失败事实，保留 `current_hp`，收益只留快照基础收益 ×0.3、不掉落、不滚传承机缘（§Q4 重拍）；逃跑失败使用 pending 中同一 enemy id 立即开战，不可重掷或重试；战败同样不滚传承；
+3. 玩家只能对该 pending 选择一次迎战或逃跑；重启后仍可恢复；pending 期间保留历练 busy 并阻止新历练（**全玩法锁**，唯一出口迎战/逃跑；气血恢复按全时段计时照常，不受 pending 影响），终态消费用条件更新或事务锁保证一次性并原子 clear busy；
+4. 逃跑成功不创建战斗/击败/失败事实（`win_pve` 不推进，但悬赏/师承「完成历练」类进度照常推进——设计 §Q4 特意保留的两个事实），保留 `current_hp`，收益只留快照基础收益 ×0.3、不掉落、不滚传承机缘（§Q4 重拍）；逃跑失败使用 pending 中同一 enemy id 立即开战，不可重掷或重试；战败同样不滚传承；
 5. 逃跑概率实现为单调有界、可配置且可独立模拟的身法关系函数；参数已封板且只存在于配置（`config/adventure_config.json` + `data/default_configs.py`），代码不另拍数值。
 
-疲劳从 `AdventureManager._route_cooldowns` 搬到持久字段/表。只有实际战败追加 600 秒；战败后 `current_hp = max(current_hp_after_battle, ceil(0.01 * max_hp))`（2026-10-12 由 0.25 下调；胜场不保底）。pending 首版无自动过期、也不加取消出口（用户拍板：全玩法锁即设计，`逃跑` 就是后路）；疲劳结束登记 GM time-skip。恢复锚点不是 expiry、不登记 SQL 字段快进；当前 `/时间快进` 只前移注册字段，不改变业务时钟，因此不会额外制造空闲恢复。恢复经过量与跨日行为分别用可注入业务时钟测试。
+疲劳从 `AdventureManager._route_cooldowns` 搬到持久字段/表。只有实际战败追加 600 秒；战败后 `current_hp = max(current_hp_after_battle, ceil(0.01 * max_hp))`（2026-10-12 由 0.25 下调；胜场不保底）。pending 首版无自动过期、也不加取消出口（用户拍板：全玩法锁即设计，`逃跑` 就是后路）；疲劳结束登记 GM time-skip。恢复锚点不是 expiry、不登记 SQL 字段快进；当前 `/时间快进` 只前移注册字段，不改变业务时钟，因此不会额外制造气血恢复。恢复经过量与跨日行为分别用可注入业务时钟测试。
 
 路线上收益与战斗事实通过明确的 settlement result 传回；本次只保留现有路线基础收益，不引入 Step 7 新奖励。
 
@@ -97,7 +96,7 @@ Health Domain 提供单一入口完成：动态上限计算、`current_hp` clamp
 
 #### 内容快照
 
-`config/world_bosses.json` 承载 4 只固定档案。生成活动实例时复制不可变出生快照（profile id/version、名称、境界、最大 HP、五维、技能和阶段规则）到实例，活动期间不因配置热更新重算。
+`config/enemies.json`（schema v2 的 `world_bosses` 段，单文档）承载 4 只固定档案。生成活动实例时复制不可变出生快照（profile id/version、名称、境界、最大 HP、五维、技能和阶段规则）到实例，活动期间不因配置热更新重算。
 
 难度倍率与普通 PVE 同义，只乘伤害。不得复用旧的 level/exp 随机推导或即时奖励字段。
 
@@ -129,7 +128,7 @@ stateDiagram-v2
 
 阶段由剩余 HP 比例确定：60% 与 20% 阈值；阶段 2 伤害×1.10，阶段 3 伤害×0.90/护甲×0.50。阈值只前进不回退，阶段事件每实例每阶段至多一条。
 
-数据表可按职责拆为实例、daily attempts、贡献/挑战 ledger 和 outbox；最终字段名由子任务实现设计固定，但必须有稳定 instance id、日期键/用户唯一约束和事件去重键。
+数据表已由持久化基座 P 冻结为 v37（实例/挑战/每日次数/台账/贡献）与 v38（business events/event_deliveries）；D 只消费该 schema，不得重命名或另建迁移版本。稳定 instance id、日期键/用户唯一约束和事件去重键已由这两版冻结。
 
 ### 3.5 稳定结算事实与 Step 7 边界
 
@@ -146,7 +145,7 @@ stateDiagram-v2
 1. `design_docs/` 中内容必须先由用户确认并标为可同步状态；
 2. 只有明确执行 `scripts/sync_content_to_config.py` 才写 `config/`。
 
-当前 CSV 为 `status=draft`、`narrative_status=占位`，因此规划和 adapter 可实施，但不得在未获用户确认时生成正式运行时配置。正式 adapter 必须校验独立 `combat_status=final`（或等价字段）及 approval manifest；manifest 绑定 CSV SHA-256、获批数据集/列范围和叙事决策。战斗数值可单独批准，叙事占位不得被整表状态隐式放行；draft/缺 manifest/hash 漂移/列范围越权均 fail closed。同步必须稳定排序、确定性输出、校验 28+4 数量/唯一 id/枚举/数值边界/阶段阈值，并有 golden/schema 测试。
+当前 CSV 为 `status=draft`、`narrative_status=占位`，因此规划和 adapter 可实施，但不得在未获用户确认时生成正式运行时配置。正式 adapter 必须校验独立 `status=final`（`enemies.csv` / `world_bosses.csv` 的战斗数值列，等价于战斗数值独立批准）及 approval manifest；manifest 绑定 CSV SHA-256、获批数据集/列范围和叙事决策。战斗数值可单独批准，叙事占位不得被整表状态隐式放行；draft/缺 manifest/hash 漂移/列范围越权均 fail closed。同步必须稳定排序、确定性输出、校验 28+4 数量/唯一 id/枚举/数值边界/阶段阈值，并有 golden/schema 测试。
 
 ## 5. 事务、并发与幂等
 
@@ -171,7 +170,7 @@ Handler 只做输入解析、调用领域服务和格式化输出。Combat engin
 
 ### 单元/契约
 
-- `base_hp` 聚合、动态 `max_hp`、current clamp、空闲区间恢复和属性下降；
+- `base_hp` 聚合、动态 `max_hp`、current clamp、按经过时间的气血恢复和属性下降；
 - 固定目录解析、只乘伤害、Enemy→Fighter 完整映射、专项组兼容；
 - 逃跑概率单调/上下界、同敌人锁定、pending 单次消费；
 - Boss 阶段阈值、真实伤害差、北京日边界、生命周期转换和事件去重。
@@ -206,13 +205,15 @@ uv run python -m pytest tests/ -v
 
 在内容同步前做用户确认检查；在启用新 Boss 轮询前停用旧随机生成和旧即时奖励路径。回滚优先恢复代码并从数据库备份恢复，因为删除 `hp` alias 后不承诺新旧版本同时读写；迁移子任务须给出备份、校验与失败恢复步骤。
 
+**旧 Boss 数据与结构直接放弃（2026-10-28 用户拍板）**：不迁移、不归档；旧 `boss` 表、`system_config.boss_next_spawn_time`、旧 CRUD/poller/广播/旧测试在内容批准后的同一激活检查点整删（含 v40 `DROP TABLE IF EXISTS boss`），回滚走 git revert + 同期 DB/config 备份，不做旧/new 双运行。
+
 ## 9. 关键风险与对策
 
 | 风险 | 对策 |
 |---|---|
 | `Player.hp` 消费者遗漏导致永久属性或当前血条错写 | 禁止 alias；全仓静态搜索 + 跨功能回归；Health Domain 单写入边界 |
 | 内容 draft 被误同步 | 用户确认 + 显式 sync 双闸门；当前 child 只实现 adapter/schema |
-| 逃跑公式未封板 | 先提供模拟与配置槽；参数回写设计后才启用高/极高风险交互 |
+| 逃跑公式曾未封板 | 2026-10-19 已封板并落地全风险段；后续调参须先回写权威设计（§Q4） |
 | pending 造成收益重复领取 | 持久状态机、幂等键、同事务消费路线 settlement |
 | Boss 并发超扣/重复末击 | `BEGIN IMMEDIATE` 事务、条件终态更新、唯一约束和并发测试 |
 | 广播与事务耦合 | 提交后 outbox；网络发送不持数据库锁 |

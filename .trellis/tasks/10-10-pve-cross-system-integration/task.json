@@ -1,8 +1,8 @@
 {
   "id": "pve-cross-system-integration",
   "name": "pve-cross-system-integration",
-  "title": "PVE 跨系统迁移与集成上线",
-  "description": "迁移所有气血消费者，移除旧动态敌人和旧 Boss 奖励路径，完成时间快进、广播、回归与上线检查。",
+  "title": "PVE 跨系统收口：气血地板与消费者清零",
+  "description": "收口秘境兽/传承守护者 PVE 气血地板（含宗门领取入口）、组合复核全部气血消费者、清零 data/ 之外事务叶子，完成文档与版本收尾；旧 Boss 整删与内容激活切流归 E2（10-28-pve-content-activation）。",
   "status": "planning",
   "dev_type": null,
   "scope": null,
