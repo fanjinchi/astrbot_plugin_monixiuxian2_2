@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/index.md","reason":"后端规范入口与激活切流边界"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"v40 DROP 迁移、fresh/升级 parity 与事务约束"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"端到端、并发、重启与完整质量门证据"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"内容 sync→config→catalog→领域→poller→广播全链路"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"旧实现整删后不留双真相源，复用 Health/Outbox/registry"}
