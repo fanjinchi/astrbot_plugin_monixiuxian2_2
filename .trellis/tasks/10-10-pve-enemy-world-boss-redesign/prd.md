@@ -13,7 +13,7 @@
 - `design_docs/content-design/pve-enemy-design.md:624-637` 明确 Step 7 奖励经济总账尚未完成，因此最终掉落和世界 Boss 分账数值尚未封板。
 - `design_docs/content-design/enemies.csv` 与 `design_docs/content-design/world_bosses.csv` 仍为 `status=draft`，叙事状态仍为占位；依照 `AGENTS.md:153-161`，未经用户确认不得同步进入正式配置。
 - ~~`models.py:95-167` 仍以单一 `Player.hp` 同时承载永久气血基础与战后当前气血~~ **已由 child A 关闭**：`Player` 现为 `base_hp` / `current_hp` / `health_recovered_at`（`models.py:127-129`），无 `hp` 字段；旧 `hp` 已无损迁移，未保留 alias。
-- `managers/enemy_manager.py:324-438`（`spawn_enemy`）的普通敌人仍按旧模板、玩家等级、经验派生和随机倍率生成；`managers/enemy_manager.py:439-552`（`spawn_enemy_from_group`）的定向怪物组仍服务守护者/秘境，需要保留兼容路径。（**运行时链路仍成立**：child B 交付了目录/mapper 与 preview 一致性，正式 28 只名册仍是 draft CSV、`config/enemies.json` 只有 3 条专项组，切流归 Batch 5/E2 的内容门。）
+- `managers/enemy_manager.py:324-438`（`spawn_enemy`）的普通敌人仍按旧模板、玩家等级、经验派生和随机倍率生成；`managers/enemy_manager.py:439-552`（`spawn_enemy_from_group`）的定向怪物组仍服务守护者/秘境，需要保留兼容路径。（**运行时链路仍成立**：child B 交付了目录/mapper 与 preview 一致性，正式 28 只名册仍是 draft CSV、`config/enemies.json` 仍是 5 组旧模板（low/mid/high/top/legacy_guardian），切流归 Batch 5/E2 的内容门。）
 - ~~`managers/pve_combat_manager.py:193-208` 尚未把敌人境界、暴击、词缀和技能完整映射到 `FighterState`~~ **已由 child B 关闭**：映射收敛到 `managers/enemy_catalog.py::build_enemy_fighter`，`pve_combat_manager.py:229-236` 只做转发；专项组也走同一 mapper。
 - `models_extended.py:104-117`、`data/migration.py:180-197`（行号已因 v36–v39 追加而漂移，现指向历练表）与 `managers/boss_manager.py:409-550` 尚不支持世界 Boss 每日次数、累计伤害、阶段、消散、幂等分账及完整出生快照；当前单场伤害计算还可能重复计入 Boss 的历史损血。（**表侧已由 child P 建好 v37/v38**，领域行为仍待 child D。）
 - 现有 `tests/test_pve_enemy.py`、`tests/test_boss.py` 固化了旧生成/结算语义；`functional_tests/cases/pve/pve-smoke.json` 仅覆盖入口可达性。
@@ -105,7 +105,7 @@
 - [x] AC1：总任务拆为有明确依赖、验收门和回滚点的子任务（8 个），且父任务不承载无法独立验证的一锅端实现。（A 气血、B 目录、P 基座、C 结算、F 逃跑重拍已归档（2026-10-12～10-28）；D 世界 Boss 规划中；E1 收口、E2 内容激活待做。）
 - [ ] AC2：旧玩家迁移后永久气血基础不丢失，当前气血合法；所有已知 HP 消费者通过新契约及定向回归测试。（**child A 已交付迁移与 Health Domain**；全消费者组合复核归 E1，且 R2 的恢复口径已按 2026-10-12 决议改为全时段，验收以变更后的口径为准。）
 - [x] AC3a（可关闭）：28 只名册敌人的关键战斗字段在 CSV、临时 preview 生成配置、Enemy 和 Fighter 四层逐项一致，守护/秘境兼容测试通过。（child B 已交付并归档：真实 CSV → preview 28+4 四层一致。）
-- [ ] AC3b（**外部门：用户内容批准**）：正式 `config/enemies.json`（schema v2）生效、**旧普通怪派生路径退役且不可达；新名册经 E2 AC2 在历练/秘境默认路径可达**。（归 E2；未批准时保持现行 config 与旧路径。）
+- [ ] AC3b（**外部门：用户内容批准**）：正式 `config/enemies.json`（schema v2）生效、**运行态下旧普通怪派生不再被普通 PVE 命中（代码静态保留，仅 `catalog=None` / 未批准 / 回滚态可达）；新名册经 E2 AC2 在历练/秘境默认路径可达**。（归 E2；未批准时保持现行 config 与旧路径。）
 - [ ] AC4（地板边界 2026-10-12 甲案）：历练侧 1% 地板由 child C 落地（已归档）；秘境兽/传承守护者由 E1「PVE 气血地板收口」统一（含宗门领取入口）；PvP 写回点不适用 PVE 地板；败场气血、疲劳和逃跑行为可观察验证。（**数值回归不在本 AC**：普通/精英/组内 Boss 的胜率/TTK/资源税对照已移交 bd `astrbot_plugin_monixiuxian2_2-9u2`（open）。资源税口径以权威设计附录 C.6 为准——全时段回血下「连刷税率不需要重算、仍在 12-20% 带内」（`pve-enemy-design.md:985-993`），不得把 C.5 的 14-17% 当作递进验收线。）
 - [ ] AC5：世界 Boss 在重启、跨日、过期与并发挑战下保持单一合法状态；次数、真实伤害、累计台账、阶段和唯一末击者均可验证；世界 Boss 地板沿用 Q4 1% 口径（每场按败场口径、含末击场），HP 锚验收以 D AC9 为准并由 E2 复跑。
 - [ ] AC6：阶段/击杀/消散业务事件唯一，per-destination partial success 隔离，已 sent 目标不重播且 uncertain 可审计人工处置；本轮能持久化供未来奖励消费的贡献与末击事实，但不引入任何未经 Step 7 确认的新经济数值。

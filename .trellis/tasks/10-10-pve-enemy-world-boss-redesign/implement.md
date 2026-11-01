@@ -78,7 +78,7 @@ A 与 B 可并行；A 的 v35/Health 契约稳定后执行 P；P 与 B 均通过
 
 - 向用户展示最终 28+4 CSV 的 `status`/`narrative_status`、批准 manifest/hash/列范围、逃跑参数和生成 diff。
 - 用户明确确认后才运行 `scripts/sync_content_to_config.py`。
-- adapter 仅接受 `status=final`（`enemies.csv` / `world_bosses.csv` 的战斗数值列；等价于独立战斗数值批准）+ 显式 CLI approval manifest；校验 count/id/schema/hash 后，在同一激活检查点：整删旧 Boss 实现/表/键/测试（清单见 E2 PRD R3；含 v40 `DROP TABLE IF EXISTS boss`），**沿用 D 的 catalog 装配（不重复装配）**、注册新 lifecycle poller（指数退避）与新 handler，**同批执行普通 PVE 调用方切流**（E2 R2：默认出怪改走固定名册、难度系数显式传入、退役旧派生、删 `enemy_groups.top`），再执行最终功能回归。叙事可否使用占位内容由 manifest 单独记录批准 hash 与列范围，不得把整份 draft 模糊升 final。
+- adapter 仅接受 `status=final`（`enemies.csv` / `world_bosses.csv` 的战斗数值列；等价于独立战斗数值批准）+ 显式 CLI approval manifest；校验 count/id/schema/hash 后，在同一激活检查点：整删旧 Boss 实现/表/键/测试（清单见 E2 PRD R3；含 v40 `DROP TABLE IF EXISTS boss`），**沿用 D 的 catalog 装配（不重复装配）**、注册新 lifecycle poller（指数退避）与新 handler，**同批执行普通 PVE 调用方切流**（E2 R2：默认出怪改走固定名册、难度系数显式传入、退役旧派生（静态保留为 v1 回落）、删 `enemy_groups` 中 `key=top` 的组），再执行最终功能回归。叙事可否使用占位内容由 manifest 单独记录批准 hash 与列范围，不得把整份 draft 模糊升 final。
 - 若 sync、验证或 cutover 任一步失败，新入口不得启用；按 RP 恢复同一代码/DB/config 组合，禁止旧/new 双运行。
 - 若用户暂不确认，任务状态应准确记录为“代码就绪、内容启用门待确认”，旧生产入口维持原状，不能伪装完成上线。
 

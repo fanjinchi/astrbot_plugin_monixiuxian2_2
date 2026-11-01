@@ -189,11 +189,11 @@ Handler 只做输入解析、调用领域服务和格式化输出。Combat engin
 - GM time-skip 覆盖疲劳与 Boss expiry/respawn 到期字段；health anchor、pending、北京日期键不注册，实际 SQL 字段快进不改变恢复量/当日次数；恢复经过量和跨日另用可注入业务时钟验证，pending 以 busy 状态跨重启恢复；
 - 设计模拟器/运行时使用相同标模口径，验证 TTK、胜率和逃跑函数参数。
 
-每个代码 child 通过 AstrBot 根目录质量门：
+每个代码 child 通过 AstrBot 根目录质量门（ruff 只跑产品范围，`.trellis/scripts` 的存量告警不计入）：
 
 ```bash
 uv run ruff format .
-uv run ruff check .
+uv run ruff check core managers handlers data utils main.py models.py models_extended.py tests
 uv run python -m pytest tests/ -v
 ```
 

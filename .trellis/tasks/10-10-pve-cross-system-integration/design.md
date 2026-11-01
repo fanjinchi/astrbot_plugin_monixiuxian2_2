@@ -23,12 +23,12 @@ managers/pve_combat_manager.py
               （无 health_service 时回退旧内存赋值，standalone 测试夹具兼容）
 ```
 
-- 战斗层直接落库：`rift_manager` 的 `update_player` 保留但不再是气血的权威写点（值一致、无竞态），其注释改口径；`sect_manager` 的失败分支（当前直接 return）与胜利分支（事务内重读旧快照）都不再吞掉战斗气血。
+- 战斗层直接落库：`managers/rift_manager.py` 的 3 处 `await self.db.update_player(player)`（胜利/失败/传承分支）保留，但不再是气血的权威写点（写回值一致，`set_current_hp` 已同步内存对象；**不宣称无竞态**——整行回写仍受 AGENTS §3 约束），其注释改口径；`sect_manager` 的失败分支（当前直接 return）与胜利分支（事务内重读旧快照）都不再吞掉战斗气血。
 - PvP（`handlers/combat_handlers.py` 切磋/决斗）保持引擎终值 + clamp，不加地板。
 
-暴击物化（Step 3 定案③）：`config/game_config.json` + `data/default_configs.py` 补 `combat.base_crit_rate=0.15`；`build_fighter_from_player` 传 `crit_rate=self._base_crit_rate`；怪物侧保持 `enemy_catalog.build_enemy_fighter` 的 per-enemy `crit_rate`（>0 覆盖、否则 0.15），**不读该 config 键**。
+暴击物化（Step 3 定案③）：`config/game_config.json` + `data/default_configs.py` 补 `combat.base_crit_rate=0.15`；`build_fighter_from_player` 传 `crit_rate=self._base_crit_rate`；怪物侧 per-enemy `crit_rate`（>0）优先，未配置时取同一 `combat.base_crit_rate`——封板原文是「两个构建点统一从该键取值」，若实现期决定怪物侧不接该键，必须在 `pve-enemy-design.md` 附录 B 记为已决「单旋钮仅玩家侧生效」，不得静默收窄。
 
-兼容：`AdventureManager` 删除本地 `DEFEAT_HP_FLOOR_RATIO` 后保留模块级 re-export（既有测试从 `_adv_mod` 导入）；`rift_manager` 的 `update_player` 保留但注释改为「非气血权威写点」。
+兼容：`AdventureManager` 删除本地 `DEFEAT_HP_FLOOR_RATIO` 后保留模块级 re-export（既有测试从 `_adv_mod` 导入）；`managers/rift_manager.py` 的 3 处 `db.update_player(player)` 保留，注释改为「非气血权威写点」。
 
 ## 3. 事务叶子
 
@@ -40,7 +40,7 @@ managers/pve_combat_manager.py
 - 地板：历练（C 已交付）/ 秘境应邀 / 宗门领取 三入口；战败残血 ≥ `ceil(1% * 动态 max_hp)`、胜场不保底；max_hp 下降时 clamp。
 - 消费者：创角/突破/装备/功法/丹药/商店/GM/PvP/历练/秘境/传承/显示；静态搜索 `Player.hp` 归零（旧 Boss 实现白名单，E2 删除）。
 - 事务：5 处门控后静态审计为空；并发双击不提前提交。
-- 暴击：改 config `base_crit_rate` → 玩家 fighter 生效；`_base_crit_rate` 不再死读取；怪物侧不受影响；`DEFEAT_HP_FLOOR_RATIO` 旧 import 不断。
+- 暴击：改 config `base_crit_rate` → 玩家 fighter 生效；`_base_crit_rate` 不再死读取；怪物侧有 per-enemy 值时不受影响（无值时取同一键，或按附录 B 已决记录标注不接）；`DEFEAT_HP_FLOOR_RATIO` 旧 import 不断。
 - 质量门：完整 pytest + 产品范围 ruff。
 
 ## 5. 回滚

@@ -8,7 +8,7 @@
 4. 玩家侧暴击物化：`config/game_config.json` + `data/default_configs.py` 补 `combat.base_crit_rate=0.15`；`build_fighter_from_player` 传 `crit_rate`；补断言证明 `_base_crit_rate` 不再是死读取。
 5. 事务叶子：门控 5 处裸 commit；补静态审计测试；注明 bd `-dfb` 依赖。
 6. 消费者组合复核：跨玩法 clamp/restart 回归；静态证明无含混 `Player.hp`（旧 Boss 实现白名单，E2 删除）。
-7. 文档与版本：按 PRD R4 清单逐项同步（§Q4 / current-design-report §4.7、§4.12、§4.17、`:208`、§五 / project-architecture `:74`、`:16`、`:132` / api-overview:108 / pve-enemy-design `:477-482`、`:755`、`:758-760`、`:883-885` / docstring+行内注释）；`metadata.yaml` version、`README.md` 日志、`/修仙帮助`。
+7. 文档与版本：按 PRD R4 清单逐项同步（§Q4 / current-design-report §4.7、§4.12、§4.17、`:208`、`:11`、`:40`、§五 / project-architecture `:74`、`:16`、`:132` / api-overview:108 / pve-enemy-design `:477-482`、`:755`、`:758-760`、`:883-885` / docstring+行内注释）；改写 §Q4 时一并更正该段已漂移的行号（`:716-717`→`pve_combat_manager.py:504/:568`、`:479` 与 pit#3 `:89`→`combat_manager.py:234`）；`metadata.yaml` version、`README.md` 日志、`/修仙帮助`。
 8. 质量门：完整 pytest + 产品范围 ruff。
 
 ## Rollback Points
@@ -18,6 +18,7 @@
 ## Completion Evidence
 
 - 三入口地板数学与落库证据（秘境/宗门/PvP 对照）；
+- 暴击物化证据（`combat.base_crit_rate` 写入 config/default_configs、`build_fighter_from_player` 实际传参、`_base_crit_rate` 不再是死读取的断言）；
 - 静态清零报告（`Player.hp` / `else 1` / 裸 commit）；
 - 文档 diff 与版本清单；
 - ruff/pytest 摘要。

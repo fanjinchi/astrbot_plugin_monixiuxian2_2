@@ -21,9 +21,9 @@
 ## 2. 普通 PVE 切流（设计点名 Batch 5 主体）
 
 - `PVECombatManager.prepare_encounter` / `challenge_rift_beast` 的默认出怪：`catalog is not None` → `catalog.spawn_enemy(player_level, category, difficulty_multiplier)`；`difficulty_multiplier` 取自 `config_manager.game_config["pve"]["difficulty_multiplier"]`（None→1.0），**旧路径在 `EnemyManager` 内部读该系数，切流漏传第三参会让全局难度旋钮静默失效**；否则（v1 config / catalog disabled）保持旧动态派生，不半切。
-- catalog 实例：复用 D 在 `_wire_core_services` 创建的同一实例（D 归档后提供），以可选依赖注入 `PVECombatManager`，不得第二次 `load_catalog`；**装配顺序钉死**：E2 在 cutover 时把 `load_catalog` 上移到 `_wire_core_services` 中 `PVECombatManager` 构造之前（D 归档后其领域装配点复用同一实例），构造参数传入，不用 setter；补 wiring 断言。
+- catalog 实例：复用 D 在 `_wire_core_services` 创建的同一实例（D 归档后提供），以可选依赖注入 `PVECombatManager`，不得第二次 `load_catalog`；**装配顺序钉死**：装配归 D；E2 只在 D 仍把 `load_catalog` 放在 `PVECombatManager` 构造之后时把该行上移，否则直接复用同一实例——任何情况不得第二次 `load_catalog`；源路径 `Path(__file__).parent / "config" / "enemies.json"`，构造参数传入，不用 setter；补 wiring 断言。
 - 定向组（`spawn_enemy_from_group`）继续走 `enemy_groups`：`legacy_guardian` 必留；**`low/mid/high` 必须保留为 v1 回落数据**（消费者是旧派生 `_get_group_by_level`，不是 `spawn_enemy_from_group`；删掉会让回落落到守护组）。
-- 删除 `enemy_groups` 中 `key=top` 的组（Q6：苍龙/墨玉麒麟/火凤整组移出第一季）——`enemy_groups` 是 sync 的手工透传段，**在 sync 前对现有 config 执行**（顺序：删 top → sync → 代码切流）；补「元婴段只出该段 7 只（4 normal/2 elite/1 boss）、不含 top 三兽」与「catalog=None 回落不刷守护」断言。
+- 删除 `enemy_groups` 中 `key=top` 的组（Q6：苍龙/墨玉麒麟/火凤整组移出第一季）——`enemy_groups` 是 sync 的手工透传段，**在 sync 前对现有 config 执行**（顺序：删 top → sync → 代码切流；若改到 sync 后删，必须同时手工删生成配置里的同组）；补「元婴段只出该段 7 只（4 normal/2 elite/1 boss）、不含 top 三兽」与「catalog=None 回落不刷守护」断言。
 - 旧派生退役口径：`enemy_manager.spawn_enemy` 静态保留仅供 v1 回落（不删除）；`enemy_manager.py` 过渡注释与 `current-design-report` 同步。
 
 ## 3. 旧 Boss 整删矩阵
@@ -33,11 +33,11 @@
 | 代码 | `managers/boss_manager.py`、`handlers/boss_handlers.py`、`models_extended.Boss`、`data/database_extended.py` boss CRUD | 整文件/整段删除 |
 | 代码 | `main.py` 的 `_schedule_boss_spawn` / `_broadcast_boss_spawn` / `_broadcast_boss_defeat` / `boss_next_spawn_time` 读写 | 删除，新 poller 接管 |
 | 配置 | `config/boss_config.json` + `data/default_configs.py::BOSS_CONFIG` + `config_manager.boss_config` 装载 | 三处同批删除（缺一会被默认值重建） |
-| 工具 | `design_docs/content-design/lint_narrative.py`（读 `boss_config.json` 的 `world_bosses` 映射） | 改为读 `config/enemies.json` v2 `world_bosses` 段，或删除该映射 |
+| 工具 | `design_docs/content-design/lint_narrative.py`（读 `boss_config.json` 的 `world_bosses` 映射） | 改为读 `config/enemies.json` v2 `world_bosses` 段（**不要直接删映射**：该表在 `desc_tables` 里且 `:707` 直接 `name_maps[table]`，删了会 KeyError；若放弃名字一致性检查须同批移出 `desc_tables`） |
 | 表 | `boss`（fresh DDL） | 删除建表；新增 v40 `DROP TABLE IF EXISTS boss`，登记 `VERSION_SCHEMA_TABLES`；补 v40 专用 parity 用例 |
 | 键 | `system_config.boss_next_spawn_time` | v40 顺带 DELETE，代码不再读取 |
 | time-skip | `boss_manager.TIME_SKIP_ENTRIES` 首条 + 「Boss/灵眼」共享标签 | 首条随文件删除；标签改「灵眼下次刷新时间」，同步 README / registry 测试 |
-| GM | `core/gm_manager.py::生成Boss`、`BOSS_ADMINS` | 删除或改接新领域 spawn（记录选择）；权限配置同步 |
+| GM | `core/gm_manager.py::生成Boss`、`BOSS_ADMINS` | **已决（2026-11-01）：整套删除**——手动生成会绕开确定性 `spawn_epoch`/`next_spawn_at`，强制刷新统一走 GM「时间快进」；同批删 `_conf_schema.json:18` 与文档 |
 | 测试 | `tests/test_boss.py`（18 用例）、`test_feature_switches.py`（6 条）、`test_gm_manager.py`、`test_time_skip_registry.py`、`test_migration.py`、`test_skill_equip_and_tome.py:168`、`test_pve_persistence_foundation.py:254/266` | 删除/改写/更新期望，全部列入执行清单 |
 | 配置 | `config/game_config.json`、`data/default_configs.py` 的 `boss` 段 | 保留 key，更新 comment 为新玩法 |
 
@@ -52,10 +52,11 @@
 
 - 内容：draft / 缺 manifest / hash 漂移 / 列范围越权 → 正式 config 零修改；批准后 count 28+4、id 唯一、运行时 profile hash 一致；占位叙事未显式批准则 fail closed。
 - 切流：28 名册在历练 / 秘境默认路径可达；改 `pve.difficulty_multiplier` 伤害随之变化；旧派生不再命中；`top` 组不存在；`low/mid/high` 在 `catalog=None` 回落时仍可用；`legacy_guardian` 仍可用。
-- 旧删：静态搜索 `boss_manager` / `boss_next_spawn_time` / `BOSS_CONFIG` 归零（`stone_reward` 限定产品代码，排除 `data/migration.py` 的 v37 历史注释）；`boss` 表不存在（v40 专用用例）；`lint_narrative.py` 不再读已删文件。
+- 旧删（判据必须可机械执行，别写成字面「归零」）：`grep -rn "boss_manager\|BossManager\|BOSS_CONFIG\|boss_config\|boss_handlers" main.py handlers managers core config` → 0（`data/migration.py` 的建表/迁移历史注释例外）；`boss_next_spawn_time` 产品代码 0 读 0 写、只允许出现在 v40 `DELETE` 与测试；`stone_reward` 以 `grep -rn "boss.*stone_reward\|stone_reward.*boss"` → 0 为准（`managers/bounty_manager.py:493/502` 的局部变量与本域无关）；`boss` 表不存在（v40 专用用例）；`lint_narrative.py` 不再读已删文件；玩家可见文案不再承诺 Boss 掉落。
 - 新启：poller 起停、指令可达、Boss 生命周期、北京日 3 次、并发唯一末击、CAS 失败不扣次数、outbox partial success、重启恢复。
 - HP 锚：正式 config 的 4 只 profile 复跑 D AC9（阶段 40/40/20 加权、±10%、3 次/日 × 2 日磨死）。
 - time-skip：Boss 到期/再生生效；anchor / pending / date_key 不受影响。
+- 文案与用例：`handlers/misc_handler.py:131`、`handlers/shop_handler.py` 的 `ITEM_ACQUIRE_HINTS`、`handlers/storage_ring_handler.py:120/:528` 不再承诺 Boss 掉落；`functional_tests/cases/pve/pve-smoke.json` 的「世界Boss」断言（`re:Boss|BOSS|boss|暂无|未生成`）仍可命中新回复。
 - 回滚演练：备份恢复后旧版本可读（不允许混合 schema）。
 
 ## 6. 风险
@@ -68,5 +69,5 @@
 | 删旧与启新不同步导致无 Boss 玩法或双跑 | 同一提交/检查点；smoke 失败整批回滚 |
 | 删 `boss_config.json` 打断 lint 闸门 / 被默认值重建 | 配置三元组 + lint 依赖同批处理 |
 | v40 DROP 无回退 | 备份 + 只允许整组合回滚（代码/DB/config） |
-| 占位叙事被当作已批准上线 | manifest 默认放行集 `{定稿, 豁免}`；放行占位须用户明确同意并回写设计 |
+| 占位叙事被当作已批准上线 / 照默认集写 manifest 导致全量 fail closed | manifest 的 `narrative_status` 必须按 CSV 实际填：全占位时写 `["占位"]`（默认集 `{定稿, 豁免}` 会 32 行全拒）；放行占位须用户明确同意并回写设计 |
 | 测试硬编码旧文件/旧版本号 | 删除矩阵显式列 `test_skill_equip_and_tome` 与 `test_pve_persistence_foundation` 的更新 |
