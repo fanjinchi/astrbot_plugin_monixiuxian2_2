@@ -643,10 +643,10 @@ The goal is to capture debugging lessons so the same class of issue doesn't recu
 
 #### 3.3 Spec update `[required · once]`
 
-Load the `trellis-update-spec` skill and review whether this task produced new knowledge worth recording:
-- Newly discovered patterns or conventions
-- Pitfalls you hit
-- New technical decisions
+Two passes, in this order:
+
+1. **`retro`** — look back over the session for what the *environment* should have caught: a check that should exist, a standard that should be written, a pointer that should be in place. It proposes changes to the agent's environment, not to the code.
+2. **`trellis-update-spec`** — turn the lasting part into `.trellis/spec/` knowledge: newly discovered patterns or conventions, pitfalls you hit, new technical decisions.
 
 Update the docs under `.trellis/spec/` accordingly. Even if the conclusion is "nothing to update", walk through the judgment.
 
