@@ -158,7 +158,9 @@ Phase 3: Finish  → verify, update spec, commit, and wrap up
 - Inline task (read-only Q&A, code explanation, local config or copy tweak, single-file or root-cause-clear fix): handle directly with minimal verification — do not ask to create a Trellis task. Inline work never gets a task card (host global rule: only durable / multi-decision work enters the board).
 - Simple conversation or small task (not clearly inline): ask only whether this turn should create a Trellis task. If the user says no, skip Trellis for this session.
 - Complex task: ask whether you may create a Trellis task and enter planning. If the user says no, do not do broad inline implementation; explain, clarify scope, or suggest a smaller split.
-- User approval to create a task is not approval to start implementation. Planning still happens first — and planning starts by grilling: load `grill-me` / `grilling` (installed at `~/.agents/skills/`) and interrogate the user until requirements, scope, acceptance criteria, and key decisions are agreed before any planning artifact is written.
+- User approval to create a task is not approval to start implementation. Planning still happens first — and planning is **Matt-owned**: load `grill-with-docs` (installed at `~/.agents/skills/`; it drives the `grilling` interview primitive and leaves a `GLOSSARY.md` / ADR paper trail) and interrogate the user until requirements, scope, acceptance criteria, and key decisions are agreed before any planning artifact is written.
+- Incoming bug report or external issue (a raw report you did not create) -> load `triage`; the project's issue tracker stays bd, so triage classifies and the Trellis task carries the work.
+- Skill routing is not memory: when the right Matt skill is not obvious, load `ask-matt` and route from its map. Some skills it names are not installed here — map a missing one to its installed fallback (`/retro` → `trellis-update-spec`, `/pr` → skip) instead of inventing a step.
 
 ### Planning Artifacts
 
@@ -167,6 +169,14 @@ Phase 3: Finish  → verify, update spec, commit, and wrap up
 - `implement.md` — execution plan for complex tasks: ordered checklist, validation commands, review gates, and rollback points.
 - `implement.jsonl` / `check.jsonl` — spec and research manifests for sub-agent context. They do not replace `implement.md`.
 - Lightweight tasks may be PRD-only. Complex tasks must have `prd.md`, `design.md`, and `implement.md` before `task.py start`.
+
+**Single-source rule (every planning artifact, every task-tree level)**
+
+- **One fact, one home.** A fact — a formula, threshold, config key, schema field, contract, or decision — is written in full in exactly one artifact. Every other place references it by path and section (`see <path> §<n>`) instead of restating it.
+- **Task trees split the ownership.** The parent owns the cross-child invariants and the source requirement set; each child owns its own contracts. Keep the map in the parent's `design.md` as `| fact | owner | referrers |`.
+- **Acceptance criteria may restate a literal.** An AC needs the value to be testable, so a threshold or key name may appear again there. Prose may not: no second full statement of the same fact outside an AC.
+- **Evidence is not a fact.** `file:line` references, grep output, and code listings belong in `{TASK_DIR}/research/` or in a check script; artifacts carry stable anchors instead (symbol, config key, command name). Line numbers rot, and a stale anchor is worse than none.
+- **One tracker.** The task directory is the tracker for this flow: `prd.md` is the spec, child tasks are the tickets. Do not publish a second copy to bd or an issue tracker.
 
 ### Parent / Child Task Trees
 
@@ -194,7 +204,7 @@ Preserve existing task fields and artifacts. If the correct status cannot be det
 
 ### Phase 1: Plan
 - 1.0 Create task `[required · once]` (only after task-creation consent)
-- 1.1 Requirement exploration `[required · repeatable]` (grill-first: interrogate the user via `grill-me` before writing artifacts; `prd.md`; complex tasks also need `design.md` + `implement.md`)
+- 1.1 Requirement exploration `[required · repeatable]` (Matt-owned: `grill-with-docs` → `to-spec` → `to-tickets`; `prd.md`; complex tasks also need `design.md` + `implement.md`)
 - 1.2 Research `[optional · repeatable]`
 - 1.3 Configure context `[required · once]` — Claude Code, Cursor, OpenCode, Codex, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Grok, Kimi Code (sub-agent-dispatch platforms only; inline platforms skip)
 - 1.4 Activate task `[required · once]` (review gate, then `task.py start`; status → in_progress)
@@ -203,7 +213,7 @@ Preserve existing task fields and artifacts. If the correct status cannot be det
 <!-- Per-turn breadcrumb: shown throughout Phase 1 (status='planning') -->
 
 [workflow-state:planning]
-Load `trellis-brainstorm`; grill the plan with the user via `grill-me` until details, scope, and key decisions are agreed before writing artifacts; stay in planning.
+Load `grill-with-docs` (Matt; stateful in a repo) and grill until details, scope, and key decisions are agreed; then `to-spec` writes `prd.md` / `design.md` and `to-tickets` yields child tasks. Stay in planning.
 Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; ask for review before `task.py start`.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
 Sub-agent mode: `to-spec` wrote the spec and `to-tickets` split it into child tasks with blocking edges; register spec/research paths as context pointers in `implement.jsonl` / `check.jsonl` before start.
@@ -216,7 +226,7 @@ Sub-agent mode: `to-spec` wrote the spec and `to-tickets` split it into child ta
      into a sub-agent. -->
 
 [workflow-state:planning-inline]
-Load `trellis-brainstorm`; grill the plan with the user via `grill-me` until details, scope, and key decisions are agreed before writing artifacts; stay in planning.
+Load `grill-with-docs` (Matt; stateful in a repo) and grill until details, scope, and key decisions are agreed; then `to-spec` writes `prd.md` / `design.md` and `to-tickets` yields child tasks. Stay in planning.
 Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; ask for review before `task.py start`.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
 Inline mode: skip jsonl curation; `to-spec` / `to-tickets` still run and child tasks carry the ticket graph; Phase 2 reads artifacts/specs via `trellis-before-dev` and Matt skills.
@@ -239,7 +249,7 @@ Sub-agent dispatch protocol applies to all platforms and all sub-agents, includi
 Tools: `trellis-research` is a sub-agent type; `trellis-update-spec` is a skill. Implementation and review are Matt skills (`implement` / `implement-spec` + `tdd` / `code-review`) loaded from the skill catalog.
 Flow: Matt implement (`implement` / `implement-spec` on the ticket frontier) + `tdd` -> `code-review` -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
 Parallel dispatch is allowed (the host rule exempts `implement-spec`); pick frontier-ready tickets and dispatch implementers concurrently. Sub-agent self-exemption: a spawned implementer must not spawn further implement/review agents — dispatch is main-session only.
-Dispatch prompt starts with `Active task: <task path from task.py current>`. Read context: jsonl pointer entries -> `prd.md` -> `design.md if present` -> `implement.md if present`.
+Dispatch prompt starts with `Active task: <task path from task.py current>`. Read context: jsonl pointer entries -> `prd.md` -> `design.md if present` -> `implement.md if present` -> the parent task's `design.md` / `prd.md` when `task.json` declares a `parent` (shared contracts are stated there once).
 [/workflow-state:in_progress]
 
 <!-- Per-turn breadcrumb: shown while status='in_progress' when
@@ -250,7 +260,7 @@ Dispatch prompt starts with `Active task: <task path from task.py current>`. Rea
 [workflow-state:in_progress-inline]
 Flow: `trellis-before-dev` -> Matt implement (`implement` / `implement-spec` + `tdd`) -> `code-review` -> validation -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
 Do not dispatch implement/check sub-agents in inline mode (parallel `implement-spec` still allowed under the host exemption).
-Read context: `prd.md` -> `design.md if present` -> `implement.md if present`, plus relevant spec/research loaded by skills.
+Read context: `prd.md` -> `design.md if present` -> `implement.md if present` -> the parent task's `design.md` / `prd.md` when `task.json` declares a `parent`, plus relevant spec/research loaded by skills.
 [/workflow-state:in_progress-inline]
 
 ### Phase 3: Finish
@@ -281,13 +291,34 @@ Code committed. Run `/trellis:finish-work`; if dirty, return to Phase 3.4 first.
 4. Steps tagged `[once]` are skipped if the output already exists; don't re-run
 5. Artifact presence informs the next step; missing `design.md` / `implement.md` is valid for lightweight tasks and incomplete planning for complex tasks.
 
+### Skill Routing (Matt)
+
+The Matt catalog is large and half of it is not installed here, so route from this table instead of guessing, and load `ask-matt` only when none of these rows fits. This table is the workflow's own contract: it names only skills this flow actually uses.
+
+| Intent | Skill |
+| --- | --- |
+| Requirements unclear / new feature | `grill-with-docs` (repo working dir; drives the `grilling` primitive) |
+| Turn the agreed conversation into a spec | `to-spec` (tracker override: persist as `{TASK_DIR}/prd.md`) |
+| Split the spec into tickets | `to-tickets` (tracker override: materialize as child tasks) |
+| Module / interface shape question | `codebase-design` |
+| Domain vocabulary or an irreversible decision | `domain-modeling` |
+| Reading legwork, third-party API facts | `research` -> `{TASK_DIR}/research/` |
+| A bug that resists a first look | `diagnosing-bugs` |
+| Incoming bug report / external issue | `triage` |
+| Write production code | `implement` (one ticket) / `implement-spec` (whole graph, frontier-parallel) |
+| Per-slice red-green | `tdd` |
+| Review a diff | `code-review` |
+| None of the above fits | `ask-matt`, then map any skill it names but does not install here to an installed fallback |
+
+`implement` vs `implement-spec`: use `implement` for one ticket (or a couple) worked in the current context; use `implement-spec` when the ticket graph has several frontier-ready tickets and you want them built in parallel on one integration branch.
+
 ### Active Task Routing
 
 When a user request matches one of these intents inside an active task, route first, then load the detailed phase step if needed.
 
 [Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
 
-- Planning or unclear requirements -> `trellis-brainstorm` (grill first: load `grill-me` and interrogate the user until the plan's details, scope, and key decisions are agreed before any task is created).
+- Planning or unclear requirements -> Matt `grill-with-docs` → `to-spec` → `to-tickets` (grill until the plan's details, scope, and key decisions are agreed before any task is created).
 - `in_progress` implementation/check -> Matt: `implement` / `implement-spec` (ticket frontier) + `tdd`; review via `code-review`.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
 - Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; installed at `~/.agents/skills/`).
@@ -296,7 +327,7 @@ When a user request matches one of these intents inside an active task, route fi
 
 [codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
-- Planning or unclear requirements -> `trellis-brainstorm` (grill first: load `grill-me` and interrogate the user until the plan's details, scope, and key decisions are agreed before any task is created).
+- Planning or unclear requirements -> Matt `grill-with-docs` → `to-spec` → `to-tickets` (grill until the plan's details, scope, and key decisions are agreed before any task is created).
 - Before editing -> `trellis-before-dev`; implement via Matt (`implement` / `implement-spec` + `tdd`); after editing -> `code-review`.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
 - Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; shipped on DeepSeek Harness at `~/.agents/skills/`).
@@ -347,26 +378,23 @@ Skip when `python3 ./.trellis/scripts/task.py current --source` already points t
 
 #### 1.1 Requirement exploration `[required · repeatable]`
 
-Load the `trellis-brainstorm` skill and explore requirements interactively with the user per the skill's guidance.
+Planning is **Matt-owned**; Trellis owns the task lifecycle and the artifact paths. Run the Matt flow in this order and persist its output into the artifacts:
 
-**Grill gate (all platforms)**: before `task.py create` and before writing or updating planning artifacts, load `grill-me` / `grilling` (installed at `~/.agents/skills/`) and interrogate the user one question at a time until requirements, scope, acceptance criteria, and key decisions are explicitly agreed — never persist `prd.md` from assumptions. Update artifacts immediately after each confirmed answer.
+1. **Grill** — load `grill-with-docs` (installed at `~/.agents/skills/`). It runs the `grilling` interview primitive in rounds — every question whose prerequisites are settled, numbered, each with a recommended answer — and keeps a paper trail (`GLOSSARY.md`, ADRs), which is why it beats the stateless `grill-me` inside a repo. Never persist `prd.md` from assumptions; update the artifacts after each confirmed answer.
+2. **Research** — step 1.2. Prefer reading the codebase over asking the user.
+3. **Spec** — load `to-spec`; it synthesizes the agreed conversation without re-interviewing. **Tracker override:** the Trellis task directory is the tracker — persist the spec as `{TASK_DIR}/prd.md`, and for complex tasks turn the spec's Implementation Decisions / Testing Decisions / contract sections into `{TASK_DIR}/design.md`. Do not publish a second copy elsewhere. Keep `to-spec`'s section skeleton and add the **Acceptance Criteria** section it lacks.
+4. **Tickets** — load `to-tickets`; it splits the spec into tracer-bullet tickets with declared blocking edges. **Materialize each ticket as a child task** (`task.py create --parent`) instead of `.scratch/` files: the child's `prd.md` carries the ticket body plus its blocking edges. Tickets are the task graph — implement in frontier order; a ticket whose blockers are all done is ready. Apply the single-source rule from "Planning Artifacts": a child that shares a fact with a sibling points at the owner instead of restating it.
+5. **Design depth (optional)** — `codebase-design` for interface/module-shape questions (module, interface, depth, seam); `domain-modeling` for domain vocabulary and irreversible decisions (ADR).
+6. **Router** — when the right skill is not obvious, load `ask-matt` and route from its map; map any skill it names that is not installed to an installed fallback.
 
-**Matt spec & tickets (all platforms)**: once the grill has converged, load `to-spec` to synthesize the agreed conversation into a spec and persist it as `prd.md` (complex tasks: also `design.md`). Then load `to-tickets` to split the spec into tracer-bullet tickets, each declaring its blocking edges, and materialize each ticket as a child task (`task.py create --parent`) with its blocking edges written into the child's `prd.md` / `implement.md`. Tickets are the task graph: implement in frontier order — a ticket whose blockers are all done is ready.
-
-The brainstorm skill will guide you to:
-- Ask one question at a time
-- Prefer researching over asking the user
-- Prefer offering options over open-ended questions
-- Update `prd.md` immediately after each user answer
-- Split large scopes into a parent task plus child tasks when the deliverables can be verified independently
-- Keep `prd.md` focused on requirements and acceptance criteria
-- For complex tasks, produce `design.md` and `implement.md` before implementation starts
+`trellis-brainstorm` is **retired from routing**: its artifact rules, convergence gate, and quality bar now live in this workflow (1.1, "Planning Artifacts", 1.4). Its skill file stays on disk untouched.
 
 When considering a parent/child split:
 - Use a parent task when one request contains several independently verifiable deliverables.
 - Parent tasks own source requirements, child-task mapping, cross-child acceptance criteria, and final integration review.
 - Child tasks own actual deliverables that can be planned, implemented, checked, and archived independently.
-- Parent/child structure is not a dependency system. If child B depends on child A, write that ordering in child B's `prd.md` / `implement.md`.
+- Parent/child structure is not a dependency system. If child B depends on child A, put a pointer in child B (`upstream contract: .trellis/tasks/<child-A>/design.md §<n>`) and write the ordering in `implement.md`; do not copy A's facts into B.
+- Shared facts live in the parent. A child artifact that needs one writes a path pointer, never a second full statement — the implementer reads parent artifacts before the child's own.
 - Start the child task that owns the next deliverable. Do not start the parent unless the parent itself has direct implementation work.
 
 Return to this step whenever requirements change and revise the relevant artifact.
@@ -374,6 +402,8 @@ Return to this step whenever requirements change and revise the relevant artifac
 #### 1.2 Research `[optional · repeatable]`
 
 Research can happen at any time during requirement exploration. It isn't limited to local code — you can use any available tool (MCP servers, skills, web search, etc.) to look up external information, including third-party library docs, industry practices, API references, etc.
+
+**Method**: load the Matt `research` skill — it delegates the reading to a background agent and writes one cited Markdown file. Point that file at `{TASK_DIR}/research/`; a finding that stays only in the chat is lost at the next compaction.
 
 [Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
 
@@ -466,6 +496,12 @@ python3 ./.trellis/scripts/task.py start <task-dir>
 
 For lightweight tasks, `prd.md` can be enough. For complex tasks, `prd.md`, `design.md`, and `implement.md` must exist and be reviewed before start. On sub-agent-dispatch platforms, `implement.jsonl` and `check.jsonl` must both have real curated entries before start. Runtime consumers tolerate missing or seed-only manifests for compatibility, but that tolerance is not a planning-ready state.
 
+**Convergence gate (all artifacts)**: before `start`, read `prd.md` -> `design.md` -> `implement.md` once, top to bottom, and fix what the single-source rule forbids:
+- the same fact stated twice outside an acceptance criterion;
+- a child artifact restating a fact owned by the parent or a sibling instead of pointing at it;
+- a `file:line` reference, grep output, or code listing left in an artifact (move it to `research/` or the check script);
+- a resolved open question or temporary brainstorm section still standing.
+
 After this command succeeds, the breadcrumb auto-switches to `[workflow-state:in_progress]`, and the rest of Phase 2 / 3 follows.
 
 If `task.py start` errors with a session-identity message (no context key from hook input, `TRELLIS_CONTEXT_ID`, or platform-native session env), follow the hint in the error to set up session identity, then retry.
@@ -545,7 +581,7 @@ The platform prelude auto-handles the context load requirement:
 
 1. Load the `trellis-before-dev` skill to read project guidelines
 2. Load the Matt flow: `implement-spec` (whole ticket graph: frontier-parallel implementers, one integration branch) or `implement` per ticket; drive `tdd` red-green per slice
-3. Read `{TASK_DIR}/prd.md`, then `design.md` if present, then `implement.md` if present, plus materials under `{TASK_DIR}/research/`
+3. Read `{TASK_DIR}/prd.md`, then `design.md` if present, then `implement.md` if present, plus materials under `{TASK_DIR}/research/`; if `task.json` declares a `parent`, read the parent's `design.md` first — shared contracts are stated there once and only pointed at here
 4. Parallel implementers are allowed: the host global rule treats choosing `implement-spec` as explicit opt-in for sub-agents — no extra confirmation needed
 5. Implement the code per reviewed artifacts, then run project lint and type-check
 
@@ -565,7 +601,7 @@ Spawn the review sub-agent:
 
 The check agent's job:
 - Review code changes against specs
-- Review code changes against `prd.md`, `design.md` if present, and `implement.md` if present
+- Review code changes against `prd.md`, `design.md` if present, and `implement.md` if present, plus the parent task's `design.md` / `prd.md` when `task.json` declares a `parent` (shared contracts live there, not in the child)
 - Auto-fix issues it finds
 - Run lint and typecheck to verify
 
@@ -574,7 +610,7 @@ The check agent's job:
 [codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
 Load the `code-review` skill and review the diff on both axes (Standards + Spec):
-- Spec compliance (`prd.md` / `design.md` / tickets)
+- Spec compliance (`prd.md` / `design.md` / tickets, plus the parent task's contracts when `task.json` declares a `parent`)
 - lint / type-check / tests
 - Cross-layer consistency (when changes span layers)
 

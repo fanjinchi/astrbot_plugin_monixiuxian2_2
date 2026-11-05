@@ -302,12 +302,37 @@ def _parse_meta_pairs(pairs: list[str] | None) -> dict[str, str] | None:
     return meta
 
 
-def _default_prd_content(title: str, description: str | None = None) -> str:
-    """Return the default PRD skeleton created with every task."""
+def _default_prd_content(
+    title: str, description: str | None = None, parent_name: str | None = None
+) -> str:
+    """Return the default PRD skeleton created with every task.
+
+    A child task seeded with ``parent_name`` gets an ``Upstream Contracts``
+    section that points at the parent instead of copying it: cross-child facts
+    (formulas, thresholds, config keys, contracts) are stated once in the
+    parent, and the child only references them. Seeding the pointer here is
+    deliberate -- it belongs in ``prd.md``, the first artifact an implementer
+    reads, and NOT in ``implement.jsonl``, where any ``file`` row counts as a
+    curated entry and would defeat the zero-spec-context start gate.
+    """
     goal = (description or "").strip() or "TBD."
     heading = title.strip() or "Untitled task"
+    upstream_block = ""
+    if parent_name:
+        upstream_block = (
+            f"\n## Upstream Contracts\n\n"
+            f"- Parent task: `.trellis/tasks/{parent_name}/` "
+            "(`prd.md` / `design.md` / `implement.md`).\n"
+            "- Read it before this task's artifacts: cross-child facts "
+            "(formulas, thresholds, config keys, contracts) are stated in full "
+            "there once.\n"
+            "- Point at them (`see .trellis/tasks/<owner>/<file>.md \u00a7<n>`) "
+            "instead of restating them here.\n"
+            "- If the parent has been archived, look under "
+            "`.trellis/tasks/archive/<YYYY-MM>/`.\n"
+        )
     return f"""# {heading}
-
+{upstream_block}
 ## Goal
 
 {goal}
@@ -630,7 +655,9 @@ def cmd_create(args: argparse.Namespace) -> int:
     prd_path = task_dir / "prd.md"
     if not prd_path.exists():
         prd_path.write_text(
-            _default_prd_content(args.title, description),
+            _default_prd_content(
+                args.title, description, parent_dir.name if parent_dir else None
+            ),
             encoding="utf-8",
         )
 
