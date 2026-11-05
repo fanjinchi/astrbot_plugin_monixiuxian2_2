@@ -54,7 +54,7 @@
 ## Acceptance Criteria
 
 - [ ] AC1：秘境兽（秘境应邀）与传承守护者（秘境应邀 + 宗门宝库领取）战败/平局残血 = `max(引擎终值, ceil(1% 动态 max_hp))`（至少 1），胜场不保底；PvP 不受地板影响；产品代码无 `else 1`/`current_hp = 1` 败场赋值。
-- [ ] AC2：地板单源——`HealthService` 提供地板 API，历练/秘境/守护者三类入口已消费、无第二份 0.01 公式；`PVECombatManager` 经装配段注入 `health_service`。（**世界 Boss 地板消费由 D AC4 验收；E2 在激活检查点只做「D 写回点改调 `HealthService.defeat_hp_floor`」的切换与回归，不重做地板验收标准**；E1 只保证 API 就绪与 D 可 import 的模块级 re-export。）
+- [ ] AC2：地板单源——`HealthService` 提供地板 API，历练/秘境/守护者三类入口已消费、无第二份 0.01 公式；`PVECombatManager` 经装配段注入 `health_service`。（**世界 Boss 地板消费由 D AC4 验收；若 D 落地时仍引用旧常量，E2 在激活检查点只做「D 写回点改调 `HealthService.defeat_hp_floor`」的切换与回归，不重做地板验收标准**；E1 只保证 API 就绪与 D 可 import 的模块级 re-export。）
 - [ ] AC3：全 HP 消费者组合复核通过；产品代码与测试无含混 `Player.hp`（旧 Boss 实现除外）；max_hp 下降/药品/跨玩法战斗后 current clamp 成立；`base_crit_rate` 已物化进 config 且 `build_fighter_from_player` 实际传参（静态搜索不再有死读取）；**怪物侧缺省时回退同一键**（改键后名册/专项组/秘境/守护者 fighter 也变化；世界 Boss 侧由 D 经同一 mapper 接线，D 若自建 Fighter 则该侧不生效，须在 D 落地时同批接）、per-enemy 有值时仍覆盖。
 - [ ] AC4：data/ 之外 5 处裸 commit 全部按 `_txn_depth` 门控，静态审计为空；未新增叶子并发路径。
 - [ ] AC5：以 R4 清单为准逐项完成（§Q4 / current-design-report §4.7、§4.12、§4.17、`:208`、`:11`、`:40`、§五 / project-architecture `:74`、`:16`、`:132` / pve-enemy-design `:472-476`、`:477-482`、`:755`、`:758-760`、`:883-885` / api-overview `:94`、`:108` / rift 与 pve_combat_manager docstring+行内注释），并与版本清单（metadata / README / 修仙帮助）同步。
