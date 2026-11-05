@@ -243,7 +243,7 @@ Inline mode: skip jsonl curation; `to-spec` / `to-tickets` still run and child t
      therefore must cover every required step from implementation through
      commit, including Phase 3.3 spec update and Phase 3.4 commit. -->
 
-Sub-agent dispatch protocol applies to all platforms and all sub-agents, including native Codex `SubagentStart` context injection with child-side pull fallback, class-2 Gemini/Qoder/Copilot/Reasonix/Trae/Grok/Kimi Code, hook-backed ZCode/Snow, and `trellis-research`: every dispatch prompt starts with `Active task: <task path from task.py current>` before role-specific instructions. On Grok Build, use `spawn_subagent` with `subagent_type` set to the Trellis agent name (e.g. `trellis-implement`). On Kimi Code, dispatch the built-in `coder` / `explore` sub-agent with the matching `.kimi-code/skills/trellis-<role>/SKILL.md` instructions.
+Sub-agent dispatch protocol applies to all platforms and all sub-agents, including native Codex `SubagentStart` context injection with child-side pull fallback, class-2 Gemini/Qoder/Copilot/Reasonix/Trae/Grok/Kimi Code, hook-backed ZCode/Snow, and `trellis-research`: every dispatch prompt starts with `Active task: <task path from task.py current>` before role-specific instructions. On Grok Build, use `spawn_subagent` with `subagent_type` set to the Trellis agent name (e.g. `trellis-implement`). On Kimi Code, dispatch the built-in `coder` / `explore` sub-agent with the matching `.kimi-code/skills/trellis-<role>/SKILL.md` instructions; `AgentSwarm` may run frontier-ready tickets concurrently. On Pi / Oh My Pi there is no concurrent sub-agent: `trellis_subagent` queues tasks that execute **one at a time** in FIFO order, so a dispatch is a serial turn, not a parallel worker.
 
 [workflow-state:in_progress]
 Tools: `trellis-research` is a sub-agent type; `trellis-update-spec` is a skill. Implementation and review are Matt skills (`implement` / `implement-spec` + `tdd` / `code-review`) loaded from the skill catalog.
@@ -310,20 +310,38 @@ The Matt catalog is large and half of it is not installed here, so route from th
 | Review a diff | `code-review` |
 | None of the above fits | `ask-matt`, then map any skill it names but does not install here to an installed fallback |
 
-`implement` vs `implement-spec`: use `implement` for one ticket (or a couple) worked in the current context; use `implement-spec` when the ticket graph has several frontier-ready tickets and you want them built in parallel on one integration branch.
+`implement` vs `implement-spec`: use `implement` for one ticket (or a couple) worked in the current context; use `implement-spec` when the ticket graph has several frontier-ready tickets and you want them built in parallel on one integration branch. On Pi / Oh My Pi `implement-spec` degrades to serial: one ticket at a time, mainline gating each result.
 
 ### Active Task Routing
 
 When a user request matches one of these intents inside an active task, route first, then load the detailed phase step if needed.
 
-[Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
+[Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, ZCode, Snow, Reasonix, Trae, Grok]
 
 - Planning or unclear requirements -> Matt `grill-with-docs` → `to-spec` → `to-tickets` (grill until the plan's details, scope, and key decisions are agreed before any task is created).
 - `in_progress` implementation/check -> Matt: `implement` / `implement-spec` (ticket frontier) + `tdd`; review via `code-review`.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
 - Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; installed at `~/.agents/skills/`).
 
-[/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
+[/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, ZCode, Snow, Reasonix, Trae, Grok]
+[Pi, Oh My Pi]
+
+- Planning or unclear requirements -> Matt `grill-with-docs` → `to-spec` → `to-tickets` (same flow; the skills are pi-local copies under `~/.pi/agent/skills/`).
+- `in_progress` implementation/check -> Matt `implement` / `implement-spec` + `tdd`, executed through the pi task queue: **one task at a time**, mainline gates each result.
+- Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
+- Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; pi-local copies at `~/.pi/agent/skills/`).
+
+[/Pi, Oh My Pi]
+
+[Kimi Code]
+
+- Planning or unclear requirements -> Matt `grill-with-docs` → `to-spec` → `to-tickets` (skills under `~/.kimi-code/skills/`).
+- `in_progress` implementation/check -> Matt `implement` / `implement-spec` + `tdd`; review via `code-review`.
+- Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
+- Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; installed at `~/.kimi-code/skills/`).
+
+[/Kimi Code]
+
 
 [codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
@@ -405,7 +423,7 @@ Research can happen at any time during requirement exploration. It isn't limited
 
 **Method**: load the Matt `research` skill — it delegates the reading to a background agent and writes one cited Markdown file. Point that file at `{TASK_DIR}/research/`; a finding that stays only in the chat is lost at the next compaction.
 
-[Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
+[Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, ZCode, Snow, Reasonix, Trae, Grok]
 
 Spawn the research sub-agent:
 
@@ -413,7 +431,19 @@ Spawn the research sub-agent:
 - **Task description**: Research <specific question>
 - **Key requirement**: Research output MUST be persisted to `{TASK_DIR}/research/`
 
-[/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
+[/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, ZCode, Snow, Reasonix, Trae, Grok]
+[Pi, Oh My Pi]
+
+Queue a research task with `trellis_subagent` (single mode, self-contained prompt — a fresh task does not see this conversation). It runs **serially**, one task at a time, and its report arrives as a result message next turn. Cheap lookups (read/grep/fetch) are faster inline; queue only the reading legwork that would otherwise flood the context.
+
+[/Pi, Oh My Pi]
+
+[Kimi Code]
+
+Dispatch the built-in `explore` sub-agent with the `.kimi-code/skills/trellis-research/SKILL.md` instructions, or load the Matt `research` skill and let it drive the same sub-agent. Persist the report to `{TASK_DIR}/research/`.
+
+[/Kimi Code]
+
 
 [codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
@@ -432,7 +462,7 @@ Brainstorm and research can interleave freely — pause to research a technical 
 
 #### 1.3 Configure context `[required · once]`
 
-[Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
+[Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, ZCode, Snow, Reasonix, Trae, Grok]
 
 Curate `implement.jsonl` and `check.jsonl` so the Phase 2 implementers get the right spec/tickets/research context — these entries are exactly the Matt context-pointer list. These files were seeded on `task create` with a single self-describing `_example` line; register real entries produced by the `to-spec` / `to-tickets` flow (spec files, ticket child tasks, research notes).
 
@@ -478,7 +508,19 @@ Ready gate: both `implement.jsonl` and `check.jsonl` must contain at least one r
 
 Skip this step only when both files already have real curated entries.
 
-[/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
+[/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, ZCode, Snow, Reasonix, Trae, Grok]
+[Pi, Oh My Pi]
+
+Curate `implement.jsonl` and `check.jsonl` exactly as above — a queued pi task reads them from disk, so they are the only context it gets besides its prompt.
+
+[/Pi, Oh My Pi]
+
+[Kimi Code]
+
+Curate `implement.jsonl` and `check.jsonl` exactly as above — the dispatched sub-agent reads them from disk.
+
+[/Kimi Code]
+
 
 [codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
@@ -517,11 +559,23 @@ If `task.py start` errors with a session-identity message (no context key from h
 | `design.md` exists (complex tasks) | ✅ |
 | `implement.md` exists (complex tasks) | ✅ |
 
-[Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
+[Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, ZCode, Snow, Reasonix, Trae, Grok]
 
 | `implement.jsonl` and `check.jsonl` each contain at least one real curated entry (seed row does not count) | ✅ |
 
-[/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
+[/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, ZCode, Snow, Reasonix, Trae, Grok]
+[Pi, Oh My Pi]
+
+| `implement.jsonl` and `check.jsonl` each contain at least one real curated entry (seed row does not count) | ✅ |
+
+[/Pi, Oh My Pi]
+
+[Kimi Code]
+
+| `implement.jsonl` and `check.jsonl` each contain at least one real curated entry (seed row does not count) | ✅ |
+
+[/Kimi Code]
+
 
 ---
 
@@ -531,7 +585,7 @@ Goal: turn reviewed planning artifacts into code that passes quality checks.
 
 #### 2.1 Implement `[required · repeatable]`
 
-[Claude Code, Cursor, OpenCode, codex-sub-agent, CodeBuddy, Droid, Pi, ZCode, Snow, Oh My Pi]
+[Claude Code, Cursor, OpenCode, codex-sub-agent, CodeBuddy, Droid, ZCode, Snow]
 
 Spawn the implement sub-agent:
 
@@ -545,9 +599,31 @@ The platform hook/plugin auto-handles:
 - Injects `prd.md`, `design.md` if present, and `implement.md` if present
 - For Codex, `SubagentStart` supplies native context injection; the agent profile keeps child-side loading as the fallback
 
-[/Claude Code, Cursor, OpenCode, codex-sub-agent, CodeBuddy, Droid, Pi, ZCode, Snow, Oh My Pi]
+[/Claude Code, Cursor, OpenCode, codex-sub-agent, CodeBuddy, Droid, ZCode, Snow]
+[Pi, Oh My Pi]
 
-[Gemini, Qoder, Copilot, Reasonix, Trae, Grok, Kimi Code]
+The main session orchestrates; the pi extension queues the work.
+
+- **Method**: Matt `implement` per ticket, driven through `trellis_subagent` (agent `trellis-implement`, prompt starts with `Active task: <task path>`). **One task at a time**: queue it, wait for the result, verify it, then queue the next. `implement-spec`'s frontier-parallelism does not exist here — N tickets cost N serial turns, so choose the frontier order deliberately and never queue several implement tasks in one reply expecting concurrent work.
+- **Shared-tree hazard**: queued tasks work in the same working tree. A task that leaves the branch or the tree dirty blocks the next one, so every implement prompt must say "commit or revert before you finish".
+- **Task description**: implement the reviewed artifacts, consult `{TASK_DIR}/research/`, run project lint and type-check, report files touched and verification results.
+- **Recursion guard**: a queued task must not queue further tasks — dispatch is mainline-only.
+
+[/Pi, Oh My Pi]
+
+[Kimi Code]
+
+Spawn the implement sub-agent:
+
+- **Method**: Matt `implement` per ticket, or `implement-spec` for the whole graph — Kimi's `AgentSwarm` can run frontier-ready tickets concurrently.
+- **Agent type**: `coder` with the `.kimi-code/skills/trellis-implement/SKILL.md` instructions (or the `trellis-implement` agent profile).
+- **Dispatch prompt guard**: the prompt MUST start with `Active task: <task path>`, then say the agent is already the implementer and must not spawn another implement/review agent.
+- **Task description**: implement the reviewed artifacts, consult `{TASK_DIR}/research/`, finish by running project lint and type-check.
+
+[/Kimi Code]
+
+
+[Gemini, Qoder, Copilot, Reasonix, Trae, Grok]
 
 Spawn the implement sub-agent:
 
@@ -560,7 +636,7 @@ The pull-based sub-agent definition auto-handles the context load requirement:
 - Resolves the active task with `task.py current --source`, then reads `prd.md`, `design.md` if present, and `implement.md` if present
 - Reads `implement.jsonl` and requires the agent to load each referenced spec/research file before coding
 
-[/Gemini, Qoder, Copilot, Reasonix, Trae, Grok, Kimi Code]
+[/Gemini, Qoder, Copilot, Reasonix, Trae, Grok]
 
 [Kiro]
 
@@ -589,7 +665,7 @@ The platform prelude auto-handles the context load requirement:
 
 #### 2.2 Quality check `[required · repeatable]`
 
-[Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
+[Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, ZCode, Snow, Reasonix, Trae, Grok]
 
 Spawn the review sub-agent:
 
@@ -605,7 +681,19 @@ The check agent's job:
 - Auto-fix issues it finds
 - Run lint and typecheck to verify
 
-[/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Trae, Grok, Kimi Code]
+[/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, ZCode, Snow, Reasonix, Trae, Grok]
+[Pi, Oh My Pi]
+
+Queue one review task (`trellis_subagent`, agent `trellis-check`) after the implement result lands, or run `code-review` inline. Two queued review tasks would serialize anyway, so put both axes in one brief.
+
+[/Pi, Oh My Pi]
+
+[Kimi Code]
+
+Spawn the review sub-agent (`trellis-check` profile / `.kimi-code/skills/trellis-check/SKILL.md`), or load `code-review` and run both axes. Fix findings, then re-check until green.
+
+[/Kimi Code]
+
 
 [codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
