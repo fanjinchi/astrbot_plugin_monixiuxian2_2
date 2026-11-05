@@ -24,7 +24,7 @@
 
 - 复核 A 已交付的 base/current/max HP 消费者（创角/突破/装备/功法/丹药/商店/GM/PvP/历练/秘境/传承/显示/排行），补跨玩法 clamp 回归。
 - 产品代码与测试不残留含混 `Player.hp`；旧 Boss 实现中的旧语义归 E2 整删，不在此列。
-- 补完设计 Step 3 定案③「暴击物化」，**双侧接线**（`pve-enemy-design.md:44/:89/:472-482`）：`config/game_config.json` + `data/default_configs.py` 补 `combat.base_crit_rate=0.15`；玩家侧 `build_fighter_from_player` 传参（`FighterState` 默认值保持兼容）；**怪物侧 `build_enemy_fighter` 增可选 `base_crit_rate` 形参**：`enemy.crit_rate > 0` 时按 /100 覆盖，否则回退该键（默认 0.15）。依据封板 `:480-482`「两个构建点统一从该键取值、怪物有配时覆盖」。现状：第一季 28 只与 4 只世界 Boss 的 CSV **都没有 `crit_rate` 列**（`core/enemy_schema.py:394/:500` 的 builder 默认 0），因此全部走回退——默认 0.15 时行为逐点不变，第二季配 per-enemy 值即可覆盖。当前 `managers/combat_manager.py:234` 的 `_base_crit_rate` 是**读值零消费**的死读取，属设计警告的「半接线」状态。
+- 补完设计 Step 3 定案③「暴击物化」，**双侧接线**（`pve-enemy-design.md:44/:89/:472-482`）：`config/game_config.json` + `data/default_configs.py` 补 `combat.base_crit_rate=0.15`；玩家侧 `build_fighter_from_player` 传参（`FighterState` 默认值保持兼容）；**怪物侧 `build_enemy_fighter` 增可选 `base_crit_rate` 形参**：`enemy.crit_rate > 0` 时按 /100 覆盖，否则回退该键（默认 0.15）。依据封板 `:480-482`「两个构建点统一从该键取值、怪物有配时覆盖」。现状：第一季 28 只与 4 只世界 Boss 的 CSV **都没有 `crit_rate` 列**（`core/enemy_schema.py:394/:500` 的 builder 默认 0），因此全部走回退——默认 0.15 时行为逐点不变，第二季配 per-enemy 值即可覆盖。当前 `managers/combat_manager.py:234` 的 `_base_crit_rate` 是**读值零消费**的死读取，属设计警告的「半接线」状态。**范围边界**：玩家目前没有任何暴击率加成来源——`Player` / `get_total_attributes` 不聚合 crit，武器/护甲/心法/丹药表也没有暴击字段，内容侧只有「暴击时触发/暴击增伤」类技（如战意诀 `trigger_condition=crit`，`design_docs/content-design/skills-ultimates.md`、`weapon-skills.md:42-46`），它们消费暴击但不提供暴击率；本轮只做「物化 + 双侧接线」，不新增玩家暴击加成通道（词条专项另开）。
 
 ### R3. 事务叶子清零
 
