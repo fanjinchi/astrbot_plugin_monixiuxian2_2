@@ -37,7 +37,7 @@
 | 表 | `boss`（fresh DDL） | 删除建表；新增 v40 `DROP TABLE IF EXISTS boss`，登记 `VERSION_SCHEMA_TABLES`；补 v40 专用 parity 用例 |
 | 键 | `system_config.boss_next_spawn_time` | v40 顺带 DELETE，代码不再读取 |
 | time-skip | `boss_manager.TIME_SKIP_ENTRIES` 首条 + 「Boss/灵眼」共享标签 | 首条随文件删除；标签改「灵眼下次刷新时间」，同步 README / registry 测试 |
-| GM | `core/gm_manager.py::生成Boss`、`BOSS_ADMINS` | **2026-11-05 修订：保留并改接新领域**——`GM 生成Boss [profile_id]` 触发 ensure（可选强制 profile；仍走 `(profile_id, epoch)` 派生 + 不可变快照 + 单 active + 到期规则），`BOSS_ADMINS` 继续作管理员闸门，`broadcast_callback` 改走 outbox |
+| GM | `core/gm_manager.py::生成Boss`、`BOSS_ADMINS` | **2026-11-05 修订：保留并改接新领域**——顶层 `生成Boss [profile_id]`（`BOSS_ADMINS`）与 `GM 生成Boss [profile_id]` 都调 `ensure_spawn`，三分支：无 active 生成 / 未知 id 明确失败 / 有 active 复用并回报实际 Boss；只有管理入口可传 `profile_id`，poller 一律 `None`；`broadcast_callback` 改走 outbox |
 | 测试 | `tests/test_boss.py`（18 用例）、`test_feature_switches.py`（6 条）、`test_gm_manager.py`、`test_time_skip_registry.py`、`test_migration.py`、`test_skill_equip_and_tome.py:168`、`test_pve_persistence_foundation.py:254/266` | 删除/改写/更新期望，全部列入执行清单 |
 | 配置 | `config/game_config.json`、`data/default_configs.py` 的 `boss` 段 | 保留 key，更新 comment 为新玩法 |
 
@@ -50,9 +50,9 @@
 
 ## 5. 验证矩阵
 
-- 内容：draft / 缺 manifest / hash 漂移 / 列范围越权 → 正式 config 零修改；批准后 count 28+4、id 唯一、运行时 profile hash 一致；占位叙事未显式批准则 fail closed。
+- 内容：draft / 缺 manifest / hash 漂移 / 列范围越权 → 正式 config 零修改；批准后 count 28+4、id 唯一、运行时 profile hash 一致；占位叙事未显式批准则 fail closed；**正式产物含 `world_bosses[*].narrative_approved=true`**（sync 由 manifest 派生，D 门控据此放行广播，缺省 false）。
 - 切流：28 名册在历练 / 秘境默认路径可达；改 `pve.difficulty_multiplier` 伤害随之变化；旧派生不再命中；`top` 组不存在；`low/mid/high` 在 `catalog=None` 回落时仍可用；`legacy_guardian` 仍可用。
-- 旧删（判据必须可机械执行，别写成字面「归零」）：`grep -rn "boss_manager\|BossManager\|BOSS_CONFIG\|boss_config\|boss_handlers" main.py handlers managers core config` → 0（`data/migration.py` 的建表/迁移历史注释例外）；`boss_next_spawn_time` 产品代码 0 读 0 写、只允许出现在 v40 `DELETE` 与测试；`stone_reward` 以 `grep -rn "boss.*stone_reward\|stone_reward.*boss"` → 0 为准（`managers/bounty_manager.py:493/502` 的局部变量与本域无关）；`boss` 表不存在（v40 专用用例）；`lint_narrative.py` 不再读已删文件；玩家可见文案不再承诺 Boss 掉落。
+- 旧删（判据必须可机械执行且交付后真能为 0）：① `grep -rn --include='*.py' "BossManager\|boss_handlers\|BOSS_CONFIG" main.py handlers managers core config config_manager.py data scripts` → 0；② `grep -rn --include='*.py' "boss_config" config_manager.py data/default_configs.py main.py handlers managers` → 0（前提：`managers/enemy_manager.py:364-368` 的局部变量改名 `boss_mult`、`managers/spirit_eye_manager.py:22` 注释同步）；③ `boss_next_spawn_time` 产品代码 0 读 0 写、只允许出现在 v40 `DELETE` 与测试；④ `stone_reward` 以 `grep -rn "boss.*stone_reward\|stone_reward.*boss"` → 0 为准（`bounty_manager.py:493/502` 局部变量与本域无关）；⑤ `boss` 表不存在（v40 专用用例）；⑥ `lint_narrative.py` 不再读已删文件；⑦ 玩家可见文案不再承诺 Boss 掉落。**统一加 `--include='*.py'`**：`__pycache__` 的旧 .pyc 会输出 binary matches，否则「→0」永不成立。
 - 新启：poller 起停、指令可达、Boss 生命周期、北京日 3 次、并发唯一末击、CAS 失败不扣次数、outbox partial success、重启恢复。
 - HP 锚：正式 config 的 4 只 profile 复跑 D AC9（阶段 40/40/20 加权、±10%、3 次/日 × 2 日磨死）。
 - time-skip：Boss 到期/再生生效；anchor / pending / date_key 不受影响。

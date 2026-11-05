@@ -16,7 +16,7 @@
 | F | `10-22-adventure-flee-contract-rework` | R4 逃跑细则；AC4 | 全风险段 pending、逃跑收益 ×0.3/不掉落/不滚传承、败场不滚传承、4 处文案、sect 用例双分支适配 | 单提交 revert（无 schema / config 数值变更） |
 | C | `10-10-pve-adventure-settlement` | R4；AC4 | pending、逃跑、current HP、1%战败保底（胜场不保底）、全局疲劳、settlement facts | Adventure handler 切流前 |
 | D | `10-10-pve-world-boss-domain` | R5/R6；AC5/AC6 | 四段全随机固定实例、生命周期、北京日次数、HP 地板保底 1%（Q4 统一下调）且无疲劳/入场费、原子挑战/台账、outbox | Boss poller/handler 切流前 |
-| E1 | `10-10-pve-cross-system-integration` | R7；AC1/AC7a、AC2/AC4 组合复核 | 全消费者组合复核、PVE 气血地板收口（秘境兽/传承守护者含宗门入口）、事务叶子清零、文档与版本 | 地板与消费者收口前备份 |
+| E1 | `10-10-pve-cross-system-integration` | R7；AC1/AC7a、AC2/AC4 组合复核 | 全消费者组合复核、PVE 气血地板收口（秘境兽/传承守护者含宗门入口）、暴击双侧接线（`base_crit_rate` 物化）、事务叶子清零、文档与版本 | 地板与消费者收口前备份 |
 | E2 | `10-28-pve-content-activation` | R7；AC3b/AC7b 外部门、AC4 激活 | 内容批准/sync/hash、旧 Boss 整删（代码+表 v40+key+测试）、新入口与 poller 原子激活、回滚 | 激活前 DB + generated config 备份 |
 
 Step 7 奖励经济不是 child；只由 C/D 输出稳定事实，待正式秘境设计完成后另建 Trellis 任务。
@@ -71,6 +71,7 @@ A 与 B 可并行；A 的 v35/Health 契约稳定后执行 P；P 与 B 均通过
 ### Batch 4 — E1 收口（可独立关闭）
 
 - 复核 A 已完成的全消费者迁移；把秘境兽/传承守护者 PVE 气血地板统一到 Health Domain（含宗门领取入口）。
+- 暴击双侧接线：`base_crit_rate` 物化进 config + 玩家侧传参 + 怪物侧缺省回退（世界 Boss 侧由 D 经同一 mapper 接线）。
 - 清零 data/ 之外剩余事务叶子；更新架构、状态、README/API 文档与版本清单。
 - Gate 4：产品范围旧语义清零（旧 Boss 实现按 2026-10-28 决议由 E2 整删，不在 E1 删）；产品范围 ruff/pytest 通过。真实 webtest 仍不运行，除非用户明确要求。
 

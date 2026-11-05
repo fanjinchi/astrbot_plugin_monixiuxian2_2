@@ -17,8 +17,12 @@
 
 ### R1. 固定实例与出生快照
 
-- 每次新实例在 4 个境界段中全随机选择，不按活跃玩家、全服平均境界或来客境界适配；选中段对应第一季固定 profile。选择用可审计的 spawn seed/selection fact，profile id/version 与 seed 随出生快照持久化，重复轮询或幂等重试不得重掷。`instance_id` 由 `(profile_id, spawn_epoch)` 确定性派生，并发 ensure 靠主键冲突读回同一行（DDL 无「单 active」唯一约束，领域侧以确定性 id + 状态条件写保证）。**`spawn_epoch` 定义 = 上一实例 `terminated_at + respawn_{kill|dissipate}_h`**（无上一实例/首次启动时取持久化基准时刻），seed 只由该 epoch 派生；ensure 前先查 `state='active'`，存在则直接复用、不生成新实例。**首次基准落点**：取 `system_config` 新键（首次实例同事务写入）或首个实例 `spawned_at` 作为基准；ensure 的 active 读 + insert 必须在同一 `db.transaction()` 内，否则并发 ensure 只靠「同一秒算出同一 id」的巧合。
-- **GM/fixture 强制 profile 入口**：`ensure_spawn(profile_id: str | None = None)` —— `None` 走 4 段随机；给定 profile 时强制选择该 Boss，供 GM「生成Boss」与功能用例按 Boss 验证。强制路径不得改变其它不变式：instance_id 仍由 `(profile_id, spawn_epoch)` 派生、快照仍不可变、仍受「单 active」与 12h/24h 到期约束，并记 warning 日志区分人工触发。
+- 每次新实例在 4 个境界段中全随机选择，不按活跃玩家、全服平均境界或来客境界适配；选中段对应第一季固定 profile。选择用可审计的 spawn seed/selection fact，profile id/version 与 seed 随出生快照持久化，重复轮询或幂等重试不得重掷。`instance_id` 由 `(profile_id, spawn_epoch)` 确定性派生，并发 ensure 靠主键冲突读回同一行（DDL 无「单 active」唯一约束，领域侧以确定性 id + 状态条件写保证）。**`next_spawn_at` 是再生资格的唯一权威，`spawn_epoch := 全表最近一条终态实例的 `next_spawn_at`（不按 profile 分链）**（无终态实例/首次启动时取持久化基准时刻），seed 只由该 epoch 派生；实例进入终态（defeated/dissipated）的**同一 CAS 批次**写 `next_spawn_at = terminated_at + respawn_{kill|dissipate}_h`（`insert_instance` 不写该列、DDL 默认 0，只有领域终态写与 time-skip 会动它；漏写会让 GM「时间快进」的再生行 0 条命中、E2 time-skip 矩阵拿不到证据）；ensure 前先查 `state='active' AND expires_at > now`，存在则直接复用、不生成新实例。**首次基准落点**：取 `system_config` 新键（首次实例同事务写入）或首个实例 `spawned_at` 作为基准；ensure 的 active 读 + insert 必须在同一 `db.transaction()` 内，否则并发 ensure 只靠「同一秒算出同一 id」的巧合。
+- **GM/fixture 强制 profile 入口**：`ensure_spawn(profile_id: str | None = None)`。`None` 走常规选段（poller 只用这一种，**生产代码只有管理入口允许传 `profile_id`**：顶层 `生成Boss`（受 `BOSS_ADMINS`）与 GM 子命令；普通玩家入口不暴露该参数）；`profile_id` 必须来自 catalog（形如 `wb_lq_ba`），未知 id 或 catalog=None **明确失败并转成玩家可读消息**（不回落随机）。
+  - **无 active 时**：`None` → 仅 `now >= spawn_epoch` 才生成，否则返回「未到再生时间」；`X` → **跳过资格判断立即生成**（GM 供功能用例按 Boss 验证的目的），仍写不可变快照、仍按 `(profile_id, spawn_epoch)` 派生 id，并记 `selection_source='forced'` 与 warning 日志。
+  - **有 active 时**：一律不新建、不替换（不允许双 active），返回既有实例与实际 `profile_id`；GM 消息写成「已有活跃 Boss {实际名}，未生成 {请求名}」，功能用例此时不得断言「已生成」。
+  - **active 判据必须带到期**：`state='active' AND expires_at > now`（或在 ensure 内先 `expire_active`），避免时间快进后把已过期行当活跃实例复用。
+  - 「12h/24h」只约束再生资格与实例自身终态节奏；强制路径只跳过资格判断，不改终态规则与 12h/24h 节奏。
 - 出生时复制 profile id/version、名称、境界、最大 HP、五维、技能和阶段规则；活动期间不可因配置热更新或旧 level/exp 公式重算面板，难度倍率只乘伤害。
 - 移除随机 HP、旧 `stone_reward` 和即时奖励作为新实例权威字段/行为。
 
@@ -27,7 +31,7 @@
 - 状态机为 `active -> defeated | dissipated`；active 最长 48h。
 - defeated 12h 后、dissipated 24h 后获得下一实例生成资格。
 - 过期检查和终态转换幂等；重启或重复轮询不重复生成或广播。
-- expiry/next spawn 等绝对时间戳**已由 P 在 `managers/boss_manager.TIME_SKIP_ENTRIES` 登记**（本 child 只确认、不重复声明；勿建第二 provider，避免快进双扣）；E2 负责迁到新领域属主模块。
+- expiry/next spawn 等绝对时间戳**已由 P 在 `managers/boss_manager.TIME_SKIP_ENTRIES` 登记**（本 child 只确认、不重复声明；勿建第二 provider，避免快进双扣）；**本 child 必须保证 `next_spawn_at` 在终态同批写入**，否则该条目永不命中（见 R1）；E2 负责迁到新领域属主模块。
 
 ### R3. 每日次数
 
@@ -42,7 +46,7 @@
 - **事务契约**：任一条件写（实例 CAS / 每日次数 / 玩家前像）返回 `False` 时必须立即 `txn.abort()`（或抛出明确冲突错误）再离开事务——事务正常退出等于提交，禁止带半截写入退出。执行顺序固定：实例 CAS 成功 → 扣每日次数 → 玩家 `cas_update_player_health` → 账本/贡献/阶段/事件；任一失败即终止。
 - 本场伤害只等于成功写事务中的 `hp_before - hp_after`，不可用 `max_hp - final_hp` 重算历史损血；Boss HP 不得为负。
 - 每场只结算玩家战斗 HP 损耗，写回必须走 `data/pve_repository.py::cas_update_player_health`（前像 = 短读的 `current_hp, health_recovered_at`），值为 `max(engine_remaining_hp, 全局单源地板)`——**本 child 不新增 0.01 常量**：E1 把地板上收 `HealthService.defeat_hp_floor` 之前复用 `managers/adventure_manager.py::DEFEAT_HP_FLOOR_RATIO`；若 E1 已交付则直接调该 API，若本 child 先落地则由 **E2 在激活检查点改调**（E2 R2 承接，设计 :886 明确地板全局统一，含世界 Boss）；本玩法每场按败场口径写回（含末击场，设计 :572「世界 Boss 每场本质是必败的 DPS 竞赛」）。禁止用 `HealthService.set_current_hp` 的无条件窄写，`HealthService.compute_max_hp` 只用于算动态上限与地板。战前 settle 必须放在一笔短 `db.transaction()` 内（事务外 settle 触发叶子写，与 bd `-dfb` 的悬空隐式事务竞态冲突）。不得复用普通 PVE 的 600 秒疲劳，不得收取灵石入场费或新增其他挑战税。每日 3 次就是本玩法的稀缺闸门。
-- Boss 侧 Fighter 必须以实例 `current_hp/max_hp` 与构建时 `phase` 倍率构建，**不得直接复用** `profile_to_enemy` 的满血面板（`profile_to_enemy` 固定 `hp=max_hp=profile.hp`，复用会让每场从满血开打、实例累计伤害与末击事实全失真；旧实现的真实坑是用 `damage_dealt = max_hp - final_hp` 复算历史损血）。
+- Boss 侧 Fighter 必须以实例 `current_hp/max_hp` 与构建时 `phase` 倍率构建，**不得直接复用** `profile_to_enemy` 的满血面板（`profile_to_enemy` 固定 `hp=max_hp=profile.hp`，复用会让每场从满血开打、实例累计伤害与末击事实全失真；旧实现的真实坑是用 `damage_dealt = max_hp - final_hp` 复算历史损血）。**构建要走 `managers/enemy_catalog.build_enemy_fighter` 并显式传 `base_crit_rate`**（E1 新增形参，取自 `game_config.combat.base_crit_rate`，缺省 0.15）：否则 Boss 自建 `FighterState` 会丢暴击接线，改基础暴击键对世界 Boss 不生效（世界 Boss profile 的 `crit_rate=0`，完全依赖该回退）。
 - 并发挑战至多一个事务把实例变为 defeated，末击者唯一；事务异常或任一条件写失败时全回滚。
 - 挑战进入前保留 `BusyState.assert_idle(user_id, template="❌ 你当前正忙，无法挑战Boss！")` 守卫（沿用旧实现语义；禁止手写 user_cd 判断）。
 - 使用持久化基座已重构的 transaction-joining Boss repository；本 child 必须沿 challenge 调用图复验无中间 commit，但不重复拥有共享 commit 基础改造。
@@ -66,8 +70,8 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1：每次新实例在 4 个境界段中全随机且不按玩家境界适配；固定 seed 可复现选择，profile/seed 持久化后重复轮询或幂等重试不重掷；4 只 profile 均可生成不可变快照，活动中配置变化不改面板，难度只改伤害。**已有 `active` 实例时 ensure 不得生成新实例**，`instance_id` 由 `(profile_id, spawn_epoch)` 确定性派生且并发 ensure 只落一行（active 读 + insert 同一事务；首次基准落点见 R1）。**GM/fixture 用 `profile_id` 强制时上述不变式同样成立**（强制只替换选段决策，不改 id 派生、快照与单 active 校验）。
-- [ ] AC2：active/48h/defeated/dissipated/12h/24h 状态机在重启和重复轮询下唯一合法。
+- [ ] AC1：**常规生成路径（`ensure_spawn(None)`，即 poller）**每次新实例在 4 个境界段中全随机且不按玩家境界适配；固定 seed 可复现选择（**仅对 `selection_source='seed'` 断言**），selection fact（`seed`/`selected_profile_id`/`selection_source`/`scheduled_epoch`）随出生快照持久化后重复轮询或幂等重试不重掷；4 只 profile 均可生成不可变快照，活动中配置变化不改面板，难度只改伤害。**已有 `active AND expires_at>now` 实例时 ensure 不得生成新实例**，`instance_id` 由 `(profile_id, spawn_epoch)` 确定性派生且并发 ensure 只落一行（active 读 + insert 同一事务；首次基准落点见 R1）。**GM/fixture 强制 `profile_id` 时只替换选段决策**：id 派生、不可变快照、单 active 与 12h/24h 终态规则照旧，并显式记 `selection_source='forced'`（强制路径不适用「seed 可复现选择」）。
+- [ ] AC2：active/48h/defeated/dissipated/12h/24h 状态机在重启和重复轮询下唯一合法；终态同批写 `next_spawn_at`，GM「时间快进」前移它即前移再生资格（E2 的 time-skip 矩阵据此取证）。
 - [ ] AC3：北京日 3 次在 UTC 边界、服务器不同时区、并发和幂等重试下均正确。
 - [ ] AC4：并发挑战不超扣次数或 HP，本场/累计伤害正确且只有一个末击；玩家写回按败场口径 `max(引擎终值, 1% 动态 max_hp)`（10-12 Q4 决议；本玩法每场均按败场口径、含末击场，设计 :572），地板比例复用全局单源、不新增 0.01 常量；挑战只产生 HP 损耗而不增加 fatigue 或收取入场费；combat 不占用写事务，版本冲突以固定 RNG 重算/CAS 处理，故障注入全回滚；CAS 失败方 `attempts_used` 与 Boss HP 均不变，事务无半截提交。
 - [ ] AC5：60%/20% 阶段属性通过；阶段1一次跨两阈值时按 phase2→phase3 产生两条唯一事件且最终 phase=3。
