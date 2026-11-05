@@ -41,9 +41,9 @@ flowchart LR
 |---|---|---|
 | 三层气血语义与恢复口径 | 父 R2 + child A 已交付 | E1 复核 |
 | 地板公式与单源 API | **E1 R1/design §2** | D R4、父 AC4/AC5 引用 |
-| 暴击物化（`combat.base_crit_rate`、双侧接线、取值通道） | **E1 R2/design §2** | D R4 引用（世界 Boss 载体） |
+| 暴击物化（`combat.base_crit_rate`、双侧接线、取值通道） | **E1 R2/design §3** | D R4 引用（世界 Boss 载体） |
 | 固定名册 schema v2 与映射契约 | child B（已归档） | D/E2 引用 |
-| 世界 Boss `spawn_epoch`/`next_spawn_at`/强制生成/返回契约 | **D R1** | E2 R3 引用 |
+| 世界 Boss `spawn_epoch`/`next_spawn_at`/强制生成/返回契约 | **D prd R1**（签名与返回契约）+ **D design §3**（生命周期行为） | E2 R3 引用 |
 | 世界 Boss 事件、叙事门控、outbox 恢复窗口 | **D R7** | E2 R1 引用（写法） |
 | 旧 Boss 整删清单、`key=top`、激活顺序 | **E2 R2/R3** | 父 R7、D 依赖引用 |
 | 叙事批准与 manifest 形状 | **E2 R1** | D R7 引用（门控字段） |
@@ -53,7 +53,7 @@ flowchart LR
 
 1. 气血：`base_hp` 永久、`current_hp` 资源、`max_hp` 运行时；旧 `hp` 无 alias。
 2. 难度：`pve.difficulty_multiplier` 只乘伤害；敌人面板来自不可变 profile/快照。
-3. 地板：败场 `max(引擎终值, ceil(1% × 动态 max_hp))`，胜场不保底；世界 Boss 每场按败场口径（含末击场）。
+3. 地板：见 `10-10-pve-cross-system-integration/design.md` §2（`defeat_hp_floor`）；胜场不保底，世界 Boss 每场按败场口径（含末击场）。
 4. 实例：世界 Boss 出生快照不可变；同一时刻至多一个 active；`instance_id` 由 `(profile_id, spawn_epoch)` 派生。
 5. 事务：多语句写在 `db.transaction()` 内；条件写失败立即 `txn.abort()`；网络 await 不在事务内。
 6. 事件：业务事件唯一，per-destination delivery 幂等；不承诺接收端 exactly-once。
@@ -80,7 +80,7 @@ flowchart LR
 
 未上线，一次性明确迁移、不做双写。集成顺序：气血基座 → 内容 adapter/目录 → 普通 PVE → 世界 Boss → 全消费者/迁移回归 →（内容批准后）激活切流。每次 schema/handler/poller/config 切换前保留同点代码、DB 与 config hash；回滚恢复三者一致组合。
 
-**2026-10-28 决议**：旧 Boss 数据与结构直接放弃，不迁移不归档；旧表/key/实现/测试/配置三元组/`lint_narrative` 脱钩在内容批准后的同一激活检查点整删（含 v40 `DROP TABLE IF EXISTS boss`），回滚走 git revert + 同期备份。
+**2026-10-28 决议**：旧 Boss 数据与结构直接放弃，不迁移不归档；整删清单与激活顺序见 `10-28-pve-content-activation/design.md` §1/§3；v40 不可回退，只允许整组回滚（git revert + 同期备份）。
 
 ## 8. 关键风险
 

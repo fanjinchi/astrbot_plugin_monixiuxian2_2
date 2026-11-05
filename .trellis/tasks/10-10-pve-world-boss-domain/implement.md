@@ -12,7 +12,7 @@
 
 1. 用 shared-schema/concurrency/lifecycle fixtures 固化状态机约束，覆盖 catalog 可用/不可用两种装配。
 2. 对接 v37 instance/attempt/ledger/contribution 与 v38 event/delivery repository（不新增版本、不复制 fresh DDL）；补一条「最近终态实例」只读查询与 outbox 恢复扫描查询（只读、不改 schema）。
-3. 实现选段与 ensure：4 段全随机 + selection fact（`seed`/`selected_profile_id`/`selection_source`/`scheduled_epoch`）随快照持久化；`next_spawn_at` 为再生资格权威，终态同批写；`spawn_epoch` 按 `terminated_at DESC` 取最近终态；active 读 + insert 同事务；`created=False` 校验回读行 active。并暴露 `ensure_spawn(profile_id=None)` 强制入口（无 active 跳过资格立即生成／有 active 复用并回报实际 profile／未知 id 或 catalog=None 明确失败；返回 `(instance, created, profile_id)`，仅 `created=True` 插 spawn 事件）。
+3. 实现选段与 ensure：按 prd R1 落地 4 段全随机 + selection fact（`seed`/`selected_profile_id`/`selection_source`/`scheduled_epoch`）随快照持久化、`next_spawn_at` 终态同批写、`spawn_epoch` 取最近终态、active 读 + insert 同事务、`created=False` 校验回读行 active；暴露 `ensure_spawn(profile_id=None)` 强制入口（三分支与返回 `(instance, created, profile_id)` 契约见 prd R1，仅 `created=True` 插 spawn 事件）。
 4. 沿 challenge 调用图复验无中间 commit（Boss repository 参与外层事务）。
 5. 复用 `pve_repository.shanghai_date_key`，补业务时钟注入与 UTC 15:59/16:00 测试；实现每日 3 次与 challenge 幂等。
 6. 实现 challenge service：短事务 settle 气血 → 短读快照/版本（顺序颠倒会让 CAS 前像失效）→ 事务外固定 RNG 战斗 → 短写事务（实例 CAS → 扣次数 → `cas_update_player_health` → 账本/贡献/阶段事件/唯一末击/终态；任一条件写失败立即 `txn.abort()`）。玩家写回 `max(engine_remaining_hp, E1 地板)`（E1 未交付时用 re-export 常量，E2 激活检查点改调 API）；Boss Fighter 由实例面板包装成 `Enemy` 载体后经 `build_enemy_fighter(..., base_crit_rate=…)` 构建（E1 形参未落地时先不传，E2 补传）。不写 fatigue、不收入场费；保留 `BusyState.assert_idle`；验证有界冲突重算。

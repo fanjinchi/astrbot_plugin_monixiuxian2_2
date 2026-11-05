@@ -29,7 +29,7 @@
 - **装配**：catalog 装配归 D；E2 只在 D 归档时 `load_catalog` 仍位于 `PVECombatManager` 构造之后的情况下把该行上移，否则复用同一实例——**任何情况不得第二次 load**；构造参数注入、不用 setter；源路径 `Path(__file__).parent / "config" / "enemies.json"`（`_wire_core_services` 只收到 `plugin_data_dir`）。
 - 旧动态派生退役：`enemy_manager.spawn_enemy` 的 exp 派生路径不再被普通 PVE 命中，但**静态保留为 v1 回落**（不删除）；`enemy_catalog.spawn_enemy` docstring 改为「同名但需显式传 `difficulty_multiplier`」；把 `enemy_manager` 里的局部变量 `boss_config` 改名 `boss_mult`（否则 audit 判据永远命中）。
 - **Q6 清理**：删除 `config/enemies.json` 的 `enemy_groups` 中 `key=top` 的组；**`low/mid/high` 必须保留**为 `catalog=None` 的 v1 回落（消费者是旧派生 `_get_group_by_level`，删掉会落到无 `level_range` 的守护组，未同步态会刷出守护 NPC）；`legacy_guardian` 保留。顺序：**删 top → sync → 代码切流**（`enemy_groups` 是 sync 的手工透传段）。
-- **承接 D/E1 的延迟项**：若 D 落地时地板写回仍引用 `DEFEAT_HP_FLOOR_RATIO`，本 child 在激活检查点改调 `HealthService.defeat_hp_floor`；若 D 落地时 `build_enemy_fighter` 仍无 `base_crit_rate` 形参（D 先于 E1），本 child 补传（默认 0.15、行为不变）并核世界 Boss 暴击随键变化。
+- **承接 D/E1 的延迟项**：若 D 落地时地板写回仍引用 `DEFEAT_HP_FLOOR_RATIO`，本 child 在激活检查点改调 `HealthService.defeat_hp_floor`（定义见 `10-10-pve-cross-system-integration/design.md` §2）；若 D 落地时 `build_enemy_fighter` 仍无 `base_crit_rate` 形参（D 先于 E1），本 child 补传（默认值见 `10-10-pve-cross-system-integration/design.md` §3、行为不变）并核世界 Boss 暴击随键变化。
 
 ### R3. 旧 Boss 整删（数据与结构直接放弃）
 
@@ -38,7 +38,7 @@
 - **叙事 lint 依赖**：`lint_narrative.py` 读 `config/boss_config.json` 的 `world_bosses` 映射（`_load_json` 无兜底）；删文件前改为读 `config/enemies.json` v2（**不要直接删映射**：该表在 `desc_tables` 中且 `name_maps[table]` 直接索引，删了会 KeyError）。
 - 表与键：删旧 `boss` 建表 DDL；新增 v40 `DROP TABLE IF EXISTS boss`，登记 `VERSION_SCHEMA_TABLES[40] = ()`（空表集合；boss 不得记入 v40 表集）与 `tests/test_pve_persistence_foundation.py` 的 `NEW_TABLES[40] = ()`；`DELETE system_config.boss_next_spawn_time`；补 v40 专用 parity 用例（手动建表 + 1 行 + 旧 key，fresh 已无表不能回退取证）。
 - time-skip：旧 `boss_manager.TIME_SKIP_ENTRIES` 首条随文件删除；世界 Boss 两条迁到新属主模块并登记 `_PROVIDER_MODULES`（**删除 `"managers.boss_manager"` 元组项**，漏删会让 `from_providers()` 抛 FileNotFoundError、插件装配失败）；`spirit_eye_manager` 共享标签改「灵眼下次刷新时间」，同步 README 与 registry/GM 帮助文案（删 1 条后总数为 **13 条**；`gm_manager` 里「10 行 vs 11 条」在拆条前就已失真，改为按注册表动态计数）。
-- GM / 权限（**保留**，2026-11-05 修订）：顶层 `生成Boss [profile_id]`（受 `BOSS_ADMINS`）与 `GM 生成Boss [profile_id]` 都改接 `ensure_spawn(profile_id)`，按 D R1 三分支（无 active 生成 / 未知 id 失败 / 有 active 复用并回报实际 Boss）；只有管理入口可传 `profile_id`，poller 一律 `None`；`CMD_*`、`boss_admins`、`_check_boss_admin`、`BOSS_ADMINS` 保留，`broadcast_callback` 停用改走 outbox。
+- GM / 权限（**保留**，2026-11-05 修订）：顶层 `生成Boss [profile_id]`（受 `BOSS_ADMINS`）与 `GM 生成Boss [profile_id]` 都改接 `ensure_spawn(profile_id)`，三分支语义见 `10-10-pve-world-boss-domain/prd.md` R1；只有管理入口可传 `profile_id`，poller 一律 `None`；`CMD_*`、`boss_admins`、`_check_boss_admin`、`BOSS_ADMINS` 保留，`broadcast_callback` 停用改走 outbox。
 - 玩家可见文案不得再承诺 Boss 掉落：`handlers/misc_handler.py`（挑战Boss 帮助行）、`handlers/shop_handler.py` 的 `ITEM_ACQUIRE_HINTS`、`handlers/storage_ring_handler.py` 的「Boss击杀掉落」。
 - 机械清理判据：`python3 scripts/audit_pve_redesign.py --scope e2` 必须为 0（覆盖旧符号、旧配置属性/文件、旧 key、玩家文案、time-skip provider、v2 config 的 top 组与 `narrative_approved`）；脚本不覆盖的装配/import 点按 `implement.md` step 6 逐项改。
 

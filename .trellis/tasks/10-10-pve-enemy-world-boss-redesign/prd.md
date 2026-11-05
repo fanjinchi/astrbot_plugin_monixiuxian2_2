@@ -29,7 +29,7 @@
 - `base_hp` 永久基础、`current_hp` 当前资源、`max_hp` 运行时上限；旧 `hp` 已无损迁移且不保留 alias。
 - 恢复 = 每分钟动态 `max_hp` 的 1%，**全时段计时**（2026-10-12 取消「仅空闲」闸门），不依赖常驻定时器。
 - 动态上限下降时 `current_hp` 钳制到 `[0, max_hp]`；突破只增长 `base_hp`。
-- PVE 败场地板 = `max(引擎终值, ceil(1% × 动态 max_hp))`，胜场不保底；历练与世界 Boss 统一适用（2026-10-12 由 25% 下调）。
+- PVE 败场地板见 `10-10-pve-cross-system-integration/design.md` §2（`defeat_hp_floor`），胜场不保底；历练与世界 Boss 统一适用（2026-10-12 由 25% 下调）。
 
 ### R3. 固定敌人名册运行时
 

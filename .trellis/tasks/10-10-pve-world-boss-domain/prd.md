@@ -43,7 +43,7 @@
 - 版本/CAS 冲突不得把旧战报套到新 HP：同 challenge id 确定性重算并重试，或返回明确冲突；只有成功 CAS 消耗次数。
 - 本场伤害 = 成功写事务中的 `hp_before - hp_after`，不得用 `max_hp - final_hp` 重算历史损血；Boss HP 不为负。
 - 玩家写回走 `data/pve_repository.py::cas_update_player_health`，值为 `max(engine_remaining_hp, 全局单源地板)`——地板定义见 **E1 R1**（本 child 不新增 0.01 常量）；每场按败场口径（含末击场，设计 :572）。禁止 `set_current_hp` 无条件窄写；`compute_max_hp` 只算上限与地板。战前 settle 在同一短事务内（避免 bd `-dfb` 的悬空隐式事务竞态）。不得复用普通 PVE 600s 疲劳、不收入场费。
-- Boss 侧 Fighter 以实例 `current_hp/max_hp` 与构建时 `phase` 倍率构建，不得复用 `profile_to_enemy` 满血面板（旧坑是 `damage_dealt = max_hp - final_hp` 复算历史损血）。**构建走 `build_enemy_fighter` 并传 `base_crit_rate`**（定义见 **E1 R2**）：先把实例行包装成 `Enemy` 载体（`hp=max_hp=实例值`、`damage=profile.damage×phase 倍率`、phase3 `armor×0.5`、`crit_rate=0`），再调用；服务未注入 `config_manager` 时自读同一键（缺失 0.15）。**若 E1 形参尚未落地**（Batch 顺序先 D 后 E1），先 `build_enemy_fighter(carrier)`（默认 0.15、行为不变），由 E2 激活检查点补传，不得自建 `FighterState`。
+- Boss 侧 Fighter 以实例 `current_hp/max_hp` 与构建时 `phase` 倍率构建，不得复用 `profile_to_enemy` 满血面板（旧坑是 `damage_dealt = max_hp - final_hp` 复算历史损血）。**构建走 `build_enemy_fighter` 并传 `base_crit_rate`**（定义见 `10-10-pve-cross-system-integration/design.md` §3）：先把实例行包装成 `Enemy` 载体（`hp=max_hp=实例值`、`damage=profile.damage×phase 倍率`、phase3 `armor×0.5`、`crit_rate=0`），再调用；服务未注入 `config_manager` 时自读同一键（回退值同 E1 定义）。**若 E1 形参尚未落地**（Batch 顺序先 D 后 E1），先 `build_enemy_fighter(carrier)`（行为不变），由 E2 激活检查点补传，不得自建 `FighterState`。
 - 并发至多一个事务把实例变 defeated，末击者唯一；事务异常或任一条件写失败全回滚。
 - 挑战入口保留 `BusyState.assert_idle(user_id, template="❌ 你当前正忙，无法挑战Boss！")`，禁止手写 user_cd 判断。
 - 使用基座 transaction-joining Boss repository；沿调用图复验无中间 commit。
