@@ -18,6 +18,7 @@
 ### R1. 固定实例与出生快照
 
 - 每次新实例在 4 个境界段中全随机选择，不按活跃玩家、全服平均境界或来客境界适配；选中段对应第一季固定 profile。选择用可审计的 spawn seed/selection fact，profile id/version 与 seed 随出生快照持久化，重复轮询或幂等重试不得重掷。`instance_id` 由 `(profile_id, spawn_epoch)` 确定性派生，并发 ensure 靠主键冲突读回同一行（DDL 无「单 active」唯一约束，领域侧以确定性 id + 状态条件写保证）。**`spawn_epoch` 定义 = 上一实例 `terminated_at + respawn_{kill|dissipate}_h`**（无上一实例/首次启动时取持久化基准时刻），seed 只由该 epoch 派生；ensure 前先查 `state='active'`，存在则直接复用、不生成新实例。**首次基准落点**：取 `system_config` 新键（首次实例同事务写入）或首个实例 `spawned_at` 作为基准；ensure 的 active 读 + insert 必须在同一 `db.transaction()` 内，否则并发 ensure 只靠「同一秒算出同一 id」的巧合。
+- **GM/fixture 强制 profile 入口**：`ensure_spawn(profile_id: str | None = None)` —— `None` 走 4 段随机；给定 profile 时强制选择该 Boss，供 GM「生成Boss」与功能用例按 Boss 验证。强制路径不得改变其它不变式：instance_id 仍由 `(profile_id, spawn_epoch)` 派生、快照仍不可变、仍受「单 active」与 12h/24h 到期约束，并记 warning 日志区分人工触发。
 - 出生时复制 profile id/version、名称、境界、最大 HP、五维、技能和阶段规则；活动期间不可因配置热更新或旧 level/exp 公式重算面板，难度倍率只乘伤害。
 - 移除随机 HP、旧 `stone_reward` 和即时奖励作为新实例权威字段/行为。
 
@@ -65,7 +66,7 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1：每次新实例在 4 个境界段中全随机且不按玩家境界适配；固定 seed 可复现选择，profile/seed 持久化后重复轮询或幂等重试不重掷；4 只 profile 均可生成不可变快照，活动中配置变化不改面板，难度只改伤害。**已有 `active` 实例时 ensure 不得生成新实例**，`instance_id` 由 `(profile_id, spawn_epoch)` 确定性派生且并发 ensure 只落一行（active 读 + insert 同一事务；首次基准落点见 R1）。
+- [ ] AC1：每次新实例在 4 个境界段中全随机且不按玩家境界适配；固定 seed 可复现选择，profile/seed 持久化后重复轮询或幂等重试不重掷；4 只 profile 均可生成不可变快照，活动中配置变化不改面板，难度只改伤害。**已有 `active` 实例时 ensure 不得生成新实例**，`instance_id` 由 `(profile_id, spawn_epoch)` 确定性派生且并发 ensure 只落一行（active 读 + insert 同一事务；首次基准落点见 R1）。**GM/fixture 用 `profile_id` 强制时上述不变式同样成立**（强制只替换选段决策，不改 id 派生、快照与单 active 校验）。
 - [ ] AC2：active/48h/defeated/dissipated/12h/24h 状态机在重启和重复轮询下唯一合法。
 - [ ] AC3：北京日 3 次在 UTC 边界、服务器不同时区、并发和幂等重试下均正确。
 - [ ] AC4：并发挑战不超扣次数或 HP，本场/累计伤害正确且只有一个末击；玩家写回按败场口径 `max(引擎终值, 1% 动态 max_hp)`（10-12 Q4 决议；本玩法每场均按败场口径、含末击场，设计 :572），地板比例复用全局单源、不新增 0.01 常量；挑战只产生 HP 损耗而不增加 fatigue 或收取入场费；combat 不占用写事务，版本冲突以固定 RNG 重算/CAS 处理，故障注入全回滚；CAS 失败方 `attempts_used` 与 Boss HP 均不变，事务无半截提交。

@@ -37,7 +37,7 @@
 | 表 | `boss`（fresh DDL） | 删除建表；新增 v40 `DROP TABLE IF EXISTS boss`，登记 `VERSION_SCHEMA_TABLES`；补 v40 专用 parity 用例 |
 | 键 | `system_config.boss_next_spawn_time` | v40 顺带 DELETE，代码不再读取 |
 | time-skip | `boss_manager.TIME_SKIP_ENTRIES` 首条 + 「Boss/灵眼」共享标签 | 首条随文件删除；标签改「灵眼下次刷新时间」，同步 README / registry 测试 |
-| GM | `core/gm_manager.py::生成Boss`、`BOSS_ADMINS` | **已决（2026-11-01）：整套删除**——手动生成会绕开确定性 `spawn_epoch`/`next_spawn_at`，强制刷新统一走 GM「时间快进」；同批删 `_conf_schema.json:18` 与文档 |
+| GM | `core/gm_manager.py::生成Boss`、`BOSS_ADMINS` | **2026-11-05 修订：保留并改接新领域**——`GM 生成Boss [profile_id]` 触发 ensure（可选强制 profile；仍走 `(profile_id, epoch)` 派生 + 不可变快照 + 单 active + 到期规则），`BOSS_ADMINS` 继续作管理员闸门，`broadcast_callback` 改走 outbox |
 | 测试 | `tests/test_boss.py`（18 用例）、`test_feature_switches.py`（6 条）、`test_gm_manager.py`、`test_time_skip_registry.py`、`test_migration.py`、`test_skill_equip_and_tome.py:168`、`test_pve_persistence_foundation.py:254/266` | 删除/改写/更新期望，全部列入执行清单 |
 | 配置 | `config/game_config.json`、`data/default_configs.py` 的 `boss` 段 | 保留 key，更新 comment 为新玩法 |
 
