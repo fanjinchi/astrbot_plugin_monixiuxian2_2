@@ -29,7 +29,7 @@
 - 旧动态派生退役：`enemy_manager.spawn_enemy` 的 exp 派生路径不再被普通 PVE 命中，但**静态保留为 v1 回落**（不删除——删了 `catalog=None` 的回落就不成立）；`enemy_manager.py` 过渡注释与 `current-design-report` 措辞同步。`managers/enemy_catalog.py` 的 `spawn_enemy` docstring（现写「Same name/signature … mechanical」）同步为「同名但需显式传 `difficulty_multiplier`」，避免两参调用静默降级。**顺带把 `managers/enemy_manager.py:364-368` 的局部变量 `boss_config` 改名 `boss_mult`**（否则 AC3 的 grep 判据永远命中）。
 - 名册可达性证据：历练 / 秘境默认路径命中 28 只名册（segment × category），元婴段不再刷出 top 三兽组。
 - **Q6 清理**：删除 `config/enemies.json` 中 `enemy_groups` 里 `key=top` 的组（苍龙/墨玉麒麟/火凤整组移出第一季）；**`low/mid/high` 必须保留**作为 catalog `None` 时的 v1 回落数据——它们的消费者是旧派生 `enemy_manager._get_group_by_level`（不是 `spawn_enemy_from_group`；全仓配置引用只有 `legacy_guardian`），删掉会让回落落到无 `level_range` 的守护组，未同步/回滚态下普通 PVE 会刷出守护 NPC；`legacy_guardian` 保留。**删除时机钉死**：在 R1 正式 sync **之前**从现有 `config/enemies.json` 删除（`enemy_groups` 是 sync 的手工透传段，透传源就是现有 config）；实现步骤顺序为「删 top → sync → 代码切流」；若改到 sync 之后才删，必须同时手工删生成配置里的同组（sync 不会从 CSV 重建 groups），否则残留。
-- **世界 Boss 地板切换（承接 D）**：若 D 落地时写回仍引用 `DEFEAT_HP_FLOOR_RATIO`，E2 在激活检查点改调 `HealthService.defeat_hp_floor`（数值不变，仅收敛单源）；证据：D 的挑战写回点不再引用该常量（E1 保留的模块级 re-export 供旧测试用，不算引用）、三入口地板回归仍绿。
+- **世界 Boss 地板切换（承接 D）**：若 D 落地时写回仍引用 `DEFEAT_HP_FLOOR_RATIO`，E2 在激活检查点改调 `HealthService.defeat_hp_floor`（数值不变，仅收敛单源）；证据：D 的挑战写回点不再引用该常量（E1 保留的模块级 re-export 供旧测试用，不算引用）、三入口地板回归仍绿。**同理，若 D 落地时 `build_enemy_fighter` 还没有 `base_crit_rate` 形参**（Batch 顺序先 D 后 E1），E2 在激活检查点补传（默认 0.15、行为不变），并核世界 Boss challenge 的暴击值随 `combat.base_crit_rate` 变化。
 
 ### R3. 旧 Boss 整删（数据与结构直接放弃）
 
