@@ -1,19 +1,16 @@
 # Technical Design: 世界 Boss 生命周期与原子挑战
 
-## 1. Persistence model
+## 1. 持久化模型（消费 P 已冻结的 v37/v38）
 
-按职责拆分（最终命名可随现有 repository 风格调整）：
+- Instance：稳定 id、selection fact 与 spawn seed、profile id/version、不可变出生快照（含 5 个叙事列）、current/max HP、phase、state、spawn/expires/next_spawn、终态元数据与 CAS 版本。
+- Daily attempts：`(date_key, user_id)` 唯一，count ≤ 3。
+- Challenge ledger：challenge/幂等 id、instance/user、hp_before/after、真实伤害、气血结果、阶段/终态事实。
+- Contribution：`(instance_id, user_id)` 唯一累计。
+- Outbox event / delivery：事件唯一键；`(event_id, platform, group_id)` 唯一，状态 queued/dispatching/sent/uncertain + lease/attempt/error。
 
-- Boss instance：稳定 instance id、全随机境界段选择事实与 spawn seed、profile id/version、不可变出生快照、current/max HP、phase、status、spawn/expires/next_spawn、终态元数据和版本；出生快照同时携带 profile 的 5 个叙事文案字段（spawn/phase2/phase3/kill/dissipate_text），renderer 只读快照；
-- Daily attempts：`(date_key, user_id)` 唯一（`date_key` = `Asia/Shanghai` 自然日键），count≤3；
-- Challenge ledger：challenge/idempotency id、instance/user、hp_before/after、真实伤害、玩家气血结果、阶段/终态事实；
-- Contribution：`(instance_id, user_id)` 唯一累计，或从不可变 ledger 聚合但需满足性能与审计；
-- Business outbox event：event key 唯一、payload 和创建提交状态；
-- Outbox delivery：`(event_id, platform, group_id)` 唯一，目标快照、queued/dispatching/sent/uncertain、lease/attempt/error。
+本 child 不新增迁移版本。旧 `boss` 表与数据不迁移（2026-10-28），其删除归 E2。
 
-v37/v38 的 fresh schema 与 repository contract 已由持久化基座冻结并以 fixtures 验证；**旧 `boss` 表与其数据不迁移、不归档（2026-10-28 用户拍板）**，其删除随旧实现整删归 E2；本 child 只消费新 schema/repository，不修改 `LATEST_DB_VERSION` 或重复迁移。由于未上线，Integration 可一次性切换运行入口，但数据库版本仍必须连续、可回滚验证。
-
-## 2. Challenge service
+## 2. 挑战服务
 
 ```mermaid
 sequenceDiagram
@@ -22,39 +19,44 @@ sequenceDiagram
     participant DB as Database
     participant C as CombatEngine
     participant O as Outbox Dispatcher
-
     H->>S: challenge(user, instance, idempotency_key)
-    S->>DB: short read immutable snapshots + versions
-    DB-->>S: boss/player snapshots + version + attempt view
-    S->>C: run snapshots with deterministic RNG (no write txn)
-    C-->>S: final fighter states
-    S->>DB: BEGIN IMMEDIATE; revalidate + CAS versions
-    S->>DB: write attempt/boss/player/ledger/contribution/phases/events
-    S->>DB: COMMIT
-    alt CAS conflict
-        S->>S: reload and deterministically recompute, bounded retry
+    S->>DB: 短读不可变快照 + 版本 + 次数视图 + 固定 RNG
+    S->>C: 事务外确定性战斗
+    S->>DB: BEGIN IMMEDIATE; 重校验 + CAS 写 attempt/boss/player/ledger/contribution/phases/events
+    alt CAS 冲突
+        S->>S: 重读 + 同 challenge id 重算（有界）
     end
-    S-->>H: committed result
-    O->>DB: expand/claim committed per-destination delivery
-    O-->>H: external broadcast (outside transaction)
+    S-->>H: 已提交结果
+    O->>DB: 提交后展开/claim per-destination delivery
+    O-->>H: 事务外广播
 ```
 
-combat 对短读得到的不可变快照和 challenge 派生的固定 RNG 做事务外纯计算。写事务重新读取版本与状态，只有 `instance_version`、玩家 health version、active/expiry 和次数条件全部成立时才 CAS 提交；冲突后加载最新快照并以同一 challenge id 确定性重算，设置有界重试/明确冲突错误。**事务契约**：任一条件写返回 `False` → 立即 `txn.abort()`（正常退出=commit，禁止带半截写入退出）；顺序为实例 CAS → 扣次数 → 玩家 `cas_update_player_health` → 账本/贡献/阶段/事件。玩家 health 版本 = 前像 `(current_hp, health_recovered_at)`，不得用 `set_current_hp` 无条件窄写；战前 settle 放在一笔短 `db.transaction()` 内（避免事务外叶子写，bd `-dfb`）。Boss damage 为成功提交时的 `hp_before - max(0, hp_after)`；玩家写回 `max(engine_remaining_hp, 全局单源地板)`（每场按败场口径、含末击场；E1 前用 `DEFEAT_HP_FLOOR_RATIO`、之后 `HealthService.defeat_hp_floor`，本 child 不新增 0.01 常量），且挑战事务不写 fatigue、不扣灵石入场费。Boss Fighter 以实例 `current_hp/max_hp` 与构建时 `phase` 倍率构建，不得复用 `profile_to_enemy` 的满血面板；构建走 `build_enemy_fighter` 并传 `base_crit_rate`（E1 形参，缺省 0.15），避免自建 `FighterState` 丢暴击接线。challenge idempotency key 的重复请求返回已提交结果，不再扣次数。这样避免最多 200 回合战报计算长期占用 SQLite 全局写锁。
+事务契约：任一条件写返回 `False` → 立即 `txn.abort()`；顺序为实例 CAS → 扣次数 → `cas_update_player_health` → 账本/贡献/阶段/事件。玩家前像 `(current_hp, health_recovered_at)`，禁止无条件 `set_current_hp`。本场伤害 = `hp_before - max(0, hp_after)`。玩家写回 `max(engine_remaining_hp, 全局单源地板)`（地板定义见 E1）；不写 fatigue、不收入场费。Boss Fighter 用实例面板 + phase 倍率经 `build_enemy_fighter` 构建（暴击键见 E1 R2），不复用满血 `profile_to_enemy`。
 
-## 3. Lifecycle and phases
+## 3. 生命周期与阶段
 
-轮询服务调用领域命令而不直接写表：ensure spawn eligibility、expire active、dispatch committed events。**常规生成路径（`ensure_spawn(None)`）**在 4 个境界段中全随机且不读取玩家/全服平均境界；GM/功能用例可传 `profile_id` 强制选段（跳过再生资格判断、记 `selection_source='forced'`，单 active 与快照不变式不变）；有 active 时一律复用并回报实际 profile，未知 id 明确失败；spawn seed 派生选择并与 profile/version 原子持久化，重复 poll 读回既有实例而不重掷；`instance_id` 由 `(profile_id, spawn_epoch)` 确定性派生，并发 ensure 靠主键冲突读回同一行；`spawn_epoch := 全表最近一条终态实例的 next_spawn_at`（终态同批写 `terminated_at + respawn_h`；首次取持久化基准时刻），seed 只由该 epoch 派生，ensure 发现 `active AND expires_at>now` 实例直接复用；首次基准取 `system_config` 新键（首次同事务写入）或首个实例 `spawned_at`，active 读 + insert 必须在同一 `db.transaction()` 内。所有终态用 status 条件更新。阶段由持久 max/current 比例计算，只允许升序；一次攻击从 phase 1 跨过 60% 与 20% 时，同一事务按 phase2→phase3 各插入一条唯一事件，最终 phase=3。不得把两阶段聚合为一条。
+轮询服务只调领域命令：ensure eligibility / expire active / dispatch events。常规生成 4 段全随机；GM/fixture 可传 `profile_id` 强制（走同一 id 派生、快照与单 active 校验）。`spawn_epoch := 最近终态实例的 next_spawn_at`（终态同批写；查询按 `terminated_at DESC`，见 prd R1）。ensure 发现 `active AND expires_at>now` 直接复用；active 读 + insert 同一事务。
 
-## 4. Beijing day
+阶段由持久 max/current 比例计算，只升不降；一次跨 60%/20% 时同事务按 phase2→phase3 各插一条唯一事件，最终 phase=3。
 
-集中 helper 用 `ZoneInfo("Asia/Shanghai")` 从业务时钟产生 `YYYY-MM-DD` date key。测试 UTC 15:59/16:00（非夏令时）、部署 TZ 改变及模拟时钟。不得复用本地 `datetime.now().date()`。
+## 4. 北京日
 
-## 5. Events
+集中 helper 用 `ZoneInfo("Asia/Shanghai")` 从业务时钟产 `YYYY-MM-DD`；测试 UTC 15:59/16:00、部署时区变化与模拟时钟；不得用本地 `datetime.now().date()`。
 
-领域事务只插唯一 business outbox event，event key 如 `(instance, type, phase/version)`。payload 是稳定 event facts 或 `copy_key + vars`，由新 renderer 生成消息，禁止把新事件传给读取 `stone_reward` 的旧 Boss object callback。dispatcher 提交后读取当前平台/白名单群并持久化目标快照，展开为唯一 `(event_id, platform, group_id)` delivery；dispatcher 每轮/启动扫描「已提交但无 delivery 的事件」并按同一唯一键幂等补展开（覆盖事件提交后、展开前崩溃的窗口）；随后逐 delivery 条件 claim 为 `dispatching`，并发 worker 只有一个取得发送权。广播文案准入归 E2 approval manifest——sync 把批准结论写进 profile（`narrative_approved`，**缺省 False；写入方是 E2 sync，见 E2 R1/AC1**），运行期只认该标记，fixture 只验证机械契约；若 E2 最终不改 sync，本 child 必须改读 `narrative_status ∈ {定稿,豁免}` 并在文档记录取舍。恢复扫描：`business_events` 没有「展开完成」列且本 child 不改 schema，因此只能采用「最近 N 分钟窗口」，并明确「超窗口不补发」的取舍，避免白名单后配时把历史 spawn/kill 事件迟到补发。
+## 5. 事件
 
-平台发送无法提供真正 exactly-once，因此 delivery 状态机明确取舍：调用前已知失败可回 `queued` 自动重试；请求已发但结果不确定标记 `uncertain` 且禁止自动重试，只允许管理员在接受重复风险后显式重放；`sent` destination 永不因同事件其他目标失败而重播。`dispatching` 必须有 lease/owner；基座 `claim_delivery` 只认领 `queued`，陈旧 `dispatching` **不自动回收**——由 `list_stale_dispatching` 暴露、管理员判定后转 `uncertain` 或人工重放。网络 await 始终在数据库事务外。该接口保证业务事件唯一与 partial success 隔离，不承诺接收端 exactly-once。
+领域事务只插唯一 business event；payload 为稳定 facts 或 `copy_key + vars`，由新 renderer 生成，禁止传给读 `stone_reward` 的旧 callback。dispatcher 提交后读取平台/白名单群并持久化目标快照，展开唯一 delivery；逐 delivery 条件 claim，并发只有一个取得发送权。恢复扫描用「最近 N 分钟窗口」（`business_events` 无展开完成列、不改 schema），超窗口不补发。
 
-## 6. Tests
+平台无 exactly-once：已知未发送可回 `queued` 重试；已发但不确定标 `uncertain` 禁止自动重试；`sent` 不因同事件其他目标失败重播。`dispatching` 有 lease/owner，陈旧行由 `list_stale_dispatching` 暴露由管理员处置。网络 await 始终在事务外。
 
-shared-schema contract、4 段全随机且不按玩家适配、固定 spawn seed 可复现/重复 poll 不重掷、snapshot immutable、lifecycle/time-skip、Beijing date、3次并发、同幂等键、事务外战斗/版本 CAS/有界重算、玩家 maxHP 地板 1%（Q4 统一下调）、无 fatigue/灵石入场费、多人并发击杀、真实 damage、唯一末击、phase1→3 两事件顺序、事务注错回滚、新 renderer 不读取旧奖励字段，以及多平台/多群 delivery partial success、claim 崩溃、uncertain 人工处置；新增 CAS 失败立即 abort（次数/HP 不变）、确定性 `instance_id` 并发 ensure 单实例、事件提交后无 delivery 的恢复扫描补展开、catalog 为 `None` 时领域 disabled、HP 锚验收（AC9）用 4 只 profile 跑真实引擎核对附录 F 场均输出（阶段 40/40/20 加权、±10%）与 3 次/日×2 日磨死；另补首次基准落点与 ensure 单事务、GM 强制 `profile_id` 路径（无 active 立即生成／有 active 复用并回报实际 Boss／未知 id 明确失败）、`next_spawn_at` 终态写入与 time-skip 前移资格、`narrative_approved` 门控与 outbox 展开去重（最近 N 分钟窗口）。
+## 6. 测试
+
+- 契约：4 段全随机、固定 seed 可复现、重复 poll 不重掷、快照不可变、GM 强制 profile 三分支（生成/复用并回报/未知 id 失败）。
+- 生命周期：48h/12h/24h、time-skip 前移 `next_spawn_at` 即前移资格、重启恢复、北京日 3 次与 UTC 边界。
+- 并发/事务：并发挑战唯一末击、CAS 失败次数与 HP 不变、故障注入全回滚、确定性 instance id 并发 ensure 单实例。
+- 事件：phase1→3 两事件顺序、partial success、claim 崩溃、uncertain 人工处置、无 delivery 恢复扫描、`narrative_approved` 门控。
+- 数值：AC9 HP 锚（4 profile × 真实引擎，阶段 40/40/20 加权，±10%，3 次/日×2 日磨死）。
+
+## 7. 回滚
+
+切流前备份 DB；失败回退代码并恢复备份，不允许旧随机生成器与新实例生成器同时运行。本 child 只交付 service/poller 函数与 fixture 测试，不注册 poller、不切 handler（归 E2）。

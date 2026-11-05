@@ -1,220 +1,95 @@
 # Technical Design: PVE 怪物与世界 Boss 重做总规划
 
-## 1. 设计目标与边界
+## 1. 目标与边界
 
-本设计把 `design_docs/content-design/pve-enemy-design.md` 已确认的 Step 0–6 转换为可独立实现和验收的工程边界，覆盖：
-
-1. 玩家 `base_hp` / `current_hp` / 动态 `max_hp` 三层气血；
-2. 28 只普通 PVE 固定名册与现有秘境兽/传承守护兼容；
-3. 普通 PVE 持续气血、持久疲劳和全风险段战前逃跑（2026-10-19 重拍，见 §Q4）；
-4. 4 只世界 Boss 的固定出生快照、生命周期、每日次数、贡献台账和阶段；
-5. 提交后事件、迁移、质量门与集成上线。
-
-Step 7 正式奖励经济不在本次实现范围。本次只产出以后可安全消费的稳定结算事实，不写临时掉落、材料、丹药或世界 Boss 分账数字。
+把 `design_docs/content-design/pve-enemy-design.md` 的 Step 0–6 转换成可独立实现与验收的工程边界，覆盖：玩家三层气血、固定名册运行时、普通 PVE 结算与逃跑、世界 Boss 生命周期、内容同步与激活。Step 7 奖励经济不在范围内。
 
 ## 2. 总体架构
 
 ```mermaid
 flowchart LR
     D[design_docs 已确认内容] --> S[sync_content_to_config]
-    S --> C1[config/enemies.json（v2：名册 + world_bosses 段）]
+    S --> C1[config/enemies.json v2：名册 + world_bosses]
     C1 --> ER[Enemy Catalog / Resolver]
     C1 --> BR[World Boss Catalog]
-
     PDB[(players)] --> HP[Player Health Domain]
-    CD[(user_cd / health anchor)] --> HP
     HP --> ADV[Adventure Settlement]
     ER --> ADV
     ADV --> CS[Combat Engine]
-    ADV --> PDB
-    ADV --> PS[(PVE pending / fatigue)]
-
     BR --> BS[World Boss Challenge Service]
     PDB --> BS
-    BDB[(boss state / attempts / ledger)] --> BS
     BS --> CS
-    BS --> BDB
     BS --> OE[(outbox events)]
-    OE --> BW[Post-commit Broadcaster]
-
+    OE --> BW[Post-commit Dispatcher]
     ADV --> RF[Stable settlement facts]
     BS --> RF
-    RF -. Step 7 后续消费 .-> RE[Reward Economy]
+    RF -. Step 7 .-> RE[Reward Economy]
 ```
 
 原则：
 
-- 内容档案、领域规则、存储状态和适配器分层，不允许 handler/manager 再散落推导敌人数值。
-- 玩家气血只有 Health Domain 能解释；普通 PVE 与世界 Boss 通过它读取动态上限、写回当前值。
-- 世界 Boss 战斗对短读不可变快照与固定 RNG 在事务外纯计算；所有最终校验和数据库变更在一个短 `async with db.transaction() as txn:` 中以 version/CAS 提交，外部广播只在提交后发生。
-- 所有等待/冷却/生命周期到期字段由字段属主声明并登记 `TIME_SKIP_ENTRIES`。health recovery anchor、PVE pending、北京日期键不登记；当前 GM `/时间快进` 只前移 registry SQL 字段、不改变业务时钟，须验证它不修改 anchor、不额外恢复或重置当日次数；经过量与跨日另由可注入业务时钟测试。
+- 内容档案 / 领域规则 / 存储状态 / 适配器分层，handler 与 manager 不再散落推导敌人数值。
+- 玩家气血只有 Health Domain 能解释；普通 PVE 与世界 Boss 经它读写当前值。
+- 世界 Boss 用「短读不可变快照 + 事务外固定 RNG 计算 + 短写 CAS」；广播只在提交后发生。
+- 等待/冷却/到期字段由属主声明并登记 `TIME_SKIP_ENTRIES`；气血恢复锚点、PVE pending、北京日期键不登记。
 
-## 3. 数据与领域契约
+## 3. 契约归属（单点事实表）
 
-### 3.1 玩家气血
+同一事实只在一处定义，其余文档引用；改动只改定义处。
 
-权威语义：
+| 事实 | 唯一定义处 | 其它位置 |
+|---|---|---|
+| 三层气血语义与恢复口径 | 父 R2 + child A 已交付 | E1 复核 |
+| 地板公式与单源 API | **E1 R1/design §2** | D R4、父 AC4/AC5 引用 |
+| 暴击物化（`combat.base_crit_rate`、双侧接线、取值通道） | **E1 R2/design §2** | D R4 引用（世界 Boss 载体） |
+| 固定名册 schema v2 与映射契约 | child B（已归档） | D/E2 引用 |
+| 世界 Boss `spawn_epoch`/`next_spawn_at`/强制生成/返回契约 | **D R1** | E2 R3 引用 |
+| 世界 Boss 事件、叙事门控、outbox 恢复窗口 | **D R7** | E2 R1 引用（写法） |
+| 旧 Boss 整删清单、`key=top`、激活顺序 | **E2 R2/R3** | 父 R7、D 依赖引用 |
+| 叙事批准与 manifest 形状 | **E2 R1** | D R7 引用（门控字段） |
+| 机械清理判据 | **`scripts/audit_pve_redesign.py`** | 各 child AC 只写「跑脚本 → 0」 |
 
-- `base_hp: int`：永久基础气血；突破只增长该值。
-- `current_hp: int`：数据库持久化的当前气血资源；战斗、恢复和药品只改变该值。
-- `max_hp: int`：运行时从 `base_hp` 加装备、功法和其他有效加成计算出的最终上限，不另存冗余列。
+## 4. 跨 child 不变式
 
-旧 `Player.hp` 删除且不提供 alias。`get_total_attributes(...)` 和所有调用者要显式使用 `base_hp` 或结果中的 `max_hp`，避免新旧语义混用。
+1. 气血：`base_hp` 永久、`current_hp` 资源、`max_hp` 运行时；旧 `hp` 无 alias。
+2. 难度：`pve.difficulty_multiplier` 只乘伤害；敌人面板来自不可变 profile/快照。
+3. 地板：败场 `max(引擎终值, ceil(1% × 动态 max_hp))`，胜场不保底；世界 Boss 每场按败场口径（含末击场）。
+4. 实例：世界 Boss 出生快照不可变；同一时刻至多一个 active；`instance_id` 由 `(profile_id, spawn_epoch)` 派生。
+5. 事务：多语句写在 `db.transaction()` 内；条件写失败立即 `txn.abort()`；网络 await 不在事务内。
+6. 事件：业务事件唯一，per-destination delivery 幂等；不承诺接收端 exactly-once。
+7. 内容：未获用户批准不得写正式 config；文案是否放行由 approval manifest 决定。
 
-迁移同时修改 fresh schema 与增量链：
+## 5. 模块边界
 
-- 将旧 `players.hp` 的值迁至 `players.base_hp`；
-- v35 优先 rename `players.hp`→`base_hp` 并 add `current_hp`、`health_recovered_at`；现有玩家由迁移检查点的一次性 backfill 读取装备/功法等有效加成，初始化为迁移瞬间动态 `max_hp`，不得延迟到普通首次读取；
-- 新玩家 `base_hp` 和 `current_hp` 由创角契约显式初始化；
-- Persistence child（P）独占 v36…v38；C 获准 v39（2026-10-12 决议，`adventure_settlements` 状态机列，走共享建表函数保持 fresh==upgrade parity）；D 只消费共享 schema/repository、不新增版本。覆盖 v34→latest 不 reset、版本只在成功后推进、重复启动和旧数据加载测试。
+- Player Health Domain：唯一解释与变更持续气血；
+- Enemy Catalog/Resolver：唯一完成名册选择与 combat profile 组装；
+- Adventure Settlement Service：唯一拥有 pending/逃跑/疲劳/普通 PVE 原子结算；
+- World Boss Challenge Service：唯一拥有世界 Boss 生命周期与挑战原子转换；
+- Post-commit Event Dispatcher：只消费已提交事件；
+- Handler 只做解析/调用/格式化；Combat Engine 无数据库写权限。
 
-Health Domain 提供单一入口完成：动态上限计算、`current_hp` clamp、按经过时间的气血恢复结算、战后写回和展示快照。由于 `user_cd` 每用户只有一行，不能事后重建活动区间；所有 `BusyState.set_busy(...)` / `clear(...)` 及权威旁路必须在状态转换前按旧状态结算并推进持久锚点。按锚点到当前的完整分钟线性恢复 `1% * max_hp`，**不判断 `user_cd`/忙闲**（2026-10-12 拍板全时段计时）；不能用常驻 per-player 定时器，也不能只读 `players.state` 镜像。
+## 6. 测试策略
 
-### 3.2 普通敌人目录
+- 契约层：气血聚合/clamp/恢复、目录解析、逃跑参数、Boss 阶段与次数、事件去重。
+- 迁移/并发：fresh 与 v34→latest、重复启动、并发挑战唯一末击、故障注入全回滚。
+- 集成：普通 PVE / 秘境兽 / 传承守护三入口；世界 Boss spawn→challenge→phase→终态→respawn；广播 partial success。
+- 时间：GM 时间快进覆盖疲劳与 Boss 到期字段；恢复量与跨日用可注入业务时钟验证。
+- 机械清理：`python3 scripts/audit_pve_redesign.py --scope all`（E1/E2 各自的 AC 用它取证）。
 
-`config/enemies.json` 的新 schema 必须能无损承载 `design_docs/content-design/enemies.csv` 的 28 只固定档案：稳定 id、段位、类别、名称、五维、技能、词条和必要展示元数据。运行时装载后建立按稳定 id 和 `(realm_segment, category)` 的索引。
+## 7. 上线与回滚
 
-敌人解析器接收玩家境界/场景和可选固定 enemy id，返回完整不可变 combat profile；调用方不得自行乘系数。`pve.difficulty_multiplier` 只作用于伤害，不改变 HP、护甲、身法或迅捷。
+未上线，一次性明确迁移、不做双写。集成顺序：气血基座 → 内容 adapter/目录 → 普通 PVE → 世界 Boss → 全消费者/迁移回归 →（内容批准后）激活切流。每次 schema/handler/poller/config 切换前保留同点代码、DB 与 config hash；回滚恢复三者一致组合。
 
-现有 `spawn_enemy_from_group(...)` 的秘境兽/传承守护数据源继续保留，但输出统一的 combat profile，使三类入口复用 Fighter 映射与测试。新固定名册不得破坏专项组的显式选择。
+**2026-10-28 决议**：旧 Boss 数据与结构直接放弃，不迁移不归档；旧表/key/实现/测试/配置三元组/`lint_narrative` 脱钩在内容批准后的同一激活检查点整删（含 v40 `DROP TABLE IF EXISTS boss`），回滚走 git revert + 同期备份。
 
-### 3.3 普通 PVE 结算与逃跑
-
-普通 PVE 分成“生成稳定遭遇”与“消费结算”两段：
-
-1. 所有风险档在历练开始生成唯一 `adventure_run_id`；历练完成时都先持久化 settlement、enemy/profile、路线收益、combat snapshot 和固定 RNG，不得走无记录同步旁路；
-2. **遇敌即进入 `pending_choice`（2026-10-19 重拍：全风险段给选择）**，未遇敌的完成直通 `resolved_win`；首版不自动过期；
-3. 玩家只能对该 pending 选择一次迎战或逃跑；重启后仍可恢复；pending 期间保留历练 busy 并阻止新历练（**全玩法锁**，唯一出口迎战/逃跑；气血恢复按全时段计时照常，不受 pending 影响），终态消费用条件更新或事务锁保证一次性并原子 clear busy；
-4. 逃跑成功不创建战斗/击败/失败事实（`win_pve` 不推进，但悬赏/师承「完成历练」类进度照常推进——设计 §Q4 特意保留的两个事实），保留 `current_hp`，收益只留快照基础收益 ×0.3、不掉落、不滚传承机缘（§Q4 重拍）；逃跑失败使用 pending 中同一 enemy id 立即开战，不可重掷或重试；战败同样不滚传承；
-5. 逃跑概率实现为单调有界、可配置且可独立模拟的身法关系函数；参数已封板且只存在于配置（`config/adventure_config.json` + `data/default_configs.py`），代码不另拍数值。
-
-疲劳从 `AdventureManager._route_cooldowns` 搬到持久字段/表。只有实际战败追加 600 秒；战败后 `current_hp = max(current_hp_after_battle, ceil(0.01 * max_hp))`（2026-10-12 由 0.25 下调；胜场不保底）。pending 首版无自动过期、也不加取消出口（用户拍板：全玩法锁即设计，`逃跑` 就是后路）；疲劳结束登记 GM time-skip。恢复锚点不是 expiry、不登记 SQL 字段快进；当前 `/时间快进` 只前移注册字段，不改变业务时钟，因此不会额外制造气血恢复。恢复经过量与跨日行为分别用可注入业务时钟测试。
-
-路线上收益与战斗事实通过明确的 settlement result 传回；本次只保留现有路线基础收益，不引入 Step 7 新奖励。
-
-### 3.4 世界 Boss
-
-#### 内容快照
-
-`config/enemies.json`（schema v2 的 `world_bosses` 段，单文档）承载 4 只固定档案。生成活动实例时复制不可变出生快照（profile id/version、名称、境界、最大 HP、五维、技能和阶段规则）到实例，活动期间不因配置热更新重算。
-
-难度倍率与普通 PVE 同义，只乘伤害。不得复用旧的 level/exp 随机推导或即时奖励字段。
-
-#### 生命周期
-
-实例状态机：
-
-```mermaid
-stateDiagram-v2
-    [*] --> active: 到达可生成时间并创建快照
-    active --> defeated: 原子挑战把 HP 降到 0
-    active --> dissipated: 48h 到期且仍存活
-    defeated --> active: 12h 后生成下一实例
-    dissipated --> active: 24h 后生成下一实例
-```
-
-终态转换用条件写保证唯一；末击者只由把 HP 从正数降到 0 的事务产生。`expires_at`、`next_spawn_at` 等绝对时间戳登记 time-skip。
-
-#### 原子挑战服务
-
-一次挑战采用短读/锁外计算/短写 CAS：
-
-1. 短读实例与玩家不可变快照、版本、次数视图和由 challenge id 派生的固定 RNG；
-2. 在数据库写事务外运行 CombatEngine；
-3. 短写事务重新验证实例仍 `active` 且未过期、北京日次数与 instance/player health version；过期则原子转 `dissipated`，CAS 冲突则按同一 challenge id 有界重算或返回明确冲突；
-4. 只有成功 CAS 扣次数，并以提交时 `hp_before - hp_after` 记录本场真实伤害；
-5. 原子写回 Boss HP、玩家 `current_hp`、按玩家累计贡献、挑战明细、阶段变化、唯一末击和终态；
-6. 一次攻击 phase1 跨 60%/20% 时按 phase2→phase3 插入两条唯一业务事件；其他阶段/击杀/消散同样先写唯一 event，提交后展开 per-destination delivery。
-
-阶段由剩余 HP 比例确定：60% 与 20% 阈值；阶段 2 伤害×1.10，阶段 3 伤害×0.90/护甲×0.50。阈值只前进不回退，阶段事件每实例每阶段至多一条。
-
-数据表已由持久化基座 P 冻结为 v37（实例/挑战/每日次数/台账/贡献）与 v38（business events/event_deliveries）；D 只消费该 schema，不得重命名或另建迁移版本。稳定 instance id、日期键/用户唯一约束和事件去重键已由这两版冻结。
-
-### 3.5 稳定结算事实与 Step 7 边界
-
-普通 PVE 至少产出：encounter/settlement id、enemy profile id/version、风险、战斗结果、真实气血差、是否逃跑、是否产生击败事实。
-
-世界 Boss 至少产出：instance/challenge id、profile version、玩家、真实伤害、贡献累计输入、阶段变化、是否末击、终态及时间。
-
-这些事实可被后续奖励服务幂等消费；当前任务不创建正式 reward claim，不发放新材料/丹药/掉落/分账，也不保留旧 `stone_reward` 行为作为临时替代。
-
-## 4. 内容同步与治理
-
-新增 enemies/world_bosses 的同步 adapter 和 schema 校验，但保持双闸门：
-
-1. `design_docs/` 中内容必须先由用户确认并标为可同步状态；
-2. 只有明确执行 `scripts/sync_content_to_config.py` 才写 `config/`。
-
-当前 CSV 为 `status=draft`、`narrative_status=占位`，因此规划和 adapter 可实施，但不得在未获用户确认时生成正式运行时配置。正式 adapter 必须校验独立 `status=final`（`enemies.csv` / `world_bosses.csv` 的战斗数值列，等价于战斗数值独立批准）及 approval manifest；manifest 绑定 CSV SHA-256、获批数据集/列范围和叙事决策。战斗数值可单独批准，叙事占位不得被整表状态隐式放行；draft/缺 manifest/hash 漂移/列范围越权均 fail closed。同步必须稳定排序、确定性输出、校验 28+4 数量/唯一 id/枚举/数值边界/阶段阈值，并有 golden/schema 测试。
-
-## 5. 事务、并发与幂等
-
-- 多语句写入统一用 `DataBase.transaction()`；底层 `BEGIN IMMEDIATE` 已负责同任务 join 和跨任务串行。
-- 现有会逐方法 commit 的 boss CRUD 必须提供可参与外层 transaction 的数据操作，禁止 challenge service 中间提交。
-- pending PVE 消费、世界 Boss 挑战和 outbox event 各有调用级幂等键；重试返回已提交结果或明确冲突，不重复扣次数、伤害或广播。
-- 网络/平台发送不在 DB 事务内 await。唯一 business event 提交后展开唯一 `(event_id, platform, group_id)` delivery；逐 destination 条件 claim 隔离 partial success。若平台 API 不支持端到端 exactly-once，则区分“已知未发送”（可安全重试）与“请求已发但结果不确定”（标记 uncertain、禁止自动重试）；后者只能由管理员接受潜在重复风险后人工重放，已 sent destination 不因其他目标失败而重播。测试覆盖并发 worker、进程在 claim/发送/标记各点崩溃和网络异常，不能伪称 exactly-once。
-
-## 6. 模块边界与复用
-
-建议由 children 固化以下深模块：
-
-- Player Health Domain：唯一解释和变更玩家持续气血；
-- Enemy Catalog/Resolver：唯一完成固定名册选择和 combat profile 组装；
-- Adventure Settlement Service：唯一拥有 pending、逃跑、疲劳和普通 PVE 原子结算；
-- World Boss Challenge Service：唯一拥有生命周期和一次挑战的原子状态转换；
-- Post-commit Event Dispatcher：只消费已提交事件，不参与领域事务。
-
-Handler 只做输入解析、调用领域服务和格式化输出。Combat engine 继续负责确定性回合战斗，不获得数据库写权限。
-
-## 7. 测试策略
-
-### 单元/契约
-
-- `base_hp` 聚合、动态 `max_hp`、current clamp、按经过时间的气血恢复和属性下降；
-- 固定目录解析、只乘伤害、Enemy→Fighter 完整映射、专项组兼容；
-- 逃跑概率单调/上下界、同敌人锁定、pending 单次消费；
-- Boss 阶段阈值、真实伤害差、北京日边界、生命周期转换和事件去重。
-
-### 数据库/迁移
-
-- fresh schema、v34 升级、重复启动；旧 HP 值保全且无 `hp` alias；
-- 疲劳/pending/次数/ledger/outbox 在重启后保持；
-- 并发挑战只扣合法次数、HP 不为负、只有一个末击、贡献不重复；
-- 事务注入异常时全量回滚。
-
-### 集成/回归
-
-- 普通 PVE、秘境兽、传承守护三条入口；创角、突破、装备、丹药、商店、GM、PvP 和显示消费者；
-- Boss spawn→challenge→阶段→defeated/dissipated→respawn；广播失败与重试；
-- GM time-skip 覆盖疲劳与 Boss expiry/respawn 到期字段；health anchor、pending、北京日期键不注册，实际 SQL 字段快进不改变恢复量/当日次数；恢复经过量和跨日另用可注入业务时钟验证，pending 以 busy 状态跨重启恢复；
-- 设计模拟器/运行时使用相同标模口径，验证 TTK、胜率和逃跑函数参数。
-
-每个代码 child 通过 AstrBot 根目录质量门（ruff 只跑产品范围，`.trellis/scripts` 的存量告警不计入）：
-
-```bash
-uv run ruff format .
-uv run ruff check core managers handlers data utils main.py models.py models_extended.py tests
-uv run python -m pytest tests/ -v
-```
-
-真实 webtest 仅在用户明确要求时运行。
-
-## 8. 上线与回滚
-
-项目尚未上线，因此采用一次性明确迁移，不保留双写或长期兼容 alias。集成顺序为：气血基座 → 内容 adapter/目录 → 普通 PVE → 世界 Boss → 全消费者/迁移回归。
-
-在内容同步前做用户确认检查；在启用新 Boss 轮询前停用旧随机生成和旧即时奖励路径。回滚优先恢复代码并从数据库备份恢复，因为删除 `hp` alias 后不承诺新旧版本同时读写；迁移子任务须给出备份、校验与失败恢复步骤。
-
-**旧 Boss 数据与结构直接放弃（2026-10-28 用户拍板）**：不迁移、不归档；旧 `boss` 表、`system_config.boss_next_spawn_time`、旧 CRUD/poller/广播/旧测试在内容批准后的同一激活检查点整删（含 v40 `DROP TABLE IF EXISTS boss`），回滚走 git revert + 同期 DB/config 备份，不做旧/new 双运行。
-
-## 9. 关键风险与对策
+## 8. 关键风险
 
 | 风险 | 对策 |
 |---|---|
-| `Player.hp` 消费者遗漏导致永久属性或当前血条错写 | 禁止 alias；全仓静态搜索 + 跨功能回归；Health Domain 单写入边界 |
-| 内容 draft 被误同步 | 用户确认 + 显式 sync 双闸门；当前 child 只实现 adapter/schema |
-| 逃跑公式曾未封板 | 2026-10-19 已封板并落地全风险段；后续调参须先回写权威设计（§Q4） |
-| pending 造成收益重复领取 | 持久状态机、幂等键、同事务消费路线 settlement |
-| Boss 并发超扣/重复末击 | `BEGIN IMMEDIATE` 事务、条件终态更新、唯一约束和并发测试 |
-| 广播与事务耦合 | 提交后 outbox；网络发送不持数据库锁 |
-| Step 7 被临时奖励渗透 | 删除旧即时 Boss 奖励调用；只输出稳定事实和明确占位接口 |
+| `Player.hp` 消费者遗漏 | 禁止 alias + 全仓静态搜索（audit 脚本）+ 跨功能回归 |
+| 内容 draft 被误同步 | 用户确认 + 显式 sync 双闸门；未批准只做 adapter |
+| 逃跑/疲劳口径漂移 | 参数封板在配置，语义写在设计 §Q4 |
+| 世界 Boss 并发超扣/重复末击 | 条件终态更新 + CAS + 并发测试 |
+| 广播与事务耦合 | 提交后 outbox，网络不持锁 |
+| Step 7 被临时奖励渗透 | 只输出稳定事实；旧即时奖励随 E2 删除 |
+| 文档与实现漂移 | 事实单点化（§3）+ 判据脚本化，不再在文档抄代码快照 |

@@ -1,37 +1,34 @@
 # Implementation Plan: 世界 Boss 生命周期与原子挑战
 
-## Dependencies and Gate
+## 依赖与门
 
-1. 玩家气血 child 完成。
-2. 固定 Boss profile/snapshot contract 完成。
-3. 持久化/事务基座的 v37/v38 schema、transaction-joining repository、CAS/claim 和 Boss time-skip provider 通过 Gate 2。
-4. 正式内容 sync 需用户确认；领域实现可先用 fixtures。
-5. `EnemyCatalog` 装配（B 的 catalog + `load_catalog()`；v1 → `None` 时领域 disabled）由本 child 在 `main.py::_wire_core_services` 完成，E2 在内容同步后启用。
-6. bd `-dfb`（叶子写事务竞态，P1 open）未修前，本 child 并发路径必须全程在 `db.transaction()` 内，禁止事务外叶子写。
-7. AC9 的 HP 锚验收用 B 的 preview profile/fixtures 完成（不依赖正式 config），正式 config 复验归 E2。
+1. A（气血）与 B（目录）已归档；P 的 v37/v38 schema、repository、CAS/claim、time-skip provider 已冻结。
+2. 正式内容 sync 需用户确认；领域实现可先用 fixtures。
+3. `EnemyCatalog` 装配由本 child 在 `main.py::_wire_core_services` 完成（v1 → `None` → 领域 disabled），E2 在 sync 后启用。
+4. bd `-dfb` 未修前，并发路径全程在 `db.transaction()` 内，禁止事务外叶子写。
+5. AC9 用 B 的 preview profile/fixtures 完成（不依赖正式 config），正式 config 复验归 E2。
 
 ## Steps
 
-1. 用 shared-schema/concurrency/lifecycle fixtures 固化持久化基座约束和领域状态机，并覆盖 catalog 可用/不可用两种装配状态。
-2. 对接并验证 v37 instance/version、attempt、ledger/contribution 与 v38 business event/per-destination delivery repository；不得在本 child 重新分配 migration 版本或复制 fresh DDL。**恢复扫描缺只读查询**：基座只有 `get_event`/`get_event_by_business_key`/`list_deliveries`/`claim_delivery`/`list_stale_dispatching`，本 child 需在 `data/pve_repository.py` 补「已提交但无 delivery 的事件」查询（如 `list_events_without_deliveries`，只读、不改 schema），并说明它与「展开完成标记 / 最近 N 分钟限定」的配合。
-3. 实现 4 境界段全随机、非玩家适配的 spawn selector；`instance_id` 用 `(profile_id, spawn_epoch)` 确定性派生（`spawn_epoch := 全表最近一条终态实例的 next_spawn_at`；终态同批写 `next_spawn_at = terminated_at + respawn_h`，首次取持久化基准时刻），持久化 spawn seed/selection fact 与固定 profile→不可变出生快照（含 5 个叙事文案列），保证重复 poll/幂等重试不重掷、已有 active 时 ensure 不生成、并发 ensure 只落一行；并实现幂等 lifecycle commands；首次基准取 `system_config` 新键（首次同事务写入）或首个实例 `spawned_at`，ensure 的 active 读 + insert 同一事务。另暴露 `ensure_spawn(profile_id: str | None = None)` 供 GM「生成Boss」/ fixture 强制指定 profile：无 active 时跳过再生资格立即生成、有 active 时复用并回报实际 profile（不允许双 active）、未知 id / catalog=None 明确失败；强制路径仍走同一 `(profile_id, spawn_epoch)` 派生与不可变快照，并记 `selection_source='forced'` 与 warning 日志；active 判据带 `expires_at > now`。
-4. 沿 challenge 调用图复验所有 Boss 数据操作加入外层 `DataBase.transaction()`，无中间 commit。
-5. 复用基座 `data/pve_repository.py::shanghai_date_key`（不重写时区逻辑），补业务时钟注入与 UTC 15:59/16:00 测试；实现每日 3 次与 challenge idempotency。
-6. 实现 challenge service：先在一笔短 `db.transaction()` 内 settle 气血，再短读不可变快照/版本（顺序颠倒会使 CAS 前像必然失效）→ 事务外固定 RNG 战斗 → 短写事务：实例 CAS 成功 → 扣每日次数 → 玩家 `cas_update_player_health`（写 `max(engine_remaining_hp, 全局单源地板)`：E1 前用 `DEFEAT_HP_FLOOR_RATIO`、之后 `HealthService.defeat_hp_floor`（**若本 child 先于 E1 落地，由 E2 在激活检查点改调该 API**，见 R4）；每场按败场口径含末击场，不新增 0.01 常量；Boss Fighter 用实例 `current_hp/max_hp` + 当前 phase 倍率构建，不复用 `profile_to_enemy` 满血面板，并走 `build_enemy_fighter(..., base_crit_rate=…)` 接暴击回退；载体构造见 R4（hp/max_hp=实例值、damage×phase 倍率、phase3 armor×0.5、crit_rate=0）；**若 E1 形参尚未落地**，先 `build_enemy_fighter(carrier)`（默认 0.15）并在 E2 激活检查点补传，不得自建 `FighterState`）→ 账本/贡献/phase2→phase3 有序事件/唯一末击/终态；**任一条件写返回 `False` 立即 `txn.abort()`**；不得写 fatigue 或扣灵石入场费；保留 `BusyState.assert_idle` 守卫；验证有界冲突重算。
-7. 新领域不引用 `stone_reward`/旧即时奖励，只保留稳定奖励输入事实；旧实现与其测试的整删归 E2（本 child 不动旧路径）。
-8. 实现稳定 event facts / `copy_key + vars` 的新 renderer（文案取自出生快照的 5 个叙事列；需同步扩展 `core/enemy_schema.build_world_boss_profile`、`_WB_PROFILE_REQUIRED_KEYS`、`managers/enemy_catalog.WorldBossProfile` 字段与 `from_dict`（**同批补 `profile_version`**，否则实例/台账版本恒为 0），并在本 child 定义 `narrative_approved` 字段与运行期门控；**该字段的写入义务归 E2 的 sync**（E2 R1/AC1），D 不自己编批准结论；sync golden 同步）及提交后 business event→per-destination delivery dispatcher（**不复用旧 callback**；旧多平台/多群直接广播与读 `stone_reward` 的路径整删归 E2）；补 partial success、claim 崩溃、uncertain/人工重放、**事件提交后无 delivery 的恢复扫描**和重启测试。
-9. 验证领域生命周期字段与持久化基座已登记的 `TIME_SKIP_ENTRIES` 映射一致；补 AC9 HP 锚验收（4 只 profile × 真实引擎、阶段 40/40/20 加权、偏差 ≤±10%、3 次/日×2 日磨死复核）；补 `narrative_approved` 门控与 outbox 展开去重（不改 schema，只能「最近 N 分钟窗口」）、`next_spawn_at` 终态写入与 time-skip 前移资格、GM 强制 profile 路径用例；完成并发/故障/产品范围 ruff + 完整 pytest 质量门。
+1. 用 shared-schema/concurrency/lifecycle fixtures 固化状态机约束，覆盖 catalog 可用/不可用两种装配。
+2. 对接 v37 instance/attempt/ledger/contribution 与 v38 event/delivery repository（不新增版本、不复制 fresh DDL）；补一条「最近终态实例」只读查询与 outbox 恢复扫描查询（只读、不改 schema）。
+3. 实现选段与 ensure：4 段全随机 + selection fact（`seed`/`selected_profile_id`/`selection_source`/`scheduled_epoch`）随快照持久化；`next_spawn_at` 为再生资格权威，终态同批写；`spawn_epoch` 按 `terminated_at DESC` 取最近终态；active 读 + insert 同事务；`created=False` 校验回读行 active。并暴露 `ensure_spawn(profile_id=None)` 强制入口（无 active 跳过资格立即生成／有 active 复用并回报实际 profile／未知 id 或 catalog=None 明确失败；返回 `(instance, created, profile_id)`，仅 `created=True` 插 spawn 事件）。
+4. 沿 challenge 调用图复验无中间 commit（Boss repository 参与外层事务）。
+5. 复用 `pve_repository.shanghai_date_key`，补业务时钟注入与 UTC 15:59/16:00 测试；实现每日 3 次与 challenge 幂等。
+6. 实现 challenge service：短事务 settle 气血 → 短读快照/版本（顺序颠倒会让 CAS 前像失效）→ 事务外固定 RNG 战斗 → 短写事务（实例 CAS → 扣次数 → `cas_update_player_health` → 账本/贡献/阶段事件/唯一末击/终态；任一条件写失败立即 `txn.abort()`）。玩家写回 `max(engine_remaining_hp, E1 地板)`（E1 未交付时用 re-export 常量，E2 激活检查点改调 API）；Boss Fighter 由实例面板包装成 `Enemy` 载体后经 `build_enemy_fighter(..., base_crit_rate=…)` 构建（E1 形参未落地时先不传，E2 补传）。不写 fatigue、不收入场费；保留 `BusyState.assert_idle`；验证有界冲突重算。
+7. 新领域不引用 `stone_reward`/旧即时奖励，只保留稳定输入事实；旧实现与其测试的整删归 E2（本 child 不动旧路径）。
+8. 实现 event renderer（文案取出生快照 5 列；扩 `build_world_boss_profile`/必需键/`WorldBossProfile` 字段与 `from_dict`，同批补 `profile_version`，定义 `narrative_approved` 门控）与 dispatcher（逐 destination claim，网络 await 在事务外；partial success、claim 崩溃、uncertain 人工处置、无 delivery 恢复扫描「最近 N 分钟」）。
+9. 验证生命周期字段与 `TIME_SKIP_ENTRIES` 映射一致；补 AC9 HP 锚（4 profile × 真实引擎、阶段 40/40/20 加权、±10%、3 次/日×2 日）；补 GM 强制 profile 三分支与时间快进前移再生资格用例；完成产品范围 ruff + 完整 pytest。
 
-## Rollback Point
+## 回滚点
 
-在新轮询和 handler 切流前，schema/service 可独立验证。切流前备份数据库；失败时回退代码并恢复备份，不允许旧随机生成器和新实例生成器同时运行。本 child 只交付 service/poller 函数与 fixture 测试，**不注册 `main.py` 的 poller、不切 handler**（注册与整删旧实现归 E2；poller 复用 `_schedule_boss_spawn` 的指数退避模板）。
+切流前备份 DB；失败回退代码并恢复备份。本 child 只交付 service/poller 函数与 fixture 测试，不注册 poller、不切 handler。
 
-## Completion Evidence
+## 完成证据
 
-- v37/v38 shared schema/repository 消费与领域字段映射证据；
-- 4 段全随机/固定 seed/重复 poll 不重掷、GM 强制 profile（无 active 生成 / 有 active 复用 / 未知 id 失败）、`next_spawn_at` 终态写入与 time-skip 前移资格、北京日、生命周期测试；
-- 并发次数/伤害/末击、玩家 1% maxHP floor（Q4 统一下调）、无 fatigue/入场费与故障回滚报告；
-- 阶段和 outbox 广播测试（含 CAS 失败方次数/HP 不变、确定性 `instance_id` 并发 ensure、事件无 delivery 的恢复扫描、catalog disabled、叙事未批准不广播）；
-- AC9 HP 锚实测：4 只 profile 场均输出 vs 附录 F（±10%）、阶段 40/40/20 加权、3 次/日×2 日磨死复核；
-- 证明无 Step 7 奖励调用的静态/行为检查；
-- 完整质量门摘要。
+- v37/v38 repository 消费与字段映射证据；
+- 选段/强制 profile（生成·复用·失败）、`next_spawn_at` 终态写入与 time-skip 前移、北京日、生命周期、重启恢复测试；
+- 并发次数/伤害/末击、地板写回与无 fatigue/入场费、故障回滚报告；
+- 事件顺序、partial success/uncertain、恢复扫描、catalog disabled、narrative 未批准不广播；
+- AC9 HP 锚实测（4 只 profile vs 附录 F、±10%、3 次/日×2 日）；
+- 无 Step 7 奖励调用的静态/行为检查；产品范围 ruff + pytest 摘要。
