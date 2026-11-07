@@ -46,16 +46,16 @@
 ## 4. 新入口装配
 
 - 复用 D 的 `_wire_core_services` 注入（E2 不重复 load）；v2 config 自动启用，v1 → disabled + 维护文案。
-- lifecycle poller：指数退避（`min(60 * 2**n, 3600)`），`initialize()` 启动、`terminate()` cancel；每轮 `ensure_spawn / expire_active / dispatch_events`。
+- lifecycle poller：指数退避（`min(60 * 2**n, 3600)`），`initialize()` 启动、`terminate()` cancel；每轮固定 `expire_active → ensure_spawn → dispatch_events`，先提交到期终态再做生成资格判断。D 的 ensure 仍须在自己的事务内幂等处理到期 active，防止 GM 等其他调用方绕过 poller 顺序。
 - outbox dispatcher：读已提交事件 → 展开 per-destination delivery → 逐条 claim 发送；网络 await 在事务外；`uncertain` 人工处置。
 - 零奖励过渡：只落台账事实，不新增保底/分档/彩蛋数值，广播不承诺奖励。
 
 ## 5. 验证矩阵
 
-- 内容：draft/缺 manifest/hash 漂移/列越权 → 正式 config 零修改；批准后 count 28+4、id 唯一、profile hash 一致；正式产物含 `world_bosses[*].narrative_approved=true`。
+- 内容：draft/缺 manifest/hash 漂移/列越权 → 正式 config 零修改；批准后 count 28+4、id 唯一、profile hash 一致；combat-only 占位产物 `narrative_approved=false` 且不广播，只有独立叙事批准的 `定稿` 或显式 `豁免` 才为 true；共享 Schema、真实加载与叙事快照链路按 §7 验收。
 - 切流：28 名册在历练/秘境可达；改 `pve.difficulty_multiplier` 伤害变化；旧派生不再命中；无 `key=top`；`low/mid/high` 在 `catalog=None` 回落可用；`legacy_guardian` 可用。
 - 旧删：`audit_pve_redesign.py --scope e2` 为 0；`boss` 表不存在（v40 专用用例）；`lint_narrative` 不读已删文件；玩家文案无 Boss 掉落承诺。
-- 新启：poller 起停、三个命令可达、生命周期、北京日 3 次、并发唯一末击、CAS 失败不扣次数、outbox partial success、重启恢复。
+- 新启：poller 起停与固定调用顺序、到期后换不同 profile 仍单 active、三个命令可达、生命周期、北京日 3 次、并发唯一末击、CAS 失败不扣次数、outbox partial success、重启恢复。
 - HP 锚：正式 config 的 4 只 profile 复跑 D AC9。
 - time-skip：Boss 到期/再生生效；anchor/pending/date_key 不受影响。
 - 回滚演练：备份恢复后旧版本可读（不允许混合 schema）。
@@ -67,9 +67,18 @@
 | 只 sync 不切流 → 名册成死配置、父 AC3b 无法关闭 | R2 独立 + AC2 可观察证据 |
 | 切流漏传难度系数 / 二次 load / 误删 low-mid-high | R2 写死来源、同一实例、v1 回落保留 |
 | CSV 全 draft 直接 sync | R1 两步批准，AI 不得代改 |
-| 占位叙事被当已批准 / 照默认集写 manifest 全拒 | manifest 按实际填 `["占位"]`；|
-| 叙事批准没落进 profile → 广播全哑 | sync 写 `narrative_approved`，D builder 缺省 false |
+| 占位叙事被当已批准 / 照默认集写 manifest 全拒 | manifest 按实际填 `["占位"]` 只放行 sync；占位始终 `narrative_approved=false`，只有 `定稿`/显式 `豁免` 可 true |
+| 叙事批准结论没正确落进 profile → 占位误广播或定稿广播全哑 | sync 按 R1 逐行写 `narrative_approved`，D builder 缺省 false；真实加载链见 §7 |
+| 把文案误接入 `narrative_config.json` / 代码 fallback → 双来源或未批准文案被当正式内容 | 只走 CSV→enemies.json→profile→出生快照，见 §7 |
 | 删旧与启新不同步 → 无 Boss 或双跑 | 同一提交/检查点，smoke 失败整组回滚 |
 | 删 `boss_config.json` 打断 lint / 被默认值重建 | 三元组 + lint 同批；D 删除与 lint 改读同一提交 |
 | v40 DROP 无回退 | 备份 + 只允许整组合回滚 |
 | 清零判据与代码漂移 | 判据脚本化（audit），文档只写「跑脚本」 |
+
+## 7. 配置 Schema、真实加载与叙事单链路
+
+- **共享 Schema 属主**：沿用 `core/enemy_schema.py` 的 `build_world_boss_profile`、`_WB_PROFILE_REQUIRED_KEYS`、`validate_enemy_document` 和 `managers/enemy_catalog.py` 的 `WorldBossProfile.from_dict`，不另建配置校验层。新增字段、必填/默认值与类型契约由 D prd R7 唯一定义；E2 的责任是在正式 sync 前确认 D 已交付，并用正式产物复验整条链，而不是只检查 JSON 已生成。
+- **叙事唯一来源**：`world_bosses.csv` 五叙事列 → `sync_content_to_config.py` → `config/enemies.json` 的 `world_bosses` → `EnemyCatalog`/profile → D 出生快照 → renderer。世界 Boss 不使用 `config/narrative_config.json` 或 `copy_variants.csv`，不新增对应场景键，也不设代码文案 fallback；正式内容仍须用户批准，生成配置禁止手改。
+- **lint 门**：`design_docs/content-design/lint_narrative.py` 继续以 `world_bosses.csv` 为文案源，对五叙事列复用现有文本检查；旧 Boss 配置删除时按 §3 把名称映射改读 `enemies.json` v2。`narrative_approved=false` 的 preview/占位内容只允许验证「不广播」，不得作为正式文案验收证据。
+- **真实加载契约测试**：正式 `render_enemy_document`（manifest）→ `validate_enemy_document` → 写入临时 `enemies.json` → 真实 `ConfigManager` 加载 `game_config` 的开关/难度配置，同时由 `EnemyCatalog.load` 加载该生成文件 → `world_boss_by_id` 构造 profile → D `ensure_spawn` 固化快照 → renderer 生成 spawn/phase/defeated/dissipated 四类事件。分别覆盖 combat-only 占位与独立叙事批准/豁免，断言前者快照 false 且不广播、后者按 R1 为 true。`ConfigManager` 不负责读取 `enemies.json`，不得为通过测试新增第二加载入口。
+- **契约测试矩阵**：合法且叙事已批准的完整配置可加载、五文案与快照逐字一致且 `narrative_approved=true`；每个新增必填键缺失、类型错误或已批准空文案均在 Schema/加载边界 fail closed；未批准/preview 保持 false 且不广播；旧 v1 配置使 `load_catalog` 返回 `None`、新领域 disabled，不得与 v2 字段混读。

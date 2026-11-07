@@ -80,10 +80,10 @@
 - [x] AC1：拆为 8 个有依赖/验收门/回滚点的子任务（A/B/P/C/F 已归档；D/E1/E2 见各自任务）。
 - [ ] AC2：旧玩家迁移后气血无损、当前气血合法；全 HP 消费者经新契约与回归（**child A 已交付迁移与 Health Domain**；全消费者组合复核归 E1）。
 - [x] AC3a：28 只名册四层逐项一致，守护/秘境兼容测试通过（child B 已交付并归档）。
-- [ ] AC3b（**外部门：用户内容批准**）：正式 v2 config 生效、运行态旧派生不再被普通 PVE 命中（代码静态保留为回落）、28 名册经 E2 AC2 可达。
+- [ ] AC3b（**外部门：用户内容批准**）：正式 v2 config 生效、运行态旧派生不再被普通 PVE 命中（代码静态保留为回落）、28 名册经 E2 AC2 可达；世界 Boss 正式产物通过 E2 design §7 的共享 Schema→真实 `EnemyCatalog` 加载→profile→出生快照契约链，新增键缺失/类型错误与旧 v1 配置 fail closed。
 - [ ] AC4（地板边界甲案）：历练 1% 地板由 C 落地（已归档）；秘境兽/传承守护者（含宗门领取）由 E1 统一；PvP 不适用；败场气血、疲劳、逃跑可观察验证。（**数值回归不在本 AC**：普通/精英/组内 Boss 的胜率·TTK·资源税移交 bd `-9u2`；资源税口径以附录 C.6 为准。）
-- [ ] AC5：世界 Boss 在重启/跨日/过期/并发下单一合法状态；次数、真实伤害、累计、阶段、唯一末击可验证；地板 1%（每场按败场口径、含末击场）；HP 锚以 D AC9 为准并由 E2 复跑。
-- [ ] AC6：阶段/击杀/消散事件唯一，per-destination partial success 隔离，已 sent 不重播、uncertain 可审计；只持久化贡献/末击事实，不引入未确认经济数值。
+- [ ] AC5：世界 Boss 在重启/跨日/过期/并发下单一合法状态；旧实例在轮询间到期且新随机 profile 不同时仍至多一个 active；次数、真实伤害、累计、阶段、唯一末击可验证；地板 1%（每场按败场口径、含末击场）；HP 锚以 D AC9 为准并由 E2 复跑；`game_config.boss.enabled=false` 不生成、`false→true` 与启用态重启不双跑，含旧 `boss` 表/数据的旧库经 v40 后可启动且旧表/key 删除。
+- [ ] AC6：阶段/击杀/消散事件唯一，per-destination partial success 隔离，已 sent 不重播、uncertain 可审计；spawn/phase/defeated/dissipated 四类事件使用已批准出生快照文案，未批准不广播，且不读取 `narrative_config.json` 或使用代码文案 fallback；只持久化贡献/末击事实，不引入未确认经济数值。
 - [x] AC7a：迁移、定向、完整 pytest、产品范围 ruff 通过；文档与实现一致。
 - [ ] AC7b（**外部门：用户内容批准**）：双闸门（combat/narrative 独立批准 + manifest/hash/列范围）通过后激活；未批准以「代码就绪、内容待批」结案（归 E2）。
 

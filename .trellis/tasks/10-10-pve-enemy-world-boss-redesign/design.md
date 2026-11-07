@@ -44,7 +44,11 @@ flowchart LR
 | 暴击物化（`combat.base_crit_rate`、双侧接线、取值通道） | **E1 R2/design §3** | D R4 引用（世界 Boss 载体） |
 | 固定名册 schema v2 与映射契约 | child B（已归档） | D/E2 引用 |
 | 世界 Boss `spawn_epoch`/`next_spawn_at`/强制生成/返回契约 | **D prd R1**（签名与返回契约）+ **D design §3**（生命周期行为） | E2 R3 引用 |
+| 世界 Boss 难度倍率取值时点 | **D prd R4** | 父 §4、E2 激活验收引用 |
+| 世界 Boss poller 调用顺序 | **E2 design §4** | D prd R1/design §3、父 AC5 引用 |
+| 世界 Boss profile 五文案/批准字段与快照渲染契约 | **D prd R7** | E2 design §7、父 AC6 引用 |
 | 世界 Boss 事件、叙事门控、outbox 恢复窗口 | **D R7** | E2 R1 引用（写法） |
+| 正式产物共享 Schema→真实加载→profile→快照→renderer 验收链 | **E2 design §7** | E2 R1/R5、父 AC3b/AC6 引用 |
 | 旧 Boss 整删清单、`key=top`、激活顺序 | **E2 R2/R3** | 父 R7、D 依赖引用 |
 | 叙事批准与 manifest 形状 | **E2 R1** | D R7 引用（门控字段） |
 | 机械清理判据 | **`scripts/audit_pve_redesign.py`** | 各 child AC 只写「跑脚本 → 0」 |
@@ -72,7 +76,7 @@ flowchart LR
 
 - 契约层：气血聚合/clamp/恢复、目录解析、逃跑参数、Boss 阶段与次数、事件去重。
 - 迁移/并发：fresh 与 v34→latest、重复启动、并发挑战唯一末击、故障注入全回滚。
-- 集成：普通 PVE / 秘境兽 / 传承守护三入口；世界 Boss spawn→challenge→phase→终态→respawn；广播 partial success。
+- 集成：普通 PVE / 秘境兽 / 传承守护三入口；世界 Boss spawn→challenge→phase→终态→respawn；广播 partial success；正式配置真实加载与快照文案链按 E2 design §7，开关切换、重启和旧库 v40 升级按 E2 R4/R5。
 - 时间：GM 时间快进覆盖疲劳与 Boss 到期字段；恢复量与跨日用可注入业务时钟验证。
 - 机械清理：`python3 scripts/audit_pve_redesign.py --scope all`（E1/E2 各自的 AC 用它取证）。
 

@@ -2,7 +2,7 @@
 
 ## Steps
 
-1. 生成静态清单与审计入口：HP 消费者、`Player.hp`/`else 1` 残留、`data/` 之外裸 `conn.commit()`（以函数名锚定；机械判据统一跑 `python3 scripts/audit_pve_redesign.py --scope e1`）。
+1. 先跑 `tests/test_audit_pve_redesign.py`，确认审计器不会自命中、不会把无关 `else 1` 当气血、不会按整个文件放行裸 commit；再生成静态清单与审计入口：HP 消费者、`Player.hp`/败场固定 1 残留、`data/` 之外裸 `conn.commit()`（以函数名锚定；机械判据统一跑 `python3 scripts/audit_pve_redesign.py --scope e1`）。
 2. 地板 API 上收：`core/health.py` 增 `DEFEAT_HP_FLOOR_RATIO` + `HealthService.defeat_hp_floor`；`AdventureManager._defeat_hp_floor` 改委托；删本地常量但**保留模块级 re-export**（`test_adventure_settlement_state_machine` 从 `_adv_mod` 导入）。
 3. 战斗接线：`PVECombatManager` 增 `health_service` 注入（装配段）；`challenge_rift_beast`/`challenge_legacy_guardian` 按 `won ? 引擎终值 : max(引擎终值, 地板)` 经 `set_current_hp` 落库；补秘境/宗门两条入口用例与 PvP 不受地板用例；改写 `test_rift_encounters` 旧 `== 1` 断言；两函数 docstring 同步。
 4. 暴击双侧接线：按 design §3 落地 `combat.base_crit_rate` 物化（live config + default_configs）、`build_fighter_from_player` 传参、`build_enemy_fighter` 增 `base_crit_rate` 形参、`PVECombatManager._build_enemy_fighter` 经 `config_manager` 取值（禁用 `combat_engine`）。补断言：改键后玩家与名册/专项组 fighter 同步变化、per-enemy 覆盖、第一季 28+4 默认值、全量 pytest 保持绿。

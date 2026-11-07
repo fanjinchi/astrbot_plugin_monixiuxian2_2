@@ -31,11 +31,11 @@ sequenceDiagram
     O-->>H: 事务外广播
 ```
 
-事务契约：任一条件写返回 `False` → 立即 `txn.abort()`；顺序为实例 CAS → 扣次数 → `cas_update_player_health` → 账本/贡献/阶段/事件。玩家前像 `(current_hp, health_recovered_at)`，禁止无条件 `set_current_hp`。本场伤害 = `hp_before - max(0, hp_after)`。玩家写回 `max(engine_remaining_hp, 全局单源地板)`（地板定义见 E1）；不写 fatigue、不收入场费。Boss Fighter 用实例面板 + phase 倍率经 `build_enemy_fighter` 构建（暴击键见 E1 R2），不复用满血 `profile_to_enemy`。
+事务契约：任一条件写返回 `False` → 立即 `txn.abort()`；顺序为实例 CAS → 扣次数 → `cas_update_player_health` → 账本/贡献/阶段/事件。玩家前像 `(current_hp, health_recovered_at)`，禁止无条件 `set_current_hp`。本场伤害 = `hp_before - max(0, hp_after)`。玩家写回 `max(engine_remaining_hp, 全局单源地板)`（地板定义见 E1）；不写 fatigue、不收入场费。Boss Fighter 用实例面板 + phase 倍率经 `build_enemy_fighter` 构建（难度快照见 prd R4、暴击键见 E1 R2），不复用满血 `profile_to_enemy`。
 
 ## 3. 生命周期与阶段
 
-轮询服务只调领域命令：ensure eligibility / expire active / dispatch events。常规生成 4 段全随机；GM/fixture 可传 `profile_id` 强制（走同一 id 派生、快照与单 active 校验）。`spawn_epoch := 最近终态实例的 next_spawn_at`（终态同批写；查询按 `terminated_at DESC`，见 prd R1）。ensure 发现 `active AND expires_at>now` 直接复用；active 读 + insert 同一事务。
+轮询服务只调领域命令，调用顺序见 E2 design §4。常规生成 4 段全随机；GM/fixture 可传 `profile_id` 强制（走同一 id 派生、快照与单 active 校验）。`spawn_epoch := 最近终态实例的 next_spawn_at`（终态同批写；确定性排序见 prd R1）。ensure 事务内先幂等过期到期 active，再发现 `active AND expires_at>now` 直接复用；过期、active 读 + insert 同一事务。
 
 阶段由持久 max/current 比例计算，只升不降；一次跨 60%/20% 时同事务按 phase2→phase3 各插一条唯一事件，最终 phase=3。
 
@@ -45,17 +45,17 @@ sequenceDiagram
 
 ## 5. 事件
 
-领域事务只插唯一 business event；payload 为稳定 facts 或 `copy_key + vars`，由新 renderer 生成，禁止传给读 `stone_reward` 的旧 callback。dispatcher 提交后读取平台/白名单群并持久化目标快照，展开唯一 delivery；逐 delivery 条件 claim，并发只有一个取得发送权。恢复扫描用「最近 N 分钟窗口」（`business_events` 无展开完成列、不改 schema），超窗口不补发。
+领域事务只插唯一 business event；payload 为稳定 facts 或 `copy_key + vars`，由新 renderer 生成，禁止传给读 `stone_reward` 的旧 callback。dispatcher 提交后读取平台/白名单群并持久化目标快照，展开唯一 delivery；逐 delivery 条件 claim，并发只有一个取得发送权。恢复扫描使用 prd R7 的固定窗口（`business_events` 无展开完成列、不改 schema），超窗口不补发。
 
 平台无 exactly-once：已知未发送可回 `queued` 重试；已发但不确定标 `uncertain` 禁止自动重试；`sent` 不因同事件其他目标失败重播。`dispatching` 有 lease/owner，陈旧行由 `list_stale_dispatching` 暴露由管理员处置。网络 await 始终在事务外。
 
 ## 6. 测试
 
 - 契约：4 段全随机、固定 seed 可复现、重复 poll 不重掷、快照不可变、GM 强制 profile 三分支（生成/复用并回报/未知 id 失败）。
-- 生命周期：48h/12h/24h、time-skip 前移 `next_spawn_at` 即前移资格、重启恢复、北京日 3 次与 UTC 边界。
+- 生命周期：48h/12h/24h、time-skip 前移 `next_spawn_at` 即前移资格、重启恢复、到期边界换不同 profile 仍单 active、最近终态同秒确定性排序、北京日 3 次与 UTC 边界。
 - 并发/事务：并发挑战唯一末击、CAS 失败次数与 HP 不变、故障注入全回滚、确定性 instance id 并发 ensure 单实例。
 - 事件：phase1→3 两事件顺序、partial success、claim 崩溃、uncertain 人工处置、无 delivery 恢复扫描、`narrative_approved` 门控。
-- 数值：AC9 HP 锚（4 profile × 真实引擎，阶段 40/40/20 加权，±10%，3 次/日×2 日磨死）。
+- 数值：出生后修改难度配置不影响当前实例、下一实例才生效；AC9 HP 锚（4 profile × 真实引擎，阶段 40/40/20 加权，±10%，3 次/日×2 日磨死）。
 
 ## 7. 回滚
 

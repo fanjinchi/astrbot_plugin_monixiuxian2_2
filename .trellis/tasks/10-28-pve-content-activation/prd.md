@@ -18,9 +18,9 @@
 - 展示：28+4 CSV 的 `status`/`narrative_status`、approval manifest、CSV SHA-256、获批列范围、生成 diff。
 - 批准分两步、**均不由 AI 代劳**：① 用户按数据集确认「战斗数值列」获批范围；② 在获批范围内把对应行 `status` 由 `draft` 改 `final`，**重算 SHA-256 并生成 manifest**（hash 漂移 fail closed），再展示 diff 与 sync 计划。
 - adapter 冻结：只认逐行 `status=final` + 显式 `--approval-manifest`（无第二通道）；manifest 绑定 CSV hash、列范围与叙事决策。**`columns` 必须覆盖整行表头**（含叙事列），「获批范围」指列内容被批准、不是选列；只列数值列会被判「列越权」。manifest 形状：`{"datasets": {"enemies.csv": {"sha256", "columns": [...], "narrative_status": [...]}, "world_bosses.csv": {...}}}`，`datasets` 键必须恰为两个文件名。
-- **叙事状态必须按实际填**：当前 28+4 全为 `占位`，因此「只批战斗数值」时 manifest 必须写 `["占位"]`（闸门默认 `["定稿","豁免"]` 会让 32 行全拒）；只有用户同时批准叙事、CSV 升 `定稿` 后才写 `["定稿"]`（`豁免` 是 gate 语义值、不进 CSV）。放行占位必须在 `pve-enemy-design.md` 记录。
-- **叙事批准结论必须落进 profile**：D 的 `build_world_boss_profile` 缺省发 `narrative_approved: false`（preview / 无 manifest 也带该键，否则 validate 因缺必填键失败），sync 在 `render_enemy_document` 的 `if manifest is not None:` 之后、唯一 `validate_enemy_document` 之前，按 `spec.get("narrative_status") or ["定稿","豁免"]` 对 `world_bosses` 每条翻 `true`（`enemies` 段无该字段）。缺省 `false` 时 D 的广播门控全挡。
-- sync 后校验 count（28+4）/ id 唯一 / schema / hash；先 preview 再写正式 `config/enemies.json`（v2，含 `world_bosses` 段）。
+- **叙事状态必须按实际填**：当前 28+4 全为 `占位`，因此「只批战斗数值」时 manifest 必须写 `["占位"]`（闸门默认 `["定稿","豁免"]` 会让 32 行全拒）；只有用户同时批准叙事、CSV 升 `定稿` 后才写 `["定稿"]`（`豁免` 是 gate 语义值、不进 CSV）。放行占位只表示允许正式 sync 和构造运行时快照，**不等于叙事批准**；该区分必须在 `pve-enemy-design.md` 记录。
+- **叙事批准结论必须落进 profile**：D 的 `build_world_boss_profile` 缺省发 `narrative_approved: false`（preview / 无 manifest 也带该键，否则 validate 因缺必填键失败），sync 在 `render_enemy_document` 的 `if manifest is not None:` 之后、唯一 `validate_enemy_document` 之前逐行写批准结论（`enemies` 段无该字段）。仅当「CSV 行 `narrative_status=定稿` 且 manifest 决策含 `定稿`」或「manifest 显式含 gate 语义 `豁免`」时置 `true`；`占位` 即使经 manifest `["占位"]` 放行也必须保持 `false`。战斗批准不得隐式批准叙事，缺省 `false` 时 D 的广播门控全挡。
+- sync 后校验 count（28+4）/ id 唯一 / schema / hash；先 preview 再写正式 `config/enemies.json`（v2，含 `world_bosses` 段）。共享 Schema 扩展、真实加载契约测试和世界 Boss 叙事唯一链路按 `design.md` §7 执行；字段清单与默认值唯一归属 D prd R7，不在本 child 另建 Schema 或第二文案来源。
 
 ### R2. 普通 PVE 调用方切流与旧派生退役
 
@@ -45,13 +45,15 @@
 ### R4. 新入口与 poller 接管
 
 - 复用 D 的 catalog 装配与领域服务，不重复装配；`boss.enabled` 保留为新玩法总开关（更新 comment 与默认配置文案）。
-- 注册 lifecycle poller（指数退避、`initialize()` 启动 / `terminate()` 取消）；新 handler 接管 `世界Boss`/`挑战Boss`/`生成Boss` 三个命令名；outbox dispatcher 运行，网络 await 在事务外。
+- 注册 lifecycle poller（指数退避、`initialize()` 启动 / `terminate()` 取消），每轮顺序按 `design.md` §4 先过期再 ensure；新 handler 接管 `世界Boss`/`挑战Boss`/`生成Boss` 三个命令名；outbox dispatcher 运行，网络 await 在事务外。
 - **零奖励过渡**：本轮只落台账事实，不发任何奖励；过渡态写入 `current-design-report §4.7` 与 `pve-enemy-design` Step 6 遗留①，广播文案不得承诺奖励。
-- 旧/new 不得同时运行；删除与启用必须同一提交/检查点。
+- 旧/new 不得同时运行；删除与启用必须同一提交/检查点。`boss.enabled=false` 时新 poller 不得生成实例，旧生成器已随同一检查点删除；`false→true` 后由下轮 poller 按 D 再生资格恢复，不补建一套补偿流程。
 
 ### R5. 端到端验收
 
+- 按 `design.md` §7 跑通正式产物的 Schema→真实加载→profile→出生快照→renderer 契约链；spawn/phase/defeated/dissipated 四类事件只使用已批准快照文案，未批准/缺键/旧 v1 配置 fail closed，无代码 fallback。
 - spawn→challenge→phase→defeated/dissipated→respawn；北京日 3 次与跨日；重启恢复；并发唯一末击；CAS 失败方次数/HP 不变。
+- 覆盖 `boss.enabled=false` 不生成、`false→true` 后恢复轮询、启用态重启，以及含旧 `boss` 表/数据的旧库执行 v40 后启动；旧表与旧 key 按 R3 删除，新旧生成器任何阶段均不双跑。
 - 普通 PVE 切流：28 名册在历练/秘境默认路径可达；旧派生运行态不再命中；`enemy_groups` 无 `key=top`；`legacy_guardian` 与秘境定向组回归；`catalog=None` 回落不刷守护 NPC。
 - HP 锚：用正式 config 的 4 只 profile 复跑 D AC9 同一断言（阶段 40/40/20、±10%、3 次/日×2 日磨死）。
 - GM `/时间快进` 矩阵：Boss `expires_at`/`next_spawn_at` 生效；health anchor/pending/`date_key` 不受影响。
@@ -68,9 +70,9 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1：批准流程可执行——获批列范围 → 用户侧 `status→final` → 重算 hash/manifest → sync；draft/缺 manifest/hash 漂移/列越权 fail closed；占位放行须 manifest `["占位"]` 并回写设计；该正向组合有用例；**正式产物 `world_bosses[*].narrative_approved` 为 true**。
+- [ ] AC1：批准流程可执行——获批列范围 → 用户侧 `status→final` → 重算 hash/manifest → sync；draft/缺 manifest/hash 漂移/列越权 fail closed；占位放行须 manifest `["占位"]` 并回写设计。正向用例分别证明：combat-only 的占位产物 `narrative_approved=false` 且不广播；独立叙事批准后的 `定稿` 或显式 `豁免` 才产生 `true`。`design.md` §7 的合法完整/新增键缺失或类型错误/已批准空文案/旧 v1 配置契约测试通过。
 - [ ] AC2：普通 PVE 默认路径切到固定名册（28 可达、全局难度系数仍生效、v2 config 下 `catalog` 非 None）且 `key=top` 组删除；旧派生运行态不再命中（静态保留、仅回滚/未批准态可达）；`legacy_guardian` 与秘境组回归；`catalog=None` 回落用例通过。
 - [ ] AC3：旧 Boss 代码/配置三元组/表/键/测试/文档清零，`audit_pve_redesign.py --scope e2` 为 0；`boss` 表不存在（v40 专用 parity）；`system_config.boss_next_spawn_time` 无生产读写；`lint_narrative` 不再依赖已删配置；玩家文案不再承诺 Boss 掉落。
-- [ ] AC4：新入口与 poller 同一检查点启用，旧/new 不双跑；poller 指数退避与 terminate；`boss.enabled` 关闭仍生效；`生成Boss`/`GM 生成Boss` 按 D R1 三分支改接且 `BOSS_ADMINS` 沿用；catalog 装配复用 D 的注入。
-- [ ] AC5：端到端链路、北京日 3 次、重启恢复、并发唯一末击、CAS 失败不扣次数、time-skip 矩阵、广播 partial success、D AC9 HP 锚复跑均有证据；零奖励过渡已记录且广播不承诺奖励。
+- [ ] AC4：新入口与 poller 同一检查点启用，旧/new 不双跑；poller 指数退避与 terminate，固定先 `expire_active` 再 `ensure_spawn`，旧实例在轮询间到期且新随机 profile 不同时仍至多一个 active；`boss.enabled=false` 不生成，`false→true`、启用态重启与旧库 v40 升级后启动均符合 R4/R5；`生成Boss`/`GM 生成Boss` 按 D R1 三分支改接且 `BOSS_ADMINS` 沿用；catalog 装配复用 D 的注入。
+- [ ] AC5：端到端链路、北京日 3 次、重启恢复、并发唯一末击、CAS 失败不扣次数、time-skip 矩阵、广播 partial success、D AC9 HP 锚复跑均有证据；真实 `EnemyCatalog` 加载正式产物可生成世界 Boss，四类事件使用已批准快照文案且无 `narrative_config.json`/代码 fallback；零奖励过渡已记录且广播不承诺奖励。
 - [ ] AC6：回滚材料齐备并演练；文档清单逐项完成；完整 pytest + 产品范围 ruff + `audit_pve_redesign.py --scope all` 为 0。

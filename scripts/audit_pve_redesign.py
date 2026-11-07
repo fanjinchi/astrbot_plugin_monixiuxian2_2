@@ -24,6 +24,7 @@ Product code must stay ruff-clean; this script is dev tooling under
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import sys
@@ -71,7 +72,7 @@ def _iter_py_files() -> list[Path]:
             files.append(p)
     for d in CODE_DIRS:
         for p in sorted((ROOT / d).rglob("*.py")):
-            if "__pycache__" in p.parts:
+            if "__pycache__" in p.parts or p.resolve() == Path(__file__).resolve():
                 continue
             files.append(p)
     return files
@@ -119,30 +120,73 @@ def check_e1(report: Report) -> None:
             if hp_pattern.search(text):
                 report.add("e1.no-player-hp", rel, idx, text)
 
-    # 3. No defeat-floor writes hard-coded to 1 in PVE combat paths.
-    floor_pattern = re.compile(r"(else\s+1\b|current_hp\s*=\s*1\b)")
+    # 3. Match assignments to the HP values used by defeat settlement instead
+    #    of treating every unrelated conditional expression ending in 1 as HP.
     for f in _iter_py_files():
         rel = f.relative_to(ROOT).as_posix()
         if rel.startswith(("tests/", "scripts/")):
             continue
-        for idx, text in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
-            if floor_pattern.search(text):
-                report.add("e1.no-hardcoded-floor", rel, idx, text)
+        text = f.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        for node in ast.walk(ast.parse(text)):
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            target_names = [
+                target.attr if isinstance(target, ast.Attribute) else target.id
+                for target in targets
+                if isinstance(target, (ast.Attribute, ast.Name))
+            ]
+            if not {"current_hp", "final_hp"}.intersection(target_names):
+                continue
+            value = node.value
+            if isinstance(value, ast.IfExp):
+                value = value.orelse
+            if (
+                isinstance(value, ast.Constant)
+                and type(value.value) is int
+                and value.value == 1
+            ):
+                report.add(
+                    "e1.no-hardcoded-floor",
+                    rel,
+                    node.lineno,
+                    lines[node.lineno - 1],
+                )
 
-    # 4. Bare commits outside data/ must be gated by conn._txn_depth.
+    # 4. A commit is gated only by an enclosing if condition on _txn_depth;
+    #    another function using the idiom must not whitelist the whole file.
     for d in ("handlers", "managers", "core", "utils"):
         for path in sorted((ROOT / d).rglob("*.py")):
             text = path.read_text(encoding="utf-8")
-            for idx, line in enumerate(text.splitlines(), 1):
-                stripped = line.strip()
-                if stripped.startswith("#"):
+            lines = text.splitlines()
+            tree = ast.parse(text)
+            commits = [
+                node
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "commit"
+            ]
+            gated_lines: set[int] = set()
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.If) or not any(
+                    (isinstance(child, ast.Attribute) and child.attr == "_txn_depth")
+                    or (isinstance(child, ast.Constant) and child.value == "_txn_depth")
+                    for child in ast.walk(node.test)
+                ):
                     continue
-                if re.search(r"\.commit\(\)", line) and "_txn_depth" not in text:
+                for statement in node.body:
+                    for child in ast.walk(statement):
+                        if child in commits:
+                            gated_lines.add(child.lineno)
+            for node in commits:
+                if node.lineno not in gated_lines:
                     report.add(
                         "e1.ungated-commit",
                         path.relative_to(ROOT).as_posix(),
-                        idx,
-                        line,
+                        node.lineno,
+                        lines[node.lineno - 1],
                     )
 
     # 5. Crit materialization: config key present in both the live config and
@@ -238,8 +282,8 @@ def check_e2(report: Report) -> None:
             'string "managers.boss_manager" still in _PROVIDER_MODULES',
         )
 
-    # 7. Generated v2 config (after sync) must carry narrative approval on
-    #    world bosses and no legacy top group.
+    # 7. Generated v2 config must carry a boolean narrative decision on world
+    #    bosses and no legacy top group; false is valid for combat-only approval.
     enemies_cfg = ROOT / "config/enemies.json"
     doc = json.loads(enemies_cfg.read_text(encoding="utf-8"))
     if doc.get("schema_version") == 2:
@@ -252,12 +296,12 @@ def check_e2(report: Report) -> None:
                 "enemy_groups still has key=top",
             )
         for wb in doc.get("world_bosses", []):
-            if not wb.get("narrative_approved"):
+            if not isinstance(wb.get("narrative_approved"), bool):
                 report.add(
                     "e2.narrative-approved",
                     "config/enemies.json",
                     0,
-                    f"world boss {wb.get('id')!r} missing narrative_approved=true",
+                    f"world boss {wb.get('id')!r} missing boolean narrative_approved",
                 )
 
 

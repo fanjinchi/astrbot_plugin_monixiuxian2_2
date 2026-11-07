@@ -57,12 +57,12 @@ A/B 可并行；C 与 D 可并行；E1 可与 D 并行（只碰地板/消费者/
 | AC1 拆分/依赖/回滚 | 父 | 8 children 工件、依赖图、回滚点 |
 | AC2 HP 迁移与消费者 | A + E1 | v34/fresh/幂等迁移、全消费者静态清零与回归 |
 | AC3a 四层一致 | B ✅ | CSV→preview→profile→Fighter golden |
-| AC3b 正式 config 生效（外部门） | E2 | 内容批准 + 正式 sync + 同链路复验 + 旧派生运行态不再命中 |
+| AC3b 正式 config 生效（外部门） | E2 | 内容批准 + 正式 sync + 同链路复验 + 旧派生运行态不再命中 + E2 design §7 的共享 Schema/真实 `EnemyCatalog` 加载/profile 契约矩阵 |
 | AC4 地板/疲劳/逃跑 | C + E1 | 三入口地板（含宗门领取）、疲劳与 time-skip、restart；数值回归归 bd `-9u2` |
-| AC5 Boss 状态/并发 | D + E2 | 生命周期/次数/真实伤害/末击/CAS；HP 锚 D AC9 + E2 复跑 |
-| AC6 广播/奖励边界 | D + E2 | 唯一事件、partial success/uncertain、贡献末击事实、无 Step 7 数值 |
+| AC5 Boss 状态/并发 | D + E2 | 生命周期/次数/真实伤害/末击/CAS；到期后换不同 profile 仍单 active；HP 锚 D AC9 + E2 复跑；`boss.enabled=false`、`false→true`、启用态重启与旧库 v40 升级后启动 |
+| AC6 广播/奖励边界 | D + E2 | 唯一事件、partial success/uncertain、贡献末击事实、无 Step 7 数值；四类事件取已批准出生快照文案，未批准不广播且无第二文案来源/fallback |
 | AC7a 质量/文档 | E1 + E2 | 产品范围 ruff/pytest、`audit_pve_redesign.py` 为 0、文档一致 |
-| AC7b 内容双闸门（外部门） | E2 | 独立批准/manifest/hash/列范围、sync 复验 |
+| AC7b 内容双闸门（外部门） | E2 | 独立批准/manifest/hash/列范围、sync 复验、`world_bosses.csv` 五叙事列 lint 与批准状态进 profile |
 
 ## 6. 总回滚
 
