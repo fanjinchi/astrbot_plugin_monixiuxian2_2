@@ -309,11 +309,11 @@ webtest 真实消息管线 + GM「时间快进」，固定测试 ID `900000002`�
 - 下一张卡：世界 Boss 域（10-10-pve-world-boss-domain，前置已满足），其次是跨系统集成 E
 
 
-## Session 10: Session 11: 世界 Boss 生命周期与原子挑战（child D）
+## Session 10: 世界 Boss 生命周期与原子挑战（child D）
 <!-- trellis-session: v=2 fp=ab7250d67e2f6575 -->
 
 **Date**: 2026-11-09
-**Task**: Session 11: 世界 Boss 生命周期与原子挑战（child D）
+**Task**: 世界 Boss 生命周期与原子挑战（child D）
 **Branch**: `main`
 
 ### Summary
