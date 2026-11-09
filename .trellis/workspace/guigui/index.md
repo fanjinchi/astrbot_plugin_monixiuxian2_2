@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
-- **Last Active**: 2026-10-28
+- **Total Sessions**: 10
+- **Last Active**: 2026-11-09
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~305 | Active |
+| `journal-1.md` | ~334 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-11-09 | Session 11: 世界 Boss 生命周期与原子挑战（child D） | `6265bff`, `b55f84f`, `755fce6`, `d577f72` | `main` |
 | 9 | 2026-10-28 | 逃跑契约重拍落地（Trellis 10-22 / bd -w07） | - | `main` |
 | 8 | 2026-10-17 | GM「设置战斗气血」+ 23 条 PvP 用例 v35 适配（bd -xtv，两轮独立评审核订） | `45ff8e9` | `main` |
 | 7 | 2026-10-16 | 全列回写收口：忙碌行窄写 + 经济写点锁内重读（Trellis 10-15 + 两轴评审与修复轮） | `5e9c169` | `main` |

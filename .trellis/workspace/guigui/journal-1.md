@@ -307,3 +307,28 @@ webtest 真实消息管线 + GM「时间快进」，固定测试 ID `900000002`�
 
 - bd `-w07` 关闭（reason 引交付摘要）；`-2v2`（迎战/逃跑真实管线用例）因 blocks 解除自动回 ready
 - 下一张卡：世界 Boss 域（10-10-pve-world-boss-domain，前置已满足），其次是跨系统集成 E
+
+
+## Session 10: Session 11: 世界 Boss 生命周期与原子挑战（child D）
+<!-- trellis-session: v=2 fp=ab7250d67e2f6575 -->
+
+**Date**: 2026-11-09
+**Task**: Session 11: 世界 Boss 生命周期与原子挑战（child D）
+**Branch**: `main`
+
+### Summary
+
+child D 落地：WorldBossService 生命周期/原子挑战（事务内 CAS、每日次数、单一 last hit、地板能力探测）、事件派发（600s 恢复窗口、uncertain 不自动重试）、schema+仓储扩展、main 仅装配不切流；双轴评审 0 阻塞并修复 5 项；AC9 锚实测 PASS 4/4；pytest 1224 passed；补重启恢复测试并归档任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6265bff` | feat(pve): 新增世界 Boss 生命周期服务与事件派发 |
+| `b55f84f` | test(pve): 覆盖世界 Boss 生命周期与事件派发边界 |
+| `755fce6` | docs(design): 登记世界 Boss 验收锚与接口索引 |
+| `d577f72` | chore(trellis): 记录 child D 证据与仓储连接规范 |
+
+### Status
+
+[OK] **Completed**
