@@ -55,6 +55,10 @@
 ## 定时任务与连接
 
 - 定时任务中先 `await db.ensure_connection()` 再操作
+- **长驻对象不要缓存仓储实例**：`DataBase.connect()` 重连时会替换底层 conn，
+  构造时用 `Repository(db.conn)` 缓存的仓储在重连后会继续写旧连接。仓储应在使用时
+  现建（局部变量或 property）；服务类持有的是 `db` 本身，不是 `db.conn` 的派生对象
+  （世界 Boss 事件派发器即按此修正）
 
 ## Migrations（迁移）
 
