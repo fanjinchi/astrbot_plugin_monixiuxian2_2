@@ -262,6 +262,13 @@ class TestCatalogResolver:
         with pytest.raises(_catalog.EnemyCatalogError):
             _catalog.EnemyCatalog.load(path)
 
+    @pytest.mark.asyncio
+    async def test_catalog_invalid_json_degrades_instead_of_crashing(self, tmp_path):
+        path = tmp_path / "enemies.json"
+        path.write_text("{not valid json", encoding="utf-8")
+        # main 装配依赖 load_catalog 降级：坏 JSON 不能让整个插件加载失败。
+        assert _catalog.load_catalog(path) is None
+
 
 # ───────────────────────────── 难度只乘伤害 ─────────────────────────────────
 
