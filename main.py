@@ -276,6 +276,8 @@ class XiuXianPlugin(Star):
         from .core.encounter_store import EncounterStore
         from .core.health import HealthService
         from .data.default_configs import RIFT_CONFIG
+        from .managers.enemy_catalog import load_catalog
+        from .managers.world_boss_service import WorldBossService
 
         # Phase 1: 核心管理器（无相互依赖，仅依赖 db/config）
         skill_manager = SkillManager(self.config_manager, self.db)
@@ -321,6 +323,20 @@ class XiuXianPlugin(Star):
             self.config_manager,
             storage_ring_mgr,
             busy_state=busy_state,
+        )
+        # child D 世界 Boss 固定档案领域：catalog 从 config/enemies.json 读取；
+        # 文件缺失或仍是 v1 文档时 catalog=None，领域整体 disabled（prd R1）。
+        # 本 child 只装配服务，不注册 poller、不切 handler（切流见 E2）。
+        enemy_catalog = load_catalog(
+            Path(__file__).resolve().parent / "config" / "enemies.json"
+        )
+        world_boss_service = WorldBossService(
+            self.db,
+            enemy_catalog,
+            health_service,
+            busy_state,
+            combat_mgr,
+            self.config_manager,
         )
         # 遭遇存储单例：秘境/历练共享（add-rift-encounters design D8）；内存态，
         # 热重载即清空——零惩罚设计下玩家无损失（design D1）。
@@ -488,6 +504,8 @@ class XiuXianPlugin(Star):
             "pve_combat_mgr": pve_combat_mgr,
             "sect_mgr": sect_mgr,
             "boss_mgr": boss_mgr,
+            "enemy_catalog": enemy_catalog,
+            "world_boss_service": world_boss_service,
             "encounter_store": encounter_store,
             "rift_mgr": rift_mgr,
             "rank_mgr": rank_mgr,

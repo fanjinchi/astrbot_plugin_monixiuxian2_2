@@ -173,6 +173,13 @@ class WorldBossProfile:
         phase3_armor_multiplier: P3 armor multiplier.
         lifetime_h / daily_attempts / respawn_after_kill_h /
         respawn_after_dissipate_h: spawn/dissipation metadata (hours/attempts).
+        profile_version: generated profile contract version (persisted into
+            instance/ledger facts; previously dropped by from_dict).
+        spawn_text / phase2_text / phase3_text / kill_text / dissipate_text:
+            the five narrative copy strings rendered for spawn/phase2/phase3/
+            defeated/dissipated events (prd R7, no code fallback).
+        narrative_approved: narrative gate; False forbids any broadcast even
+            when the copy strings are present.
     """
 
     id: str
@@ -199,6 +206,13 @@ class WorldBossProfile:
     respawn_after_dissipate_h: int
     status: str
     narrative_status: str
+    profile_version: int
+    spawn_text: str
+    phase2_text: str
+    phase3_text: str
+    kill_text: str
+    dissipate_text: str
+    narrative_approved: bool
 
     @classmethod
     def from_dict(cls, entry: dict) -> WorldBossProfile:
@@ -238,6 +252,13 @@ class WorldBossProfile:
             respawn_after_dissipate_h=int(entry["respawn_after_dissipate_h"]),
             status=entry.get("status", ""),
             narrative_status=entry.get("narrative_status", ""),
+            profile_version=int(entry.get("profile_version", 0)),
+            spawn_text=entry["spawn_text"],
+            phase2_text=entry["phase2_text"],
+            phase3_text=entry["phase3_text"],
+            kill_text=entry["kill_text"],
+            dissipate_text=entry["dissipate_text"],
+            narrative_approved=bool(entry["narrative_approved"]),
         )
 
 
@@ -448,8 +469,14 @@ class EnemyCatalog:
             EnemyCatalogError: JSON invalid or document not a dict.
             OSError: file missing/unreadable (caller maps to fallback).
         """
-        with open(path, encoding="utf-8") as f:
-            doc = json.load(f)
+        try:
+            with open(path, encoding="utf-8") as f:
+                doc = json.load(f)
+        except ValueError as exc:
+            # json.JSONDecodeError / UnicodeDecodeError: keep the documented
+            # EnemyCatalogError contract so load_catalog can degrade instead of
+            # crashing plugin startup.
+            raise EnemyCatalogError(f"敌人名册配置不是合法 JSON：{exc}") from exc
         if not isinstance(doc, dict):
             raise EnemyCatalogError("敌人名册配置必须是 JSON 对象")
         return doc

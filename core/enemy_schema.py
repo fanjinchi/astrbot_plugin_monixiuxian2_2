@@ -70,6 +70,17 @@ WORLD_BOSS_FORBIDDEN_EFFECTS = ("heal", "damage_reduction", "survive", "buff")
 #: 允许的阶段阈值格式 "hi/lo"（P2/P3 触发 HP 占比，百分数）。
 PHASE_COUNT = 2
 
+#: 五叙事文案列（prd R7 唯一定义处）：依次供 spawn/phase2/phase3/defeated/
+#: dissipated 事件使用。均为产物必填键、不设代码默认文案；narrative_approved
+#: 为 True 时必须非空，False 时即使有文案也禁止广播（E2 sync 批准后放行）。
+WB_NARRATIVE_TEXT_COLUMNS = (
+    "spawn_text",
+    "phase2_text",
+    "phase3_text",
+    "kill_text",
+    "dissipate_text",
+)
+
 # ------------------------------------------- mechanic materialization maps
 # 权威口径 = pve-enemy-design.md 附录 D.2/D.3 + F（Q3c/Step6 定案数值）。
 # 必须与设计验收门 design_docs/content-design/sim_pve_acceptance.py 的
@@ -484,6 +495,16 @@ def build_world_boss_profile(row: dict, ctx: str, errors: list[str]) -> dict | N
                 "no-heal/no-reduce discipline (pve-enemy-design.md 附录 F)"
             )
 
+    narrative_texts: dict[str, str] = {}
+    for col in WB_NARRATIVE_TEXT_COLUMNS:
+        raw = row.get(col)
+        narrative_texts[col] = "" if raw is None else str(raw).strip()
+    approved = _to_wb_approval(row.get("narrative_approved"), ctx, errors)
+    if approved:
+        empty = [c for c in WB_NARRATIVE_TEXT_COLUMNS if not narrative_texts[c]]
+        if empty:
+            errors.append(f"{ctx}: narrative_approved=true requires non-empty {empty}")
+
     if len(errors) > before:
         return None
     return {
@@ -512,7 +533,41 @@ def build_world_boss_profile(row: dict, ctx: str, errors: list[str]) -> dict | N
         "respawn_after_dissipate_h": int(meta["respawn_dissipate_h"]),
         "status": (row.get("status") or "").strip(),
         "narrative_status": (row.get("narrative_status") or "").strip(),
+        "spawn_text": narrative_texts["spawn_text"],
+        "phase2_text": narrative_texts["phase2_text"],
+        "phase3_text": narrative_texts["phase3_text"],
+        "kill_text": narrative_texts["kill_text"],
+        "dissipate_text": narrative_texts["dissipate_text"],
+        "narrative_approved": approved,
     }
+
+
+def _to_wb_approval(value: Any, ctx: str, errors: list[str]) -> bool:
+    """Parse the narrative_approved marker (default False, fail closed).
+
+    The CSV has no approval column: the formal sync writes the approval
+    conclusion into the rendered row before validation (E2 R1). Anything that
+    is not an explicit true/false is a contract error, never a silent pass.
+
+    Args:
+        value: Raw marker from the row (absent in the preview path).
+        ctx: Error location prefix.
+        errors: Error sink list.
+
+    Returns:
+        Approval flag; False for absent/false markers.
+    """
+    if value is None or value is False:
+        return False
+    if value is True:
+        return True
+    text = str(value).strip().lower()
+    if text in ("", "false", "0", "no"):
+        return False
+    if text in ("true", "1", "yes"):
+        return True
+    errors.append(f"{ctx}: narrative_approved must be a bool, got {value!r}")
+    return False
 
 
 # ------------------------------------------------------------ doc validation
@@ -564,6 +619,12 @@ _WB_PROFILE_REQUIRED_KEYS = {
     "respawn_after_dissipate_h",
     "status",
     "narrative_status",
+    "spawn_text",
+    "phase2_text",
+    "phase3_text",
+    "kill_text",
+    "dissipate_text",
+    "narrative_approved",
 }
 
 _LEGACY_KEYS = {
@@ -676,6 +737,15 @@ def validate_enemy_document(doc: dict, expected_count: int | None = None) -> lis
             or not (th[0] > th[1] > 0)
         ):
             errors.append(f"{ctx}: phase_thresholds must be two descending fractions")
+        approved = b.get("narrative_approved")
+        if not isinstance(approved, bool):
+            errors.append(f"{ctx}: narrative_approved must be a bool")
+        for col in WB_NARRATIVE_TEXT_COLUMNS:
+            text = b.get(col)
+            if not isinstance(text, str):
+                errors.append(f"{ctx}: {col} must be a string")
+            elif approved is True and not text.strip():
+                errors.append(f"{ctx}: {col} must be non-empty when narrative_approved")
         for j, sk in enumerate(b["trigger_skills"]):
             _check_trigger_skill(sk, f"{ctx}.trigger_skills[{j}]", errors)
             if isinstance(sk, dict) and sk.get("effect_type") in (

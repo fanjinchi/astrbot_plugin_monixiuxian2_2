@@ -661,6 +661,20 @@ class WorldBossRepository(BaseRepository):
             (*states, int(limit)),
         )
 
+    async def get_latest_terminal_instance(self) -> dict | None:
+        """Fetch the newest defeated/dissipated instance (spawn-epoch source).
+
+        prd R1 pins this ordering: the spawn epoch must come from the newest
+        terminal row by termination time, with a rowid tiebreak for the
+        same-second case. MAX(next_spawn_at) is explicitly forbidden - a
+        forced spawn breaks that monotonicity.
+        """
+        return await self._fetchone(
+            "SELECT * FROM world_boss_instances "
+            "WHERE state IN ('defeated', 'dissipated') "
+            "ORDER BY terminated_at DESC, rowid DESC LIMIT 1"
+        )
+
     async def insert_instance(
         self,
         *,
@@ -1085,6 +1099,28 @@ class OutboxRepository(BaseRepository):
         """Fetch an event row by its unique business key (idempotency lookup)."""
         return await self._fetchone(
             "SELECT * FROM business_events WHERE business_key = ?", (business_key,)
+        )
+
+    async def list_events_since(
+        self, *, occurred_at_from: int, limit: int = 50
+    ) -> list[dict]:
+        """List events committed inside a recovery window, oldest first.
+
+        business_events has no expansion-complete column and the schema is
+        frozen, so the dispatcher's recovery scan uses a fixed recent window
+        (prd R7); this read is what that scan iterates.
+        """
+        return await self._fetchall(
+            "SELECT * FROM business_events WHERE occurred_at >= ? "
+            "ORDER BY occurred_at, event_id LIMIT ?",
+            (int(occurred_at_from), int(limit)),
+        )
+
+    async def list_deliveries_for_event(self, event_id: str) -> list[dict]:
+        """List the persisted destination deliveries of one event."""
+        return await self._fetchall(
+            "SELECT * FROM event_deliveries WHERE event_id = ? ORDER BY delivery_id",
+            (event_id,),
         )
 
     async def append_event(
