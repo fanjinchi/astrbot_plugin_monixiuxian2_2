@@ -110,6 +110,7 @@ class PVECombatManager:
         combat_mgr: CombatManager,
         enemy_mgr: EnemyManager,
         config_manager=None,
+        health_service=None,
     ):
         """
         初始化PVE战斗管理器
@@ -117,12 +118,14 @@ class PVECombatManager:
         Args:
             combat_mgr: 统一战斗引擎或其 Legacy 适配器。
             enemy_mgr: 敌人管理器，用于生成敌人
-            config_manager: 配置管理器，可选，用于读取装备数据
+            config_manager: 配置管理器，可选，用于读取装备与战斗配置。
+            health_service: Health Domain，负责败场地板与战斗气血持久化。
         """
         # 兼容直接传入 CombatEngine 或 Legacy CombatManager
         self.combat_engine = getattr(combat_mgr, "engine", combat_mgr)
         self.enemy_mgr = enemy_mgr
         self.config_manager = config_manager
+        self.health_service = health_service
 
     def _should_trigger_combat(self, scene: str, difficulty: str) -> bool:
         """
@@ -230,10 +233,20 @@ class PVECombatManager:
         """Build a FighterState via the single fixed-roster mapper (Child B R3).
 
         映射逻辑收敛到 ``managers/enemy_catalog.build_enemy_fighter``：名册、
-        动态临时路径、秘境兽/传承守护共用同一个 Enemy→Fighter 口径
-        （level_index/暴击/技能不再丢失；旧 Enemy 实例字段缺省时逐点兼容）。
+        动态临时路径、秘境兽/传承守护共用同一个 Enemy→Fighter 口径。
+        普通 PVE 的缺省暴击只从 ConfigManager 读取；测试替身或 None/缺键
+        回退 0.15，不能从形态不固定的 combat_engine 读取。
         """
-        return build_enemy_fighter(enemy)
+        base_crit_rate = 0.15
+        config_manager = getattr(self, "config_manager", None)
+        game_config = getattr(config_manager, "game_config", None)
+        if isinstance(game_config, dict):
+            combat = game_config.get("combat", {})
+            if isinstance(combat, dict):
+                configured = combat.get("base_crit_rate")
+                if configured is not None:
+                    base_crit_rate = configured
+        return build_enemy_fighter(enemy, base_crit_rate=base_crit_rate)
 
     def _calculate_rewards(
         self, result: dict, base_rewards: dict, enemy: Enemy
@@ -547,10 +560,12 @@ class PVECombatManager:
         won = result.winner_id == player.user_id
         is_draw = result.winner_side == "draw"
 
-        # 4. HP 写回：胜利按战斗结果；失败/平局不致死但气血降为 1
-        #    （challenge_legacy_guardian 同款口径，惩罚语义由调用方消费）
-        final_hp = result.fighter1_final_hp if won else 1
-        player.current_hp = final_hp  # child A：current 层写回
+        # 4. Health Domain owns the write: wins keep the engine final value;
+        #    losses/draws use the shared 1% dynamic-max floor.
+        final_hp = result.fighter1_final_hp
+        if not won:
+            final_hp = max(final_hp, self.health_service.defeat_hp_floor(player))
+        final_hp = await self.health_service.set_current_hp(player, final_hp)
 
         # 5. 组织战报（无奖励结算；奖励由 RiftManager 组装）
         lines = list(result.combat_log or [])
@@ -569,7 +584,7 @@ class PVECombatManager:
         """发起传承之地守护 NPC 挑战（获取传承的前置门槛）。
 
         独立函数而非复用 trigger_pve_combat：无概率触发、无修为/灵石/
-        掉落结算，战斗失败不致死（HP 下限 1），仅损失本次触发机会。
+        掉落结算；败场/平局经 Health Domain 套用 1% 动态上限地板，胜场不保底。
 
         Args:
             player: 发起挑战的玩家。
@@ -596,14 +611,14 @@ class PVECombatManager:
             player_fighter, enemy_fighter, combat_type="pve"
         )
 
-        # 3. HP 写回，失败不致死（下限 1，不扣修为/灵石/掉落；平局同归于尽
-        #    时同样兜底，避免玩家 hp=0）
+        # 3. Persist through HealthService so direct rift and sect-claim callers
+        #    share exactly the same defeat floor and restart-safe write.
         final_hp = result.fighter1_final_hp
         is_draw = result.winner_side == "draw"
         won = result.winner_id == player.user_id
         if not won:
-            final_hp = max(1, final_hp)
-        player.current_hp = final_hp  # child A：current 层写回
+            final_hp = max(final_hp, self.health_service.defeat_hp_floor(player))
+        final_hp = await self.health_service.set_current_hp(player, final_hp)
 
         # 4. 组织结果消息（无奖励结算）
         lines = list(result.combat_log or [])

@@ -27,6 +27,10 @@ _data_pkg = __import__(
 )
 DataBase = _data_pkg.DataBase
 MigrationManager = _data_pkg.MigrationManager
+_leaf_mod = load_package_module(
+    "data/leaf_write.py", "astrbot_plugin_monixiuxian2_2.data.leaf_write"
+)
+leaf_write = _leaf_mod.leaf_write
 Player = __import__("astrbot_plugin_monixiuxian2_2.models", fromlist=["Player"]).Player
 
 
@@ -693,25 +697,216 @@ async def test_13_begin_failure_compensation_clears_state(db):
 
 
 @pytest.mark.asyncio
-async def test_13_helper_default_commit_gated_inside_cm(db):
-    """D2 gate: a leaf call inside the CM does not commit early.
-
-    The 25 leaf helpers now commit only when ``_txn_depth == 0`` (they carry no
-    commit parameter), so a call inside a CM block is a no-op commit that the
-    owner performs on exit; the same call outside the CM keeps legacy
-    standalone semantics (fail-open).
-    """
+async def test_13_leaf_joins_cm_and_commits_standalone(db):
+    """A leaf is passive inside a CM and owns its commit outside one."""
     await _make_player(db)
     player = await db.get_player_by_id("u1")
     player.gold = 200
     async with db.transaction():
-        # Leaf without commit param: gated by depth, must NOT commit early.
+        # The joined leaf does not commit early; the CM owner commits on exit.
         await db.update_player(player)
         assert db.conn.in_transaction
     assert (await db.get_player_by_id("u1")).gold == 200
     assert not db.conn.in_transaction
 
     # Outside the CM the same call commits standalone (legacy).
+    player = await db.get_player_by_id("u1")
+    player.gold = 300
+    await db.update_player(player)
+    assert (await db.get_player_by_id("u1")).gold == 300
+
+
+@pytest.mark.asyncio
+async def test_dfb_standalone_leaf_serializes_with_cm_before_first_dml(db):
+    """A standalone leaf owns the connection before DML; a concurrent CM waits.
+
+    The real UPDATE is allowed to open sqlite's implicit transaction, then its
+    return to ``update_player`` is paused. Before the ownership fix, the CM
+    claims depth=1 and its BEGIN fails inside that implicit transaction; the
+    leaf subsequently loses its standalone commit. The fixed protocol keeps
+    the CM parked until the leaf commits, then runs both writes normally.
+    """
+    await _make_player(db)
+    player = await db.get_player_by_id("u1")
+    player.gold = 200
+    dml_done = asyncio.Event()
+    release_dml = asyncio.Event()
+    cm_entered = asyncio.Event()
+    orig_execute = db.conn.execute
+
+    async def gated_execute(sql, parameters=None):
+        cursor = await orig_execute(sql, parameters)
+        if sql.lstrip().startswith("UPDATE players") and not dml_done.is_set():
+            assert db.conn.in_transaction
+            dml_done.set()
+            await release_dml.wait()
+        return cursor
+
+    def execute_result(sql, parameters=None):
+        return Result(gated_execute(sql, parameters))
+
+    async def leaf_work():
+        await db.update_player(player)
+
+    async def cm_work():
+        async with db.transaction():
+            cm_entered.set()
+            latest = await db.get_player_by_id("u1")
+            latest.gold = 300
+            await db.update_player(latest)
+
+    db.conn.execute = execute_result
+    leaf_task = asyncio.create_task(leaf_work())
+    cm_task = None
+    try:
+        await asyncio.wait_for(dml_done.wait(), timeout=2)
+        cm_task = asyncio.create_task(cm_work())
+        await asyncio.sleep(0.05)
+        if cm_task.done():
+            # Pre-fix this await exposes SQLite's real nested-BEGIN error.
+            await cm_task
+        assert not cm_task.done(), "CM must wait for the standalone leaf owner"
+        assert not cm_entered.is_set()
+        release_dml.set()
+        await asyncio.gather(leaf_task, cm_task)
+        assert cm_entered.is_set()
+        assert (await db.get_player_by_id("u1")).gold == 300
+        assert not db.conn.in_transaction
+        assert db.conn._txn_owner_task is None
+        assert db.conn._txn_depth == 0
+    finally:
+        release_dml.set()
+        db.conn.execute = orig_execute
+        tasks = [leaf_task] if cm_task is None else [leaf_task, cm_task]
+        await asyncio.gather(*tasks)
+
+
+@pytest.mark.asyncio
+async def test_dfb_cm_owner_blocks_standalone_leaf(db):
+    """Reverse interleaving: a standalone leaf waits for a foreign CM owner."""
+    await _make_player(db)
+    owner_inside = asyncio.Event()
+    release_owner = asyncio.Event()
+
+    async def cm_work():
+        async with db.transaction():
+            player = await db.get_player_by_id("u1")
+            player.gold = 200
+            await db.update_player(player)
+            owner_inside.set()
+            await release_owner.wait()
+
+    async def leaf_work():
+        player = await db.get_player_by_id("u1")
+        player.gold = 300
+        await db.update_player(player)
+
+    owner_task = asyncio.create_task(cm_work())
+    await asyncio.wait_for(owner_inside.wait(), timeout=2)
+    leaf_task = asyncio.create_task(leaf_work())
+    try:
+        await asyncio.sleep(0.05)
+        assert not leaf_task.done(), "leaf must not silently join a foreign CM"
+        assert db.conn._txn_owner_task is owner_task
+        release_owner.set()
+        await asyncio.gather(owner_task, leaf_task)
+    finally:
+        release_owner.set()
+        await asyncio.gather(owner_task, leaf_task)
+    assert (await db.get_player_by_id("u1")).gold == 300
+    assert not db.conn.in_transaction
+    assert db.conn._txn_owner_task is None
+
+
+@pytest.mark.asyncio
+async def test_dfb_same_task_leaf_join_rolls_back_with_cm(db):
+    """A same-task leaf remains passive and is rolled back by its CM owner."""
+    await _make_player(db)
+    player = await db.get_player_by_id("u1")
+    player.gold = 200
+    with pytest.raises(RuntimeError, match="rollback joined leaf"):
+        async with db.transaction():
+            await db.update_player(player)
+            assert db.conn._txn_depth == 1  # joined leaf exited; CM owner remains
+            assert db.conn.in_transaction
+            raise RuntimeError("rollback joined leaf")
+    assert (await db.get_player_by_id("u1")).gold == 10000
+    assert db.conn._txn_depth == 0
+    assert db.conn._txn_owner_task is None
+
+
+@pytest.mark.asyncio
+async def test_dfb_leaf_exception_rolls_back_and_releases_owner(db):
+    """A standalone owner rolls back on BaseException and releases all state."""
+    await _make_player(db)
+    with pytest.raises(RuntimeError, match="leaf failed"):
+        async with leaf_write(db.conn):
+            await db.conn.execute("UPDATE players SET gold = 200 WHERE user_id = 'u1'")
+            raise RuntimeError("leaf failed")
+    assert (await db.get_player_by_id("u1")).gold == 10000
+    assert not db.conn.in_transaction
+    assert db.conn._txn_owner_task is None
+    assert db.conn._txn_depth == 0
+
+    async with leaf_write(db.conn):
+        await db.conn.execute("UPDATE players SET gold = 300 WHERE user_id = 'u1'")
+    assert (await db.get_player_by_id("u1")).gold == 300
+
+
+@pytest.mark.asyncio
+async def test_dfb_leaf_cancellation_rolls_back_and_releases_owner(db):
+    """Cancellation at an owner-body await cannot leak the implicit transaction."""
+    await _make_player(db)
+    entered = asyncio.Event()
+
+    async def cancelled_leaf():
+        async with leaf_write(db.conn):
+            await db.conn.execute("UPDATE players SET gold = 200 WHERE user_id = 'u1'")
+            entered.set()
+            await asyncio.sleep(30)
+
+    task = asyncio.create_task(cancelled_leaf())
+    await asyncio.wait_for(entered.wait(), timeout=2)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert (await db.get_player_by_id("u1")).gold == 10000
+    assert not db.conn.in_transaction
+    assert db.conn._txn_owner_task is None
+    assert db.conn._txn_depth == 0
+
+    player = await db.get_player_by_id("u1")
+    player.gold = 300
+    await db.update_player(player)
+    assert (await db.get_player_by_id("u1")).gold == 300
+
+
+@pytest.mark.asyncio
+async def test_dfb_immediate_leaf_begin_failure_releases_owner(db):
+    """A failed own BEGIN wakes waiters and leaves no owner behind."""
+    import sqlite3
+
+    await _make_player(db)
+    await db.update_shop_data("global", 1, [{"name": "x", "stock": 2}])
+    orig_execute = db.conn.execute
+
+    async def failing_execute(sql, parameters=None):
+        if sql.strip().upper().startswith("BEGIN"):
+            raise sqlite3.OperationalError("injected BEGIN failure")
+        return await orig_execute(sql, parameters)
+
+    db.conn.execute = lambda sql, parameters=None: Result(
+        failing_execute(sql, parameters)
+    )
+    try:
+        with pytest.raises(sqlite3.OperationalError, match="injected BEGIN failure"):
+            await db.decrement_shop_item_stock("global", "x")
+    finally:
+        db.conn.execute = orig_execute
+    assert db.conn._txn_owner_task is None
+    assert db.conn._txn_depth == 0
+    assert not db.conn.in_transaction
+
     player = await db.get_player_by_id("u1")
     player.gold = 300
     await db.update_player(player)
@@ -735,8 +930,8 @@ async def test_13_precondition_bare_dml_in_transaction_true(db):
 
     The counter-intuitive sqlite behavior the whole design relies on: after a
     bare INSERT/UPDATE, ``in_transaction`` is True even though no explicit
-    BEGIN was issued — which is why ownership (depth), not in_transaction,
-    is the gating signal.
+    BEGIN was issued. Ownership is therefore acquired before DML rather than
+    inferred afterward from ``in_transaction`` or a post-write depth check.
     """
     await _make_player(db)
     await db.conn.execute("UPDATE players SET gold = gold + 1 WHERE user_id = 'u1'")
@@ -819,11 +1014,10 @@ async def test_ip5_joined_exit_after_reconnect_clamps_depth_at_zero(db):
         # The joined layer has just exited against the replacement handle.
         assert db.conn._txn_depth >= 0, "joined exit must never drive depth negative"
         assert db.conn._txn_depth == 0
-        # Gate sanity on the (unowned) replacement handle: a leaf call must
-        # commit by itself instead of leaving its DML pending (fail-open).
+        # An unowned replacement handle must still commit a standalone leaf.
         player.gold = 700
         await db.update_player(player)
-        assert not db.conn.in_transaction, "commit gate must still fire after the swap"
+        assert not db.conn.in_transaction, "standalone leaf must commit after the swap"
 
     # An independent write path after the CM still commits standalone.
     player = await db.get_player_by_id("u1")

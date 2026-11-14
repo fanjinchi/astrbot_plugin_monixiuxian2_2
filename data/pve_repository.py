@@ -9,9 +9,9 @@ C/D/E 在 ``async with db.transaction():`` 内组合调用本模块（传入 ``d
 
 约定（.trellis/tasks/10-10-pve-persistence-transaction-foundation/design.md）：
 
-* 叶子提交门控：每个公开写方法收尾时调用 :meth:`BaseRepository._commit_if_standalone`，
-  只有 ``conn._txn_depth == 0``（自己就是事务所有者，或使用裸连接的测试/迁移）
-  才真正 ``commit``，因此被包进调用方事务时绝不提前提交。
+* 叶子归属：每个公开写方法经 ``leaf_write_method`` 在首条 DML 前取得
+  连接级 owner；standalone 退出时提交，包进调用方事务时同任务 join，
+  跨任务等待而绝不提前提交。
 * 幂等：写入一律 insert-or-read（``ON CONFLICT DO NOTHING`` + 回读），唯一键冲突
   时返回既有行并报告 ``created=False``，不产生第二条事实、不抛异常。
 * 并发：条件写入（CAS）以 ``cas_version`` 为前像，不匹配返回 ``False`` 交调用方
@@ -35,6 +35,11 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import aiosqlite
+
+try:
+    from .leaf_write import leaf_write_method
+except ImportError:  # Standalone manager tests load this repository by file path.
+    from astrbot_plugin_monixiuxian2_2.data.leaf_write import leaf_write_method
 
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
 # 列名会被拼进 SQL（SET/WHERE 片段），只允许迁移文件里出现的纯小写下划线标识符。
@@ -159,24 +164,13 @@ class BaseRepository:
     Args:
         conn: Active aiosqlite connection — pass ``db.conn`` (inside
             ``async with db.transaction():`` the manager yields itself, not
-            a connection, so ``txn`` must never be passed here). The
-            repository never opens or nests transactions itself.
+            a connection, so ``txn`` must never be passed here). Standalone writes
+            acquire the shared connection owner; caller-owned transactions are joined.
     """
 
     def __init__(self, conn: aiosqlite.Connection):
         """Bind the repository to a connection that may already be in a transaction."""
         self.conn = conn
-
-    async def _commit_if_standalone(self) -> None:
-        """Commit only when this call is not nested inside an owner transaction.
-
-        ``_txn_depth`` 由 ``DataBase.connect()`` 在连接上初始化，只在
-        ``DataBase.transaction()`` 持有期间非零。裸 ``aiosqlite.connect``
-        （迁移与单元测试）没有该属性 → ``getattr`` 取默认 0 → 自行提交，
-        两种用法都正确。
-        """
-        if getattr(self.conn, "_txn_depth", 0) == 0:
-            await self.conn.commit()
 
     async def _fetchone(self, sql: str, params: Sequence[Any] = ()) -> dict | None:
         """Run a SELECT and return the first row as a dict (``None`` when empty)."""
@@ -285,6 +279,7 @@ class BaseRepository:
         await cursor.close()
         return moved
 
+    @leaf_write_method()
     async def cas_update_player_health(
         self,
         *,
@@ -325,7 +320,6 @@ class BaseRepository:
             },
             values=values,
         )
-        await self._commit_if_standalone()
         return moved
 
     async def get_player_health(self, user_id: str) -> dict | None:
@@ -399,6 +393,7 @@ class AdventureRepository(BaseRepository):
             (user_id,),
         )
 
+    @leaf_write_method()
     async def insert_settlement(
         self,
         *,
@@ -493,9 +488,9 @@ class AdventureRepository(BaseRepository):
             key_where="adventure_run_id = ?",
             key_params=(adventure_run_id,),
         )
-        await self._commit_if_standalone()
         return row, created
 
+    @leaf_write_method()
     async def cas_update_settlement(
         self,
         settlement_id: str,
@@ -526,9 +521,9 @@ class AdventureRepository(BaseRepository):
             expected_cas_version=expected_cas_version,
             values=values,
         )
-        await self._commit_if_standalone()
         return moved
 
+    @leaf_write_method()
     async def claim_effect(
         self,
         *,
@@ -559,7 +554,6 @@ class AdventureRepository(BaseRepository):
         )
         claimed = cursor.rowcount == 1
         await cursor.close()
-        await self._commit_if_standalone()
         return claimed
 
     async def list_effect_claims(self, settlement_id: str) -> list[dict]:
@@ -576,6 +570,7 @@ class AdventureRepository(BaseRepository):
             "SELECT * FROM adventure_fatigue WHERE user_id = ?", (user_id,)
         )
 
+    @leaf_write_method()
     async def set_fatigue(
         self,
         *,
@@ -609,9 +604,9 @@ class AdventureRepository(BaseRepository):
             "cas_version = adventure_fatigue.cas_version + 1",
             (user_id, route_id, int(fatigue_until), settlement_id),
         )
-        await self._commit_if_standalone()
         return await self.get_fatigue(user_id)  # type: ignore[return-value]
 
+    @leaf_write_method()
     async def cas_clear_fatigue(
         self, user_id: str, *, expected_cas_version: int
     ) -> bool:
@@ -630,7 +625,6 @@ class AdventureRepository(BaseRepository):
             expected_cas_version=expected_cas_version,
             values={"fatigue_until": 0, "route_id": ""},
         )
-        await self._commit_if_standalone()
         return moved
 
 
@@ -675,6 +669,7 @@ class WorldBossRepository(BaseRepository):
             "ORDER BY terminated_at DESC, rowid DESC LIMIT 1"
         )
 
+    @leaf_write_method()
     async def insert_instance(
         self,
         *,
@@ -758,9 +753,9 @@ class WorldBossRepository(BaseRepository):
             key_where="instance_id = ?",
             key_params=(instance_id,),
         )
-        await self._commit_if_standalone()
         return row, created
 
+    @leaf_write_method()
     async def cas_update_instance(
         self,
         instance_id: str,
@@ -799,7 +794,6 @@ class WorldBossRepository(BaseRepository):
             expected_cas_version=expected_version,
             values=values,
         )
-        await self._commit_if_standalone()
         return moved
 
     async def get_challenge(self, challenge_id: str) -> dict | None:
@@ -819,6 +813,7 @@ class WorldBossRepository(BaseRepository):
             (instance_id, int(limit)),
         )
 
+    @leaf_write_method()
     async def record_challenge(
         self,
         *,
@@ -904,7 +899,6 @@ class WorldBossRepository(BaseRepository):
             key_where="challenge_id = ?",
             key_params=(challenge_id,),
         )
-        await self._commit_if_standalone()
         return row, created
 
     async def get_daily_attempts(self, *, date_key: str, user_id: str) -> dict | None:
@@ -915,6 +909,7 @@ class WorldBossRepository(BaseRepository):
             (date_key, user_id),
         )
 
+    @leaf_write_method()
     async def increment_daily_attempts(
         self, *, date_key: str, user_id: str, limit: int
     ) -> dict | None:
@@ -945,7 +940,6 @@ class WorldBossRepository(BaseRepository):
         )
         moved = cursor.rowcount == 1
         await cursor.close()
-        await self._commit_if_standalone()
         if not moved:
             return None
         return await self.get_daily_attempts(date_key=date_key, user_id=user_id)
@@ -956,6 +950,7 @@ class WorldBossRepository(BaseRepository):
             "SELECT * FROM world_boss_ledger WHERE challenge_id = ?", (challenge_id,)
         )
 
+    @leaf_write_method()
     async def record_ledger(
         self,
         *,
@@ -1000,7 +995,6 @@ class WorldBossRepository(BaseRepository):
             key_where="challenge_id = ?",
             key_params=(challenge_id,),
         )
-        await self._commit_if_standalone()
         return row, created
 
     async def get_contribution(self, *, instance_id: str, user_id: str) -> dict | None:
@@ -1021,6 +1015,7 @@ class WorldBossRepository(BaseRepository):
             (instance_id, int(limit)),
         )
 
+    @leaf_write_method()
     async def accumulate_contribution(
         self,
         *,
@@ -1075,7 +1070,6 @@ class WorldBossRepository(BaseRepository):
                 int(bool(is_last_hit)),
             ),
         )
-        await self._commit_if_standalone()
         return await self.get_contribution(  # type: ignore[return-value]
             instance_id=instance_id, user_id=user_id
         )
@@ -1123,6 +1117,7 @@ class OutboxRepository(BaseRepository):
             (event_id,),
         )
 
+    @leaf_write_method()
     async def append_event(
         self,
         *,
@@ -1171,9 +1166,9 @@ class OutboxRepository(BaseRepository):
             key_where="business_key = ?",
             key_params=(business_key,),
         )
-        await self._commit_if_standalone()
         return row, created
 
+    @leaf_write_method()
     async def add_delivery(
         self, *, event_id: str, platform: str, group_id: str, now: int
     ) -> tuple[dict, bool]:
@@ -1195,7 +1190,6 @@ class OutboxRepository(BaseRepository):
             key_where="event_id = ? AND platform = ? AND group_id = ?",
             key_params=(event_id, platform, group_id),
         )
-        await self._commit_if_standalone()
         return row, created
 
     async def get_delivery(self, delivery_id: int) -> dict | None:
@@ -1217,6 +1211,7 @@ class OutboxRepository(BaseRepository):
             (*states, int(now), int(limit)),
         )
 
+    @leaf_write_method()
     async def claim_delivery(
         self, delivery_id: int, *, owner: str, lease_until: int, now: int
     ) -> dict | None:
@@ -1247,7 +1242,6 @@ class OutboxRepository(BaseRepository):
         )
         moved = cursor.rowcount == 1
         await cursor.close()
-        await self._commit_if_standalone()
         if not moved:
             return None
         return await self.get_delivery(delivery_id)
@@ -1261,6 +1255,7 @@ class OutboxRepository(BaseRepository):
             (int(now), int(limit)),
         )
 
+    @leaf_write_method()
     async def complete_delivery(
         self,
         delivery_id: int,
@@ -1310,5 +1305,4 @@ class OutboxRepository(BaseRepository):
                 "updated_at": int(now),
             },
         )
-        await self._commit_if_standalone()
         return moved

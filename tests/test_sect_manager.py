@@ -605,21 +605,31 @@ class LegacySectConfig(FakeConfigManager):
 class _StubPveCombat:
     """Stub PVECombatManager returning a fixed guardian-challenge outcome."""
 
-    def __init__(self, won: bool):
+    def __init__(self, won: bool, db=None, final_hp: int | None = None):
         self.won = won
+        self.db = db
+        self.final_hp = final_hp
         self.calls = 0
 
     async def challenge_legacy_guardian(self, player):
+        """Simulate the real combat boundary, including its HP DB write."""
         self.calls += 1
+        if self.final_hp is not None:
+            player.current_hp = self.final_hp
+            await self.db.conn.execute(
+                "UPDATE players SET current_hp = ? WHERE user_id = ?",
+                (self.final_hp, player.user_id),
+            )
+            await self.db.conn.commit()
         return self.won, ("战胜守护者" if self.won else "败于守护者")
 
 
-def _make_legacy_mgr(db, config, won=True):
+def _make_legacy_mgr(db, config, won=True, final_hp: int | None = None):
     """SectManager wired with a real ImpartManager and a stub guardian fight."""
     mgr = SectManager(db, config, busy_state=make_busy_state(db))
     impart = ImpartManager(db, config)
     mgr.impart_mgr = impart
-    mgr.pve_combat_mgr = _StubPveCombat(won)
+    mgr.pve_combat_mgr = _StubPveCombat(won, db=db, final_hp=final_hp)
     return mgr, impart
 
 
@@ -635,7 +645,7 @@ async def test_sect_legacy_claim_success_occupies_quota():
     """Winning the guardian fight creates a sect instance and consumes the quota."""
     db = await _make_db()
     config = LegacySectConfig()
-    mgr, _ = _make_legacy_mgr(db, config, won=True)
+    mgr, _ = _make_legacy_mgr(db, config, won=True, final_hp=7)
     await mgr.ensure_system_sects()
 
     await _make_player(db, "u1", level_index=2)
@@ -644,6 +654,8 @@ async def test_sect_legacy_claim_success_occupies_quota():
     success, msg = await mgr.claim_treasure("u1", "青云门传承")
     assert success, msg
     assert "战胜" in msg and "宗门传承" in msg
+    # The claim transaction must not restore a stale pre-battle HP snapshot.
+    assert (await db.get_player_by_id("u1")).current_hp == 7
 
     # 实例已创建，type=sect 且绑定本宗
     instances = await db.ext.list_legacy_instances_by_owner("u1")
@@ -663,7 +675,7 @@ async def test_sect_legacy_claim_failure_keeps_quota():
     """Losing the guardian fight does not consume the claim quota (retryable)."""
     db = await _make_db()
     config = LegacySectConfig()
-    mgr, _ = _make_legacy_mgr(db, config, won=False)
+    mgr, _ = _make_legacy_mgr(db, config, won=False, final_hp=12)
     await mgr.ensure_system_sects()
 
     await _make_player(db, "u1", level_index=2)
@@ -672,6 +684,9 @@ async def test_sect_legacy_claim_failure_keeps_quota():
     success, msg = await mgr.claim_treasure("u1", "青云门传承")
     assert not success
     assert "不占用领取名额" in msg
+    # The combat layer has already persisted the defeat floor; no extra write
+    # from the sect-claim failure branch is required.
+    assert (await db.get_player_by_id("u1")).current_hp == 12
     # 守护战仅触发一次（失败即结算，不重复挑战）
     assert mgr.pve_combat_mgr.calls == 1
     # 未创建实例、未占名额

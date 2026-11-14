@@ -35,6 +35,8 @@ def test_default_matches_shipped_file():
     shipped = json.loads(
         (PLUGIN_ROOT / "config" / "game_config.json").read_text(encoding="utf-8")
     )
+    assert GAME_CONFIG["combat"]["base_crit_rate"] == 0.15
+    assert shipped["combat"]["base_crit_rate"] == 0.15
     assert json.dumps(GAME_CONFIG, ensure_ascii=False, sort_keys=True) == json.dumps(
         shipped, ensure_ascii=False, sort_keys=True
     )

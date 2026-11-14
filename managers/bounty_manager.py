@@ -11,6 +11,7 @@ from astrbot.api import logger
 
 from ..data import DataBase
 from ..data.default_configs import BOUNTY_CONFIG
+from ..data.leaf_write import leaf_write_method
 from ..models import Player
 
 if TYPE_CHECKING:
@@ -661,6 +662,7 @@ class BountyManager:
                 )
             return True, f"\n\n📜 悬赏进度：{new_progress}/{target}"
 
+    @leaf_write_method()
     async def check_and_expire_bounties(self) -> int:
         """Mark overdue active bounties as expired (status 3). Entry point of the scheduled expiry task."""
         now = int(time.time())
@@ -668,5 +670,4 @@ class BountyManager:
             "UPDATE bounty_tasks SET status = 3 WHERE status = 1 AND expire_time < ?",
             (now,),
         )
-        await self.db.conn.commit()
         return cursor.rowcount

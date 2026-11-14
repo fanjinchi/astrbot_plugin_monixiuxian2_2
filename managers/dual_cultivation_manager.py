@@ -9,6 +9,7 @@ from astrbot.api import logger
 
 from ..core.cultivation_manager import CultivationManager
 from ..data import DataBase
+from ..data.leaf_write import leaf_write_method
 from ..models import Player
 
 if TYPE_CHECKING:
@@ -142,6 +143,7 @@ class DualCultivationManager:
             f"冷却时间：{cooldown_minutes}分钟"
         )
 
+    @leaf_write_method()
     async def _create_request(
         self, from_id: str, from_name: str, target_id: str
     ) -> int:
@@ -161,12 +163,12 @@ class DualCultivationManager:
             """,
             (from_id, from_name, target_id, now, expires_at),
         )
-        await self.db.conn.commit()
 
         async with self.db.conn.execute("SELECT last_insert_rowid()") as cursor:
             row = await cursor.fetchone()
             return row[0] if row else 0
 
+    @leaf_write_method()
     async def _get_pending_request(self, target_id: str) -> dict | None:
         """获取待处理的双修请求"""
         now = int(time.time())
@@ -175,10 +177,6 @@ class DualCultivationManager:
         await self.db.conn.execute(
             "DELETE FROM dual_cultivation_requests WHERE expires_at < ?", (now,)
         )
-        # D2 ownership gate: commit only outside an active CM transaction.
-        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
-        if getattr(self.db.conn, "_txn_depth", 0) == 0:
-            await self.db.conn.commit()
 
         async with self.db.conn.execute(
             """
@@ -201,15 +199,12 @@ class DualCultivationManager:
                 }
             return None
 
+    @leaf_write_method()
     async def _delete_request(self, request_id: int):
         """删除双修请求"""
         await self.db.conn.execute(
             "DELETE FROM dual_cultivation_requests WHERE id = ?", (request_id,)
         )
-        # D2 ownership gate: commit only outside an active CM transaction.
-        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
-        if getattr(self.db.conn, "_txn_depth", 0) == 0:
-            await self.db.conn.commit()
 
     async def send_request(self, initiator: Player, target_id: str) -> tuple[bool, str]:
         """发起双修请求"""
@@ -367,6 +362,7 @@ class DualCultivationManager:
             row = await cursor.fetchone()
             return row[0] if row else None
 
+    @leaf_write_method()
     async def _set_last_dual_time(self, user_id: str, timestamp: int):
         """设置上次双修时间"""
         await self.db.conn.execute(
@@ -377,7 +373,3 @@ class DualCultivationManager:
             """,
             (user_id, timestamp),
         )
-        # D2 ownership gate: commit only outside an active CM transaction.
-        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
-        if getattr(self.db.conn, "_txn_depth", 0) == 0:
-            await self.db.conn.commit()

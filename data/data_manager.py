@@ -11,6 +11,7 @@ from astrbot.api import logger
 
 from ..models import Player
 from .database_extended import DatabaseExtended
+from .leaf_write import TxnState, leaf_write, leaf_write_method
 
 # 获取 Player 模型的所有字段名（用于过滤数据库中的多余字段，作为迁移未完成时的兼容）
 PLAYER_FIELDS = {f.name for f in fields(Player)}
@@ -54,18 +55,6 @@ def _player_to_tuple(player: Player, for_insert: bool = True):
         # UPDATE: user_id 移到最后
         values.append(values.pop(0))
     return tuple(values)
-
-
-class TxnState:
-    """One-shot abort flag carrier shared by all layers of one transaction.
-
-    Created by the transaction owner on entry; inner (no-op join) layers share
-    the same instance through ``conn._txn_state``; discarded by the owner on
-    exit, so the abort marker never outlives its transaction.
-    """
-
-    def __init__(self):
-        self.aborted = False
 
 
 class _TransactionCM:
@@ -231,18 +220,20 @@ class DataBase:
     async def connect(self):
         """连接数据库"""
         # Pin the sqlite3 default isolation_level="" explicitly (design D0): the
-        # whole CM/helper-gating reasoning relies on implicit BEGIN/DML and the
-        # 42 flag-less data-layer leaf commits rely on implicit per-DML
-        # transaction atomicity. Python 3.12's autocommit attribute or a driver
-        # default change would silently alter both behaviors — make it visible.
+        # CM/leaf ownership protocol relies on implicit BEGIN at the first DML.
+        # Python 3.12's autocommit attribute or a driver default change would
+        # silently alter that behavior, so make the compatibility precondition
+        # visible and testable.
         self.conn = await aiosqlite.connect(self.db_path, isolation_level="")
         self.conn.row_factory = aiosqlite.Row
-        # Transaction ownership state (design D1/D1.2): depth gate, owner task
-        # (identity-compared), and the shared abort-marker carrier. Initialized
-        # fresh on every (re)connect; reconnection rebuilds all three.
+        # Transaction ownership state (design D1/D1.2): reentrant depth, owner
+        # task (identity-compared), and the shared abort-marker carrier. The
+        # connection-local condition and these fields are initialized fresh on
+        # every (re)connect; both CM and leaf_write use the same state.
         self.conn._txn_depth = 0
         self.conn._txn_owner_task = None
         self.conn._txn_state = None
+        self.conn._txn_free = self._txn_free
         self.ext = DatabaseExtended(self.conn)  # 初始化扩展操作
 
     async def close(self):
@@ -288,11 +279,8 @@ class DataBase:
         """创建新玩家（字段从 Player dataclass 动态生成，避免遗漏）"""
         sql = _build_insert_sql()
         params = _player_to_tuple(player, for_insert=True)
-        await self.conn.execute(sql, params)
-        # D2 ownership gate: commit only outside an active CM transaction
-        # (child A step-5 audit: 创角 may run inside a settle+create txn).
-        if getattr(self.conn, "_txn_depth", 0) == 0:
-            await self.conn.commit()
+        async with leaf_write(self.conn):
+            await self.conn.execute(sql, params)
 
     async def get_player_by_id(self, user_id: str) -> Player:
         """根据用户ID获取玩家信息"""
@@ -333,20 +321,15 @@ class DataBase:
         """
         sql = _build_update_sql()
         params = _player_to_tuple(player, for_insert=False)
-        await self.conn.execute(sql, params)
-        # D2 ownership gate: commit only outside an active CM transaction.
-        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
-        if getattr(self.conn, "_txn_depth", 0) == 0:
-            await self.conn.commit()
+        async with leaf_write(self.conn):
+            await self.conn.execute(sql, params)
 
     async def delete_player(self, user_id: str):
         """删除玩家"""
-        await self.conn.execute("DELETE FROM players WHERE user_id = ?", (user_id,))
-        # D2 ownership gate: commit only outside an active CM transaction.
-        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
-        if getattr(self.conn, "_txn_depth", 0) == 0:
-            await self.conn.commit()
+        async with leaf_write(self.conn):
+            await self.conn.execute("DELETE FROM players WHERE user_id = ?", (user_id,))
 
+    @leaf_write_method()
     async def delete_player_cascade(self, user_id: str):
         """级联删除玩家及所有关联数据
 
@@ -401,10 +384,6 @@ class DataBase:
             await safe_execute(sql, params)
 
         await self.conn.execute("DELETE FROM players WHERE user_id = ?", (user_id,))
-        # D2 ownership gate: commit only outside an active CM transaction.
-        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
-        if getattr(self.conn, "_txn_depth", 0) == 0:
-            await self.conn.commit()
 
     async def get_all_players(self):
         """获取所有玩家"""
@@ -454,18 +433,16 @@ class DataBase:
             current_items: 当前商店物品列表
         """
         items_json = json.dumps(current_items, ensure_ascii=False)
-        await self.conn.execute(
-            """
-            INSERT OR REPLACE INTO shop (shop_id, last_refresh_time, current_items)
-            VALUES (?, ?, ?)
-            """,
-            (shop_id, last_refresh_time, items_json),
-        )
-        # D2 ownership gate: commit only outside an active CM transaction.
-        # Fail-open default 0 keeps legacy standalone semantics for bare conns.
-        if getattr(self.conn, "_txn_depth", 0) == 0:
-            await self.conn.commit()
+        async with leaf_write(self.conn):
+            await self.conn.execute(
+                """
+                INSERT OR REPLACE INTO shop (shop_id, last_refresh_time, current_items)
+                VALUES (?, ?, ?)
+                """,
+                (shop_id, last_refresh_time, items_json),
+            )
 
+    @leaf_write_method(immediate=True)
     async def decrement_shop_item_stock(
         self,
         shop_id: str,
@@ -483,63 +460,43 @@ class DataBase:
             (是否成功, last_refresh_time, 扣减后的库存数量)
         """
         quantity = max(1, int(quantity))
-        # D2 ownership gate: own the transaction only when no outer CM is
-        # active (4.2 收编：外层事务内 join，不另起 BEGIN/commit/rollback)。
-        own_txn = getattr(self.conn, "_txn_depth", 0) == 0
-        if own_txn:
-            await self.conn.execute("BEGIN IMMEDIATE")
+        async with self.conn.execute(
+            "SELECT last_refresh_time, current_items FROM shop WHERE shop_id = ?",
+            (shop_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+
+        if not row:
+            return False, 0, 0
+
+        last_refresh_time = row[0]
         try:
-            async with self.conn.execute(
-                "SELECT last_refresh_time, current_items FROM shop WHERE shop_id = ?",
-                (shop_id,),
-            ) as cursor:
-                row = await cursor.fetchone()
+            current_items = json.loads(row[1])
+        except json.JSONDecodeError:
+            current_items = []
 
-            if not row:
-                if own_txn:
-                    await self.conn.rollback()
-                return False, 0, 0
+        target_index = -1
+        for idx, item in enumerate(current_items):
+            if item.get("name") == item_name:
+                target_index = idx
+                break
 
-            last_refresh_time = row[0]
-            try:
-                current_items = json.loads(row[1])
-            except json.JSONDecodeError:
-                current_items = []
+        if target_index == -1:
+            return False, last_refresh_time, 0
 
-            target_index = -1
-            for idx, item in enumerate(current_items):
-                if item.get("name") == item_name:
-                    target_index = idx
-                    break
+        stock = current_items[target_index].get("stock", 0)
+        if stock is None or stock <= 0:
+            return False, last_refresh_time, max(stock or 0, 0)
 
-            if target_index == -1:
-                if own_txn:
-                    await self.conn.rollback()
-                return False, last_refresh_time, 0
+        if stock < quantity:
+            return False, last_refresh_time, stock
 
-            stock = current_items[target_index].get("stock", 0)
-            if stock is None or stock <= 0:
-                if own_txn:
-                    await self.conn.rollback()
-                return False, last_refresh_time, max(stock or 0, 0)
+        new_stock = stock - quantity
+        current_items[target_index]["stock"] = new_stock
 
-            if stock < quantity:
-                if own_txn:
-                    await self.conn.rollback()
-                return False, last_refresh_time, stock
-
-            new_stock = stock - quantity
-            current_items[target_index]["stock"] = new_stock
-
-            items_json = json.dumps(current_items, ensure_ascii=False)
-            await self.conn.execute(
-                "UPDATE shop SET current_items = ?, last_refresh_time = ? WHERE shop_id = ?",
-                (items_json, last_refresh_time, shop_id),
-            )
-            if own_txn:
-                await self.conn.commit()
-            return True, last_refresh_time, new_stock
-        except Exception:
-            if own_txn:
-                await self.conn.rollback()
-            raise
+        items_json = json.dumps(current_items, ensure_ascii=False)
+        await self.conn.execute(
+            "UPDATE shop SET current_items = ?, last_refresh_time = ? WHERE shop_id = ?",
+            (items_json, last_refresh_time, shop_id),
+        )
+        return True, last_refresh_time, new_stock

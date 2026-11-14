@@ -1,5 +1,6 @@
 # core/storage_ring_manager.py
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from ..models import Player
@@ -107,23 +108,24 @@ class StorageRingManager:
     ) -> tuple[bool, str]:
         """将物品存入储物戒（带事务保护）
 
-        4.2 收编（design D1.2）：external_transaction 分支已删除，外部事务
-        路径与独立路径统一收编到 _store_item_inner。嵌套（外层已有 CM 事务，
-        如 shop_handler.handle_buy 已在写锁内重取过 player）时同任务 join、
-        直接作用于传入对象——不二次重取，否则产生第二个 player 对象，物品
-        写入新对象后会被外层用旧对象整行写回覆盖（购买丢货扣钱 bug 根因）；
-        独立调用时 CM 取得写锁后重取保证读到最新数据。
+        4.2 收编（design D1.2）：external_transaction 分支已删除。只有当前
+        任务确实持有连接事务所有权时才直接作用于传入对象，避免二次重取后被
+        外层旧对象覆盖（购买丢货扣钱 bug）；其他任务持有 CM 时必须进入自己的
+        CM 等待，取得写锁后重取最新 Player，再应用本次物品变更。
         """
         can_store, reason = self.can_store_item(item_name)
         if not can_store:
             return False, reason
 
-        # 嵌套判定：外层已有 CM 事务时 join，事务状态由外层管理（三不）
-        if getattr(self.db.conn, "_txn_depth", 0) > 0:
+        current_task = asyncio.current_task()
+        if (
+            current_task is not None
+            and getattr(self.db.conn, "_txn_owner_task", None) is current_task
+        ):
             return await self._store_item_inner(player, item_name, count, silent)
 
         async with self.db.transaction() as txn:
-            # 独立调用路径：CM 已取得写锁，重取保证在写锁内读到最新数据
+            # Standalone and foreign-owner paths both serialize before rereading.
             fresh_player = await self.db.get_player_by_id(player.user_id)
             if not fresh_player:
                 txn.abort()
@@ -145,8 +147,8 @@ class StorageRingManager:
         Args:
             player: 写入目标玩家对象。外部事务路径由调用方传入；CM 路径为重取后
                 的最新对象。
-            txn: 独立调用路径的事务句柄，失败分支标记 abort；外部事务路径为
-                None——失败分支不做任何事务操作（三不）。
+            txn: 本任务新建的 CM 事务句柄，失败分支标记 abort；同任务嵌套
+                外部事务时为 None——失败分支不做任何事务操作（三不）。
 
         Returns:
             (bool, str) 与 store_item 一致。

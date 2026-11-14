@@ -13,7 +13,7 @@
 - **形态**：AstrBot 插件（群聊文字修仙游戏），运行于宿主 `~/code/AstrBot/`（uv 环境，Python ≥3.12）
 - **入口**：`main.py` 的 `XiuXianPlugin`（`Star` 子类），AstrBot 插件加载器要求文件名必须是 main.py；core 服务（修炼/丹药/装备/储物戒/商店等）由 `__init__` 内 `_wire_core_services()` 装配段统一构造并按依赖序注入各 manager/handler，禁止在 handler/manager 内自构造核心服务
 - **依赖**：无额外依赖（历史 Pillow 依赖已随 image_generator 死代码移除）
-- **数据**：SQLite（aiosqlite）`xiuxian_data_lite.db`，位于 `data/plugin_data/astrbot_plugin_monixiuxian2_2_2/`（AstrBot 数据目录，禁止写插件自身目录）；当前数据库版本 v31
+- **数据**：SQLite（aiosqlite）`xiuxian_data_lite.db`，位于 `data/plugin_data/astrbot_plugin_monixiuxian2_2_2/`（AstrBot 数据目录，禁止写插件自身目录）；当前数据库版本 v39
 - **配置**：静态 `config/*.json` ×22（`config_manager.py` 加载，改后重启生效）；动态 `_conf_schema.json`（WebUI 可调：白名单、GM/Boss 管理员、灵根、数值、数据库文件名）
 - **测试**：pytest，`tests/helpers.py` 的 `load_module()` 绕过 managers/`__init__.py` 相对导入链
 
@@ -26,7 +26,7 @@
   → managers/  业务逻辑层（17 管理器：战斗/宗门/Boss/银行/悬赏/秘境/历练/双修/传承/炼丹/洞天/灵田/灵眼…）
   → core/      通用系统层（9 模块：修炼/突破/丹药/装备/商店/储物戒/技能/GM/…）
   → data/      数据层（data_manager.py 玩家 CRUD、database_extended.py 扩展 CRUD、
-                      migration.py 版本化迁移、default_configs.py 内置默认配置）
+                      migration.py 版本化迁移（v39）、default_configs.py 内置默认配置）
   → models.py / models_extended.py（Player、UserStatus、Sect、Boss、Rift…）
 ```
 
@@ -36,7 +36,7 @@ flowchart TD
     M --> H["handlers/ 指令处理层（26 文件）<br/>utils.py @player_required 双层状态检查 + 忙碌白名单"]
     H --> MG["managers/ 业务逻辑层（17 管理器）<br/>战斗 · 宗门 · Boss · 银行 · 悬赏 · 秘境 · 历练 · 双修 · 传承 · 炼丹 · 灵田/灵眼/洞天"]
     MG --> C["core/ 通用系统层（9 模块）<br/>修炼 · 突破 · 丹药 · 装备 · 商店 · 储物戒 · 技能 · GM"]
-    C --> D["data/ 数据层<br/>data_manager · database_extended · migration（v31）· default_configs"]
+    C --> D["data/ 数据层<br/>data_manager · database_extended · migration（v39）· default_configs"]
     D --> DB[("SQLite xiuxian_data_lite.db<br/>AstrBot data/plugin_data/ 下")]
     CFG["config/*.json ×22<br/>config_manager.py（缺失自动建默认）"] -.-> C
     MD["models.py / models_extended.py<br/>Player · UserStatus · Sect · Boss · Rift"] -.-> MG
@@ -47,7 +47,7 @@ flowchart TD
 **关键机制**（踩坑高发区）：
 
 1. **状态双层维护**：`player.state`（字符串）与 `user_cd` 表 `type` 字段（`UserStatus` 枚举）必须同步；新增"进行中"状态要同时改 `models_extended.py`、`BUSY_STATE_ALLOWED_COMMANDS`（handlers/utils.py）、写入/清除 user_cd。
-2. **事务保护**：并发敏感操作 `BEGIN IMMEDIATE` + commit/rollback；定时任务先 `ensure_connection()`。
+2. **事务保护**：并发敏感操作使用 `DataBase.transaction()`；独立首写经 `data/leaf_write.py` 获取同一跨任务所有权（同任务 join、外任务等待、异常回滚），不得抢回连接或强制提交；定时任务先 `ensure_connection()`。
 3. **定时任务**（main.py `initialize()`，全部指数退避重试）：Boss 生成（boss.enabled）、贷款逾期检查、灵眼生成（7200s）、悬赏过期检查。
 4. **广播**：`self.context.send_message({platform}:GroupMessage:{group_id}, chain)`；aiocqhttp 会 strip plain 消息首尾空白（用零宽空格保留）。
 5. **消息发送**：普通 handler 用 `yield`，事件钩子（on_llm_request 等）用 `event.send()`。
@@ -71,7 +71,7 @@ flowchart TD
 | 宗门 | 「宗门」 | 单入口 + 子命令（创建/加入/退出/信息/列表/捐献/任务/丹房/建设/镇派功法/晋升/宝库/师承/踢出/传位/职位/排行/贡献排行/悬赏/商店）；创建 1万灵石+L3；捐献 1灵石→+1贡献+`scale_ratio`(10)建设度；建设任务从 sect_tasks.json 抽（cost/reward/cooldown 按任务配置）；**默认宗门**（sect_factions.json，启动幂等播种，加入校验境界段）；建筑：洞天全员闭关加成/丹房每日领丹（签到日重置）；镇派功法位全员被动；职阶晋升双门槛（贡献+境界，读 positions.promotion）+ 福利（签到俸禄/商店折扣/宝库 unlocks）；师承任务链（默认宗门专属，进度存 players.sect_master_progress）；离宗三路径回收 treasure 宝物、sect_bound 功法保留可用、绑定物禁赠；宗门悬赏独立入口（「宗门 悬赏」）、宗门专属秘境仅本宗可见、历练宗门事件带 🏯 标记、领悟池注入宗门池；宗门商店贡献点结算（faction shop 池）；宗主死亡自动传位 |
 | 银行/贷款 | 「银行」 | 存款复利 0.1%/日、上限 1000 万；普通贷 0.5%/7d、突破贷 0.8%/3d；还款单利；**逾期删号** |
 | 悬赏 | 「悬赏」 | 难度解锁（hard L7/elite L12）；奖励=base×scale×(target/min)×(1+max(0,L-3)×0.06)；时限、70% 掉 1 件、放弃 1800s CD；宗门专属悬赏（sect_id）走「宗门 悬赏」入口，全局指令只处理公共悬赏 |
-| 历练 | 「历练」 | 路线化收益玩法（不受 pve.enabled 开关影响）；exp/gold 按分钟+等级加成+完成奖励×事件倍率；事件组 safe 1.1×/standard 1.2×/risky 0.7×（`injury` 2026-10-12 起只是内容标记，不再扣血）；v39 起为**持久结算状态机**：完成时刻锁定敌人+事件+基础收益+`rng_seed` 写入 `adventure_settlements.snapshot`，高/极高风险挂 `pending_choice` 由玩家发「迎战/逃跑」消费（逃跑成功率按身法比两段式，配置 `flee` 段），败场气血地板 `ceil(max_hp×1%)`；休整=**全局窗口**（`adventure_fatigue.fatigue_until`，跨路线通用，败场 +600s），期内「开始历练」被拦 |
+| 历练 | 「历练」 | 路线化收益玩法（不受 pve.enabled 开关影响）；exp/gold 按分钟+等级加成+完成奖励×事件倍率；事件组 safe 1.1×/standard 1.2×/risky 0.7×（`injury` 2026-10-12 起只是内容标记，不再扣血）；v39 起为**持久结算状态机**：完成时刻锁定敌人+事件+基础收益+`rng_seed` 写入 `adventure_settlements.snapshot`，全风险段遇敌挂 `pending_choice` 由玩家发「迎战/逃跑」消费（逃跑成功率按身法比两段式，配置 `flee` 段），败/平气血地板 `ceil(max_hp×1%)`；休整=**全局窗口**（`adventure_fatigue.fatigue_until`，跨路线通用，败场 +600s），期内「开始历练」被拦 |
 | 秘境 | 「秘境」 | 5 层预置（青云→上古遗迹）；1800s 探索；掉落按 drop_tables 权重；稀有丹 1/2/3 层 3%/5%/10% |
 | 洞天福地 | 「洞天」 | 5 档（1万~100万灵石）；exp_bonus 5%~50%、灵石/时 100~1万；≥1h 可收、累计 24h 上限 |
 | 灵田 | 「灵田」 | 开垦 1 万；5 作物（灵草 1h → 九叶灵芝 24h）；成熟 48h 枯萎；田地 5 级（3~20 格） |
@@ -129,7 +129,7 @@ flowchart TD
 | 2026-08-20 | `unify-sect-commands` 落地 | 宗门功能收敛为「宗门」单入口+子命令（删 18 旧顶层指令）；宗门悬赏独立入口与全局悬赏分流；宗门商店（贡献点结算，faction shop 池）；宗门专属秘境仅本宗可见；历练宗门事件 🏯 标记；GM「清除悬赏」；v3.10.0 |
 | 2026-08-20 | `update-sect-functional-tests` / `adapt-pvp-effects-to-platform-v020` 归档 | sect 域用例全量迁移 `/宗门` 子命令并补新功能用例（商店/悬赏分流/事件标记/入口导航）；PvP 效果用例 deterministic/seed 化；平台 v0.2.0（expect_not/deterministic/combine/one-shot 编排） |
 
-**数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底 → v28 默认宗门+功法归属（sects.is_system/faction_id、player_skills.sect_bound）→ v29 宝库领取记录 → v30 师承任务链进度 → v31 rifts 播种青云剑冢（id 6，宗门专属秘境）→ v32 传承改版（legacy_instances/impart_pk_cooldown/impart_snatch_protection 三表，当前最新）。
+**数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底 → v28 默认宗门+功法归属（sects.is_system/faction_id、player_skills.sect_bound）→ v29 宝库领取记录 → v30 师承任务链进度 → v31 rifts 播种青云剑冢（id 6，宗门专属秘境）→ v32 传承改版（legacy_instances/impart_pk_cooldown/impart_snatch_protection 三表，历史里程碑）→ v39 历练结算状态机增量列与索引（当前最新）。
 
 ## 6. 进行中的工作（bd open，设计相关）
 

@@ -4,3 +4,5 @@
 {"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"气血地板跨战斗/秘境/宗门/显示链路"}
 {"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"地板 API 单源与 Health Domain 复用"}
 {"file":".trellis/tasks/10-10-pve-enemy-world-boss-redesign/research/current-system-evidence.md","reason":"旧语义/旧行号基线（以当日审计为准）"}
+{"file":"data/data_manager.py","reason":"CM 所有权协议、连接初始化与 standalone 叶子现状"}
+{"file":"tests/test_transaction_cm_spike.py","reason":"dfb 确定性竞态与既有事务兼容回归入口"}

@@ -2,13 +2,13 @@
 
 > **文档状态**：
 > - 创建：**2026-07-29**（重设计起点，与 `redesign-combat-skills` 变更同批，commit 8fa47f7）
-> - 最近更新：**2026-09-08**（`armor-content-design`：§4.4 新增防具供给体系定稿框架——两族 × 9 品级 18 标杆件、供给曲线与对称 EHP/M 序列，待用户确认后导入）
+> - 最近更新：**2026-11-14**（Trellis E1：PVE 败场/平局 1% 动态气血地板全入口收口；暴击基础配置双侧接线；战斗气血持久化由 HealthService 统一）
 > - 定位：**数值细节基线（活文档，非归档）**——架构总览见 `project-architecture.md`，行为契约见
 >   `openspec/specs/`；本文是数值/公式/数据库的权威基线，被 `project-architecture.md` §1/§3 引用。
 > - 维护义务：内容必须与代码同步（插件根 `AGENTS.md` §14，影响玩法的修改须同步修正本文）；
 >   若未来被新报告取代，移入 archive 并更新本标注。
 >
-> 生成方式：基于源码静态分析（含 `file:line` 引用），数据库结构以 `data/migration.py` 最新版本 **v34** 为准。
+> 生成方式：基于源码静态分析（含 `file:line` 引用），数据库结构以 `data/migration.py` 最新版本 **v39** 为准。
 > 战斗与属性体系为 **CombatEngine 四主属性框架**（伤害/身法/迅捷/气血 + 护甲），规范见 `openspec/specs/`（attribute-numerics / combat-core / level-progression / skill-system）。
 
 ---
@@ -37,7 +37,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 ├── data/              # 数据层
 │   ├── data_manager.py        # 连接管理 + 玩家 CRUD（ensure_connection 自动重连）
 │   ├── database_extended.py   # 宗门/Boss/秘境/银行/悬赏等扩展 CRUD
-│   ├── migration.py           # 版本化迁移（当前 LATEST_DB_VERSION = 30）
+│   ├── migration.py           # 版本化迁移（当前 LATEST_DB_VERSION = 39）
 │   └── default_configs.py     # 内置默认配置（config/*.json 缺失时创建）
 ├── models.py          # Player、Item 数据模型（dataclass）
 ├── models_extended.py # Sect/BuffInfo/Boss/Rift/ImpartInfo/UserCd + UserStatus 枚举
@@ -205,7 +205,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **统一判定链**：出手权 → 闪避 → 格挡 → 暴击 → 触发技 → 大招 → 伤害结算
   - 闪避率由双方身法差决定，上限 `dodge_cap`（0.4）
   - 格挡 `_calc_block_rate`（:1257）：**来源分离**（openspec `separate-block-armor-source`）——`格挡率 = min(5% + block_armor_value × 0.001, block_cap(0.3))`，`block_armor_value` 仅含天生护甲 + 武器槽护甲（models.py `get_total_attributes` 汇总层产出，:258），防具/功法/心法槽护甲不计入；PvE 敌人/Boss（cfg 构建路径）护甲视为天生，回退 `block_armor_value = armor_value` 行为不变。格挡成功伤害减半（在护甲减伤之前结算，不受 40% 总减伤上限约束）
-  - 暴击率基础 `base_crit_rate`（0.15，仅代码默认值，combat 段未配置）、上限 `crit_rate_cap`（0.5），暴击倍率 ×1.5（`crit_damage_multiplier`），减伤上限 `damage_reduction_cap`（0.4）
+  - 暴击率基础 `base_crit_rate`（0.15，已物化进 combat 段；玩家与怪物缺省/None 共用此回退，怪物 `crit_rate > 0` 按百分比覆盖）、上限 `crit_rate_cap`（0.5），暴击倍率 ×1.5（`crit_damage_multiplier`），减伤上限 `damage_reduction_cap`（0.4）
 - **胜负**：一方气血 ≤ 0 即败；切磋无实质惩罚，决斗败者气血置 1
 - **战报**：叙事化判定记录按合并条数输出（玩家可配 `battle_report_merge_count`，默认 10；`_merge_log` 分块 :1409）
   - **结构行（代码拼装，不走文案池）**：开战横幅 `_BANNER_OPENING`「☆━━━━ 战斗开始 ━━━━☆」（常量 :65，落盘 :288）→ 对阵行 `_VERSUS_LINE`「甲 VS 乙」（:71，落盘 :289）→ 双方面板行 `{name}：气血 hp/max_hp，伤害 …，身法 …，迅捷 …`（:296/:300）→ 回合行（`round_header` 文案池，:312）→ 收束横幅 `_BANNER_VICTORY`「☆━━━━ {name} 胜利！━━━━☆」/ `_BANNER_DRAW` / `_BANNER_DRAW_STALEMATE` / `_BANNER_MUTUAL_DESTRUCTION`（:66-69，分派 :344-362）。横幅与对阵行由代码常量拼装（原文案池场景 `battle_vs` 已随 change combat-report-structure 退役），改版式不再受文案池约束，功能用例也以这三行为最稳锚点
@@ -229,8 +229,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 - **功能开关**：`game_config.json` 的 `pve.enabled` / `boss.enabled`（当前均为 true）。开关关闭时对应玩法入口不可用并提示"玩法维护中"；历练（纯收益玩法）与 PvP 不受影响
 - **触发概率**：历练 low/mid/high/extreme = 30/45/65/75%（结算自动战斗，不变）；**秘境结算自 v3.14.0 起不再自动触发战斗**——改为结算后按 `puzzle_rate`/`beast_rate` 独立判定谜题/妖兽遭遇（秘境条目 `encounter_rate` 可覆盖，见 §4.12）
-- **敌人生成**（enemy_manager.py，过渡方案）：从 `config_manager.level_data`（由公式配置运行时合成的 shim，仅含 level/level_name/exp_needed/success_rate）读取基准；因合成数据**不含 base_\* 字段**，实际走 exp 派生回退（`damage ≈ exp_needed//10`、`hp ≈ exp_needed//2`），再乘模板倍率与 ±10% 随机。**全局难度系数 `pve.difficulty_multiplier` 只乘伤害**（v3.19.0 起；原实现同时乘 HP/护甲，违反 pve-enemy-design「难度只乘伤害」定案）；死配置 `difficulty_coefficients`（normal 0.85/elite 1.0/boss 1.2，加载后从未消费）已从 config 与默认表删除。敌人→FighterState 映射收敛到唯一 mapper `managers/enemy_catalog.py:build_enemy_fighter`：补齐 `level_index`（修护甲 K 常数按 lv1 取值）、真实暴击率（crit_rate>0 按 /100 覆盖默认 0.15）、触发技能/大招；秘境兽/传承守护同走该 mapper。固定名册（28 敌 + 4 世界 Boss）内容治理管线与不可变 catalog（`core/enemy_schema.py` + `managers/enemy_catalog.py`）已落地并通过真实 CSV preview 四层一致性验收；**正式 sync 与调用方切流属父计划 Batch 5（待用户内容批准，本批次未执行）**，详见 `design_docs/content-design/pve-enemy-design.md`
-- **奖励**：历练自动战斗——胜利 `exp = base × 1.2 + 敌人exp`；失败 `exp = base × 0.3` + 安慰灵石 + 气血保底 `ceil(max_hp × 1%)`（见下方「败场口径」）；平局不变。**秘境迎战（可选）**：胜利 = 敌人修为 + 一次掉落 roll（item_chance=100）；失败/平局仍为引擎终值 `HP→1`（秘境兽/传承守护者的地板收口属 child E，bd `-8oh`）、机缘消耗，不动已结算基础奖励
+- **敌人生成**（enemy_manager.py，过渡方案）：从 `config_manager.level_data`（由公式配置运行时合成的 shim，仅含 level/level_name/exp_needed/success_rate）读取基准；因合成数据**不含 base_\* 字段**，实际走 exp 派生回退（`damage ≈ exp_needed//10`、`hp ≈ exp_needed//2`），再乘模板倍率与 ±10% 随机。**全局难度系数 `pve.difficulty_multiplier` 只乘伤害**（v3.19.0 起；原实现同时乘 HP/护甲，违反 pve-enemy-design「难度只乘伤害」定案）；死配置 `difficulty_coefficients`（normal 0.85/elite 1.0/boss 1.2，加载后从未消费）已从 config 与默认表删除。敌人→FighterState 映射收敛到唯一 mapper `managers/enemy_catalog.py:build_enemy_fighter`：补齐 `level_index`（修护甲 K 常数按 lv1 取值）、真实暴击率（per-enemy `crit_rate>0` 按 /100 覆盖 `combat.base_crit_rate`，缺省/None 回退 0.15）、触发技能/大招；秘境兽/传承守护同走该 mapper。固定名册（28 敌 + 4 世界 Boss）内容治理管线与不可变 catalog（`core/enemy_schema.py` + `managers/enemy_catalog.py`）已落地并通过真实 CSV preview 四层一致性验收；**正式 sync 与调用方切流属父计划 Batch 5（待用户内容批准，本批次未执行）**，详见 `design_docs/content-design/pve-enemy-design.md`
+- **奖励**：历练自动战斗——胜利 `exp = base × 1.2 + 敌人exp`；失败 `exp = base × 0.3` + 安慰灵石 + 气血保底 `ceil(max_hp × 1%)`（见下方「败场口径」）；平局收益与 `resolved_win` 状态不变，气血同败场保留至少 1% 动态上限。**秘境迎战（可选）**：胜利 = 敌人修为 + 一次掉落 roll（item_chance=100）；失败/平局由 `HealthService` 统一保留至少 `ceil(动态 max_hp × 1%)`，机缘消耗，不动已结算基础奖励
 - **世界 Boss**（boss_manager.py）：8 档境界 hp_mult 1.0→6.0；数值同样经 level_data shim 派生；Boss 会心率固定 30%（combat.boss_crit_rate）；败给 Boss 安慰奖 `reward = int(boss经验 × 总伤害 / max_hp)`；自动刷 Boss `base_exp = 全服平均exp × 1.2`（无玩家时 50000）
 - **已知缺口**：独立于 level_config 的境界基准区间表将在 Boss/PvE 模块重做（bd-9u2，attribute-numerics 的 PvE 数值生成基准需求）落地
 
@@ -285,7 +285,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
   - **逃跑契约（2026-10-19 重拍已实施，pve-enemy-design §Q4；Trellis 10-22-adventure-flee-contract-rework）**：
     定位 = 玩家后路、代价全在收益侧。三档结局阶梯：胜 = 全额 ×1.2 + 敌修为 + 掉落 + 传承 roll；
     逃 = ×0.3 修为/灵石、无掉落无传承、气血不动；败 = ×0.3 修为 + 1% 地板 + 600s、不滚传承（2026-10-20 定）
-- **败场口径**：战败不掉落（`hp_penalty` 走掉落闸门）且不滚传承机缘，当前气血地板 `ceil(max_hp × 1%)`
+- **败场/平局口径**：战败不掉落（`hp_penalty` 走掉落闸门）且不滚传承机缘；败/平当前气血下限由 `HealthService.defeat_hp_floor()` 计算为 `ceil(动态 max_hp × 1%)`，与秘境/守护者共享常量。胜场使用引擎终值（可低于地板）；历练结算事务负责原子落库并防恢复迟到回写。
 - **休整 = 全局窗口**：`adventure_fatigue.fatigue_until`（跨路线通用，非按路线分别计），
   时长 = 本次路线 `fatigue_cooldown`，败场追加 600s；写入取 `max(现有值, now+时长)` 不回退已生效休整；
   期内任何路线的「开始历练」被拦（文案「⚠️ 你刚历练回来，还需休整 X 分钟」），GM 可经 `clear_fatigue` 清除
@@ -302,7 +302,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - 中途退出无奖励；秘境入口受 pve.enabled 开关控制
 - **结算后遭遇机制（v3.14.0，`add-rift-encounters`）**：基础结算完成后独立概率判定三类遭遇——古阵谜题（`puzzle_rate`）/妖兽拦路（`beast_rate`）/传承之地（沿用 `legacy_chance`），互不互斥可同时触发；秘境条目 `encounter_rate` 存在时覆盖谜题/妖兽两者（传承不受覆盖）。遭遇以内存 `EncounterStore`（core/encounter_store.py）按玩家挂起（每类最多一个，`encounter_ttl_seconds` 默认 600s 惰性过期，同类覆盖刷新，热重载丢失→"机缘已消散"），不写 UserStatus；响应入口为「探索秘境」子命令：`破阵 <答案>`/`迎战`/`传承`
 - **古阵谜题**（core/rift_puzzle_manager.py）：谜题族程序生成（五行破阵/洛书数阵/灵龟辨窟），题面自带解题线索；`puzzle_attempts`（默认 2）次机会，非法形式不耗次；答对 = 一次掉落 roll（item_chance=100）+ 修为基数×0.2；答错/耗尽/过期零惩罚
-- **可选妖兽挑战**：迎战胜利 = 敌人修为 + 掉落 roll，并推进师承 win_pve 计数（main.py 迎战分支消费 `pve_won`）；失败/平局 HP→1、机缘消耗；无视零损失。秘境条目 `enemy_group` 指定定向怪物组（enemies.json 无 `level_range` 的组，经 `spawn_enemy_from_group` 触达，不被普通匹配命中），缺省回落按玩家境界的全局池
+- **可选妖兽挑战**：迎战胜利 = 敌人修为 + 掉落 roll，并推进师承 win_pve 计数（main.py 迎战分支消费 `pve_won`）；失败/平局由 `HealthService.set_current_hp()` 保留至少 1% 动态上限气血、机缘消耗；无视零损失。秘境条目 `enemy_group` 指定定向怪物组（enemies.json 无 `level_range` 的组，经 `spawn_enemy_from_group` 触达，不被普通匹配命中），缺省回落按玩家境界的全局池
 - **传承之地应邀制**：秘境/历练命中 `legacy_chance` 改为挂起传承遭遇（记录来源 rift/adventure），时限内以「探索秘境 传承」应邀才挑战守护 NPC；宗门宝库领取保持"领取即挑战"不变
 
 ### 4.13 洞天福地（managers/blessed_land_manager.py）
@@ -343,7 +343,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **传承实例**：一人可持多条（`legacy_instances` 表）；类型 common/sect/adventure/rift，宗门传承绑定宗门、离宗/被踢自动回收（sect_manager.py:472/:780 + `delete_legacy_instances_by_owner_sect`），且**不可被 PK 夺取**
 - **传承值累积**：仅修炼出关时结算（`handle_end_cultivation` 尾部），每 15 分钟 1 点，**仅累积激活中的传承**（「激活传承」指令切换，同玩家同时仅一条，部分唯一索引 `idx_legacy_active_owner` 保证）；传承值不参与 PK 计算，也不进战力公式
 - **传承 PK（夺取制）**：走 CombatEngine 统一结算（`combat_type="impart_pk"`）；胜利夺走对方最新一条非宗门实例（整个实例转移，传承值/已领奖励清零，新持有者重新修炼）；失败扣 1% 修为 + 5 天同人冷却（`impart_pk_cooldown`）；被夺方 3 日保护期（`impart_snatch_protection`）；平局不转移不计冷却
-- **获取途径**：①宗门宝库（`sect_factions.json` `legacies` 列表，领取即挑战守护 NPC，每人限领一条本宗传承）②历练机缘（adventure_config.json `legacy_chance`）③秘境机缘（rift_config.json `legacy_chance`）；v3.14.0 起②③命中后**挂起传承之地遭遇**（内存 pending，10 分钟惰性过期），玩家以「探索秘境 传承」应邀才触发 `spawn_enemy_from_group("legacy_guardian")` 守护挑战，胜利后按遭遇来源类型获得实例；失败/平局机缘消耗、气血下限 1；无视/过期机缘消散零惩罚
+- **获取途径**：①宗门宝库（`sect_factions.json` `legacies` 列表，领取即挑战守护 NPC，每人限领一条本宗传承）②历练机缘（adventure_config.json `legacy_chance`）③秘境机缘（rift_config.json `legacy_chance`）；v3.14.0 起②③命中后**挂起传承之地遭遇**（内存 pending，10 分钟惰性过期），玩家以「探索秘境 传承」应邀才触发 `spawn_enemy_from_group("legacy_guardian")` 守护挑战，胜利后按遭遇来源类型获得实例；失败/平局机缘消耗、由 `HealthService` 保留至少 1% 动态上限气血；无视/过期机缘消散零惩罚
 - **等阶奖励**：达到类型对应 tiers 阈值（默认 20/40/60/80/100）自动发放（传承心法→储物戒/传承功法→player_skills source="impart"/等级提升封顶），按实例独立记录，复发防重。奖励 id 来自 content-design 管道（传承心法·吐纳/归元、传承·破妄一击/归元护体）
 - **GM 支持**：给予传承/清除传承/清除传承状态（测试预置与清理，仅 GM_ADMINS）
 
@@ -367,7 +367,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 ---
 
-## 五、数据库（SQLite，当前版本 v32）
+## 五、数据库（SQLite，当前版本 v39）
 
 ### 5.1 表清单
 
@@ -430,7 +430,11 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | v32 | 传承系统改版：legacy_instances/impart_pk_cooldown/impart_snatch_protection 三表，impart_info 数据拷贝后 DROP |
 | v33 | rifts 播种试炼古境（id 7，遭遇机制测试脚手架；增量任务链仅对 ≥ TASK_CHAIN_MIN_VERSION(=32) 的库开放，更早旧库走重建路径） |
 | v34 | 拆除试炼古境测试脚手架：删除 rifts 表 id 7 行（幂等；v33 播种的验证用秘境，功能验证通过后移除） |
-| v35 | 玩家气血三层化：`players.hp` RENAME→`base_hp`，新增 `current_hp`+`health_recovered_at`；一次性按迁移时点动态上限 backfill（rename+列新增+校验在同一迁移事务，失败回滚保持 v34）（当前最新） |
+| v35 | 玩家气血三层化：`players.hp` RENAME→`base_hp`，新增 `current_hp`+`health_recovered_at`；一次性按迁移时点动态上限 backfill（rename+列新增+校验在同一迁移事务，失败回滚保持 v34） |
+| v36 | 历练结算事实、效果消费幂等表与持久疲劳表（`adventure_*`） |
+| v37 | 世界 Boss 实例/出生快照/挑战/每日次数/台账/贡献（`world_boss_*`） |
+| v38 | 业务事件 outbox 与逐目标投递 claim（`business_events` / `event_deliveries`） |
+| v39 | 历练结算状态机增量列与索引（`adventure_settlements.state/route_key/snapshot` 等；当前最新，本任务未新增迁移） |
 
 ---
 

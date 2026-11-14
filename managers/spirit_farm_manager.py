@@ -6,6 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 from ..data import DataBase
+from ..data.leaf_write import leaf_write_method
 from ..models import Player
 
 if TYPE_CHECKING:
@@ -120,6 +121,7 @@ class SpiritFarmManager:
             "可种植：灵草、血灵草、冰心草..."
         )
 
+    @leaf_write_method()
     async def plant_herb(self, player: Player, herb_name: str) -> tuple[bool, str]:
         """种植灵草"""
         if herb_name not in SPIRIT_HERBS:
@@ -150,7 +152,6 @@ class SpiritFarmManager:
             "UPDATE spirit_farms SET crops = ? WHERE user_id = ?",
             (json.dumps(crops), player.user_id),
         )
-        await self.db.conn.commit()
 
         grow_hours = herb_config["grow_time"] // 3600
         return True, (

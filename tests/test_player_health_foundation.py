@@ -37,6 +37,7 @@ _health_mod = load_package_module(
     "core/health.py", "astrbot_plugin_monixiuxian2_2.core.health"
 )
 HealthService = _health_mod.HealthService
+DEFEAT_HP_FLOOR_RATIO = _health_mod.DEFEAT_HP_FLOOR_RATIO
 RECOVERY_RATE_PER_MINUTE = _health_mod.RECOVERY_RATE_PER_MINUTE
 
 _busy_mod = load_package_module(
@@ -351,6 +352,96 @@ async def test_clamp_when_ceiling_drops(db):
     assert snap["max_hp"] == 300 and snap["current_hp"] == 300
     row = await health_row(db.conn, "u_clamp")
     assert row[1] == 300
+
+
+@pytest.mark.asyncio
+async def test_defeat_hp_floor_uses_dynamic_max_and_rounds_up(db):
+    """The shared defeat floor is ceil(1% of dynamic max), with a minimum of 1."""
+    health = make_service(db)
+    player = await put_player(
+        db, "u_defeat_floor", base=950, current=0, anchor=T0, weapon=WEAPON_SWORD
+    )
+    assert health.compute_max_hp(player) == 1150
+    assert DEFEAT_HP_FLOOR_RATIO == 0.01
+    assert health.defeat_hp_floor(player) == 12
+
+    player.weapon = ""
+    player.base_hp = 1
+    assert health.defeat_hp_floor(player) == 1
+
+
+@pytest.mark.asyncio
+async def test_pve_defeat_floor_persists_across_restart(tmp_path):
+    """A rift loss writes the dynamic floor to SQLite and survives reconnect."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, MagicMock
+
+    pve_mod = load_package_module(
+        "managers/pve_combat_manager.py",
+        "astrbot_plugin_monixiuxian2_2.managers.pve_combat_manager",
+    )
+    db_path = tmp_path / "defeat-floor.db"
+    database = DataBase(str(db_path))
+    await database.connect()
+    await MigrationManager(database.conn, StubConfigManager()).migrate_or_reset()
+    try:
+        player = await put_player(
+            database,
+            "u_defeat_restart",
+            base=950,
+            current=500,
+            anchor=T0,
+            weapon=WEAPON_SWORD,
+        )
+        health = make_service(database)
+        engine = MagicMock()
+        engine.build_fighter_from_player = AsyncMock(
+            return_value=SimpleNamespace(user_id=player.user_id)
+        )
+        engine.resolve_combat.return_value = SimpleNamespace(
+            winner_side="fighter2",
+            winner_id="enemy_wolf",
+            fighter1_final_hp=0,
+            combat_log=[],
+        )
+        enemy_mgr = MagicMock()
+        enemy_mgr.spawn_enemy.return_value = pve_mod.Enemy(
+            user_id="enemy_wolf",
+            name="狼",
+            hp=100,
+            max_hp=100,
+            damage=10,
+            agility=5,
+            speed=5,
+            armor_value=0,
+            exp=0,
+        )
+        pve = pve_mod.PVECombatManager(
+            MagicMock(engine=engine), enemy_mgr, health_service=health
+        )
+
+        outcome = await pve.challenge_rift_beast(player)
+
+        assert outcome.won is False
+        assert outcome.draw is False
+        assert player.current_hp == 12
+        assert (await database.get_player_by_id(player.user_id)).current_hp == 12
+    finally:
+        await database.close()
+
+    reopened = DataBase(str(db_path))
+    await reopened.connect()
+    try:
+        restored = await reopened.get_player_by_id("u_defeat_restart")
+        assert restored.base_hp == 950
+        assert restored.current_hp == 12
+        assert await make_service(reopened).get_health_snapshot(restored) == {
+            "base_hp": 950,
+            "current_hp": 12,
+            "max_hp": 1150,
+        }
+    finally:
+        await reopened.close()
 
 
 # ----------------------------------------------------------------------

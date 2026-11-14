@@ -711,6 +711,8 @@ class RiftManager:
             player.experience += enemy_exp
             dropped_items = await self._roll_rift_drops(player, rift_level, 100)
             item_msg = await self._store_dropped_items(player, dropped_items)
+            # HealthService already persisted and synced current_hp. This legacy
+            # full-row write carries rewards; it is not the HP authority.
             await self.db.update_player(player)
             msg = f"{battle_msg}\n\n🎁 迎战奖励：修为 +{enemy_exp:,}{item_msg}"
             return (
@@ -719,7 +721,8 @@ class RiftManager:
                 {"pve_won": True, "exp": enemy_exp, "items": dropped_items},
             )
 
-        # 失败/平局：hp=1 已由战斗层写回，落库即可；基础结算奖励不受影响
+        # 失败/平局：HealthService 已持久化动态地板并同步内存；此处沿用
+        # 整行更新但非气血权威写点，基础结算奖励不受影响。
         await self.db.update_player(player)
         msg = f"{battle_msg}\n\n（未获胜，机缘已消耗；已完成的探索结算不受影响）"
         return True, msg, {"pve_won": False}
@@ -753,8 +756,8 @@ class RiftManager:
         # 应邀即消耗机缘（与旧内联路径"触发即消耗一次机会"口径一致）
         self.encounter_store.consume(user_id, KIND_LEGACY)
         won, battle_msg = await self.pve_combat_mgr.challenge_legacy_guardian(player)
-        # 守护战写回了 hp（失败下限 1），需显式落库——旧内联路径靠
-        # finish_exploration 末尾的统一 update_player 顺带持久化
+        # 守护战已由 HealthService 持久化并同步 current_hp；保留旧整行
+        # 更新以兼容后续奖励字段，但它不是气血权威写点。
         await self.db.update_player(player)
 
         if not won:

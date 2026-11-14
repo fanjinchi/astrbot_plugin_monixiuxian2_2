@@ -20,6 +20,7 @@ Covers design D1/D1.2 + D2:
    above (plus a repaid-after-snapshot guard so a closed loan never kills).
 """
 
+import asyncio
 import json
 import sys
 import time
@@ -655,6 +656,105 @@ async def test_store_item_standalone_still_refetches(db):
     assert ok, msg
     fresh = await db.get_player_by_id("u1")
     assert fresh.get_storage_ring_items() == {"青铜剑": 1, "玄铁": 1}
+
+
+@pytest.mark.asyncio
+async def test_store_item_foreign_cm_waits_then_merges_latest_player(db, monkeypatch):
+    """Two tasks storing different items must not overwrite each other's ring.
+
+    A owns a CM and pauses after storing 青铜剑. B then calls the real
+    ``store_item`` with a snapshot taken before A's write. The old depth-only
+    check treats A's foreign CM as B's own outer transaction, so B eventually
+    writes its stale whole Player row and loses 青铜剑. The fixed path waits
+    for A, rereads the player inside B's CM, and applies 玄铁 to that fresh row.
+    """
+    ring = StorageRingManager(db, FakeConfigManager())
+    await _make_player(db)
+    stale_b = await db.get_player_by_id("u1")
+    player_a = await db.get_player_by_id("u1")
+    a_stored = asyncio.Event()
+    release_a = asyncio.Event()
+    b_update_attempted = asyncio.Event()
+    b_cm_attempted = asyncio.Event()
+    b_task = None
+
+    original_update = db.update_player
+    original_transaction = db.transaction
+
+    async def observed_update(player):
+        if player is stale_b:
+            b_update_attempted.set()
+        await original_update(player)
+
+    def observed_transaction():
+        if b_task is not None and asyncio.current_task() is b_task:
+            b_cm_attempted.set()
+        return original_transaction()
+
+    monkeypatch.setattr(db, "update_player", observed_update)
+    monkeypatch.setattr(db, "transaction", observed_transaction)
+
+    async def store_as_owner():
+        async with db.transaction():
+            ok, msg = await ring.store_item(player_a, "青铜剑")
+            assert ok, msg
+            a_stored.set()
+            await release_a.wait()
+
+    async def store_from_stale_snapshot():
+        return await ring.store_item(stale_b, "玄铁")
+
+    owner_task = asyncio.create_task(store_as_owner())
+    await asyncio.wait_for(a_stored.wait(), timeout=2)
+    assert db.conn.in_transaction
+    assert (await db.get_player_by_id("u1")).get_storage_ring_items() == {"青铜剑": 1}
+
+    b_task = asyncio.create_task(store_from_stale_snapshot())
+    for _ in range(100):
+        if b_update_attempted.is_set() or b_cm_attempted.is_set():
+            break
+        await asyncio.sleep(0)
+    else:
+        pytest.fail("B never reached its write/transaction boundary")
+
+    assert b_cm_attempted.is_set()
+    assert not b_update_attempted.is_set(), "B must wait before writing its stale row"
+    assert db.conn._txn_owner_task is owner_task
+
+    release_a.set()
+    await asyncio.wait_for(asyncio.gather(owner_task, b_task), timeout=2)
+
+    fresh = await db.get_player_by_id("u1")
+    assert fresh.get_storage_ring_items() == {"青铜剑": 1, "玄铁": 1}
+    assert not db.conn.in_transaction
+    assert db.conn._txn_owner_task is None
+
+
+@pytest.mark.asyncio
+async def test_store_item_same_task_cm_join_does_not_reread_or_commit(db, monkeypatch):
+    """A same-task CM caller keeps its Player object and owns final commit."""
+    ring = StorageRingManager(db, FakeConfigManager())
+    await _make_player(db)
+    player = await db.get_player_by_id("u1")
+    original_get = db.get_player_by_id
+
+    async def unexpected_reread(user_id):
+        raise AssertionError(f"same-task store unexpectedly reread {user_id}")
+
+    monkeypatch.setattr(db, "get_player_by_id", unexpected_reread)
+    async with db.transaction() as txn:
+        ok, msg = await ring.store_item(player, "青铜剑")
+        assert ok, msg
+        assert db.conn.in_transaction
+        assert db.conn._txn_depth == 1
+        assert db.conn._txn_owner_task is asyncio.current_task()
+        txn.abort()
+
+    assert not db.conn.in_transaction
+    # Aborting the outer CM proves the inner store did not commit early.
+    monkeypatch.setattr(db, "get_player_by_id", original_get)
+    fresh = await original_get("u1")
+    assert fresh.get_storage_ring_items() == {}
 
 
 # ===== 7.5 bd 9jt：claim_interest / check_and_process_overdue_loans 补事务后的守约测试 =====
@@ -1467,9 +1567,7 @@ async def test_clear_all_cooldowns_rolls_back_and_keeps_fatigue(db, monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_clear_all_cooldowns_clears_fatigue_in_same_transaction(
-    db, monkeypatch
-):
+async def test_clear_all_cooldowns_clears_fatigue_in_same_transaction(db, monkeypatch):
     """S9 success path: all domains cleared, 休整 window cleared inside the CM."""
     uid = "u1"
     await _seed_clear_all_cooldowns_state(db, uid)

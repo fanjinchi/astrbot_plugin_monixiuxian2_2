@@ -721,6 +721,7 @@ ENEMY_CONFIG = {
 GAME_CONFIG = {
     "combat": {
         "crit_damage_multiplier": 1.5,
+        "base_crit_rate": 0.15,
         "action_limit": 200,
         "dodge_cap": 0.4,
         "block_cap": 0.3,

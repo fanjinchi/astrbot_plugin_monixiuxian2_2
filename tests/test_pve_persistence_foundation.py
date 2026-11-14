@@ -10,8 +10,8 @@
   Boss 每日次数封顶、贡献累积 sticky-last-hit、Outbox claim/lease/
   retry 水位/uncertain、FK 强制；
 - design §3 四条原子调用图：事务内抛错 → 全域零残留；成功 → 原子提交；
-- 叶子门控：事务内不提前提交（跨连接观察）、standalone 立即提交；
-- 静态审计：data/ 下 0 个未门控裸 ``conn.commit()``；
+- 叶子归属：首条 DML 前取得共享 owner；事务内不提前提交，standalone 提交；
+- 静态审计：仅事务生命周期 owner 可提交，叶子无写后 depth 门控或裸 BEGIN；
 - 时间模型：``shanghai_date_key`` 北京时间日界；健康锚点/结算记录/
   每日计数不参与 GM「时间快进」。
 
@@ -385,7 +385,8 @@ async def test_v39_adds_state_columns_to_published_v36_table(tmp_path):
         # 历史行不能被新代码读成「进行中/待选择」：默认值必须是合法终态
         assert (
             await _scalar(
-                conn, "SELECT state FROM adventure_settlements WHERE settlement_id='s_old'"
+                conn,
+                "SELECT state FROM adventure_settlements WHERE settlement_id='s_old'",
             )
             == "resolved_win"
         )
@@ -409,7 +410,9 @@ async def test_v39_adds_state_columns_to_published_v36_table(tmp_path):
         # 状态索引随增列补齐
         idx = {
             row[1]
-            for row in await _pragma_rows(conn, "PRAGMA index_list(adventure_settlements)")
+            for row in await _pragma_rows(
+                conn, "PRAGMA index_list(adventure_settlements)"
+            )
         }
         assert "idx_adventure_settlements_user_state" in idx
 
@@ -1509,8 +1512,9 @@ def test_time_skip_excludes_health_anchor_and_pve_history():
 _COMMIT_ALLOWLIST = {
     # owner 层：迁移链逐版本自提交，不在任何 CM 内
     "data/migration.py::MigrationManager.migrate_or_reset",
-    # _TransactionCM 本体：COMMIT/ROLLBACK 是 owner 职责本身
+    # Transaction lifecycle owners: COMMIT is the ownership duty itself.
     "data/data_manager.py::_TransactionCM.__aexit__",
+    "data/leaf_write.py::_LeafWriteCM.__aexit__",
 }
 
 
@@ -1533,44 +1537,8 @@ def _commit_calls(tree):
             yield node
 
 
-def _owner_local_names(fn):
-    """函数体内由 `... = <含 _txn_depth 的表达式>` 赋出的局部名（门控哨兵）。"""
-    names = set()
-    for node in ast.walk(fn):
-        if isinstance(node, ast.Assign) and "_txn_depth" in ast.dump(node.value):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    names.add(target.id)
-    return names
-
-
-def _enclosing_fn(node, parents):
-    cur = node
-    while cur is not None and not isinstance(
-        cur, (ast.FunctionDef, ast.AsyncFunctionDef)
-    ):
-        cur = parents.get(cur)
-    return cur
-
-
-def _is_gated(node, parents):
-    fn = _enclosing_fn(node, parents)
-    if fn is None:
-        return False
-    names = _owner_local_names(fn)
-    cur = parents.get(node)
-    while cur is not None and cur is not fn:
-        if isinstance(cur, ast.If):
-            test_dump = ast.dump(cur.test)
-            if "_txn_depth" in test_dump or any(
-                f"Name(id='{name}'" in test_dump for name in names
-            ):
-                return True
-        cur = parents.get(cur)
-    return False
-
-
 def _qualname(node, parents):
+    """Build a stable class/function-qualified name for audit diagnostics."""
     parts = []
     cur = node
     while cur is not None:
@@ -1581,7 +1549,8 @@ def _qualname(node, parents):
 
 
 def _scan_data_commits():
-    gated, raw = [], []
+    """Return every commit outside the explicit lifecycle-owner allowlist."""
+    raw = []
     for path in sorted((PLUGIN_ROOT / "data").rglob("*.py")):
         if "__pycache__" in path.parts:
             continue
@@ -1592,13 +1561,184 @@ def _scan_data_commits():
             qualname = _qualname(node, parents)
             if f"{rel}::{qualname}" in _COMMIT_ALLOWLIST:
                 continue
-            entry = (rel, node.lineno, qualname)
-            (gated if _is_gated(node, parents) else raw).append(entry)
-    return gated, raw
+            raw.append((rel, node.lineno, qualname))
+    return raw
 
 
 def test_no_ungated_commit_in_data_layer():
-    """事务叶子门控约定：data/ 的每个 conn.commit() 都在 _txn_depth 守卫之下。"""
-    gated, raw = _scan_data_commits()
-    assert raw == [], f"未门控的裸提交点（提前提交隐患）: {raw}"
-    assert len(gated) >= 40, f"门控提交点数量异常: {len(gated)}"
+    """Only the transaction lifecycle owners may commit a data connection."""
+    raw = _scan_data_commits()
+    assert raw == [], f"非 owner 裸提交点（提前提交隐患）: {raw}"
+
+
+def test_no_bare_commit_in_business_leaf_layers():
+    """Core, handler and manager writes must leave commit to the shared owner."""
+    violations = []
+    for root in ("core", "handlers", "managers"):
+        for path in sorted((PLUGIN_ROOT / root).rglob("*.py")):
+            if "__pycache__" in path.parts:
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            parents = _ast_parents(tree)
+            for node in _commit_calls(tree):
+                violations.append(
+                    f"{path.relative_to(PLUGIN_ROOT)}:{node.lineno} "
+                    f"{_qualname(node, parents)}"
+                )
+    assert violations == []
+
+
+_LEAF_OWNED_FILES = (
+    "data/data_manager.py",
+    "data/database_extended.py",
+    "data/pve_repository.py",
+    "core/health.py",
+    "handlers/combat_handlers.py",
+    "managers/bounty_manager.py",
+    "managers/dual_cultivation_manager.py",
+    "managers/spirit_eye_manager.py",
+    "managers/spirit_farm_manager.py",
+)
+
+
+def _is_leaf_decorator(decorator):
+    """Recognize the leaf_write_method decorator without importing product code."""
+    return (
+        isinstance(decorator, ast.Call)
+        and isinstance(decorator.func, ast.Name)
+        and decorator.func.id == "leaf_write_method"
+    )
+
+
+def _has_leaf_owner(node, parents):
+    """Whether DML is inside leaf_write, its decorator, or the shared CM."""
+    cur = node
+    while cur is not None:
+        if isinstance(cur, (ast.FunctionDef, ast.AsyncFunctionDef)) and any(
+            _is_leaf_decorator(decorator) for decorator in cur.decorator_list
+        ):
+            return True
+        if isinstance(cur, ast.AsyncWith) and any(
+            isinstance(item.context_expr, ast.Call)
+            and (
+                (
+                    isinstance(item.context_expr.func, ast.Name)
+                    and item.context_expr.func.id == "leaf_write"
+                )
+                or (
+                    isinstance(item.context_expr.func, ast.Attribute)
+                    and item.context_expr.func.attr == "transaction"
+                )
+            )
+            for item in cur.items
+        ):
+            return True
+        cur = parents.get(cur)
+    return False
+
+
+def _literal_dml(node, parents):
+    """Return whether conn.execute starts with a literal INSERT/UPDATE/DELETE."""
+    if not (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "execute"
+        and node.args
+    ):
+        return False
+    sql = node.args[0]
+    if not isinstance(sql, ast.Constant) or not isinstance(sql.value, str):
+        # delete_player_cascade's nested safe_execute receives DML as a parameter.
+        return _qualname(node, parents).endswith(".safe_execute")
+    return sql.value.lstrip().split(None, 1)[0].upper() in {
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "REPLACE",
+    }
+
+
+def test_all_leaf_dml_acquires_ownership_before_execution():
+    """Every DML in the migrated write modules runs under an ownership context."""
+    violations = []
+    owned_dml = 0
+    for rel in _LEAF_OWNED_FILES:
+        path = PLUGIN_ROOT / rel
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        parents = _ast_parents(tree)
+        for node in ast.walk(tree):
+            if _literal_dml(node, parents):
+                if _has_leaf_owner(node, parents):
+                    owned_dml += 1
+                else:
+                    violations.append(
+                        f"{rel}:{node.lineno} {_qualname(node, parents)} lacks leaf_write"
+                    )
+    assert violations == []
+    assert owned_dml >= 70, f"migrated DML coverage unexpectedly low: {owned_dml}"
+
+
+def test_no_legacy_transaction_ownership_protocol_in_production():
+    """Only lifecycle owners may use depth, own_txn, or a literal raw BEGIN."""
+    violations = []
+    for root in ("data", "core", "handlers", "managers"):
+        for path in sorted((PLUGIN_ROOT / root).rglob("*.py")):
+            if "__pycache__" in path.parts:
+                continue
+            rel = path.relative_to(PLUGIN_ROOT).as_posix()
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            parents = _ast_parents(tree)
+            for node in ast.walk(tree):
+                qualname = _qualname(node, parents)
+                if (isinstance(node, ast.Attribute) and node.attr == "_txn_depth") or (
+                    isinstance(node, ast.Constant) and node.value == "_txn_depth"
+                ):
+                    depth_owner = (
+                        rel == "data/data_manager.py"
+                        and qualname
+                        in {
+                            "_TransactionCM.__aenter__",
+                            "_TransactionCM.__aexit__",
+                            "DataBase.connect",
+                        }
+                    ) or (
+                        rel == "data/leaf_write.py"
+                        and qualname
+                        in {
+                            "_ensure_txn_ownership",
+                            "_LeafWriteCM.__aenter__",
+                            "_LeafWriteCM.__aexit__",
+                        }
+                    )
+                    if not depth_owner:
+                        violations.append(f"{rel}:{node.lineno} depth in {qualname}")
+                if isinstance(node, ast.Name) and node.id == "own_txn":
+                    violations.append(f"{rel}:{node.lineno} own_txn in {qualname}")
+                if (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "execute"
+                    and node.args
+                    and isinstance(node.args[0], ast.Constant)
+                    and isinstance(node.args[0].value, str)
+                    and node.args[0].value.strip().upper().startswith("BEGIN")
+                ):
+                    begin_owner = (
+                        (
+                            rel == "data/data_manager.py"
+                            and qualname == "_TransactionCM.__aenter__"
+                        )
+                        or (
+                            rel == "data/leaf_write.py"
+                            and qualname == "_LeafWriteCM.__aenter__"
+                        )
+                        or (
+                            rel == "data/migration.py"
+                            and qualname.startswith("MigrationManager.")
+                        )
+                    )
+                    if not begin_owner:
+                        violations.append(
+                            f"{rel}:{node.lineno} raw BEGIN in {qualname}"
+                        )
+    assert violations == []

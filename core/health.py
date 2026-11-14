@@ -33,20 +33,26 @@ core/time_skip_registry.TIME_SKIP_ENTRIES
 tests/test_player_health_foundation.py pins this boundary).
 
 Restart-safe and idempotent: anchor == 0 only adopts the clock (no epoch
-retro-heal); repeated reads in the same minute are no-ops; helpers gate
-their commit on conn._txn_depth so a settle joining an outer transaction
-spec (database-guidelines D2) rolls back atomically with it.
+retro-heal); repeated reads in the same minute are no-ops; write helpers use
+the shared leaf-write owner so a settle joining an outer transaction rolls
+back atomically with it.
 """
 
+import math
 import time
 
 try:
     from ..data import DataBase
+    from ..data.leaf_write import leaf_write_method
     from ..models import Player
 except ImportError:  # standalone (tests) fallback, same idiom as busy_state.py
+    from data.leaf_write import leaf_write_method
+
     DataBase = object
     Player = object
 
+# Shared PVE defeat floor: 1% of dynamic max_hp (pve-enemy-design §Q4).
+DEFEAT_HP_FLOOR_RATIO = 0.01
 # 每分钟恢复动态 max_hp 的百分比（父设计 PVE: 气血战后自然恢复 1%/min）。
 RECOVERY_RATE_PER_MINUTE = 0.01
 SECONDS_PER_MINUTE = 60
@@ -102,6 +108,18 @@ class HealthService:
         attrs = player.get_total_attributes(equipped, pill_multipliers=None)
         return max(1, int(attrs["max_hp"]))
 
+    def defeat_hp_floor(self, player: Player) -> int:
+        """Return the shared PVE loss/draw HP floor.
+
+        Args:
+            player: Player whose dynamic max HP includes current equipment,
+                techniques and heart methods.
+
+        Returns:
+            ``ceil(dynamic_max_hp * DEFEAT_HP_FLOOR_RATIO)``, at least 1.
+        """
+        return max(1, math.ceil(self.compute_max_hp(player) * DEFEAT_HP_FLOOR_RATIO))
+
     # ------------------------------------------------------------------
     # lazy recovery settlement
     # ------------------------------------------------------------------
@@ -155,16 +173,15 @@ class HealthService:
         await self._write_anchor(user_id, new_current, new_anchor)
         return new_current
 
+    @leaf_write_method()
     async def _write_anchor(self, user_id: str, current_hp: int, anchor: int) -> None:
+        """Persist current HP and its recovery anchor under the shared leaf owner."""
         conn = self._db.conn
         await conn.execute(
             "UPDATE players SET current_hp = ?, health_recovered_at = ? "
             "WHERE user_id = ?",
             (int(current_hp), int(anchor), user_id),
         )
-        # D2 ownership gate: commit only outside an active CM transaction.
-        if getattr(conn, "_txn_depth", 0) == 0:
-            await conn.commit()
 
     def _max_from_row(self, data: dict) -> int:
         """max_hp for a raw players row without loading the full Player.
@@ -209,14 +226,14 @@ class HealthService:
             "max_hp": max_hp,
         }
 
+    @leaf_write_method()
     async def _persist_current(self, user_id: str, current_hp: int) -> None:
+        """Persist current HP under the shared leaf owner."""
         conn = self._db.conn
         await conn.execute(
             "UPDATE players SET current_hp = ? WHERE user_id = ?",
             (int(current_hp), user_id),
         )
-        if getattr(conn, "_txn_depth", 0) == 0:
-            await conn.commit()
 
     async def clamp_current_hp(self, player: Player) -> int:
         """Re-assert 0 <= current_hp <= max_hp after max_hp may have dropped.

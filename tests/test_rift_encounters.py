@@ -479,7 +479,12 @@ def _make_pve_env():
         crit_rate=0,
     )
     enemy_mgr.spawn_enemy_from_group.return_value = guardian
-    pve = PVECombatManager(MagicMock(engine=engine), enemy_mgr)
+    health = MagicMock()
+    health.defeat_hp_floor = MagicMock(return_value=12)
+    health.set_current_hp = AsyncMock(
+        side_effect=lambda player, value: setattr(player, "current_hp", value) or value
+    )
+    pve = PVECombatManager(MagicMock(engine=engine), enemy_mgr, health_service=health)
     return pve, engine, enemy_mgr, guardian
 
 
@@ -501,7 +506,7 @@ def _combat_result(
 async def test_challenge_rift_beast_directed_group_win():
     pve, engine, enemy_mgr, guardian = _make_pve_env()
     engine.resolve_combat.return_value = _combat_result(
-        "fighter1", winner_id="player_001"
+        "fighter1", winner_id="player_001", player_hp=0
     )
     player = SimpleNamespace(user_id="player_001", level_index=10, current_hp=500)
 
@@ -511,7 +516,8 @@ async def test_challenge_rift_beast_directed_group_win():
     enemy_mgr.spawn_enemy.assert_not_called()
     assert outcome.won is True and outcome.draw is False
     assert outcome.enemy_exp == 1234
-    assert player.current_hp == 300  # 胜利按战斗结果写回
+    assert player.current_hp == 0  # 胜场不套败场地板
+    pve.health_service.set_current_hp.assert_awaited_once_with(player, 0)
     assert "石傀儡" in outcome.battle_msg
 
 
@@ -529,7 +535,8 @@ async def test_challenge_rift_beast_guardian_prefixed_enemy_win_is_loss():
 
     assert outcome.won is False
     assert outcome.draw is False
-    assert player.current_hp == 1  # 失败不致死但气血降为 1
+    assert player.current_hp == 12
+    pve.health_service.set_current_hp.assert_awaited_once_with(player, 12)
 
 
 @pytest.mark.asyncio
@@ -542,7 +549,37 @@ async def test_challenge_rift_beast_draw_is_not_a_win():
 
     assert outcome.won is False
     assert outcome.draw is True  # 平局单列
-    assert player.current_hp == 1
+    assert player.current_hp == 12
+    pve.health_service.set_current_hp.assert_awaited_once_with(player, 12)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("winner_side", "winner_id", "player_hp", "expected_won", "expected_hp"),
+    [
+        ("fighter1", "player_001", 0, True, 0),
+        ("fighter2", "guardian_stone_golem_1_ab12", 0, False, 12),
+        ("draw", None, 0, False, 12),
+        ("fighter2", "guardian_stone_golem_1_ab12", 20, False, 20),
+    ],
+)
+async def test_challenge_legacy_guardian_hp_writeback(
+    winner_side, winner_id, player_hp, expected_won, expected_hp
+):
+    """Guardian wins keep the engine value; losses/draws clamp to at least the floor."""
+    pve, engine, enemy_mgr, _ = _make_pve_env()
+    enemy_mgr.get_guardian_group_key.return_value = "guardian_test"
+    engine.resolve_combat.return_value = _combat_result(
+        winner_side, winner_id=winner_id, player_hp=player_hp
+    )
+    player = SimpleNamespace(user_id="player_001", level_index=10, current_hp=500)
+
+    won, msg = await pve.challenge_legacy_guardian(player)
+
+    assert won is expected_won
+    assert player.current_hp == expected_hp
+    pve.health_service.set_current_hp.assert_awaited_once_with(player, expected_hp)
+    assert f"💚 剩余气血：{expected_hp}" in msg
 
 
 @pytest.mark.asyncio

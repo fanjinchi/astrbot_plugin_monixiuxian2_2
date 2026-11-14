@@ -1099,8 +1099,8 @@ class GMManager:
         # force-settle 例外（design §D3）：仅上移 scheduled_time，走窄写直连
         # update_user_cd_fields——BusyState 的断言/镜像语义不适用于 GM 强制结算。
         # 用窄写而不是 update_user_cd 整行回写：陈旧快照晚一步落地会把玩家已经
-        # 收尾的忙碌复活成原状态（busy 只看 type，复活后重启不自愈）。窄写的提交
-        # 仍按 _txn_depth 门控。child A AC4：本入口仍是权威的 user_cd 写点——
+        # 收尾的忙碌复活成原状态（busy 只看 type，复活后重启不自愈）。窄写由
+        # 共享 leaf_write 按任务所有权串行并在最外层提交。child A AC4：本入口仍是权威的 user_cd 写点——
         # 同一事务内先结算旧状态并前移恢复锚点。
         async with self.db.transaction():
             if self.health_service is not None:
@@ -1205,8 +1205,8 @@ class GMManager:
         # force-settle 例外（design §D3）：仅上移 scheduled_time，走窄写直连
         # update_user_cd_fields——BusyState 的断言/镜像语义不适用于 GM 强制结算。
         # 用窄写而不是 update_user_cd 整行回写：陈旧快照晚一步落地会把玩家已经
-        # 收尾的忙碌复活成原状态（busy 只看 type，复活后重启不自愈）。窄写的提交
-        # 仍按 _txn_depth 门控。child A AC4：本入口仍是权威的 user_cd 写点——
+        # 收尾的忙碌复活成原状态（busy 只看 type，复活后重启不自愈）。窄写由
+        # 共享 leaf_write 按任务所有权串行并在最外层提交。child A AC4：本入口仍是权威的 user_cd 写点——
         # 同一事务内先结算旧状态并前移恢复锚点。
         async with self.db.transaction():
             if self.health_service is not None:

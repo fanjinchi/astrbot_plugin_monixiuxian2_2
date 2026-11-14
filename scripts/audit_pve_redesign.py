@@ -9,7 +9,7 @@ the task docs now say "run this, expect exit 0" instead of copying greps.
 Scopes map to Trellis children:
 
 - ``e1``: cross-system cleanup (health floor single source, legacy ``Player.hp``
-  zeroing, bare-commit gating, crit materialization on both build points).
+  zeroing, transaction-owner-only commits, crit materialization on both build points).
 - ``e2``: old-Boss removal (code / config triple / table version / keys /
   player-visible copy) plus the content-activation guards.
 - ``all``: both.
@@ -78,6 +78,47 @@ def _iter_py_files() -> list[Path]:
     return files
 
 
+def _qualname(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> str:
+    """Return the class/function-qualified name of an AST node."""
+    parts = []
+    current = node
+    while current is not None:
+        if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            parts.append(current.name)
+        current = parents.get(current)
+    return ".".join(reversed(parts))
+
+
+def _is_defeat_floor_formula(node: ast.AST) -> bool:
+    """Return whether a ceil call recomputes an HP-times-ratio defeat floor."""
+    if not (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "ceil"
+    ):
+        return False
+    for candidate in ast.walk(node):
+        if not isinstance(candidate, ast.BinOp) or not isinstance(
+            candidate.op, ast.Mult
+        ):
+            continue
+        names = [
+            item.id if isinstance(item, ast.Name) else item.attr
+            for item in ast.walk(candidate)
+            if isinstance(item, (ast.Name, ast.Attribute))
+        ]
+        has_hp = any("hp" in name.lower() for name in names)
+        has_ratio = any(
+            "ratio" in name.lower() or "floor" in name.lower() for name in names
+        ) or any(
+            isinstance(item, ast.Constant) and item.value == 0.01
+            for item in ast.walk(candidate)
+        )
+        if has_hp and has_ratio:
+            return True
+    return False
+
+
 def _scan_words(
     words: tuple[str, ...], skip_paths: tuple[str, ...] = ()
 ) -> list[Finding]:
@@ -108,6 +149,23 @@ def check_e1(report: Report) -> None:
     for f in ratio_sites:
         if f.path not in allowed and not f.path.startswith("tests/"):
             report.add("e1.floor-single-source", f.path, f.line, f.text)
+
+    # Constant allowlists alone miss renamed/local formula copies. Match the
+    # AST shape ceil(hp * ratio), not merely the shared constant's spelling.
+    for path in _iter_py_files():
+        rel = path.relative_to(ROOT).as_posix()
+        if rel == "core/health.py" or rel.startswith(("tests/", "scripts/")):
+            continue
+        text = path.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        for node in ast.walk(ast.parse(text)):
+            if _is_defeat_floor_formula(node):
+                report.add(
+                    "e1.floor-formula-single-source",
+                    rel,
+                    node.lineno,
+                    lines[node.lineno - 1],
+                )
 
     # 2. No ambiguous Player.hp attribute reads outside the legacy Boss module
     #    (legacy module is removed by E2).
@@ -154,40 +212,108 @@ def check_e1(report: Report) -> None:
                     lines[node.lineno - 1],
                 )
 
-    # 4. A commit is gated only by an enclosing if condition on _txn_depth;
-    #    another function using the idiom must not whitelist the whole file.
-    for d in ("handlers", "managers", "core", "utils"):
+    # 4. Only transaction lifecycle owners may commit. A post-write depth
+    #    gate is not an ownership boundary and no longer whitewashes a commit.
+    commit_owners = {
+        "data/data_manager.py::_TransactionCM.__aexit__",
+        "data/leaf_write.py::_LeafWriteCM.__aexit__",
+        "data/migration.py::MigrationManager.migrate_or_reset",
+    }
+    for d in ("handlers", "managers", "core", "utils", "data"):
         for path in sorted((ROOT / d).rglob("*.py")):
             text = path.read_text(encoding="utf-8")
             lines = text.splitlines()
             tree = ast.parse(text)
-            commits = [
-                node
-                for node in ast.walk(tree)
-                if isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and node.func.attr == "commit"
-            ]
-            gated_lines: set[int] = set()
+            parents = {
+                child: parent
+                for parent in ast.walk(tree)
+                for child in ast.iter_child_nodes(parent)
+            }
+            rel = path.relative_to(ROOT).as_posix()
             for node in ast.walk(tree):
-                if not isinstance(node, ast.If) or not any(
-                    (isinstance(child, ast.Attribute) and child.attr == "_txn_depth")
-                    or (isinstance(child, ast.Constant) and child.value == "_txn_depth")
-                    for child in ast.walk(node.test)
+                qualname = _qualname(node, parents)
+
+                if (isinstance(node, ast.Attribute) and node.attr == "_txn_depth") or (
+                    isinstance(node, ast.Constant) and node.value == "_txn_depth"
                 ):
-                    continue
-                for statement in node.body:
-                    for child in ast.walk(statement):
-                        if child in commits:
-                            gated_lines.add(child.lineno)
-            for node in commits:
-                if node.lineno not in gated_lines:
+                    depth_owner = (
+                        rel == "data/data_manager.py"
+                        and qualname
+                        in {
+                            "_TransactionCM.__aenter__",
+                            "_TransactionCM.__aexit__",
+                            "DataBase.connect",
+                        }
+                    ) or (
+                        rel == "data/leaf_write.py"
+                        and qualname
+                        in {
+                            "_ensure_txn_ownership",
+                            "_LeafWriteCM.__aenter__",
+                            "_LeafWriteCM.__aexit__",
+                        }
+                    )
+                    if not depth_owner:
+                        report.add(
+                            "e1.legacy-depth-gate",
+                            rel,
+                            node.lineno,
+                            lines[node.lineno - 1],
+                        )
+
+                if isinstance(node, ast.Name) and node.id == "own_txn":
                     report.add(
-                        "e1.ungated-commit",
-                        path.relative_to(ROOT).as_posix(),
+                        "e1.legacy-own-txn",
+                        rel,
                         node.lineno,
                         lines[node.lineno - 1],
                     )
+
+                if (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "execute"
+                    and node.args
+                    and isinstance(node.args[0], ast.Constant)
+                    and isinstance(node.args[0].value, str)
+                    and node.args[0].value.strip().upper().startswith("BEGIN")
+                ):
+                    begin_owner = (
+                        (
+                            rel == "data/data_manager.py"
+                            and qualname == "_TransactionCM.__aenter__"
+                        )
+                        or (
+                            rel == "data/leaf_write.py"
+                            and qualname == "_LeafWriteCM.__aenter__"
+                        )
+                        or (
+                            rel == "data/migration.py"
+                            and qualname.startswith("MigrationManager.")
+                        )
+                    )
+                    if not begin_owner:
+                        report.add(
+                            "e1.leaf-raw-begin",
+                            rel,
+                            node.lineno,
+                            lines[node.lineno - 1],
+                        )
+
+                if not (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "commit"
+                ):
+                    continue
+                if f"{rel}::{qualname}" in commit_owners:
+                    continue
+                report.add(
+                    "e1.ungated-commit",
+                    rel,
+                    node.lineno,
+                    lines[node.lineno - 1],
+                )
 
     # 5. Crit materialization: config key present in both the live config and
     #    the defaults, and both build points actually read it.

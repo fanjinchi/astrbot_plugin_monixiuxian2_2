@@ -38,20 +38,77 @@ def _prepare_e1_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 def test_clean_e1_fixture_has_no_findings(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A clean fixture with a correctly gated commit passes the E1 audit."""
+    """A clean fixture without business-layer commits passes the E1 audit."""
     _prepare_e1_root(tmp_path, monkeypatch)
     _write(
         tmp_path,
         "managers/clean.py",
-        "async def clean(self):\n"
-        '    if getattr(self.db.conn, "_txn_depth", 0) == 0:\n'
-        "        await self.db.conn.commit()\n",
+        "async def clean(self):\n    await self.db.update_player(player)\n",
     )
 
     report = _audit.Report()
     _audit.check_e1(report)
 
     assert report.findings == []
+
+
+@pytest.mark.parametrize(
+    "formula",
+    [
+        "math.ceil(max_hp * DEFEAT_HP_FLOOR_RATIO)",
+        "math.ceil(player.base_hp * local_ratio)",
+    ],
+)
+def test_duplicate_defeat_floor_formula_is_detected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, formula: str
+) -> None:
+    """The old fallback and a renamed equivalent both fail the formula-level gate."""
+    _prepare_e1_root(tmp_path, monkeypatch)
+    _write(
+        tmp_path,
+        "managers/adventure_manager.py",
+        "import math\n"
+        "class AdventureManager:\n"
+        "    def _defeat_hp_floor(self, player):\n"
+        "        max_hp = player.base_hp\n"
+        "        local_ratio = 0.01\n"
+        f"        return max(1, {formula})\n",
+    )
+
+    report = _audit.Report()
+    _audit.check_e1(report)
+
+    findings = [
+        finding
+        for finding in report.findings
+        if finding.contract == "e1.floor-formula-single-source"
+    ]
+    assert [(finding.path, finding.line) for finding in findings] == [
+        ("managers/adventure_manager.py", 6)
+    ]
+
+
+def test_health_domain_remains_the_only_allowed_floor_formula(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The canonical HealthService formula does not self-hit the audit."""
+    _prepare_e1_root(tmp_path, monkeypatch)
+    _write(
+        tmp_path,
+        "core/health.py",
+        "import math\n"
+        "def defeat_hp_floor(player):\n"
+        "    return max(1, math.ceil(player.max_hp * DEFEAT_HP_FLOOR_RATIO))\n",
+    )
+
+    report = _audit.Report()
+    _audit.check_e1(report)
+
+    assert not [
+        finding
+        for finding in report.findings
+        if finding.contract == "e1.floor-formula-single-source"
+    ]
 
 
 def test_scanner_excludes_only_itself_from_scripts(
@@ -120,10 +177,10 @@ def test_real_hardcoded_hp_floor_is_detected(
     ] == [("e1.no-hardcoded-floor", "managers/pve_combat_manager.py", statement)]
 
 
-def test_commit_gate_is_checked_per_statement_not_per_file(
+def test_every_non_owner_commit_is_rejected(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A gated function does not hide a bare commit in another function."""
+    """Both raw and legacy post-write-gated business commits are rejected."""
     _prepare_e1_root(tmp_path, monkeypatch)
     _write(
         tmp_path,
@@ -145,7 +202,92 @@ def test_commit_gate_is_checked_per_statement_not_per_file(
         if finding.contract == "e1.ungated-commit"
     ]
     assert [(finding.path, finding.line) for finding in findings] == [
-        ("managers/dual_cultivation_manager.py", 3)
+        ("managers/dual_cultivation_manager.py", 3),
+        ("managers/dual_cultivation_manager.py", 6),
+    ]
+
+
+def test_commit_allowlist_is_per_lifecycle_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An owner file does not hide commits in its unrelated functions."""
+    _prepare_e1_root(tmp_path, monkeypatch)
+    _write(
+        tmp_path,
+        "data/leaf_write.py",
+        "class _LeafWriteCM:\n"
+        "    async def __aexit__(self):\n"
+        "        await self.conn.commit()\n"
+        "    async def unrelated(self):\n"
+        "        await self.conn.commit()\n",
+    )
+
+    report = _audit.Report()
+    _audit.check_e1(report)
+
+    findings = [
+        finding
+        for finding in report.findings
+        if finding.contract == "e1.ungated-commit"
+    ]
+    assert [(finding.path, finding.line) for finding in findings] == [
+        ("data/leaf_write.py", 5)
+    ]
+
+
+def test_storage_ring_style_foreign_depth_gate_is_detected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The rejected storage-ring depth-only branch is visible to the E1 audit."""
+    _prepare_e1_root(tmp_path, monkeypatch)
+    _write(
+        tmp_path,
+        "core/storage_ring_manager.py",
+        "class StorageRingManager:\n"
+        "    async def store_item(self):\n"
+        '        if getattr(self.db.conn, "_txn_depth", 0) > 0:\n'
+        "            return await self._store_item_inner(player)\n",
+    )
+
+    report = _audit.Report()
+    _audit.check_e1(report)
+
+    findings = [
+        finding
+        for finding in report.findings
+        if finding.contract == "e1.legacy-depth-gate"
+    ]
+    assert [(finding.path, finding.line) for finding in findings] == [
+        ("core/storage_ring_manager.py", 3)
+    ]
+
+
+def test_legacy_own_txn_and_raw_begin_are_detected_globally(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Legacy leaf transaction shapes outside the original nine files fail."""
+    _prepare_e1_root(tmp_path, monkeypatch)
+    _write(
+        tmp_path,
+        "handlers/legacy.py",
+        "async def write(self):\n"
+        '    own_txn = getattr(self.db.conn, "_txn_depth", 0) == 0\n'
+        '    await self.db.conn.execute("BEGIN IMMEDIATE")\n',
+    )
+
+    report = _audit.Report()
+    _audit.check_e1(report)
+
+    findings = [
+        (finding.contract, finding.path, finding.line)
+        for finding in report.findings
+        if finding.contract
+        in {"e1.legacy-depth-gate", "e1.legacy-own-txn", "e1.leaf-raw-begin"}
+    ]
+    assert sorted(findings) == [
+        ("e1.leaf-raw-begin", "handlers/legacy.py", 3),
+        ("e1.legacy-depth-gate", "handlers/legacy.py", 2),
+        ("e1.legacy-own-txn", "handlers/legacy.py", 2),
     ]
 
 

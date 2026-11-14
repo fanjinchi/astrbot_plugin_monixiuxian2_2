@@ -5,6 +5,7 @@ import random
 import time
 
 from ..data import DataBase
+from ..data.leaf_write import leaf_write_method
 from ..models import Player
 
 __all__ = ["SpiritEyeManager"]
@@ -55,6 +56,7 @@ class SpiritEyeManager:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
 
+    @leaf_write_method()
     async def spawn_spirit_eye(self) -> tuple[bool, str]:
         """生成新灵眼（定时调用）"""
         # 随机生成灵眼类型
@@ -76,7 +78,6 @@ class SpiritEyeManager:
             """,
             (eye_type, config["name"], config["exp_per_hour"], int(time.time())),
         )
-        await self.db.conn.commit()
 
         return True, f"天地间出现了一处【{config['name']}】！速来抢占！"
 
@@ -171,6 +172,7 @@ class SpiritEyeManager:
             f"获得修为：+{exp_income:,}"
         )
 
+    @leaf_write_method()
     async def release_spirit_eye(self, user_id: str) -> tuple[bool, str]:
         """释放灵眼"""
         eye = await self.get_user_spirit_eye(user_id)
@@ -184,7 +186,6 @@ class SpiritEyeManager:
             """,
             (user_id,),
         )
-        await self.db.conn.commit()
 
         return True, f"已释放【{eye['eye_name']}】。"
 

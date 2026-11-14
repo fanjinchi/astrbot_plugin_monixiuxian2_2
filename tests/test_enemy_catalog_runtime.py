@@ -107,6 +107,7 @@ class TestFourLayerConsistency:
         assert fighter.block_armor_value == profile.armor_value  # design D2
         assert fighter.level_index == profile.level_index  # 修坑 #5：K 按实际等级
         assert fighter.weapon_k == 0.5 and fighter.base_damage == 5  # 附录 C.4
+        assert fighter.crit_rate == pytest.approx(0.15)
 
         # 机制映射（与验收门 sim 常量同源）
         if row["tier"] == "boss":
@@ -150,6 +151,7 @@ class TestFourLayerConsistency:
         # 签名技能按附录 F 定案参数进载体/战斗档案
         fighter = _catalog.build_enemy_fighter(_catalog.profile_to_enemy(profile, 1.0))
         assert fighter.level_index == profile.level_index
+        assert fighter.crit_rate == pytest.approx(0.15)
         assert [dict(s) for s in fighter.trigger_skills] == (
             _schema.WORLD_BOSS_SIGNATURE_SKILLS[row["skill_key"]]["trigger_skills"]
         )
@@ -408,6 +410,58 @@ class TestFighterMapper:
         assert fighter.weapon_k == 0.5 and fighter.base_damage == 5
         assert fighter.trigger_skills == [] and fighter.ultimates == []
         assert fighter.block_armor_value == 3
+
+    def test_base_crit_rate_fallback_and_per_enemy_override(self):
+        enemy = _emod.Enemy(
+            user_id="e-crit",
+            name="妖兽",
+            hp=50,
+            max_hp=50,
+            damage=10,
+            agility=5,
+            speed=6,
+            armor_value=3,
+            exp=100,
+            crit_rate=0,
+        )
+        assert _catalog.build_enemy_fighter(
+            enemy, base_crit_rate=0.27
+        ).crit_rate == pytest.approx(0.27)
+        enemy.crit_rate = 8
+        assert _catalog.build_enemy_fighter(
+            enemy, base_crit_rate=0.27
+        ).crit_rate == pytest.approx(0.08)
+
+    @pytest.mark.parametrize(
+        ("combat", "expected"),
+        [
+            ({"base_crit_rate": 0.27}, 0.27),
+            ({"base_crit_rate": None}, 0.15),
+            ({"base_crit_rate": 0}, 0),
+            ({}, 0.15),
+        ],
+    )
+    def test_pve_manager_reads_base_crit_rate_from_config_manager(
+        self, combat, expected
+    ):
+        mgr = _pve.PVECombatManager.__new__(_pve.PVECombatManager)
+        mgr.config_manager = SimpleNamespace(game_config={"combat": combat})
+        enemy = _emod.Enemy(
+            user_id="e-crit-config",
+            name="妖兽",
+            hp=50,
+            max_hp=50,
+            damage=10,
+            agility=5,
+            speed=6,
+            armor_value=3,
+            exp=100,
+            crit_rate=0,
+        )
+
+        fighter = mgr._build_enemy_fighter(enemy)
+
+        assert fighter.crit_rate == pytest.approx(expected)
 
     def test_pve_manager_delegates_to_single_mapper(self):
         mgr = _pve.PVECombatManager.__new__(_pve.PVECombatManager)

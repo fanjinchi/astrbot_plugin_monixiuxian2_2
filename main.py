@@ -309,6 +309,7 @@ class XiuXianPlugin(Star):
             combat_mgr,
             enemy_mgr,
             self.config_manager,
+            health_service=health_service,
         )
         sect_mgr = SectManager(
             self.db,

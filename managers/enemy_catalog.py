@@ -91,7 +91,7 @@ class EnemyCombatProfile:
         agility: absolute agility panel value.
         speed: absolute speed panel value.
         armor_value: absolute armor panel value.
-        crit_rate: raw percent value (0 means "use the engine base crit rate").
+        crit_rate: raw percent value (0 means "use the shared base crit rate").
         affix: elite affix name, else empty string.
         boss_skill: boss mechanic name, else empty string.
         trigger_skills: materialized trigger-skill dicts (sync output).
@@ -316,7 +316,7 @@ def profile_to_enemy(
     )
 
 
-def build_enemy_fighter(enemy: Enemy) -> FighterState:
+def build_enemy_fighter(enemy: Enemy, base_crit_rate: float = 0.15) -> FighterState:
     """The single Enemy → FighterState mapper (roster/dynamic/group shared, R3).
 
     Field-for-field aligned with the acceptance-gate
@@ -330,13 +330,16 @@ def build_enemy_fighter(enemy: Enemy) -> FighterState:
     - ``level_index`` passes through (pit #5 fixed: armor mitigation
       K=100+10×defender level no longer stuck at 1); carriers without it
       (old Enemy instances, 0) keep the engine default 1 — point-compatible.
-    - ``crit_rate`` > 0 overrides the engine base crit as percent/100 (Step 3
-      decision, pit #3); 0/absent keeps the default.
+    - ``crit_rate`` > 0 overrides ``base_crit_rate`` as percent/100 (Step 3
+      decision, pit #3); 0/absent uses the shared config-backed fallback.
     - trigger_skills/ultimates pass through verbatim (pit fixed: boss
       mechanics previously never reached the battle).
 
     Args:
         enemy: any enemy carrier (roster-spawned or legacy dynamic).
+        base_crit_rate: Shared ``combat.base_crit_rate`` fallback. A positive
+            per-enemy percentage still takes precedence; None is normalized by
+            the PVE caller to 0.15.
 
     Returns:
         FighterState ready for ``CombatEngine.resolve_combat``.
@@ -363,6 +366,8 @@ def build_enemy_fighter(enemy: Enemy) -> FighterState:
     if crit_rate > 0:
         # 名册/组模板存百分数原值（8 = 8%）；FighterState 用小数。
         kwargs["crit_rate"] = crit_rate / 100.0
+    else:
+        kwargs["crit_rate"] = base_crit_rate
     skills = getattr(enemy, "trigger_skills", None)
     if skills:
         kwargs["trigger_skills"] = [dict(s) for s in skills]

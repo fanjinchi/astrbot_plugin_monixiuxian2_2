@@ -528,6 +528,34 @@ class TestFullCombat:
 
 
 class TestLegacyAdapter:
+    @pytest.mark.asyncio
+    async def test_duel_uses_zero_to_one_clamp_not_pve_defeat_floor(self):
+        """PvP keeps its 1-point minimum and max-HP clamp, not the PVE 1% floor."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        mgr = CombatManager(FakeConfigManager(), FakeSkillManager())
+        f1 = make_fighter("A", 1000, 50, 5, 10)
+        f2 = make_fighter("B", 80, 50, 5, 10)
+        mgr.engine = MagicMock()
+        mgr.engine.build_fighter_from_player = AsyncMock(side_effect=[f1, f2])
+        mgr.engine.resolve_combat.return_value = _mod.CombatResult(
+            winner_side="fighter2",
+            winner_id="B",
+            combat_log=[],
+            fighter1_final_hp=0,
+            fighter2_final_hp=999,
+            rounds=1,
+            total_actions=1,
+        )
+
+        result = await mgr.player_vs_player(
+            FakePlayer(user_id="A"), FakePlayer(user_id="B"), combat_type=2
+        )
+
+        # A 1% PVE floor on max_hp=1000 would be 10; PvP deliberately remains 1.
+        assert result["player1_final_hp"] == 1
+        assert result["player2_final_hp"] == 80
+
     def test_legacy_player_vs_player_returns_dict(self):
         """Legacy player_vs_player should return the expected dict shape."""
         config = FakeConfigManager(
@@ -630,6 +658,29 @@ class FakePlayer:
 
 
 class TestBuildFighterFromPlayer:
+    @pytest.mark.parametrize(
+        ("combat", "expected"),
+        [
+            ({}, 0.15),
+            ({"base_crit_rate": None}, 0.15),
+            ({"base_crit_rate": 0}, 0),
+            ({"base_crit_rate": 0.23}, 0.23),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_base_crit_rate_flows_into_player_fighter(self, combat, expected):
+        """Missing/None use 0.15, zero is preserved, and real combat accepts the value."""
+        engine = CombatEngine(FakeConfigManager({"combat": combat}), FakeSkillManager())
+
+        fighter = await engine.build_fighter_from_player(FakePlayer())
+
+        assert fighter.crit_rate == pytest.approx(expected)
+        engine.resolve_combat(
+            fighter,
+            make_fighter("crit-target", hp=1, damage=1, agility=1, speed=1),
+            combat_type="pve",
+        )
+
     @pytest.mark.asyncio
     async def test_equipment_bonuses_applied_to_fighter(self):
         """FighterState damage/hp/armor include equipment bonuses."""
@@ -669,6 +720,7 @@ class TestBuildFighterFromPlayer:
         assert fighter.speed == 10  # base 5 + weapon 5
         assert fighter.max_hp == 130  # base 100 + armor 30
         assert fighter.armor_value == 20  # armor only
+        assert fighter.crit_rate == pytest.approx(0.15)  # missing key fallback
 
     @pytest.mark.asyncio
     async def test_heart_method_passive_applied(self):

@@ -11,13 +11,20 @@
 - 多语句事务（unit-of-work）统一使用 `async with db.transaction() as txn:`
   （`DataBase.transaction()`，seam 在 data/data_manager.py 返回 `_TransactionCM`）；
   BEGIN/COMMIT/ROLLBACK 由 CM 管理，业务模块不自管事务
-- 单语句写操作可直接 `await db.execute(...)`——叶子 helper 按 `conn._txn_depth` 门控
-  自动提交
+- 单语句独立写可调用经 `data/leaf_write.py::leaf_write_method` 修饰的叶子 helper；
+  装饰器在**首条 DML 前**获取连接所有权，而不是执行后再按 `_txn_depth` 裸 `commit()`。
+  需要显式上下文时使用同一模块的 `leaf_write`。调用方已有事务时叶子写必须保持被动，
+  由 owner 统一提交
 
 ## 事务并发语义（设计 D1.2）
 
 - **同任务嵌套** = no-op join：内层 CM 不重复提交，仅归属（owner）提交
 - **跨任务互斥**：事务归属 `conn._txn_owner_task`，后到者等待串行，禁止静默共享事务
+- **独立首写同一合同**：`data/leaf_write.py` 的 `@leaf_write_method` 与 CM 共用 owner/等待者；
+  同任务 join、跨任务等待串行。获取所有权必须先于 DML，不能在 `BEGIN IMMEDIATE` 前强制提交
+  另一个任务的隐式事务，也不能让内层独立写抢回连接
+- 独立写成功由叶子 owner 提交；任何 `BaseException`（含取消）都回滚后释放所有权。
+  同任务 join 的异常由外层 owner 统一处理，叶子不得提前 commit/rollback
 - 任何手工提交点未来包进 CM 时，必须删除块内裸 `conn.commit()`（残留 = 提前提交 bug）；
   CM 不得进入 raw `BEGIN IMMEDIATE` 块内部
 
@@ -75,6 +82,9 @@
 ## 常见错误（Common Mistakes）
 
 - ❌ 在 CM 块内残留裸 `conn.commit()`（提前提交 bug）
+- ❌ 新增独立叶子写只按 `_txn_depth == 0` 判断后裸提交，或在 `BEGIN IMMEDIATE` 前强抢/强提交
+  别的任务连接——独立写必须使用 `@leaf_write_method` 或 `async with leaf_write(...)`，
+  在首条 DML 前参与同一所有权协议
 - ❌ 手写 `player.state` / `user_cd` 判断绕过 BusyState（双层漂移、快进失效）
 - ❌ 新增冷却域不登记 time_skip_registry（快进测试隐性失败）
 - ❌ 硬编码数据库路径或把数据文件写进插件目录

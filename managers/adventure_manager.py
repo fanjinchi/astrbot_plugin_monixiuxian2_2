@@ -6,7 +6,6 @@
 import hashlib
 import importlib.util
 import json
-import math
 import os
 import random
 import sys
@@ -19,6 +18,9 @@ from astrbot.api import logger
 
 try:
     from ..core.encounter_store import KIND_LEGACY, EncounterStore
+
+    # Compatibility re-export only; the formula lives in HealthService.
+    from ..core.health import DEFEAT_HP_FLOOR_RATIO as DEFEAT_HP_FLOOR_RATIO
     from ..data.data_manager import DataBase
     from ..data.default_configs import ADVENTURE_CONFIG
     from ..data.pve_repository import (
@@ -79,6 +81,12 @@ except ImportError:
         return mod
 
     DataBase = object
+    # Keep the package-qualified import so HealthService's own relative imports
+    # remain valid when this manager is loaded as a standalone test module.
+    from astrbot_plugin_monixiuxian2_2.core.health import (
+        DEFEAT_HP_FLOOR_RATIO as DEFEAT_HP_FLOOR_RATIO,
+    )
+
     _pve = _load_module("pve_combat_manager", "managers/pve_combat_manager.py")
     PVECombatManager = _pve.PVECombatManager
     _md = _load_module("models", "models.py")
@@ -148,8 +156,6 @@ SETTLEMENT_EFFECTS: tuple[str, ...] = (
     EFFECT_ROUTE_DROPS,
     EFFECT_LEGACY_TRIGGER,
 )
-# 战败气血地板：1% 动态 max_hp（PRD R3/§Q4，全局统一口径，非历练私有）
-DEFEAT_HP_FLOOR_RATIO = 0.01
 # 败场额外休整（design §4：只有 resolved_loss 追加，injury 事件分支已删除）
 DEFEAT_FATIGUE_EXTRA_SECONDS = 600
 # 结算行 risk_level 列（int）与 PVE 难度档的对应，供内容审计与报表用
@@ -274,7 +280,8 @@ class AdventureManager:
 
         必须是每次取用重建的属性，而不是 ``__init__`` 里存一个实例：
         ``DataBase.connect()`` 重连时会替换 ``conn``，存实例会永久持住旧连接并
-        在旧句柄上写库。仓储自身不开事务（叶子提交按 ``_txn_depth`` 门控）。
+        在旧句柄上写库。仓储自身不开外层事务；独立写入由共享 leaf_write
+        获取连接所有权并序列化。
         """
         return AdventureRepository(self.db.conn)
 
@@ -895,7 +902,8 @@ class AdventureManager:
 
         确定性只来自锁定输入：敌人从 snapshot 重建、战斗流由 ``rng_seed`` 派生，
         所以结算与崩溃后的重放算出的是同一份结果（design §2.2「事务外确定性计
-        算」）。逃跑脱身与未触发战斗都不打，直接落 ``resolved_win``/基础收益。
+        算」）。败场与平局都按引擎终值和 Health Domain 动态地板取大；败场状态
+        与奖励惩罚仍只适用于败场，平局保持 ``resolved_win`` 和基础收益。
 
         Args:
             player: 玩家对象（只读；构建 fighter 会顺带惰性落定恢复锚点）。
@@ -931,31 +939,20 @@ class AdventureManager:
         result["defeated"] = outcome.enemy_defeated
         result["combat_msg"] = outcome.message
         result["hp_final"] = outcome.player_final_hp
-        if rewards.get("hp_penalty"):
-            # 战败：负场事实 + 1% 动态上限地板（§Q4，全局统一口径）
-            result["state"] = STATE_RESOLVED_LOSS
+        if not outcome.enemy_defeated:
+            if self.health_service is None:
+                raise RuntimeError(
+                    "AdventureManager combat settlement requires health_service"
+                )
+            # Loss and draw both use the Health Domain floor. Do not couple HP
+            # persistence to hp_penalty: draw keeps base rewards/resolved_win.
             result["hp_final"] = max(
-                outcome.player_final_hp, self._defeat_hp_floor(player)
+                outcome.player_final_hp,
+                self.health_service.defeat_hp_floor(player),
             )
+            if outcome.winner != "draw":
+                result["state"] = STATE_RESOLVED_LOSS
         return result
-
-    def _defeat_hp_floor(self, player: Player) -> int:
-        """1% of the dynamic 气血上限, rounded up (PRD R3 / pve-enemy §Q4).
-
-        战败不会把玩家打到残血 1 点：地板按动态上限算（含装备加成）。
-        standalone 测试装配没有 Health Domain 时退回 ``base_hp``。
-
-        Args:
-            player: 玩家对象。
-
-        Returns:
-            气血地板（至少 1）。
-        """
-        if self.health_service is not None:
-            max_hp = self.health_service.compute_max_hp(player)
-        else:
-            max_hp = int(getattr(player, "base_hp", 1) or 1)
-        return max(1, math.ceil(max_hp * DEFEAT_HP_FLOOR_RATIO))
 
     async def _finalize(
         self,
@@ -1248,12 +1245,11 @@ class AdventureManager:
         settlement_id = row["settlement_id"]
         settlements = self.settlements
         # 第二笔短事务：终态事务已提交，这里把「claim + 效果本体」原子写进去。
-        # 为什么不能留成一条条评论式的裸写（叶子提交）：并发双击时，另一路
-        # 结算可能在这两次调用之间抢到事务归属，令本路的 ``_txn_depth`` 门控
-        # 读到非 0 而**跳过 commit**——sqlite 隐式事务就悬在那儿，下一笔
-        # ``BEGIN IMMEDIATE`` 直接报 "cannot start a transaction within a
-        # transaction"（tests/test_adventure_settlement_state_machine.py 的
-        # 并发用例真实复现过）。写全部收进 CM 后，两路只会在事务上排队。
+        # 单条 leaf_write 只能序列化各个写点，不能保证这组写入同生共死；旧实现的
+        # 裸写曾在并发双击下悬空隐式事务，使下一笔 BEGIN IMMEDIATE 报
+        # "cannot start a transaction within a transaction"
+        # （tests/test_adventure_settlement_state_machine.py 的并发用例真实复现过）。
+        # 写全部收进 CM 后，两路只会在事务上排队。
         # 效果本体抛出的异常仍被逐项吞掉（design §2.3：失败可见、不回滚终态），
         # 所以这里的 commit 不会被失败效果回滚掉。
         async with self.db.transaction():

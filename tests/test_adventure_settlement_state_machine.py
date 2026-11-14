@@ -7,7 +7,7 @@
 - AC2 全风险段遇敌停在 ``pending_choice``（未遇敌直通终态），「迎战」「逃跑」两个出口；未抉择
   不发任何奖励、保留忙碌；``flee.enabled=false``（kill switch）时不产生 pending。
 - AC3 逃跑公式锚点（身法相当→95%、2 倍→100%、一半→60% 保底）。
-- AC4 掉落跟随胜败（战败不掉落）；气血只跟随引擎终值，战败按动态上限 1% 保底。
+- AC4 掉落跟随胜败（战败不掉落）；气血跟随引擎终值，败/平按动态上限 1% 保底，胜场不保底。
 - AC5 重放/并发不重复发奖，重放不推进悬赏与师承进度（``reward_data=None``）。
 - AC6 全局休整窗口（乙案：跨路线同样拦、重启照拦）、战败额外休整、忙碌期照旧回血。
 - AC7 崩溃点恢复（推进后崩溃 / 提交后未 claim）、事务原子性、效果故障可见。
@@ -920,6 +920,26 @@ async def test_defeat_floors_hp_at_one_percent_of_dynamic_max(db):
     await winner.mgr.finish_adventure(USER)
     await winner.mgr.resolve_adventure_choice(USER, flee=False)
     assert (await winner.player()).current_hp == 7
+    assert int((await winner.row())["hp_after"]) == 7
+
+
+@pytest.mark.asyncio
+async def test_draw_uses_defeat_floor_without_changing_reward_outcome(db):
+    """A draw persists the dynamic floor in both player and ledger, not loss rewards."""
+    harness = build_env(db, outcome="draw", final_hp=0)
+    await start_run(harness.mgr, HIGH_ROUTE)
+    await harness.mgr.finish_adventure(USER)
+
+    ok, msg, reward_data = await harness.mgr.resolve_adventure_choice(USER, flee=False)
+
+    assert ok, msg
+    assert reward_data is not None
+    assert reward_data["exp_reward"] == BASE_EXP
+    assert reward_data["gold_reward"] == BASE_GOLD
+    assert (await harness.player()).current_hp == 10
+    row = await harness.row()
+    assert row["state"] == STATE_RESOLVED_WIN
+    assert int(row["hp_after"]) == 10
 
 
 @pytest.mark.asyncio

@@ -231,7 +231,11 @@ class CombatEngine:
         self._damage_reduction_cap = self._combat_cfg.get("damage_reduction_cap", 0.4)
         self._armor_k_base = self._combat_cfg.get("armor_k_base", 100)
         self._armor_k_level_coeff = self._combat_cfg.get("armor_k_level_coeff", 10)
-        self._base_crit_rate = self._combat_cfg.get("base_crit_rate", 0.15)
+        # Explicit None is a missing value, but configured zero disables crits.
+        configured_crit_rate = self._combat_cfg.get("base_crit_rate")
+        self._base_crit_rate = (
+            0.15 if configured_crit_rate is None else configured_crit_rate
+        )
 
         # Remaining-HP tier thresholds (change combat-report-structure D4).
         # Tuning keys: combat.remaining_hp_mid_threshold / _low_threshold in
@@ -449,6 +453,9 @@ class CombatEngine:
             agility=total_attrs["agility"],
             speed=total_attrs["speed"],
             armor_value=total_attrs["armor_value"],
+            # Use the public config-backed engine value; FighterState's static
+            # default is not a second gameplay configuration source.
+            crit_rate=self._base_crit_rate,
             # Block source from the aggregation layer (innate + weapon only).
             # Legacy/mock players without the key fall back to merged armor so
             # their block behavior is unchanged (design D2).

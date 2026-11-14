@@ -1,3 +1,5 @@
 {"file":".trellis/spec/backend/database-guidelines.md","reason":"复核事务叶子门控与写回约束"}
 {"file":".trellis/spec/backend/quality-guidelines.md","reason":"复核地板/消费者/静态清零证据"}
 {"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"复核三入口地板与消费者闭环"}
+{"file":"tests/test_transaction_cm_spike.py","reason":"复核 dfb 红绿证据与所有权释放/兼容语义"}
+{"file":"tests/test_transaction_atomicity.py","reason":"复核全局叶子迁移不破坏 CM 原子性"}

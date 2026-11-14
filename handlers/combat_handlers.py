@@ -7,6 +7,7 @@ from astrbot.api.all import *
 from astrbot.api.event import AstrMessageEvent
 
 from ..data.data_manager import DataBase
+from ..data.leaf_write import leaf_write
 from ..managers.combat_manager import CombatManager
 from ..models import Player
 
@@ -54,30 +55,25 @@ class CombatHandlers:
         """更新战斗冷却时间"""
         now = int(time.time())
         try:
-            if combat_type == "duel":
-                await self.db.conn.execute(
-                    """
-                    INSERT INTO combat_cooldowns (user_id, last_duel_time, last_spar_time)
-                    VALUES (?, ?, 0)
-                    ON CONFLICT(user_id) DO UPDATE SET last_duel_time = ?
-                    """,
-                    (user_id, now, now),
-                )
-            else:
-                await self.db.conn.execute(
-                    """
-                    INSERT INTO combat_cooldowns (user_id, last_duel_time, last_spar_time)
-                    VALUES (?, 0, ?)
-                    ON CONFLICT(user_id) DO UPDATE SET last_spar_time = ?
-                    """,
-                    (user_id, now, now),
-                )
-            # bd qbo / D2 ownership gate: 裸 conn.commit() 会在外层
-            # db.transaction() 里提前提交别人的 unit-of-work。按 _txn_depth
-            # 门控，只有叶子（无活动事务）才自己提交，与 data_manager 的
-            # update_player/delete_player 同一 idiom。
-            if getattr(self.db.conn, "_txn_depth", 0) == 0:
-                await self.db.conn.commit()
+            async with leaf_write(self.db.conn):
+                if combat_type == "duel":
+                    await self.db.conn.execute(
+                        """
+                        INSERT INTO combat_cooldowns (user_id, last_duel_time, last_spar_time)
+                        VALUES (?, ?, 0)
+                        ON CONFLICT(user_id) DO UPDATE SET last_duel_time = ?
+                        """,
+                        (user_id, now, now),
+                    )
+                else:
+                    await self.db.conn.execute(
+                        """
+                        INSERT INTO combat_cooldowns (user_id, last_duel_time, last_spar_time)
+                        VALUES (?, 0, ?)
+                        ON CONFLICT(user_id) DO UPDATE SET last_spar_time = ?
+                        """,
+                        (user_id, now, now),
+                    )
         except Exception as e:
             from astrbot.api import logger
 
