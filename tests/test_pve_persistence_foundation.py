@@ -2,7 +2,7 @@
 
 覆盖 PRD AC1–AC6 与 design §1–§6：
 
-- 版本矩阵：v36–v39 注册齐全、表归属正确、fresh install 建齐 10 张新表；
+- 版本矩阵：v36–v40 注册齐全、表归属正确、fresh install 建齐 10 张 PVE 新表；
 - schema 一致性：fresh install == 逐版本升级链（参数化 N ∈ {36,37,38}）；
 - v34 → 最新走任务链升级（数据保留、不触发 reset 备份）；
 - 迁移失败回滚停在 N-1，且修复后可续跑；任务重放幂等；
@@ -79,6 +79,8 @@ NEW_TABLES = {
     38: {"business_events", "event_deliveries"},
     # v39 不拥有新表，只给 v36 的表增列（见 data/migration.py 注释）
     39: set(),
+    # v40 只删除旧 boss 表/键，不拥有新表
+    40: set(),
 }
 
 # 回退 DROP 必须子表先于父表（FK 引用方向见 data/migration.py DDL）
@@ -249,10 +251,10 @@ async def _seed_event_and_delivery(outbox, event_id="ev-1", group_id="100"):
 
 
 def test_version_matrix_chain_registration():
-    """v36–v39 均已注册迁移任务，链条末端 == LATEST_DB_VERSION。"""
+    """v36–v40 均已注册迁移任务，链条末端 == LATEST_DB_VERSION。"""
     versions = set(MIGRATION_TASKS)
-    assert LATEST_DB_VERSION == max(versions) == 39
-    assert {36, 37, 38, 39} <= versions
+    assert LATEST_DB_VERSION == max(versions) == 40
+    assert {36, 37, 38, 39, 40} <= versions
     assert TASK_CHAIN_MIN_VERSION <= 36
 
 
@@ -260,10 +262,11 @@ def test_version_matrix_table_ownership():
     """VERSION_SCHEMA_TABLES 与 PRD 表清单逐版本一致且互不重叠。
 
     v39 拥有空表集合（child C 只给 v36 的 adventure_settlements 增列），
-    登记它是为了版本矩阵逐版可复现；增列路径的 parity 由
-    ``test_v39_adds_state_columns_to_published_v36_table`` 负责。
+    v40 也拥有空集合（只删旧 boss 表/键）；登记它们是为了版本矩阵逐版可复现。
+    增列路径的 parity 由 ``test_v39_adds_state_columns_to_published_v36_table``
+    负责，v40 删除由 ``test_v40_drops_legacy_boss_table_and_key`` 负责。
     """
-    assert sorted(VERSION_SCHEMA_TABLES) == [36, 37, 38, 39]
+    assert sorted(VERSION_SCHEMA_TABLES) == [36, 37, 38, 39, 40]
     seen = set()
     for version, tables in NEW_TABLES.items():
         assert set(VERSION_SCHEMA_TABLES[version]) == tables
@@ -284,7 +287,7 @@ async def test_fresh_install_creates_all_pve_tables(db):
 # ----------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("n", [36, 37, 38, 39])
+@pytest.mark.parametrize("n", [36, 37, 38, 39, 40])
 @pytest.mark.asyncio
 async def test_upgraded_schema_equals_fresh_install(tmp_path, n):
     """回退到 v{n}-1 后沿任务链升上来，schema 与全新安装逐表一致。"""
@@ -437,6 +440,68 @@ async def test_v39_legacy_columns_equal_fresh_install(tmp_path, db):
         fresh = await _column_defs(db.conn)
         for name in _V39_COLUMNS:
             assert upgraded[name] == fresh[name], f"{name} 列定义漂移"
+    finally:
+        await conn.close()
+
+
+# ----------------------------------------------------------------------
+# v40 — 旧 Boss 整删（fresh 已无表，必须手动构造旧库取证）
+# ----------------------------------------------------------------------
+
+_LEGACY_BOSS_DDL = """
+CREATE TABLE boss (
+    boss_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    boss_name TEXT NOT NULL,
+    boss_level TEXT NOT NULL,
+    hp INTEGER NOT NULL,
+    max_hp INTEGER NOT NULL,
+    atk INTEGER NOT NULL,
+    defense INTEGER NOT NULL DEFAULT 0,
+    stone_reward INTEGER NOT NULL DEFAULT 0,
+    create_time INTEGER NOT NULL DEFAULT 0,
+    status INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX idx_boss_status ON boss(status, create_time DESC);
+INSERT INTO boss
+    (boss_name, boss_level, hp, max_hp, atk, defense, stone_reward,
+     create_time, status)
+VALUES ('旧世代妖王', '练气', 100, 100, 10, 0, 500, 1700000000, 1);
+INSERT INTO system_config (key, value, updated_at)
+VALUES ('boss_next_spawn_time', '1795097191', 1700000000);
+"""
+
+
+@pytest.mark.asyncio
+async def test_v40_drops_legacy_boss_table_and_key(tmp_path):
+    """含旧 boss 表/数据的 v39 库升到 v40：整表与旧键删除，其余数据保留。"""
+    path = str(tmp_path / "v39_legacy_boss.db")
+    await _build_rewound(path, 39)
+    conn = await aiosqlite.connect(path)
+    try:
+        await conn.executescript(_LEGACY_BOSS_DDL)
+        await conn.commit()
+        assert "boss" in await _table_names(conn)
+
+        await MigrationManager(conn, StubConfigManager()).migrate_or_reset()
+
+        assert await _db_version(conn) == LATEST_DB_VERSION == 40
+        assert "boss" not in await _table_names(conn)
+        assert (
+            await _scalar(
+                conn,
+                "SELECT COUNT(*) FROM system_config WHERE key = 'boss_next_spawn_time'",
+            )
+            == 0
+        )
+        # 升级链而非 reset：哨兵玩家仍在
+        assert (
+            await _scalar(conn, "SELECT COUNT(*) FROM players WHERE user_id='u_keep'")
+            == 1
+        )
+
+        # 幂等重放：再次执行 v40 任务不得报错
+        await MIGRATION_TASKS[40](conn, StubConfigManager())
+        assert "boss" not in await _table_names(conn)
     finally:
         await conn.close()
 

@@ -147,6 +147,12 @@ class TestFeatureSwitchDecision:
         plugin.config_manager.game_config["boss"]["enabled"] = False
         assert plugin._is_boss_enabled() is False
 
+    def test_boss_disabled_when_catalog_missing(self, plugin):
+        """A v1/unsynced enemies.json disables the domain like the service does."""
+        plugin.world_boss_service = MagicMock()
+        plugin.world_boss_service.enabled = False
+        assert plugin._is_boss_enabled() is False
+
     def test_pve_switch_disabled_via_config(self, plugin):
         plugin.config_manager.game_config["pve"]["enabled"] = False
         assert plugin._is_pve_enabled() is False
@@ -158,35 +164,93 @@ class TestBossGate:
     @pytest.mark.asyncio
     async def test_boss_info_gated_when_disabled(self, plugin):
         plugin.config_manager.game_config["boss"]["enabled"] = False
-        plugin.boss_handlers = MagicMock()
+        plugin.world_boss_handlers = MagicMock()
         results = [
             result async for result in plugin.handle_boss_info(FakeEvent("世界Boss"))
         ]
         assert len(results) == 1
         assert "维护" in results[0].text
-        plugin.boss_handlers.handle_boss_info.assert_not_called()
+        plugin.world_boss_handlers.handle_boss_info.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_boss_info_gated_when_catalog_missing(self, plugin):
+        """v1 rollback (no catalog) shows maintenance, not "no active boss"."""
+        plugin.world_boss_service = MagicMock()
+        plugin.world_boss_service.enabled = False
+        plugin.world_boss_handlers = MagicMock()
+        results = [
+            result async for result in plugin.handle_boss_info(FakeEvent("世界Boss"))
+        ]
+        assert len(results) == 1
+        assert "维护" in results[0].text
+        plugin.world_boss_handlers.handle_boss_info.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_boss_fight_gated_when_disabled(self, plugin):
         plugin.config_manager.game_config["boss"]["enabled"] = False
-        plugin.boss_handlers = MagicMock()
+        plugin.world_boss_handlers = MagicMock()
         results = [
             result async for result in plugin.handle_boss_fight(FakeEvent("挑战Boss"))
         ]
         assert len(results) == 1
         assert "维护" in results[0].text
-        plugin.boss_handlers.handle_boss_fight.assert_not_called()
+        plugin.world_boss_handlers.handle_boss_fight.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_boss_spawn_gated_when_disabled(self, plugin):
         plugin.config_manager.game_config["boss"]["enabled"] = False
-        plugin.boss_handlers = MagicMock()
+        plugin.world_boss_handlers = MagicMock()
         results = [
             result async for result in plugin.handle_spawn_boss(FakeEvent("生成Boss"))
         ]
         assert len(results) == 1
         assert "维护" in results[0].text
-        plugin.boss_handlers.handle_spawn_boss.assert_not_called()
+        plugin.world_boss_handlers.handle_spawn_boss.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_boss_spawn_forwards_profile_id(self, plugin):
+        """Top-level ``生成Boss [profile_id]`` forwards the forced profile."""
+        plugin.boss_admins = ["u1"]
+        handler = MagicMock()
+        handler.handle_spawn_boss = AsyncMock(
+            return_value=(True, "✅ 已生成世界Boss：裂峡罴王")
+        )
+        plugin.world_boss_handlers = handler
+
+        results = [
+            result
+            async for result in plugin.handle_spawn_boss(
+                FakeEvent("生成Boss wb_lq_ba"), "wb_lq_ba"
+            )
+        ]
+
+        assert results[0].text == "✅ 已生成世界Boss：裂峡罴王"
+        handler.handle_spawn_boss.assert_awaited_once_with("wb_lq_ba")
+
+
+class TestWorldBossTargets:
+    """Broadcast targets are a live platform-instance × whitelist product."""
+
+    def test_targets_rebuild_from_live_lists(self, plugin):
+        plugin.context = MagicMock()
+        first = MagicMock()
+        first.meta.return_value.name = "aiocqhttp"
+        second = MagicMock()
+        second.meta.return_value.name = "telegram"
+        plugin.context.platform_manager.get_insts.return_value = [first, second]
+        plugin.whitelist_groups = ["g1", "g2"]
+
+        assert plugin._world_boss_targets() == [
+            ("aiocqhttp", "g1"),
+            ("aiocqhttp", "g2"),
+            ("telegram", "g1"),
+            ("telegram", "g2"),
+        ]
+
+        # No caching: the next round sees the new platform/group lists.
+        plugin.context.platform_manager.get_insts.return_value = [second]
+        plugin.whitelist_groups = ["g3"]
+        assert plugin._world_boss_targets() == [("telegram", "g3")]
 
 
 class TestPvEGate:
@@ -242,13 +306,12 @@ class TestNonPvEGameplay:
 
 
 class TestScheduledTask:
-    """The boss spawn background task is not scheduled when the switch is off."""
+    """The single lifecycle poller starts every boot; the switch gates each round."""
 
     @pytest.mark.asyncio
-    async def test_boss_spawn_task_not_started_when_disabled(
-        self, plugin, plugin_class
-    ):
+    async def test_poller_started_even_when_disabled(self, plugin):
         plugin.config_manager.game_config["boss"]["enabled"] = False
+        plugin.world_boss_poller = MagicMock()
         plugin.db.connect = AsyncMock()
         plugin.db.ensure_connection = AsyncMock()
         plugin.db.close = AsyncMock()
@@ -274,4 +337,5 @@ class TestScheduledTask:
         finally:
             _main_mod.MigrationManager = original_migration
 
-        assert plugin.boss_task is None
+        plugin.world_boss_poller.start.assert_called_once()
+        assert not hasattr(plugin, "boss_task")

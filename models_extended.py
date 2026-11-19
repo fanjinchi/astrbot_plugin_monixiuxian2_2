@@ -102,22 +102,6 @@ class BuffInfo:
 
 
 @dataclass
-class Boss:
-    """Boss数据模型"""
-
-    boss_id: int  # Boss ID（主键）
-    boss_name: str  # Boss名称
-    boss_level: str  # Boss境界
-    hp: int  # 血量
-    max_hp: int  # 最大血量
-    atk: int  # 攻击力
-    defense: int = 0  # 防御力
-    stone_reward: int = 0  # 灵石奖励
-    create_time: int = 0  # 生成时间
-    status: int = 1  # 状态（0已击败，1存活）
-
-
-@dataclass
 class Rift:
     """秘境数据模型"""
 

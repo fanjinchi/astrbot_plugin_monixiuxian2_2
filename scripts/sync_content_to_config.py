@@ -275,6 +275,19 @@ def render_enemy_document(
                 if key in existing_config:
                     doc[key] = existing_config[key]
 
+            datasets = manifest.get("datasets")
+            boss_spec = (
+                datasets.get(schema.WORLD_BOSS_CSV, {})
+                if isinstance(datasets, dict)
+                else {}
+            )
+            approved_narrative = set(boss_spec.get("narrative_status") or [])
+            for boss in bosses:
+                # 占位经 combat-only 放行不等于叙事获批；豁免必须显式写进 manifest。
+                boss["narrative_approved"] = "豁免" in approved_narrative or (
+                    boss["narrative_status"] == "定稿" and "定稿" in approved_narrative
+                )
+
     if errors:
         return {}, errors
     errors.extend(schema.validate_enemy_document(doc))

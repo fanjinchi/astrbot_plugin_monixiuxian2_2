@@ -1,0 +1,230 @@
+{
+  "approval_state": "pending_user_decision",
+  "selected_option": null,
+  "formal_manifest": false,
+  "warning": "示例绑定当前 draft CSV hash，仅供审阅；用户决定并升 status 后必须重算 hash，外层示例不能作为 --approval-manifest 直接传入。",
+  "manifest_examples": {
+    "combat_only": {
+      "datasets": {
+        "enemies.csv": {
+          "sha256": "b558813bbd8e0e4b85a43a07e4ca791e6ae45046c7d59aca42f99cf3268e7c3c",
+          "columns": [
+            "id",
+            "name",
+            "segment",
+            "tier",
+            "archetype",
+            "level",
+            "level_range",
+            "hp",
+            "damage",
+            "agility",
+            "speed",
+            "armor_value",
+            "affix",
+            "boss_skill",
+            "description",
+            "ref_source",
+            "design_note",
+            "status",
+            "canon_origin",
+            "tone_tier",
+            "story_hook",
+            "narrative_status"
+          ],
+          "narrative_status": [
+            "占位"
+          ]
+        },
+        "world_bosses.csv": {
+          "sha256": "99386e1b580fa4a962be6ff5089d0e4111f3dea8721da52fe23a8029dda9b05b",
+          "columns": [
+            "id",
+            "name",
+            "segment",
+            "level",
+            "hp",
+            "damage",
+            "agility",
+            "speed",
+            "armor_value",
+            "signature_skill",
+            "skill_key",
+            "phase_thresholds",
+            "phase2_dmg_mult",
+            "phase3_dmg_mult",
+            "phase3_armor_mult",
+            "lifetime_h",
+            "daily_attempts",
+            "respawn_kill_h",
+            "respawn_dissipate_h",
+            "spawn_text",
+            "phase2_text",
+            "phase3_text",
+            "kill_text",
+            "dissipate_text",
+            "description",
+            "story_hook",
+            "design_note",
+            "ref_source",
+            "status",
+            "canon_origin",
+            "tone_tier",
+            "narrative_status"
+          ],
+          "narrative_status": [
+            "占位"
+          ]
+        }
+      }
+    },
+    "combat_and_narrative": {
+      "datasets": {
+        "enemies.csv": {
+          "sha256": "b558813bbd8e0e4b85a43a07e4ca791e6ae45046c7d59aca42f99cf3268e7c3c",
+          "columns": [
+            "id",
+            "name",
+            "segment",
+            "tier",
+            "archetype",
+            "level",
+            "level_range",
+            "hp",
+            "damage",
+            "agility",
+            "speed",
+            "armor_value",
+            "affix",
+            "boss_skill",
+            "description",
+            "ref_source",
+            "design_note",
+            "status",
+            "canon_origin",
+            "tone_tier",
+            "story_hook",
+            "narrative_status"
+          ],
+          "narrative_status": [
+            "定稿"
+          ]
+        },
+        "world_bosses.csv": {
+          "sha256": "99386e1b580fa4a962be6ff5089d0e4111f3dea8721da52fe23a8029dda9b05b",
+          "columns": [
+            "id",
+            "name",
+            "segment",
+            "level",
+            "hp",
+            "damage",
+            "agility",
+            "speed",
+            "armor_value",
+            "signature_skill",
+            "skill_key",
+            "phase_thresholds",
+            "phase2_dmg_mult",
+            "phase3_dmg_mult",
+            "phase3_armor_mult",
+            "lifetime_h",
+            "daily_attempts",
+            "respawn_kill_h",
+            "respawn_dissipate_h",
+            "spawn_text",
+            "phase2_text",
+            "phase3_text",
+            "kill_text",
+            "dissipate_text",
+            "description",
+            "story_hook",
+            "design_note",
+            "ref_source",
+            "status",
+            "canon_origin",
+            "tone_tier",
+            "narrative_status"
+          ],
+          "narrative_status": [
+            "定稿"
+          ]
+        }
+      }
+    },
+    "explicit_narrative_exemption": {
+      "datasets": {
+        "enemies.csv": {
+          "sha256": "b558813bbd8e0e4b85a43a07e4ca791e6ae45046c7d59aca42f99cf3268e7c3c",
+          "columns": [
+            "id",
+            "name",
+            "segment",
+            "tier",
+            "archetype",
+            "level",
+            "level_range",
+            "hp",
+            "damage",
+            "agility",
+            "speed",
+            "armor_value",
+            "affix",
+            "boss_skill",
+            "description",
+            "ref_source",
+            "design_note",
+            "status",
+            "canon_origin",
+            "tone_tier",
+            "story_hook",
+            "narrative_status"
+          ],
+          "narrative_status": [
+            "豁免"
+          ]
+        },
+        "world_bosses.csv": {
+          "sha256": "99386e1b580fa4a962be6ff5089d0e4111f3dea8721da52fe23a8029dda9b05b",
+          "columns": [
+            "id",
+            "name",
+            "segment",
+            "level",
+            "hp",
+            "damage",
+            "agility",
+            "speed",
+            "armor_value",
+            "signature_skill",
+            "skill_key",
+            "phase_thresholds",
+            "phase2_dmg_mult",
+            "phase3_dmg_mult",
+            "phase3_armor_mult",
+            "lifetime_h",
+            "daily_attempts",
+            "respawn_kill_h",
+            "respawn_dissipate_h",
+            "spawn_text",
+            "phase2_text",
+            "phase3_text",
+            "kill_text",
+            "dissipate_text",
+            "description",
+            "story_hook",
+            "design_note",
+            "ref_source",
+            "status",
+            "canon_origin",
+            "tone_tier",
+            "narrative_status"
+          ],
+          "narrative_status": [
+            "豁免"
+          ]
+        }
+      }
+    }
+  }
+}

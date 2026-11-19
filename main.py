@@ -14,7 +14,6 @@ from .handlers import (
     AlchemyHandlers,
     BankHandlers,
     BlessedLandHandlers,
-    BossHandlers,
     BountyHandlers,
     BreakthroughHandler,
     CombatHandlers,
@@ -35,13 +34,13 @@ from .handlers import (
     SpiritFarmHandlers,
     StorageRingHandler,
     TechniqueHandler,
+    WorldBossHandlers,
 )
 from .managers import (
     AdventureManager,
     AlchemyManager,
     BankManager,
     BlessedLandManager,
-    BossManager,
     BountyManager,
     CombatManager,
     DualCultivationManager,
@@ -230,7 +229,6 @@ class XiuXianPlugin(Star):
         for _attr, _service in self._wire_core_services(plugin_data_path).items():
             setattr(self, _attr, _service)
 
-        self.boss_task = None  # Boss生成任务
         self.loan_check_task = None  # 贷款逾期检查任务
         self.spirit_eye_task = None  # 灵眼生成任务
         self.bounty_check_task = None  # 悬赏过期检查任务
@@ -277,6 +275,8 @@ class XiuXianPlugin(Star):
         from .core.health import HealthService
         from .data.default_configs import RIFT_CONFIG
         from .managers.enemy_catalog import load_catalog
+        from .managers.world_boss_events import WorldBossEventDispatcher
+        from .managers.world_boss_poller import WorldBossPoller
         from .managers.world_boss_service import WorldBossService
 
         # Phase 1: 核心管理器（无相互依赖，仅依赖 db/config）
@@ -305,11 +305,18 @@ class XiuXianPlugin(Star):
         )
         enemy_mgr = EnemyManager(config_manager=self.config_manager)
         impart_mgr = ImpartManager(self.db, self.config_manager)
+        # 世界 Boss 固定档案领域与普通 PVE 共用同一 catalog 实例（E2：只 load
+        # 一次；文件缺失或仍是 v1 文档时 catalog=None，两处同步保持旧路径/
+        # 领域 disabled）。load_catalog 必须在两个消费者之前。
+        enemy_catalog = load_catalog(
+            Path(__file__).resolve().parent / "config" / "enemies.json"
+        )
         pve_combat_mgr = PVECombatManager(
             combat_mgr,
             enemy_mgr,
             self.config_manager,
             health_service=health_service,
+            catalog=enemy_catalog,
         )
         sect_mgr = SectManager(
             self.db,
@@ -318,19 +325,7 @@ class XiuXianPlugin(Star):
             pve_combat_mgr=pve_combat_mgr,
             busy_state=busy_state,
         )
-        boss_mgr = BossManager(
-            self.db,
-            combat_mgr,
-            self.config_manager,
-            storage_ring_mgr,
-            busy_state=busy_state,
-        )
-        # child D 世界 Boss 固定档案领域：catalog 从 config/enemies.json 读取；
-        # 文件缺失或仍是 v1 文档时 catalog=None，领域整体 disabled（prd R1）。
-        # 本 child 只装配服务，不注册 poller、不切 handler（切流见 E2）。
-        enemy_catalog = load_catalog(
-            Path(__file__).resolve().parent / "config" / "enemies.json"
-        )
+        # child D 世界 Boss 固定档案领域：catalog 缺失/v1 时领域整体 disabled。
         world_boss_service = WorldBossService(
             self.db,
             enemy_catalog,
@@ -338,6 +333,21 @@ class XiuXianPlugin(Star):
             busy_state,
             combat_mgr,
             self.config_manager,
+        )
+        # E2 提交后事件派发：sender 只构造平台 UMO 并发送纯文本；targets 每轮
+        # 动态读平台实例 × 白名单群，不缓存列表。
+        world_boss_dispatcher = WorldBossEventDispatcher(
+            self.db,
+            sender=self._send_world_boss_message,
+            targets=self._world_boss_targets,
+        )
+        # 单个 lifecycle poller：每轮先看 boss.enabled 与领域 catalog 门，关闭时
+        # 跳过生成但始终 dispatch_pending（避免停用生成后卡住已提交事件）。
+        world_boss_poller = WorldBossPoller(
+            world_boss_service,
+            world_boss_dispatcher,
+            self._is_boss_enabled,
+            ensure_connection=self.db.ensure_connection,
         )
         # 遭遇存储单例：秘境/历练共享（add-rift-encounters design D8）；内存态，
         # 热重载即清空——零惩罚设计下玩家无损失（design D1）。
@@ -389,10 +399,9 @@ class XiuXianPlugin(Star):
             equipment_mgr,
             adventure_mgr,
             rift_mgr,
-            boss_mgr,
+            world_boss_service=world_boss_service,
             bounty_manager=bounty_mgr,
             plugin_data_path=plugin_data_path,
-            broadcast_callback=self._broadcast_boss_spawn,
             sect_manager=sect_mgr,
             impart_manager=impart_mgr,
             busy_state=busy_state,
@@ -454,7 +463,7 @@ class XiuXianPlugin(Star):
             busy_state=busy_state,
             rank_mgr=rank_mgr,
         )
-        boss_handlers = BossHandlers(self.db, boss_mgr)
+        world_boss_handlers = WorldBossHandlers(self.db, world_boss_service)
         combat_handlers = CombatHandlers(
             self.db, combat_mgr, self.config_manager, busy_state=busy_state
         )
@@ -504,9 +513,10 @@ class XiuXianPlugin(Star):
             "impart_mgr": impart_mgr,
             "pve_combat_mgr": pve_combat_mgr,
             "sect_mgr": sect_mgr,
-            "boss_mgr": boss_mgr,
             "enemy_catalog": enemy_catalog,
             "world_boss_service": world_boss_service,
+            "world_boss_dispatcher": world_boss_dispatcher,
+            "world_boss_poller": world_boss_poller,
             "encounter_store": encounter_store,
             "rift_mgr": rift_mgr,
             "rank_mgr": rank_mgr,
@@ -522,7 +532,7 @@ class XiuXianPlugin(Star):
             "storage_ring_handler": storage_ring_handler,
             "ranking_handlers": ranking_handlers,
             "sect_handlers": sect_handlers,
-            "boss_handlers": boss_handlers,
+            "world_boss_handlers": world_boss_handlers,
             "combat_handlers": combat_handlers,
             "technique_handler": technique_handler,
             "rift_handlers": rift_handlers,
@@ -579,10 +589,23 @@ class XiuXianPlugin(Star):
         return sender_id in self.gm_admins
 
     def _is_boss_enabled(self) -> bool:
-        """Return whether the world-boss feature is enabled."""
-        if not self.config_manager:
+        """Return whether the world-boss gameplay is enabled for this round.
+
+        The gate combines the live ``boss.enabled`` switch with the domain's
+        catalog capability: an unsynced/legacy v1 ``enemies.json`` leaves
+        ``WorldBossService.enabled`` false, so the commands show the maintenance
+        copy and the poller skips spawning (E2 design §4: v2 auto-enables,
+        v1 => disabled). A missing service (unit-level plugin stub) keeps the
+        config-only behaviour.
+        """
+        if self.config_manager:
+            boss_cfg = self.config_manager.game_config.get("boss", {})
+            if not boss_cfg.get("enabled", True):
+                return False
+        service = getattr(self, "world_boss_service", None)
+        if service is None:
             return True
-        return self.config_manager.game_config.get("boss", {}).get("enabled", True)
+        return bool(getattr(service, "enabled", True))
 
     def _is_pve_enabled(self) -> bool:
         """Return whether the PvE rift feature is enabled."""
@@ -601,9 +624,11 @@ class XiuXianPlugin(Star):
     async def initialize(self):
         """Plugin startup hook: connect the database, run migrations, and launch scheduled tasks.
 
-        Starts the Boss spawn, loan overdue check, spirit eye spawn, and bounty
-        expiry loops (Boss loop skipped when disabled in config). Called once by
-        AstrBot after the plugin is (re)loaded.
+        Starts the world-boss lifecycle poller plus the loan, spirit eye and
+        bounty loops. The poller itself checks the switch and domain catalog
+        gate every round, so the switch covers both boot and later
+        ``false -> true`` transitions. Called once by AstrBot after the plugin
+        is (re)loaded.
         """
         await self.db.connect()
         migration_manager = MigrationManager(self.db.conn, self.config_manager)
@@ -615,11 +640,8 @@ class XiuXianPlugin(Star):
         except Exception as e:
             logger.error("【修仙插件】默认宗门播种失败: %s", e, exc_info=True)
 
-        # 启动定时任务
-        if self._is_boss_enabled():
-            self.boss_task = asyncio.create_task(self._schedule_boss_spawn())
-        else:
-            logger.info("【修仙插件】世界Boss玩法已关闭，跳过Boss生成定时任务。")
+        # 启动定时任务（世界 Boss 单 poller；开关在每轮内判定）
+        self.world_boss_poller.start()
         self.loan_check_task = asyncio.create_task(self._schedule_loan_check())
         self.spirit_eye_task = asyncio.create_task(self._schedule_spirit_eye_spawn())
         self.bounty_check_task = asyncio.create_task(self._schedule_bounty_check())
@@ -628,8 +650,7 @@ class XiuXianPlugin(Star):
 
     async def terminate(self):
         """Plugin shutdown hook: cancel all scheduled background tasks."""
-        if self.boss_task:
-            self.boss_task.cancel()
+        await self.world_boss_poller.stop()
         if self.loan_check_task:
             self.loan_check_task.cancel()
         if self.spirit_eye_task:
@@ -639,149 +660,42 @@ class XiuXianPlugin(Star):
         await self.db.close()
         logger.info("【修仙插件】已卸载。")
 
-    async def _schedule_boss_spawn(self):
-        """Boss定时生成任务（支持持久化和指数退避）"""
-        import time
+    async def _send_world_boss_message(
+        self, platform: str, group_id: str, text: str
+    ) -> None:
+        """Send one world-boss broadcast text to a platform group.
 
-        retry_count = 0
-        max_retry_delay = 3600
-
-        while True:
-            try:
-                await self.db.ensure_connection()
-                interval = self.config_manager.boss_config.get("spawn_interval", 3600)
-
-                # 检查是否有存储的下次刷新时间
-                next_spawn_str = await self.db.ext.get_system_config(
-                    "boss_next_spawn_time"
-                )
-                current_time = int(time.time())
-
-                if next_spawn_str:
-                    next_spawn_time = int(next_spawn_str)
-                    remaining = next_spawn_time - current_time
-                    if remaining > 0:
-                        logger.info(f"【修仙插件】Boss将在 {remaining} 秒后刷新")
-                        await asyncio.sleep(remaining)
-                else:
-                    next_spawn_time = current_time + interval
-                    await self.db.ext.set_system_config(
-                        "boss_next_spawn_time", str(next_spawn_time)
-                    )
-                    await asyncio.sleep(interval)
-
-                # 尝试生成Boss
-                if self.boss_mgr:
-                    success, msg, boss = await self.boss_mgr.auto_spawn_boss()
-                    if success and boss:
-                        logger.info(f"【修仙插件】自动生成Boss: {boss.boss_name}")
-                        await self._broadcast_boss_spawn(boss)
-
-                # 设置下次刷新时间
-                next_spawn_time = int(time.time()) + interval
-                await self.db.ext.set_system_config(
-                    "boss_next_spawn_time", str(next_spawn_time)
-                )
-
-                # 成功后重置重试计数
-                retry_count = 0
-
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"Boss生成任务异常: {e}")
-                retry_count += 1
-                delay = min(60 * (2**retry_count), max_retry_delay)
-                logger.info(
-                    f"【修仙插件】Boss任务将在 {delay} 秒后重试（第{retry_count}次）"
-                )
-                await asyncio.sleep(delay)
-
-    async def _broadcast_boss_spawn(self, boss):
-        """广播Boss刷新消息到所有白名单群聊"""
+        Args:
+            platform: Platform adapter name (``platform.meta().name``).
+            group_id: Whitelisted group id.
+            text: Approved snapshot copy (plain text).
+        """
         from astrbot.api.event import MessageChain
 
-        if not self.whitelist_groups:
-            logger.debug("【修仙插件】未配置白名单群聊，跳过Boss广播")
-            return
+        umo = f"{platform}:GroupMessage:{group_id}"
+        await self.context.send_message(umo, MessageChain().message(text))
 
-        # 构建广播消息
-        broadcast_msg = (
-            f"👹 世界Boss降临！\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"名称：{boss.boss_name}\n"
-            f"境界：{boss.boss_level}\n"
-            f"血量：{boss.hp}/{boss.max_hp}\n"
-            f"攻击：{boss.atk}\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"💰 击败奖励：{boss.stone_reward} 灵石\n"
-            f"⚔️ 发送「挑战Boss」参与讨伐！"
-        )
+    def _world_boss_targets(self) -> list[tuple[str, str]]:
+        """Snapshot (platform, group_id) destinations for the next expansion.
 
-        message_chain = MessageChain().message(broadcast_msg)
+        Reads the live platform instances and whitelist each round; never caches
+        either list, and never derives the platform from a group id.
 
-        # 获取所有平台实例
+        Returns:
+            Platform-instance × whitelist-group Cartesian product.
+        """
+        targets: list[tuple[str, str]] = []
         try:
             platforms = self.context.platform_manager.get_insts()
-            for platform in platforms:
-                platform_name = (
-                    platform.meta().name
-                    if hasattr(platform, "meta") and callable(platform.meta)
-                    else "unknown"
-                )
-                for group_id in self.whitelist_groups:
-                    # 构建 unified_msg_origin: platform_name:message_type:session_id
-                    umo = f"{platform_name}:GroupMessage:{group_id}"
-                    try:
-                        await self.context.send_message(umo, message_chain)
-                        logger.debug(f"【修仙插件】Boss广播已发送到群 {group_id}")
-                    except Exception as e:
-                        logger.warning(
-                            f"【修仙插件】Boss广播发送失败 (群{group_id}): {e}"
-                        )
-        except Exception as e:
-            logger.error(f"【修仙插件】Boss广播异常: {e}")
-
-    async def _broadcast_boss_defeat(self, player_name: str, battle_result: dict):
-        """广播Boss被击杀消息到所有白名单群聊"""
-        from astrbot.api.event import MessageChain
-
-        if not self.whitelist_groups:
-            return
-
-        reward = battle_result.get("reward", 0)
-        rounds = battle_result.get("rounds", 0)
-
-        broadcast_msg = (
-            f"🎉 世界Boss已被击杀！\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"击杀者：{player_name}\n"
-            f"战斗回合：{rounds}\n"
-            f"获得奖励：{reward} 灵石\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"恭喜大侠！下一只Boss即将刷新..."
-        )
-
-        message_chain = MessageChain().message(broadcast_msg)
-
-        try:
-            platforms = self.context.platform_manager.get_insts()
-            for platform in platforms:
-                platform_name = (
-                    platform.meta().name
-                    if hasattr(platform, "meta") and callable(platform.meta)
-                    else "unknown"
-                )
-                for group_id in self.whitelist_groups:
-                    umo = f"{platform_name}:GroupMessage:{group_id}"
-                    try:
-                        await self.context.send_message(umo, message_chain)
-                    except Exception as e:
-                        logger.warning(
-                            f"【修仙插件】Boss击杀广播发送失败 (群{group_id}): {e}"
-                        )
-        except Exception as e:
-            logger.error(f"【修仙插件】Boss击杀广播异常: {e}")
+        except Exception as e:  # noqa: BLE001 - platform manager may be absent
+            logger.warning("【修仙插件】读取平台实例失败，跳过本轮世界Boss广播: %s", e)
+            return targets
+        for platform in platforms:
+            meta = getattr(platform, "meta", None)
+            name = meta().name if callable(meta) else "unknown"
+            for group_id in self.whitelist_groups:
+                targets.append((str(name), str(group_id)))
+        return targets
 
     async def _schedule_loan_check(self):
         """贷款逾期检查定时任务（每小时检查一次，支持指数退避）"""
@@ -1258,39 +1172,30 @@ class XiuXianPlugin(Star):
     @filter.command(CMD_BOSS_INFO, "查看世界Boss状态")
     @require_whitelist
     async def handle_boss_info(self, event: AstrMessageEvent):
-        """Command 「世界Boss」- 查看世界Boss状态; routes to boss_handlers.handle_boss_info."""
+        """Command 「世界Boss」- 查看世界Boss状态; routes to world_boss_handlers.handle_boss_info."""
         if not self._is_boss_enabled():
             yield event.plain_result("🛠️ 世界Boss玩法正在维护中，敬请期待！")
             return
-        async for r in self.boss_handlers.handle_boss_info(event):
+        async for r in self.world_boss_handlers.handle_boss_info(event):
             yield r
 
     @filter.command(CMD_BOSS_FIGHT, "挑战世界Boss")
     @require_whitelist
     async def handle_boss_fight(self, event: AstrMessageEvent):
-        """Command 「挑战Boss」- 挑战世界Boss; routes to boss_handlers.handle_boss_fight."""
+        """Command 「挑战Boss」- 挑战世界Boss; routes to world_boss_handlers.handle_boss_fight."""
         if not self._is_boss_enabled():
             yield event.plain_result("🛠️ 世界Boss玩法正在维护中，敬请期待！")
             return
         user_id = event.get_sender_id()
-        success, msg, battle_result = await self.boss_handlers.handle_boss_fight(
-            user_id
-        )
+        _ok, msg = await self.world_boss_handlers.handle_boss_fight(str(user_id))
         yield event.plain_result(msg)
-
-        if success and battle_result and battle_result.get("winner") == user_id:
-            player = await self.db.get_player_by_id(user_id)
-            player_name = (
-                player.user_name
-                if player and player.user_name
-                else f"道友{str(user_id)[:6]}"
-            )
-            await self._broadcast_boss_defeat(player_name, battle_result)
 
     @filter.command(CMD_SPAWN_BOSS, "生成世界Boss(管理员)")
     @require_whitelist
-    async def handle_spawn_boss(self, event: AstrMessageEvent):
-        """Command 「生成Boss」- 生成世界Boss(管理员); routes to boss_handlers.handle_spawn_boss."""
+    async def handle_spawn_boss(
+        self, event: AstrMessageEvent, profile_id: GreedyStr = ""
+    ):
+        """Command 「生成Boss」- 生成世界Boss(管理员); routes to world_boss_handlers.handle_spawn_boss."""
         if not self._is_boss_enabled():
             yield event.plain_result("🛠️ 世界Boss玩法正在维护中，敬请期待！")
             return
@@ -1298,11 +1203,10 @@ class XiuXianPlugin(Star):
             yield event.plain_result("❌ 你没有权限生成Boss！此指令仅限管理员使用。")
             return
 
-        success, msg, boss = await self.boss_handlers.handle_spawn_boss()
+        _ok, msg = await self.world_boss_handlers.handle_spawn_boss(
+            str(profile_id).strip() or None
+        )
         yield event.plain_result(msg)
-
-        if success and boss:
-            await self._broadcast_boss_spawn(boss)
 
     # ===== 排行榜指令 =====
 

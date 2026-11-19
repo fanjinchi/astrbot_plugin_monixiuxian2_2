@@ -1,0 +1,608 @@
+weapons.csv: 9 draft/final rows (2 legacy skipped)
+  UPDATE 青铜剑 [凡品]
+    (no field changes)
+  UPDATE 狼牙棒 [灵品]
+    (no field changes)
+  UPDATE 血月地匕 [地品]
+    (no field changes)
+  UPDATE 青云天剑 [天品]
+    (no field changes)
+  UPDATE 撼地皇刀 [皇品]
+    (no field changes)
+  UPDATE 弑龙帝枪 [帝品]
+    (no field changes)
+  UPDATE 太一道符 [道品]
+    (no field changes)
+  UPDATE 斩仙神刀 [仙品]
+    (no field changes)
+  UPDATE 混元至宝鼎 [混元先天]
+    (no field changes)
+heart_methods.csv: 20 draft/final rows (1 legacy skipped)
+  UPDATE 长春功 [凡品]
+    (no field changes)
+  UPDATE 养气诀 [凡品]
+    (no field changes)
+  UPDATE 烈火功 [灵品]
+    (no field changes)
+  UPDATE 龟息功 [灵品]
+    (no field changes)
+  UPDATE 金罡诀 [地品]
+    (no field changes)
+  UPDATE 云游诀 [地品]
+    (no field changes)
+  UPDATE 玄影功 [天品]
+    (no field changes)
+  UPDATE 紫府功 [天品]
+    (no field changes)
+  UPDATE 战神诀 [皇品]
+    (no field changes)
+  UPDATE 不动明王功 [皇品]
+    (no field changes)
+  UPDATE 疾风迅雷功 [帝品]
+    (no field changes)
+  UPDATE 归一诀 [帝品]
+    (no field changes)
+  UPDATE 太虚功 [道品]
+    (no field changes)
+  UPDATE 万寿诀 [道品]
+    (no field changes)
+  UPDATE 乾坤功 [仙品]
+    (no field changes)
+  UPDATE 无我功 [仙品]
+    (no field changes)
+  UPDATE 混元一气功 [混元先天]
+    (no field changes)
+  UPDATE 大梦千秋诀 [混元先天]
+    (no field changes)
+  UPDATE 传承心法·吐纳 [灵品]
+    (no field changes)
+  UPDATE 传承心法·归元 [灵品]
+    (no field changes)
+skills.csv: 40 draft/final rows (5 legacy skipped)
+  UPDATE 基础吐纳
+    (no field changes)
+  UPDATE 铁布衫
+    (no field changes)
+  UPDATE 雷击诀
+    (no field changes)
+  UPDATE 狂风诀
+    (no field changes)
+  UPDATE 以牙还牙
+    (no field changes)
+  UPDATE 震山锤
+    (no field changes)
+  UPDATE 聚星诀
+    (no field changes)
+  UPDATE 战意诀
+    (no field changes)
+  UPDATE 雷震剑诀
+    (no field changes)
+  UPDATE 青锋连斩
+    (no field changes)
+  UPDATE 万剑归宗
+    (no field changes)
+  UPDATE 铁山靠
+    (no field changes)
+  UPDATE 八式崩拳
+    (no field changes)
+  UPDATE 混元护体诀
+    (no field changes)
+  UPDATE 金身诀
+    (no field changes)
+  UPDATE 真龙诀
+    (no field changes)
+  UPDATE 九剑归一
+    (no field changes)
+  UPDATE 修罗战诀
+    (no field changes)
+  UPDATE 天魔解体
+    (no field changes)
+  UPDATE 镇魂印
+    (no field changes)
+  UPDATE 回春诀
+    (no field changes)
+  UPDATE 噬血剑意
+    (no field changes)
+  UPDATE 蚀骨咒
+    (no field changes)
+  UPDATE 涅槃诀
+    (no field changes)
+  UPDATE 破风剑意
+    (no field changes)
+  UPDATE 万毒掌
+    (no field changes)
+  UPDATE 凝神诀
+    (no field changes)
+  UPDATE 鹰击诀
+    (no field changes)
+  UPDATE 青冥剑诀
+    (no field changes)
+  UPDATE 灵蛇缠身
+    (no field changes)
+  UPDATE 铁棘功
+    (no field changes)
+  UPDATE 玄武诀
+    (no field changes)
+  UPDATE 疗伤诀
+    (no field changes)
+  UPDATE 九幽噬魂咒
+    (no field changes)
+  UPDATE 回天圣手
+    (no field changes)
+  UPDATE 噬灵魔功
+    (no field changes)
+  UPDATE 破军诀
+    (no field changes)
+  UPDATE 燃血诀
+    (no field changes)
+  UPDATE 传承·破妄一击
+    (no field changes)
+  UPDATE 传承·归元护体
+    (no field changes)
+armors.csv: 18 draft/final rows (0 legacy skipped)
+  UPDATE 铁叶甲 [凡品]
+    (no field changes)
+  UPDATE 灵岩甲 [灵品]
+    (no field changes)
+  UPDATE 玄岳重铠 [地品]
+    (no field changes)
+  UPDATE 镇岳神甲 [天品]
+    (no field changes)
+  UPDATE 崩岳皇铠 [皇品]
+    (no field changes)
+  UPDATE 镇狱帝铠 [帝品]
+    (no field changes)
+  UPDATE 太虚道甲 [道品]
+    (no field changes)
+  UPDATE 不灭仙铠 [仙品]
+    (no field changes)
+  UPDATE 混元玄武甲 [混元先天]
+    (no field changes)
+  UPDATE 粗布法袍 [凡品]
+    (no field changes)
+  UPDATE 流云袍 [灵品]
+    (no field changes)
+  UPDATE 星纹法袍 [地品]
+    (no field changes)
+  UPDATE 九霄云袍 [天品]
+    (no field changes)
+  UPDATE 织霞皇袍 [皇品]
+    (no field changes)
+  UPDATE 星河帝袍 [帝品]
+    (no field changes)
+  UPDATE 上清道袍 [道品]
+    (no field changes)
+  UPDATE 云锦仙袍 [仙品]
+    (no field changes)
+  UPDATE 混元两仪袍 [混元先天]
+    (no field changes)
+
+Running budget gate (validate_budget.py)...
+
+== weapons.csv (11 rows) ==
+  PASS sword_001    L1   中 每击=   14.0 预算=[  12.5,  16.7] TTK= 7.1 青铜剑
+  WARN sword_003    L10  中 每击=   69.5 预算=[  29.4,  39.2] TTK= 3.4 碧水灵剑
+  PASS staff_101    L11  重 每击=   43.0 预算=[  41.7,  62.5] TTK= 5.8 狼牙棒
+  PASS dagger_005   L21  轻 每击=   50.0 预算=[  40.0,  50.0] TTK= 8.0 血月地匕
+  PASS sword_006    L31  中 每击=   79.0 预算=[  68.8,  91.7] TTK= 7.0 青云天剑
+  PASS broadsword_007 L41  重 每击=  121.0 预算=[ 116.7, 175.0] TTK= 5.8 撼地皇刀
+  PASS spear_008    L51  中 每击=  121.0 预算=[ 106.2, 141.7] TTK= 7.0 弑龙帝枪
+  PASS talisman_009 L61  轻 每击=  125.0 预算=[ 100.0, 125.0] TTK= 8.0 太一道符
+  PASS blade_010    L71  中 每击=  164.0 预算=[ 143.8, 191.7] TTK= 7.0 斩仙神刀
+  PASS cauldron_011 L81  重 每击=  224.0 预算=[ 216.7, 325.0] TTK= 5.8 混元至宝鼎
+  WARN wpn_qy_001   L21   每击=   70.0 预算=[   0.0,   0.0] TTK= 5.7 青云镇山剑
+
+== weapons.csv (11 rows) ==
+  PASS sword_006 trigger_skills[0] 裂空斩 on_attack damage_bonus rate=0.15 value=0.4 期望增幅=6.0%
+  PASS broadsword_007 trigger_skills[0] 崩山击 on_attack damage_bonus rate=0.12 value=0.6 期望增幅=7.2%
+  PASS spear_008 trigger_skills[0] 蓄锐式 round_start damage_bonus rate=0.12 value=0.6 期望增幅=7.2%
+  PASS cauldron_011 trigger_skills[0] 震魂槌 on_attack stun rate=0.08 value=0.0 期望增幅=0.0%
+  WARN wpn_qy_001 trigger_skills[0] 含税每击 74.2 越带上限 0.0
+  PASS wpn_qy_001 trigger_skills[0] 青云剑意 on_attack damage_bonus rate=0.15 value=0.4 期望增幅=6.0%
+
+== weapons.csv (11 rows) ==
+
+== weapons.csv (11 rows) ==
+
+== skills.csv (45 rows) ==
+  PASS common_001     期望增益=3.0% cap=30% 基础吐纳
+  PASS common_002     期望增益=10.0% cap=30% 铁布衫
+  PASS draft_leiji    期望增益=10.0% cap=30% 雷击诀
+  PASS draft_kuangfeng 期望增益=9.0% cap=30% 狂风诀
+  PASS draft_yiyahuan 期望增益=12.0% cap=30% 以牙还牙
+  PASS draft_zhenshan 期望增益=2.9% cap=30% 震山锤
+  PASS draft_juxing   期望增益=7.5% cap=30% 聚星诀
+  PASS draft_zhanyi   期望增益=10.0% cap=30% 战意诀
+  PASS draft_leizhen  期望增益=18.0% cap=30% 雷震剑诀
+  PASS draft_qingfeng 期望增益=14.4% cap=30% 青锋连斩
+  PASS spirit_001     纯大招功法（无触发技） 万剑归宗
+  PASS draft_tieshan  期望增益=20.0% cap=30% 铁山靠
+  PASS draft_baxia    期望增益=6.0% cap=30% 八式崩拳
+  PASS draft_hunyan   期望增益=7.5% cap=30% 混元护体诀
+  PASS draft_jinshen  纯大招功法（无触发技） 金身诀
+  PASS draft_zhenlong 纯大招功法（无触发技） 真龙诀
+  PASS draft_jiujian  纯大招功法（无触发技） 九剑归一
+  PASS draft_xiuluo   期望增益=5.0% cap=30% 修罗战诀
+  PASS draft_tianmo   纯大招功法（无触发技） 天魔解体
+  PASS draft_zhonghun 期望增益=2.3% cap=30% 镇魂印
+  PASS verify_heal_001 期望增益=26.2% cap=30% 回春诀
+  PASS verify_vampire_001 期望增益=21.0% cap=30% 噬血剑意
+  PASS verify_dot_001 期望增益=11.2% cap=30% 蚀骨咒
+  PASS verify_survive_001 纯大招功法（无触发技） 涅槃诀
+  WARN verify_unavoidable_001 utility effect=unavoidable，跳过数值校验 破风剑意
+  PASS draft_wandu    期望增益=6.0% cap=30% 万毒掌
+  WARN draft_ningshen utility effect=buff，跳过数值校验 凝神诀
+  WARN draft_yingji   utility effect=unavoidable，跳过数值校验 鹰击诀
+  WARN draft_qingming utility effect=buff，跳过数值校验 青冥剑诀
+  WARN draft_lingshe  utility effect=debuff，跳过数值校验 灵蛇缠身
+  WARN draft_tieji    utility effect=reflect，跳过数值校验 铁棘功
+  WARN draft_xuanwu   utility effect=buff，跳过数值校验 玄武诀
+  PASS draft_liaoshang 期望增益=26.2% cap=30% 疗伤诀
+  PASS draft_jiuyou   纯大招功法（无触发技） 九幽噬魂咒
+  PASS draft_huitian  纯大招功法（无触发技） 回天圣手
+  PASS draft_shiling  期望增益=29.4% cap=30% 噬灵魔功
+  PASS draft_pojun    期望增益=11.2% cap=30% 破军诀
+  PASS verify_fatigue_001 期望增益=0.0% cap=30% 燃血诀
+  PASS impart_skill_001 期望增益=6.3% cap=30% 传承·破妄一击
+  PASS impart_skill_002 期望增益=9.9% cap=30% 传承·归元护体
+  PASS qy_001         期望增益=5.4% cap=30% 青云剑诀
+  PASS qy_002         期望增益=7.0% cap=30% 清风护体功
+  PASS qy_003         期望增益=12.5% cap=30% 紫霄雷引
+  WARN hx_001         utility effect=debuff，跳过数值校验 蚀心魔音
+  PASS hx_002         期望增益=9.9% cap=30% 血影掠杀
+
+== skills.csv (45 rows) ==
+  WARN qy_001         路线系数越出三族规范：灵修=1.1 体修=0.9（通用 (0.95, 1.05) / 路线向 (1.2, 1.4)×(0.5, 0.7)） 青云剑诀
+  WARN qy_003         路线系数越出三族规范：灵修=1.2 体修=0.8（通用 (0.95, 1.05) / 路线向 (1.2, 1.4)×(0.5, 0.7)） 紫霄雷引
+  WARN hx_002         路线系数越出三族规范：灵修=0.9 体修=1.1（通用 (0.95, 1.05) / 路线向 (1.2, 1.4)×(0.5, 0.7)） 血影掠杀
+
+== heart_methods.csv (21 rows) ==
+  PASS heart_001    被动合规 长春功
+  PASS heart_004    被动合规 养气诀
+  PASS heart_101    被动合规 烈火功
+  PASS heart_102    被动合规 龟息功
+  PASS heart_201    被动合规 金罡诀
+  PASS heart_202    被动合规 云游诀
+  PASS heart_301    被动合规 玄影功
+  PASS heart_302    被动合规 紫府功
+  PASS heart_401    被动合规 战神诀
+  PASS heart_402    被动合规 不动明王功
+  PASS heart_501    被动合规 疾风迅雷功
+  PASS heart_502    被动合规 归一诀
+  PASS heart_601    被动合规 太虚功
+  PASS heart_602    被动合规 万寿诀
+  PASS heart_701    被动合规 乾坤功
+  PASS heart_702    被动合规 无我功
+  PASS heart_801    被动合规 混元一气功
+  PASS heart_802    被动合规 大梦千秋诀
+  PASS impart_hm_001 被动合规 传承心法·吐纳
+  PASS impart_hm_002 被动合规 传承心法·归元
+  PASS heart_qy_001 被动合规 青云心典
+
+== heart_methods.csv (21 rows) ==
+
+== armors.csv (18 rows) ==
+  PASS plate_001    L1   重甲 总减伤=20.29% 带=[18%,22%]（天生6+武器15+件7） 铁叶甲
+  PASS plate_001    重甲 EHP倍率=1.2545（H=150 bonus_hp=0） 铁叶甲
+  PASS plate_002    L11  重甲 总减伤=20.15% 带=[18%,22%]（天生6+武器30+件17） 灵岩甲
+  PASS plate_002    重甲 EHP倍率=1.2642（H=319 bonus_hp=3） 灵岩甲
+  PASS plate_003    L21  重甲 总减伤=20.10% 带=[18%,22%]（天生6+武器45+件27） 玄岳重铠
+  PASS plate_003    重甲 EHP倍率=1.2752（H=478 bonus_hp=9） 玄岳重铠
+  PASS plate_004    L31  重甲 总减伤=20.08% 带=[18%,22%]（天生6+武器60+件37） 镇岳神甲
+  PASS plate_004    重甲 EHP倍率=1.2871（H=628 bonus_hp=18） 镇岳神甲
+  PASS plate_005    L41  重甲 总减伤=20.06% 带=[18%,22%]（天生6+武器75+件47） 崩岳皇铠
+  PASS plate_005    重甲 EHP倍率=1.2992（H=700 bonus_hp=27） 崩岳皇铠
+  PASS plate_006    L51  重甲 总减伤=20.05% 带=[18%,22%]（天生6+武器90+件57） 镇狱帝铠
+  PASS plate_006    重甲 EHP倍率=1.2994（H=850 bonus_hp=33） 镇狱帝铠
+  PASS plate_007    L61  重甲 总减伤=20.05% 带=[18%,22%]（天生6+武器105+件67） 太虚道甲
+  PASS plate_007    重甲 EHP倍率=1.2995（H=1000 bonus_hp=39） 太虚道甲
+  PASS plate_008    L71  重甲 总减伤=20.04% 带=[18%,22%]（天生6+武器120+件77） 不灭仙铠
+  PASS plate_008    重甲 EHP倍率=1.2996（H=1150 bonus_hp=45） 不灭仙铠
+  PASS plate_009    L81  重甲 总减伤=20.04% 带=[18%,22%]（天生6+武器135+件87） 混元玄武甲
+  PASS plate_009    重甲 EHP倍率=1.2996（H=1300 bonus_hp=51） 混元玄武甲
+  PASS robe_001     L1   法袍 总减伤=14.06% 带=[12%,16%]（天生0+武器15+件3） 粗布法袍
+  PASS robe_001     法袍 EHP倍率=1.2483（H=110 bonus_hp=8） 粗布法袍
+  PASS robe_002     L11  法袍 总减伤=13.93% 带=[12%,16%]（天生0+武器30+件4） 流云袍
+  PASS robe_002     法袍 EHP倍率=1.2643（H=261 bonus_hp=23） 流云袍
+  PASS robe_003     L21  法袍 总减伤=13.89% 带=[12%,16%]（天生0+武器45+件5） 星纹法袍
+  PASS robe_003     法袍 EHP倍率=1.2741（H=422 bonus_hp=41） 星纹法袍
+  PASS robe_004     L31  法袍 总减伤=14.05% 带=[12%,16%]（天生0+武器60+件7） 九霄云袍
+  PASS robe_004     法袍 EHP倍率=1.2872（H=592 bonus_hp=63） 九霄云袍
+  PASS robe_005     L41  法袍 总减伤=14.00% 带=[12%,16%]（天生0+武器75+件8） 织霞皇袍
+  PASS robe_005     法袍 EHP倍率=1.3006（H=700 bonus_hp=83） 织霞皇袍
+  PASS robe_006     L51  法袍 总减伤=13.96% 带=[12%,16%]（天生0+武器90+件9） 星河帝袍
+  PASS robe_006     法袍 EHP倍率=1.3004（H=850 bonus_hp=101） 星河帝袍
+  PASS robe_007     L61  法袍 总减伤=14.04% 带=[12%,16%]（天生0+武器105+件11） 上清道袍
+  PASS robe_007     法袍 EHP倍率=1.2995（H=1000 bonus_hp=117） 上清道袍
+  PASS robe_008     L71  法袍 总减伤=14.01% 带=[12%,16%]（天生0+武器120+件12） 云锦仙袍
+  PASS robe_008     法袍 EHP倍率=1.3005（H=1150 bonus_hp=136） 云锦仙袍
+  PASS robe_009     L81  法袍 总减伤=13.99% 带=[12%,16%]（天生0+武器135+件13） 混元两仪袍
+  PASS robe_009     法袍 EHP倍率=1.3004（H=1300 bonus_hp=154） 混元两仪袍
+  PASS 凡品     对称EHP 重甲=1.2545 法袍=1.2483 偏差=0.50%（容差 ±5%）
+  PASS 灵品     对称EHP 重甲=1.2642 法袍=1.2643 偏差=0.01%（容差 ±5%）
+  PASS 地品     对称EHP 重甲=1.2752 法袍=1.2741 偏差=0.08%（容差 ±5%）
+  PASS 天品     对称EHP 重甲=1.2871 法袍=1.2872 偏差=0.01%（容差 ±5%）
+  PASS 皇品     对称EHP 重甲=1.2992 法袍=1.3006 偏差=0.11%（容差 ±5%）
+  PASS 帝品     对称EHP 重甲=1.2994 法袍=1.3004 偏差=0.08%（容差 ±5%）
+  PASS 道品     对称EHP 重甲=1.2995 法袍=1.2995 偏差=0.00%（容差 ±5%）
+  PASS 仙品     对称EHP 重甲=1.2996 法袍=1.3005 偏差=0.07%（容差 ±5%）
+  PASS 混元先天   对称EHP 重甲=1.2996 法袍=1.3004 偏差=0.06%（容差 ±5%）
+  PASS 通用件占比 18/18 = 100%（硬约束 ≥50%）
+
+== armors.csv (18 rows) ==
+
+== enemies.csv (31 rows) ==
+  PASS 练气段矩阵 4普通+2精英+1Boss：实际 {'normal': 4, 'elite': 2, 'boss': 1}
+  PASS 筑基段矩阵 4普通+2精英+1Boss：实际 {'normal': 4, 'elite': 2, 'boss': 1}
+  PASS 金丹段矩阵 4普通+2精英+1Boss：实际 {'normal': 4, 'elite': 2, 'boss': 1}
+  PASS 元婴段矩阵 4普通+2精英+1Boss：实际 {'normal': 4, 'elite': 2, 'boss': 1}
+  PASS 守护 3 只：实际 3
+  PASS 词缀轮转 3×/3×/2：实际 {'狂暴': 3, '坚甲': 3, '嗜血': 2}（共 8 精英位）
+  PASS Boss 四技齐备且唯一：实际 ['九尾现形', '拱土疗伤', '狼王连咬', '鳞甲反震']
+
+Summary: 0 FAIL, 14 WARN (legacy rows 不计入 FAIL)
+
+Running narrative lint gate (lint_narrative.py)...
+
+== weapons.csv (11 rows) ==
+  WARN weapons.csv[sword_001] narrative_status=占位，叙事待写
+  WARN weapons.csv[sword_003] narrative_status=占位，叙事待写
+  WARN weapons.csv[staff_101] narrative_status=占位，叙事待写
+  WARN weapons.csv[dagger_005] narrative_status=占位，叙事待写
+  WARN weapons.csv[sword_006] narrative_status=占位，叙事待写
+  WARN weapons.csv[broadsword_007] narrative_status=占位，叙事待写
+  WARN weapons.csv[spear_008] narrative_status=占位，叙事待写
+  WARN weapons.csv[talisman_009] narrative_status=占位，叙事待写
+  WARN weapons.csv[blade_010] narrative_status=占位，叙事待写
+  WARN weapons.csv[cauldron_011] narrative_status=占位，叙事待写
+  WARN weapons.csv[wpn_qy_001] narrative_status=占位，叙事待写
+
+== skills.csv (45 rows) ==
+  WARN skills.csv[common_001] narrative_status=占位，叙事待写
+  WARN skills.csv[common_002] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_leiji] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_kuangfeng] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_yiyahuan] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_zhenshan] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_juxing] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_zhanyi] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_leizhen] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_qingfeng] narrative_status=占位，叙事待写
+  WARN skills.csv[spirit_001] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_tieshan] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_baxia] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_hunyan] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_jinshen] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_zhenlong] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_jiujian] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_xiuluo] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_tianmo] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_zhonghun] narrative_status=占位，叙事待写
+  WARN skills.csv[verify_heal_001] narrative_status=占位，叙事待写
+  WARN skills.csv[verify_vampire_001] narrative_status=占位，叙事待写
+  WARN skills.csv[verify_dot_001] narrative_status=占位，叙事待写
+  WARN skills.csv[verify_survive_001] narrative_status=占位，叙事待写
+  WARN skills.csv[verify_unavoidable_001] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_wandu] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_ningshen] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_yingji] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_qingming] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_lingshe] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_tieji] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_xuanwu] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_liaoshang] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_jiuyou] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_huitian] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_shiling] narrative_status=占位，叙事待写
+  WARN skills.csv[draft_pojun] narrative_status=占位，叙事待写
+  WARN skills.csv[verify_fatigue_001] narrative_status=占位，叙事待写
+  WARN skills.csv[impart_skill_001] narrative_status=占位，叙事待写
+  WARN skills.csv[impart_skill_002] narrative_status=占位，叙事待写
+  WARN skills.csv[qy_001] narrative_status=占位，叙事待写
+  WARN skills.csv[qy_002] narrative_status=占位，叙事待写
+  WARN skills.csv[qy_003] narrative_status=占位，叙事待写
+  WARN skills.csv[hx_001] narrative_status=占位，叙事待写
+  WARN skills.csv[hx_002] narrative_status=占位，叙事待写
+
+== heart_methods.csv (21 rows) ==
+  WARN heart_methods.csv[heart_001] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_004] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_101] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_102] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_201] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_202] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_301] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_302] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_401] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_402] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_501] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_502] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_601] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_602] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_701] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_702] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_801] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_802] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[impart_hm_001] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[impart_hm_002] narrative_status=占位，叙事待写
+  WARN heart_methods.csv[heart_qy_001] narrative_status=占位，叙事待写
+
+== armors.csv (18 rows) ==
+  WARN armors.csv[plate_001] narrative_status=占位，叙事待写
+  WARN armors.csv[plate_002] narrative_status=占位，叙事待写
+  WARN armors.csv[plate_003] narrative_status=占位，叙事待写
+  WARN armors.csv[plate_004] narrative_status=占位，叙事待写
+  WARN armors.csv[plate_005] narrative_status=占位，叙事待写
+  WARN armors.csv[plate_006] narrative_status=占位，叙事待写
+  WARN armors.csv[plate_007] narrative_status=占位，叙事待写
+  WARN armors.csv[plate_008] narrative_status=占位，叙事待写
+  WARN armors.csv[plate_009] narrative_status=占位，叙事待写
+  WARN armors.csv[robe_001] narrative_status=占位，叙事待写
+  WARN armors.csv[robe_002] narrative_status=占位，叙事待写
+  WARN armors.csv[robe_003] narrative_status=占位，叙事待写
+  WARN armors.csv[robe_004] narrative_status=占位，叙事待写
+  WARN armors.csv[robe_005] narrative_status=占位，叙事待写
+  WARN armors.csv[robe_006] narrative_status=占位，叙事待写
+  WARN armors.csv[robe_007] narrative_status=占位，叙事待写
+  WARN armors.csv[robe_008] narrative_status=占位，叙事待写
+  WARN armors.csv[robe_009] narrative_status=占位，叙事待写
+
+== enemies.csv (31 rows) ==
+  WARN enemies.csv[guardian_low] narrative_status=占位，叙事待写
+  WARN enemies.csv[guardian_mid] narrative_status=占位，叙事待写
+  WARN enemies.csv[guardian_high] narrative_status=占位，叙事待写
+
+== world_bosses.csv (4 rows) ==
+
+== events-canon.csv (15 rows) ==
+  WARN events.csv[herb_bloom] narrative_status=占位，叙事待写
+  WARN events.csv[travel_insight] narrative_status=占位，叙事待写
+  WARN events.csv[ally_help] narrative_status=占位，叙事待写
+  WARN events.csv[steady_path] narrative_status=占位，叙事待写
+  WARN events.csv[beast_skirmish] narrative_status=占位，叙事待写
+  WARN events.csv[secret_cache] narrative_status=占位，叙事待写
+  WARN events.csv[blood_battle] narrative_status=占位，叙事待写
+  WARN events.csv[ancient_trial] narrative_status=占位，叙事待写
+  WARN events.csv[trade_windfall] narrative_status=占位，叙事待写
+  WARN events.csv[ambush_fail] narrative_status=占位，叙事待写
+  WARN events.csv[lost_in_fog] narrative_status=占位，叙事待写
+  WARN events.csv[elder_guidance] narrative_status=占位，叙事待写
+  WARN events.csv[sect_errand] narrative_status=占位，叙事待写
+  WARN events.csv[sect_duel] narrative_status=占位，叙事待写
+  WARN events.csv[sect_trial] narrative_status=占位，叙事待写
+
+== rifts-canon.csv (6 rows) ==
+  WARN rifts.csv[1] narrative_status=占位，叙事待写
+  WARN rifts.csv[2] narrative_status=占位，叙事待写
+  WARN rifts.csv[3] narrative_status=占位，叙事待写
+  WARN rifts.csv[4] narrative_status=占位，叙事待写
+  WARN rifts.csv[5] narrative_status=占位，叙事待写
+  WARN rifts.csv[6] narrative_status=占位，叙事待写
+
+== bounty-canon.csv (8 rows) ==
+  WARN bounty.csv[301] narrative_status=占位，叙事待写
+  WARN bounty.csv[302] narrative_status=占位，叙事待写
+  WARN bounty.csv[303] narrative_status=占位，叙事待写
+  WARN bounty.csv[304] narrative_status=占位，叙事待写
+  WARN bounty.csv[305] narrative_status=占位，叙事待写
+  WARN bounty.csv[306] narrative_status=占位，叙事待写
+  WARN bounty.csv[307] narrative_status=占位，叙事待写
+  WARN bounty.csv[308] narrative_status=占位，叙事待写
+
+== config description 字段（events/enemies/bounty/routes） ==
+
+== copy_variants.csv（变体设计表） ==
+  WARN copy_variants.csv:145 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:146 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:147 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:148 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:149 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:150 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:151 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:152 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:153 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:154 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:155 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:156 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:157 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:158 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:159 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:160 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:161 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:162 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:163 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:164 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:165 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:166 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:189 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:190 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:191 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:192 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:193 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:194 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:195 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:196 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:197 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:198 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:199 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:200 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:201 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:202 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:203 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:204 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:205 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:206 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:207 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:208 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:209 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:210 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:233 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:234 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:235 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:236 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:237 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:238 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:239 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:240 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:241 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:242 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:243 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:244 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:245 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:246 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:247 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:248 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:249 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:250 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:251 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:252 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:253 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:254 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:277 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:278 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:279 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:280 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:281 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:282 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:283 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:284 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:285 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:286 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:287 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:288 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:289 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:290 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:291 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:292 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:293 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:294 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:295 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:296 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:297 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:298 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:321 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:322 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:323 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:324 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:325 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:326 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:327 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:328 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:329 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:330 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:331 [adventure_event.sect_duel] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:332 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:333 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:334 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:335 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:336 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:337 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:338 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:339 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:340 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:341 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+  WARN copy_variants.csv:342 [adventure_event.sect_trial] scene 未在运行时模板登记（见 scene_key_registry.md；四宗组待 bd n6o 立组时登记）
+
+Summary: 0 FAIL, 237 WARN
+
+Wrote /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/config/weapons.json, /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/config/heart_methods.json, /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/config/skills.json, /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/config/items.json, /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/config/enemies.json.

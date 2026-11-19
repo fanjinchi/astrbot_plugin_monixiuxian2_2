@@ -68,7 +68,7 @@ async def test_fresh_install_reaches_latest_version():
     # learned_skills column must NOT exist
     assert "learned_skills" not in columns, "learned_skills column still present"
 
-    # 全部 24 张业务表齐备
+    # 业务表齐备（旧 boss 表已由 v40 删除，不再出现在 fresh schema）
     async with aiosqlite.connect(":memory:") as db_conn2:
         await MigrationManager(db_conn2, DummyConfigManager()).migrate_or_reset()
         tables = await _all_tables(db_conn2)
@@ -78,7 +78,6 @@ async def test_fresh_install_reaches_latest_version():
             "shop",
             "sects",
             "buff_info",
-            "boss",
             "rifts",
             "legacy_instances",
             "impart_pk_cooldown",

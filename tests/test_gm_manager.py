@@ -141,7 +141,7 @@ def mock_managers():
             awaits_combat_choice=AsyncMock(return_value=False),
         ),
         "rift_manager": MagicMock(),
-        "boss_manager": MagicMock(),
+        "world_boss_service": MagicMock(),
         "bounty_manager": MagicMock(),
     }
 
@@ -155,7 +155,7 @@ def gm_manager(mock_db, mock_config_manager, mock_managers, plugin_data_dir):
         equipment_manager=mock_managers["equipment_manager"],
         adventure_manager=mock_managers["adventure_manager"],
         rift_manager=mock_managers["rift_manager"],
-        boss_manager=mock_managers["boss_manager"],
+        world_boss_service=mock_managers["world_boss_service"],
         bounty_manager=mock_managers["bounty_manager"],
         plugin_data_path=plugin_data_dir,
         busy_state=make_busy_state(mock_db),
@@ -593,21 +593,32 @@ class TestAuditLog:
 
 class TestSpawnBoss:
     @pytest.mark.asyncio
-    async def test_spawn_boss_triggers_broadcast(self, gm_manager, mock_managers):
-        boss = MagicMock()
-        boss.boss_name = "测试Boss"
-        mock_managers["boss_manager"].auto_spawn_boss = AsyncMock(
-            return_value=(True, "", boss)
+    async def test_spawn_boss_uses_domain_ensure_spawn(self, gm_manager, mock_managers):
+        service = mock_managers["world_boss_service"]
+        service.ensure_spawn = AsyncMock(
+            return_value=({"boss_name": "测试Boss"}, True, "wb_lq_ba")
         )
-        callback = AsyncMock()
-        gm_manager.broadcast_callback = callback
 
         event = make_event(sender_id="gm_001")
         success, msg = await gm_manager.cmd_spawn_boss(event, "")
 
         assert success is True
         assert "测试Boss" in msg
-        callback.assert_awaited_once_with(boss)
+        service.ensure_spawn.assert_awaited_once_with(None)
+
+    @pytest.mark.asyncio
+    async def test_spawn_boss_forwards_profile_id(self, gm_manager, mock_managers):
+        service = mock_managers["world_boss_service"]
+        service.ensure_spawn = AsyncMock(
+            return_value=({"boss_name": "裂峡罴王"}, True, "wb_lq_ba")
+        )
+
+        event = make_event(sender_id="gm_001")
+        success, msg = await gm_manager.cmd_spawn_boss(event, "wb_lq_ba")
+
+        assert success is True
+        service.ensure_spawn.assert_awaited_once_with("wb_lq_ba")
+        assert "裂峡罴王" in msg
 
 
 class TestForceSettlement:
@@ -1174,7 +1185,7 @@ async def gm_real_db(real_db, mock_config_manager, plugin_data_dir):
         equipment_manager=MagicMock(),
         adventure_manager=adventure,
         rift_manager=None,
-        boss_manager=None,
+        world_boss_service=None,
         bounty_manager=None,
         plugin_data_path=plugin_data_dir,
         busy_state=make_busy_state(real_db),
@@ -1229,7 +1240,21 @@ async def _seed_time_skip_domains(db, now):
         (now - 9000, now - 8000),
     )
     await db.ext.set_system_config("bounty_abandon_cd_u_bounty", str(now + 1800))
-    await db.ext.set_system_config("boss_next_spawn_time", str(now + 600))
+    # 世界 Boss 域（v37 表，E2 起唯一属主）：到期/再生两个绝对时间戳都前移
+    await db.conn.execute(
+        "INSERT INTO world_boss_instances "
+        "(instance_id, profile_id, boss_name, max_hp, current_hp, state, "
+        "expires_at, next_spawn_at) VALUES ('wb_time_active', 'wb_lq_ba', "
+        "'裂峡罴王', 1000, 1000, 'active', ?, 0)",
+        (now + 3600,),
+    )
+    await db.conn.execute(
+        "INSERT INTO world_boss_instances "
+        "(instance_id, profile_id, boss_name, max_hp, current_hp, state, "
+        "expires_at, next_spawn_at) VALUES ('wb_time_done', 'wb_zj_tuo', "
+        "'泽底鼍龙', 1800, 0, 'defeated', 0, ?)",
+        (now + 7200,),
+    )
     # 已过期字段：前移只会更深地留在过去，不会倒排到未来
     await db.ext.set_system_config("spirit_eye_next_spawn_time", str(now - 100))
     await db.ext.set_system_config("unrelated_key", "not_a_timestamp")
@@ -1263,9 +1288,12 @@ class TestTimeSkip:
         assert "确认" in msg
         cd = await real_db.ext.get_user_cd("u_adv")
         assert cd.scheduled_time == now + 3600
-        assert await real_db.ext.get_system_config("boss_next_spawn_time") == str(
-            now + 600
-        )
+        async with real_db.conn.execute(
+            "SELECT expires_at FROM world_boss_instances "
+            "WHERE instance_id = 'wb_time_active'"
+        ) as cur:
+            (expires_at,) = await cur.fetchone()
+        assert expires_at == now + 3600
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("bad", ["abc", "0", "-5", "3.5", ""])
@@ -1337,12 +1365,18 @@ class TestTimeSkip:
         assert loans["u_loan"] == now + 86400 - 3600
         assert loans["u_repaid"] == now - 8000
 
-        # system_config 三键；非时间戳键不动；已过期字段不倒排到未来
+        # 世界 Boss：active 行的 expires_at 与终态行的 next_spawn_at 都前移
+        async with real_db.conn.execute(
+            "SELECT instance_id, expires_at, next_spawn_at "
+            "FROM world_boss_instances ORDER BY instance_id"
+        ) as cur:
+            bosses = {r[0]: (r[1], r[2]) async for r in cur}
+        assert bosses["wb_time_active"] == (now + 3600 - 3600, 0)
+        assert bosses["wb_time_done"] == (0, now + 7200 - 3600)
+
+        # system_config 两键；非时间戳键不动；已过期字段不倒排到未来
         assert await real_db.ext.get_system_config("bounty_abandon_cd_u_bounty") == str(
             now + 1800 - 3600
-        )
-        assert await real_db.ext.get_system_config("boss_next_spawn_time") == str(
-            now + 600 - 3600
         )
         eye = int(await real_db.ext.get_system_config("spirit_eye_next_spawn_time"))
         assert eye == now - 100 - 3600 < now
@@ -1363,10 +1397,12 @@ class TestTimeSkip:
             "进行中悬赏过期时间：1 条",
             "贷款到期时间：1 条",
             "悬赏放弃冷却：1 条",
-            "Boss/灵眼下次刷新时间：2 条",
+            "世界Boss实例到期时间：1 条",
+            "世界Boss下次再生时间：1 条",
+            "灵眼下次刷新时间：1 条",
             "传承挑战冷却：1 条",
             "传承被夺保护期：1 条",
-            "共前移 11 条",
+            "共前移 12 条",
         ):
             assert fragment in msg
 

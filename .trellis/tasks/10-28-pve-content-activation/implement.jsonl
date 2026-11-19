@@ -3,3 +3,4 @@
 {"file":".trellis/spec/backend/quality-guidelines.md","reason":"端到端、并发、重启与完整质量门证据"}
 {"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"内容 sync→config→catalog→领域→poller→广播全链路"}
 {"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"旧实现整删后不留双真相源，复用 Health/Outbox/registry"}
+{"file":".trellis/tasks/10-28-pve-content-activation/research/content-approval.md","reason":"28+4 用户审批入口、完整 diff 链接与 pending 决策；不得把预览当批准"}

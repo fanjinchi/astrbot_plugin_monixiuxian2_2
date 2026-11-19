@@ -56,7 +56,7 @@ def _manifest(design_dir: Path, *, columns=None, narrative=None, break_hash=Fals
         datasets[name] = {
             "sha256": digest,
             "columns": cols,
-            "narrative_status": (["定稿", "豁免"] if narrative is None else narrative),
+            "narrative_status": (["定稿"] if narrative is None else narrative),
         }
     return {"datasets": datasets}
 
@@ -185,6 +185,33 @@ class TestFormalApprovalGate:
         assert doc == {}
         assert any("未在 manifest 叙事决策中获批" in e for e in errors)
 
+    def test_combat_only_placeholder_renders_without_narrative_approval(self, tmp_path):
+        design = tmp_path / "design"
+        _rewrite_csvs(DESIGN_DIR, design, status="final", narrative="占位")
+        existing = {"enemy_groups": [], "drop_tables": {}, "naming": {}}
+        doc, errors = _render(
+            design,
+            manifest=_manifest(design, narrative=["占位"]),
+            existing=existing,
+        )
+        assert errors == []
+        assert len(doc["world_bosses"]) == 4
+        assert all(b["narrative_status"] == "占位" for b in doc["world_bosses"])
+        assert all(b["narrative_approved"] is False for b in doc["world_bosses"])
+
+    def test_explicit_narrative_waiver_allows_placeholder_and_approves(self, tmp_path):
+        design = tmp_path / "design"
+        _rewrite_csvs(DESIGN_DIR, design, status="final", narrative="占位")
+        existing = {"enemy_groups": [], "drop_tables": {}, "naming": {}}
+        doc, errors = _render(
+            design,
+            manifest=_manifest(design, narrative=["豁免"]),
+            existing=existing,
+        )
+        assert errors == []
+        assert all(b["narrative_status"] == "占位" for b in doc["world_bosses"])
+        assert all(b["narrative_approved"] is True for b in doc["world_bosses"])
+
     def test_guardian_draft_rows_do_not_block_formal(self, tmp_path):
         """守护者行是专项组配置源（不写进名册 sections），draft 不拦 Batch 5。"""
         design = tmp_path / "design"
@@ -219,6 +246,7 @@ class TestFormalApprovalGate:
         assert doc["source"]["approval"]["datasets"]
         assert doc["enemy_groups"] == existing["enemy_groups"]
         assert doc["drop_tables"] == existing["drop_tables"]
+        assert all(b["narrative_approved"] is True for b in doc["world_bosses"])
         # 旧动态派生字段不得混入正式文档
         assert "difficulty_coefficients" not in doc
         assert _schema.validate_enemy_document(doc) == []

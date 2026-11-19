@@ -2,7 +2,7 @@
 
 ## 1. 执行原则
 
-父任务只管源需求、依赖顺序、跨 child 验收与上线门，不承载产品代码。状态（2026-11-05）：A/B/P/C/F 已归档；D、E1 可开工；E2 待 D/E1 归档 + 用户内容批准。代码实施批准与内容同步批准是两个独立动作。
+父任务只管源需求、依赖顺序、跨 child 验收与上线门，不承载产品代码。状态：A/B/P/C/F/D/E1 已归档（7/8）；E2 已完成用户战斗与叙事批准、正式 sync、切流、两轮代码复核及最终验收，当前待 Phase 3.4 本地提交后归档。代码实施批准与内容同步批准是两个独立动作。
 
 ## 2. Children
 
@@ -13,8 +13,8 @@
 | P `10-10-pve-persistence-transaction-foundation` ✅ | 共享数据基座 | v36…v39、fresh parity、事务叶子、settlement/Boss/outbox schema | 领域接线前 |
 | F `10-22-adventure-flee-contract-rework` ✅ | R4 逃跑；AC4 | 全风险段 pending、×0.3、不滚掉落/传承 | 单提交 revert |
 | C `10-10-pve-adventure-settlement` ✅ | R4；AC4 | pending、逃跑、气血回写、1% 战败保底、全局疲劳 | handler 切流前 |
-| D `10-10-pve-world-boss-domain` | R5/R6；AC5/AC6 | 固定实例与出生快照、生命周期、北京日 3 次、原子挑战、outbox | poller/handler 切流前 |
-| E1 `10-10-pve-cross-system-integration` | R7；AC1/AC2/AC4/AC7a | 地板单源、消费者复核、暴击双侧接线、事务叶子、文档与版本 | 地板与消费者收口前备份 |
+| D `10-10-pve-world-boss-domain` ✅ | R5/R6；AC5/AC6 | 固定实例与出生快照、生命周期、北京日 3 次、原子挑战、outbox | poller/handler 切流前 |
+| E1 `10-10-pve-cross-system-integration` ✅ | R7；AC1/AC2/AC4/AC7a | 地板单源、消费者复核、暴击双侧接线、事务叶子、文档与版本 | 地板与消费者收口前备份 |
 | E2 `10-28-pve-content-activation` | R7；AC3b/AC7b + 激活 | 内容批准/sync、旧 Boss 整删、普通 PVE 切流、原子激活 | 激活前 DB + generated config 备份 |
 
 Step 7 奖励经济不是 child；C/D 只输出稳定事实。
@@ -46,8 +46,8 @@ A/B 可并行；C 与 D 可并行；E1 可与 D 并行（只碰地板/消费者/
 - **Batch 0 规划审批**：审批本父文档与各 child 工件；不启动实现、不跑 sync。
 - **Batch 1 Foundations（A+B）✅**：三方契约冻结；B 的 preview 不等于内容批准。
 - **Batch 2 Persistence（P）✅**：v36…vN、fresh parity、事务/幂等/registry 契约冻结。
-- **Batch 3 Gameplay（C ✅ / F ✅ / D）**：世界 Boss 状态机、挑战、台账、outbox；不含 Step 7 奖励。
-- **Batch 4 E1（可独立关闭）**：地板单源与消费者收口（含宗门入口）、暴击双侧接线、事务叶子清零、文档与版本。Gate 4 = 产品范围 ruff/pytest + `audit_pve_redesign.py --scope e1` 为 0。
+- **Batch 3 Gameplay（C ✅ / F ✅ / D ✅）**：世界 Boss 状态机、挑战、台账、outbox；不含 Step 7 奖励。
+- **Batch 4 E1 ✅**：地板单源与消费者收口（含宗门入口）、暴击双侧接线、事务叶子清零、文档与版本。Gate 4 = 产品范围 ruff/pytest + `audit_pve_redesign.py --scope e1` 为 0。
 - **Batch 5 E2（外部门）**：内容批准 → sync → 整删旧 Boss → 普通 PVE 切流 → 新入口/poller 激活 → 最终回归；任一步失败按 RP 整组回滚，禁止旧/new 双跑。Gate 5 = `audit_pve_redesign.py --scope all` 为 0 + 端到端证据（详见 E2 文档）。
 
 ## 5. 父级验收矩阵

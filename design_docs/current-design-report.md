@@ -2,13 +2,13 @@
 
 > **文档状态**：
 > - 创建：**2026-07-29**（重设计起点，与 `redesign-combat-skills` 变更同批，commit 8fa47f7）
-> - 最近更新：**2026-11-14**（Trellis E1：PVE 败场/平局 1% 动态气血地板全入口收口；暴击基础配置双侧接线；战斗气血持久化由 HealthService 统一）
+> - 最近更新：**2026-11-19**（Trellis E2：28+4 战斗与叙事正式同步；普通 PVE 固定名册切流；旧 Boss 整删并启用新生命周期/outbox；数据库 v40）
 > - 定位：**数值细节基线（活文档，非归档）**——架构总览见 `project-architecture.md`，行为契约见
 >   `openspec/specs/`；本文是数值/公式/数据库的权威基线，被 `project-architecture.md` §1/§3 引用。
 > - 维护义务：内容必须与代码同步（插件根 `AGENTS.md` §14，影响玩法的修改须同步修正本文）；
 >   若未来被新报告取代，移入 archive 并更新本标注。
 >
-> 生成方式：基于源码静态分析（含 `file:line` 引用），数据库结构以 `data/migration.py` 最新版本 **v39** 为准。
+> 生成方式：基于源码静态分析（含 `file:line` 引用），数据库结构以 `data/migration.py` 最新版本 **v40** 为准。
 > 战斗与属性体系为 **CombatEngine 四主属性框架**（伤害/身法/迅捷/气血 + 护甲），规范见 `openspec/specs/`（attribute-numerics / combat-core / level-progression / skill-system）。
 
 ---
@@ -17,9 +17,9 @@
 
 - **类型**：AstrBot 插件（群聊文字修仙游戏），Python 异步，无独立构建系统
 - **宿主**：运行于 `~/code/AstrBot/data/plugins/` 下，依赖 AstrBot 提供的 `Context`、`filter`、`Star` API
-- **数据库**：SQLite（aiosqlite），文件为 `xiuxian_data_lite.db`，存放于 `data/plugin_data/astrbot_plugin_monixiuxian2_2_2/`
+- **数据库**：SQLite（aiosqlite），文件为 `xiuxian_data_lite.db`，存放于 `data/plugin_data/astrbot_plugin_monixiuxian2_2/`
 - **第三方依赖**：无（Pillow 已随 image_generator 死代码一并移除）
-- **静态配置**：22 个 JSON 文件（`config/`），由 `config_manager.py` 加载，修改后需重启生效
+- **静态配置**：21 个 JSON 文件（`config/`），由 `config_manager.py` 加载，修改后需重启生效
 - **动态配置**：`_conf_schema.json` 暴露给 AstrBot WebUI（白名单、数值、灵根、数据库文件名）
 
 ---
@@ -29,19 +29,19 @@
 ### 2.1 目录结构与分层
 
 ```
-main.py                # 插件入口（Star 子类）：~103 个指令注册、依赖装配、定时任务
+main.py                # 插件入口（Star 子类）：指令注册、依赖装配、定时任务
 ├── handlers/          # 指令处理层（26 个文件，按系统分类）
 │   └── utils.py       # @player_required 装饰器、忙碌白名单、贷款逾期检查
-├── managers/          # 业务逻辑层（17 个管理器：战斗/宗门/Boss/银行/悬赏/秘境…）
+├── managers/          # 业务逻辑层（17 个管理器：战斗/宗门/世界 Boss/银行/悬赏/秘境…）
 ├── core/              # 通用系统层（9 个模块：修炼/突破/丹药/装备/商店/储物戒/GM）
 ├── data/              # 数据层
 │   ├── data_manager.py        # 连接管理 + 玩家 CRUD（ensure_connection 自动重连）
-│   ├── database_extended.py   # 宗门/Boss/秘境/银行/悬赏等扩展 CRUD
-│   ├── migration.py           # 版本化迁移（当前 LATEST_DB_VERSION = 39）
+│   ├── database_extended.py   # 宗门/秘境/银行/悬赏等扩展 CRUD
+│   ├── migration.py           # 版本化迁移（当前 LATEST_DB_VERSION = 40）
 │   └── default_configs.py     # 内置默认配置（config/*.json 缺失时创建）
 ├── models.py          # Player、Item 数据模型（dataclass）
-├── models_extended.py # Sect/BuffInfo/Boss/Rift/ImpartInfo/UserCd + UserStatus 枚举
-├── config/            # 22 个静态 JSON 配置
+├── models_extended.py # Sect/BuffInfo/Rift/ImpartInfo/UserCd + UserStatus 枚举
+├── config/            # 21 个静态 JSON 配置
 ├── utils/             # 图片生成、配置加载辅助
 └── tests/             # pytest（用 tests/helpers.py 的 load_module 绕过相对导入）
 ```
@@ -60,7 +60,7 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 3. **贷款逾期即删号**：每次指令经过 `player_required` 时检查（handlers/utils.py），另有定时任务兜底。
 4. **事务保护**：并发敏感操作用 `BEGIN IMMEDIATE` + commit/rollback；定时任务先 `ensure_connection()`。
 5. **定时任务**（main.py `initialize()`，均含指数退避重试）：
-   - `_schedule_boss_spawn` Boss 自动生成（受 `boss.enabled` 开关控制）
+   - `WorldBossPoller` 世界 Boss 生命周期与 outbox 投递（`boss.enabled` 只停生成，不停已提交事件投递）
    - `_schedule_loan_check` 贷款逾期检查
    - `_schedule_spirit_eye_spawn` 灵眼生成（间隔 7200s）
    - `_schedule_bounty_check` 悬赏过期检查
@@ -74,8 +74,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | `heart_methods.json` / `skills.json` | 心法（属性被动 + 配套功法池）与功法/触发技能定义 |
 | `pills.json` / `exp_pills.json` / `utility_pills.json` | 丹药（破境丹、修为丹、功能丹） |
 | `alchemy_config.json` / `alchemy_recipes.json` | 炼丹配方与成功率 |
-| `enemies.json` | PvE 敌人模板（分组的等级区间与属性倍率） |
-| `boss_config.json` / `rift_config.json` / `sect_config.json` | Boss / 秘境 / 宗门配置（sect_config：positions 含 `promotion` 晋升门槛与 `benefits` 职阶福利、`scale_ratio` 捐献折算、`buildings` 洞天/丹房等级与消耗；rift_config 条目可带 `sect_id`+`access=sect_member` 做宗门专属秘境） |
+| `enemies.json` | schema v2 固定 PvE 名册（28 普通敌人 + 4 世界 Boss）与专项组/掉落透传配置；由获批 CSV 经 sync 生成，禁止手改 |
+| `rift_config.json` / `sect_config.json` | 秘境 / 宗门配置（sect_config：positions 含 `promotion` 晋升门槛与 `benefits` 职阶福利、`scale_ratio` 捐献折算、`buildings` 洞天/丹房等级与消耗；rift_config 条目可带 `sect_id`+`access=sect_member` 做宗门专属秘境） |
 | `sect_factions.json` / `sect_tasks.json` | 默认（系统）宗门定义（join_level_range/长老/建筑物/treasures/heart_methods/skill_pool，v28 起）与宗门建设任务池 + 师承任务链（`config_manager.py:437-441` 加载并校验） |
 | `impart_config.json` | 传承等阶（tier）与奖励表（按类型 common/sect/adventure/rift 分组） |
 | `adventure_config.json` | 历练路线与事件 |
@@ -225,14 +225,14 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 - **槽位与升星**：最多同时装备 4 本功法；重复获得同名功法自动升星强化（细节见上「升星」）
 - **路线装备池**：灵修/体修同属性池、各自专属心法/功法/武器池，通用功法对两路线应用不同倍率；心法被动加成按心法 `route_multiplier` 与玩家修炼路线乘算（百分比项与 armor_value 平加项，exp_multiplier 除外）
 
-### 4.7 PvE 与世界 Boss（过渡期状态）
+### 4.7 PvE 与世界 Boss
 
-- **功能开关**：`game_config.json` 的 `pve.enabled` / `boss.enabled`（当前均为 true）。开关关闭时对应玩法入口不可用并提示"玩法维护中"；历练（纯收益玩法）与 PvP 不受影响
-- **触发概率**：历练 low/mid/high/extreme = 30/45/65/75%（结算自动战斗，不变）；**秘境结算自 v3.14.0 起不再自动触发战斗**——改为结算后按 `puzzle_rate`/`beast_rate` 独立判定谜题/妖兽遭遇（秘境条目 `encounter_rate` 可覆盖，见 §4.12）
-- **敌人生成**（enemy_manager.py，过渡方案）：从 `config_manager.level_data`（由公式配置运行时合成的 shim，仅含 level/level_name/exp_needed/success_rate）读取基准；因合成数据**不含 base_\* 字段**，实际走 exp 派生回退（`damage ≈ exp_needed//10`、`hp ≈ exp_needed//2`），再乘模板倍率与 ±10% 随机。**全局难度系数 `pve.difficulty_multiplier` 只乘伤害**（v3.19.0 起；原实现同时乘 HP/护甲，违反 pve-enemy-design「难度只乘伤害」定案）；死配置 `difficulty_coefficients`（normal 0.85/elite 1.0/boss 1.2，加载后从未消费）已从 config 与默认表删除。敌人→FighterState 映射收敛到唯一 mapper `managers/enemy_catalog.py:build_enemy_fighter`：补齐 `level_index`（修护甲 K 常数按 lv1 取值）、真实暴击率（per-enemy `crit_rate>0` 按 /100 覆盖 `combat.base_crit_rate`，缺省/None 回退 0.15）、触发技能/大招；秘境兽/传承守护同走该 mapper。固定名册（28 敌 + 4 世界 Boss）内容治理管线与不可变 catalog（`core/enemy_schema.py` + `managers/enemy_catalog.py`）已落地并通过真实 CSV preview 四层一致性验收；**正式 sync 与调用方切流属父计划 Batch 5（待用户内容批准，本批次未执行）**，详见 `design_docs/content-design/pve-enemy-design.md`
+- **功能开关**：`game_config.json` 的 `pve.enabled` / `boss.enabled`。开关关闭时对应玩法入口不可用并提示"玩法维护中"；`boss.enabled=false` 只停自动生成，已提交 outbox 事件仍继续投递；历练（纯收益玩法）与 PvP 不受影响
+- **触发概率**：历练 low/mid/high/extreme = 30/45/65/75%；**秘境结算自 v3.14.0 起不再自动触发战斗**——改为结算后按 `puzzle_rate`/`beast_rate` 独立判定谜题/妖兽遭遇（秘境条目 `encounter_rate` 可覆盖，见 §4.12）
+- **敌人生成**：28 个普通 PVE 敌人与 4 个世界 Boss 已于 2026-11-19 经用户批准正式同步为 `enemies.json` schema v2。历练与秘境默认出怪由同一个 `EnemyCatalog` 按 `(realm_segment, category)` 固定名册生成，`pve.difficulty_multiplier` 由调用方显式传入且只乘伤害；`catalog=None` 时才保留旧 `EnemyManager` 动态派生作为 v1 回落。`enemy_groups.top` 已删除，`low/mid/high` 供回落、`legacy_guardian` 与秘境定向组继续保留。敌人→FighterState 仍唯一走 `build_enemy_fighter`，世界 Boss 同样显式读取 `combat.base_crit_rate`，per-enemy 正数覆盖、显式 0 禁用
 - **奖励**：历练自动战斗——胜利 `exp = base × 1.2 + 敌人exp`；失败 `exp = base × 0.3` + 安慰灵石 + 气血保底 `ceil(max_hp × 1%)`（见下方「败场口径」）；平局收益与 `resolved_win` 状态不变，气血同败场保留至少 1% 动态上限。**秘境迎战（可选）**：胜利 = 敌人修为 + 一次掉落 roll（item_chance=100）；失败/平局由 `HealthService` 统一保留至少 `ceil(动态 max_hp × 1%)`，机缘消耗，不动已结算基础奖励
-- **世界 Boss**（boss_manager.py）：8 档境界 hp_mult 1.0→6.0；数值同样经 level_data shim 派生；Boss 会心率固定 30%（combat.boss_crit_rate）；败给 Boss 安慰奖 `reward = int(boss经验 × 总伤害 / max_hp)`；自动刷 Boss `base_exp = 全服平均exp × 1.2`（无玩家时 50000）
-- **已知缺口**：独立于 level_config 的境界基准区间表将在 Boss/PvE 模块重做（bd-9u2，attribute-numerics 的 PvE 数值生成基准需求）落地
+- **世界 Boss**：`WorldBossService` 管理 4 只有名天灾的固定实例与出生快照，存活 48h，阶段阈值 60%/20%，北京自然日每人限 3 次；击杀后 12h、消散后 24h 获得再生资格，全服至多一个 active。`WorldBossPoller` 是唯一自动生成入口，`WorldBossEventDispatcher` 按平台实例 × 白名单群投递出场/阶段/击杀/消散文案；五类文案只读已批准出生快照，无代码或 `narrative_config.json` fallback。**当前为零奖励过渡**：只记录挑战、伤害台账、贡献与末击事实，不发灵石、修为或物品，Step 7 奖励经济另行设计
+- **旧实现移除**：旧 `BossManager/BossHandlers`、`boss_config.json`、`Boss` 模型及经验派生/30% 固定会心/安慰奖已删除；数据库 v40 删除旧 `boss` 表与 `boss_next_spawn_time`，旧数据不迁移
 
 ### 4.8 宗门（managers/sect_manager.py；config/sect_config.json + sect_factions.json + sect_tasks.json）
 
@@ -356,18 +356,19 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 
 - 统一入口 `修仙GM <子命令> [目标玩家] [参数]` + `修仙GM帮助`；权限独立于 BOSS_ADMINS，由 `_conf_schema.json` 的 `GM_ADMINS` 配置（main.py `_check_gm_admin`）
 - 目标解析优先级：@提及 → 数字 user_id → 省略时作用于命令发送者自身
-- 子命令：设置境界（境界名 → 1-based level_index，两种修炼路线通用）/设置修为/灵石/气血/战斗气血（v3.21.4，同时设永久底数与当前气血，供长局构造；「设置气血」仍只改底数）/真元/攻击/精神力、给予装备/给予物品（进储物戒）、卸下装备（入戒）、清除CD（需 `确认` 参数，同步 user_cd 与 player.state）、触发历练/秘境结算（推进 scheduled_time 后调正常结算；秘境强制结算不再有战斗）、生成Boss（委托 BossManager）、触发秘境谜题/触发秘境妖兽/触发秘境传承（v3.14.0，强制挂起对应秘境遭遇供测试，目标解析 `single_token_is_target=True`）
+- 子命令：设置境界（境界名 → 1-based level_index，两种修炼路线通用）/设置修为/灵石/气血/战斗气血（v3.21.4，同时设永久底数与当前气血，供长局构造；「设置气血」仍只改底数）/真元/攻击/精神力、给予装备/给予物品（进储物戒）、卸下装备（入戒）、清除CD（需 `确认` 参数，同步 user_cd 与 player.state）、触发历练/秘境结算（推进 scheduled_time 后调正常结算；秘境强制结算不再有战斗）、生成Boss `[profile_id]`（委托 `WorldBossService.ensure_spawn`，返回新建/复用/拒绝三分支）、触发秘境谜题/触发秘境妖兽/触发秘境传承（v3.14.0，强制挂起对应秘境遭遇供测试，目标解析 `single_token_is_target=True`）
 - **审计日志**：每次调用写一行 JSON 到插件数据目录 `gm_operations.log`（时间戳/GM id/目标 id/子命令/参数/成功与否），达 500MB 滚动改名保留
 
 ### 4.20 设计表→config 同步管道（scripts/sync_content_to_config.py）
 
 - 读 `design_docs/content-design/` 下 weapons.csv / heart_methods.csv / skills.csv，按 `name` 键控 merge（同名更新/新名新增/表外不动），仅处理 status=draft/final，legacy 跳过
-- 键名映射：weapons.csv `bonus_damage` → config `damage`；引擎契约校验（trigger 四键齐全、trigger_timing 词表、rate 值域、passive_bonus 词表防静默忽略）；写盘前跑 validate_budget.py，FAIL 中止不写盘；--dry-run 输出变更摘要
-- 已用本脚本入库：武器 v1（9 标杆件 + 狼牙棒）、心法 v1（18 draft，含 route_multiplier 路线倍率字段）、skills.csv 全量（2026-08-08 `implement-content-design` 起）
+- 键名映射：weapons.csv `bonus_damage` → config `damage`；引擎契约校验（trigger 四键齐全、trigger_timing 词表、rate 值域、passive_bonus 词表防静默忽略）；写盘前跑 validate_budget.py 与 lint_narrative.py，FAIL 中止不写盘；--dry-run 输出变更摘要
+- 敌人域读 `enemies.csv` / `world_bosses.csv`：preview 允许 draft 且不写正式配置；正式写必须提供 approval manifest，绑定两个 CSV 的 SHA-256、整行表头、逐行 `status=final` 与叙事决策。combat-only 可显式放行 `占位` 但保持 `narrative_approved=false`；只有 `定稿` 或显式 `豁免` 才为 true。本次 28+4 均按 `定稿` 批准并生成 schema v2
+- 已用本脚本入库：武器 v1（9 标杆件 + 狼牙棒）、心法 v1（18 draft，含 route_multiplier 路线倍率字段）、skills.csv 全量、28+4 PVE 固定名册与世界 Boss 文案
 
 ---
 
-## 五、数据库（SQLite，当前版本 v39）
+## 五、数据库（SQLite，当前版本 v40）
 
 ### 5.1 表清单
 
@@ -379,7 +380,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | `shop` | shop_id | 商店（'global' 单行：last_refresh_time、current_items JSON） |
 | `sects` | sect_id (AI) | 宗门（sect_name UNIQUE，建设度/灵石/资材/功法 buff/丹房等级；v28 起含 is_system/faction_id/status/destruction_tier） |
 | `buff_info` | id (AI)，user_id UNIQUE | 用户功法/法器 buff（预留字段） |
-| `boss` | boss_id (AI) | 世界 Boss（hp/atk/defense/stone_reward/status） |
+| `world_boss_instances` / `world_boss_challenges` / `world_boss_daily_attempts` / `world_boss_ledger` / `world_boss_contributions` | 见 v37 schema | 新世界 Boss 固定实例、出生快照、挑战、北京日次数、伤害台账与贡献；旧 `boss` 表已由 v40 删除 |
+| `business_events` / `event_deliveries` | event_id / delivery_id | 世界 Boss 等业务事件 outbox 与逐平台/群投递状态 |
 | `rifts` | rift_id (AI) | 秘境定义（预置 6 个：青云秘境→上古遗迹 + id 6 青云剑冢，后者为 rift_config.json 标记的青云门专属秘境，v31 播种） |
 | `legacy_instances` | id (AI) | 传承实例：owner_id/legacy_type/impart_value/claimed_tiers/sect_id/is_active（v32 重做，替代 impart_info；部分唯一索引 idx_legacy_active_owner 保证同玩家仅一条激活） |
 | `impart_pk_cooldown` | challenger_id+target_id | 传承挑战失败冷却（5 天） |
@@ -434,7 +436,8 @@ main.py                # 插件入口（Star 子类）：~103 个指令注册、
 | v36 | 历练结算事实、效果消费幂等表与持久疲劳表（`adventure_*`） |
 | v37 | 世界 Boss 实例/出生快照/挑战/每日次数/台账/贡献（`world_boss_*`） |
 | v38 | 业务事件 outbox 与逐目标投递 claim（`business_events` / `event_deliveries`） |
-| v39 | 历练结算状态机增量列与索引（`adventure_settlements.state/route_key/snapshot` 等；当前最新，本任务未新增迁移） |
+| v39 | 历练结算状态机增量列与索引（`adventure_settlements.state/route_key/snapshot` 等） |
+| v40 | 删除旧 `boss` 表与 `system_config.boss_next_spawn_time`；旧 Boss 数据不迁移，新世界 Boss 使用 v37/v38 的 `world_boss_*` 与 outbox 表 |
 
 ---
 

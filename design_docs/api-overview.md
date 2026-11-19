@@ -26,7 +26,7 @@
 |---|---|
 | `CMD_XXX = "中文指令"`（顶部常量区） | 全部 109 个指令的中文字符串定义 |
 | `require_whitelist(func)` | 群聊白名单装饰器，非白名单群直接拒绝 |
-| `XiuXianPlugin.initialize()` | 启动钩子：连库 → `MigrationManager.migrate_or_reset()` → `sect_mgr.ensure_system_sects()`（默认宗门幂等播种）→ 启动 4 个定时任务（Boss 生成/贷款逾期/灵眼生成/悬赏过期，Boss 可配置关闭） |
+| `XiuXianPlugin.initialize()` | 启动钩子：连库 → `MigrationManager.migrate_or_reset()` → `sect_mgr.ensure_system_sects()`（默认宗门幂等播种）→ 启动 4 个定时任务（WorldBossPoller/贷款逾期/灵眼生成/悬赏过期；Boss 开关只停生成、不停 outbox 投递） |
 | `XiuXianPlugin.terminate()` | 关闭钩子：取消全部后台任务 |
 | `XiuXianPlugin.__init__` → `_wire_core_services()` | 构造期装配段：core 服务单例（skill/storage_ring/equipment/cultivation/pill/shop 等）统一构造、按依赖序注入全部 manager/handler；**禁止在 handler/manager 内自构造核心服务** |
 | `handle_xxx(self, event, ...)` ×111 | 绝大多数为纯路由壳：docstring 标注指令名与下游 handler。例外（含少量逻辑）：`handle_boss_fight`/`handle_spawn_boss`（开关+权限检查、悬赏联动）、`handle_rift_complete`/`handle_adventure_complete`/`handle_adventure_fight`/`handle_adventure_flee`（结算后按 `reward_data` 联动悬赏与师承进度，共用 `_advance_adventure_progress`）、`handle_gm`（管理员门槛） |
@@ -55,7 +55,7 @@
 | `StorageRingHandler` | 储物戒/取出/丢弃/赠予/接收/拒绝/更换储物戒/搜索物品/取出所有 | → `core/StorageRingManager`；手动存入已禁用；赠予拦截宗门绑定物 |
 | `SectHandlers` | 「宗门」单入口 `handle_sect_entry` 子命令分发（信息/列表/创建/加入/退出/捐献/任务/丹房/建设/镇派功法/晋升/宝库/师承/商店/悬赏/排行/贡献排行 + 管理类 踢出/传位/职位） | 原 18 个宗门顶层指令已删除，子命令自行解析消息文本；悬赏子命令组经 handlers/bounty_handlers 模块级共享函数委托 BountyManager（排行/贡献排行直调 RankingManager，构造注入 `rank_mgr`）；商店子命令组委托 SectManager |
 | `CombatHandlers` | 切磋/决斗 | `_get_target_id` 解析 @提及/数字目标；各自冷却 |
-| `BossHandlers` | 世界Boss/挑战Boss/生成Boss | 挑战走 `BossManager.challenge_boss` |
+| `WorldBossHandlers` | 世界Boss/挑战Boss/生成Boss | 查询走 `WorldBossService.get_active`（只结算到期、不生成）；挑战走 `challenge(player=…, challenge_id=…)`；管理生成走 `ensure_spawn(profile_id)` 三分支 |
 | `RiftHandlers` | 秘境列表/探索秘境（子命令分发：数字ID进入/破阵 <答案>/传承；迎战由 main.py 拦截直调 manager）/完成探索/退出秘境 | |
 | `AdventureHandlers` | 历练信息/开始历练/完成历练/历练状态 | 顶层指令「迎战」「逃跑」（战前抉择）由 main.py 直接拦截调 `AdventureManager.resolve_adventure_choice`，不经本 handler（与秘境子命令「迎战」同惯例）；`handle_complete_adventure` 未被 main.py 路由引用（实际入口在 main.py），保留仅为兼容旧调用方、删除前请先确认无引用 |
 | `BountyHandlers` | 悬赏令/接取/状态/完成/放弃悬赏 | 全部薄委托，渲染与编号防御统一走 handlers/bounty_handlers 模块级共享函数（`scope='global'`）；宗门专属悬赏走「宗门 悬赏」子命令组（scope='sect'）；两路行为由共享函数保持同位素一致 |
@@ -77,7 +77,7 @@
 |---|---|---|
 | `CombatEngine`（combat_manager.py） | `resolve_combat(fighter1, fighter2, combat_type="spar", merge_count=None)` / `build_fighter_from_player(player, ...)` | **统一战斗引擎**：回合制 PvP/PvE 共用；触发技 `EFFECT_HANDLERS` 注册表分发 14 种效果键（13 个处理函数，combo 复用 damage_bonus）、持续状态（dot/buff/debuff/fatigue）生命周期、大招必放。配 `FighterState/StatusEffect/CombatResult` |
 | `CombatManager`（同文件） | `player_vs_player` | 旧接口适配器，委托 `CombatEngine`；`calculate_*` 系列为 deprecated 兼容保留 |
-| `BossManager` | `spawn_boss` / `challenge_boss` / `get_boss_info` / `auto_spawn_boss` | 世界 Boss 生成（`auto_spawn_boss` 供定时任务）、挑战、奖励 |
+| `WorldBossPoller`（world_boss_poller.py） | `start` / `stop` / `poll_once` | 唯一自动生成循环：`boss.enabled=true` 时 `ensure_spawn(None)`，随后无论开关状态都 `dispatch_pending()`；健康轮询 60s，异常按 60s 起指数退避至 3600s；initialize 启动、terminate 等待取消 |
 | `BountyManager` | `get_bounty_list` / `accept_bounty` / `complete_bounty` / `abandon_bounty` / `add_bounty_progress` / `check_and_expire_bounties` | 悬赏列表按境界分难度、10 分钟缓存（按 scope 分键 `user:global|sect`）；前四者带 `scope` 参数分流公共/宗门悬赏，分流校验先于缓存/冷却/活跃检查；接取/结算均 `BEGIN IMMEDIATE` 事务；`add_bounty_progress` 由历练/秘境回调推进进度 |
 | `SectManager` | `create_sect` / `join_sect` / `donate_to_sect` / `kick_member` / `transfer_ownership` / `perform_sect_task` / `handle_owner_death`；宗门成长：`ensure_system_sects` / `reclaim_sect_treasures` / `get_fairyland_exp_bonus` / `claim_elixir` / `upgrade_building` / `manage_sect_buff` / `promote_position` / `get_treasury_info` / `claim_treasure` / `get_master_task_status` / `get_position_benefits` / `get_sect_shop_info` / `buy_sect_shop_item` | 宗门全生命周期；宗主死亡自动传位/解散；默认宗门播种、离宗回收、洞天/丹房/镇派功法/晋升/宝库/师承任务链、宗门商店（贡献点结算，商品池读 faction `shop` 字段）；宝库守护者败/平经 HealthService 保留 1% 动态气血地板（详见 current-design-report.md §4.8） |
 | `BankManager` | `deposit` / `withdraw` / `borrow` / `repay` / `claim_interest` / `check_and_process_overdue_loans` | 银行存贷；**逾期贷款追杀致死**（定时任务入口 `check_and_process_overdue_loans`） |
@@ -90,11 +90,11 @@
 | `DualCultivationManager` | `send_request` / `accept_request` / `reject_request` | 双修请求-响应流程，双方修为奖励 |
 | `ImpartManager` / `ImpartPkManager` | `create_legacy` / `activate_legacy` / `add_active_impart_value` / `transfer_legacy` / `list_owner_legacies`；`challenge_impart` / `select_snatch_target` / `get_impart_ranking` | 传承实例生命周期（一人多条、激活累积、PK 转移、等阶奖励）；玩家间传承挑战（夺取制） |
 | `RankingManager` | `get_level/power/wealth/sect/deposit/contribution_ranking` | 六大排行榜；战力公式单一实现在 models.py `Player.combat_power`（伤害+身法+迅捷+气血+armor//2，含/不含临时丹药由调用方 `pill_multipliers` 实参决定） |
-| `EnemyManager` | `spawn_enemy(level_index)` / `spawn_enemy_from_group(group_key, player_level)` / `get_drop_items` | 按玩家境界生成敌人与掉落（动态路径=固定名册 Batch 5 切流前的临时入口；全局难度**只乘伤害**） |
-| `EnemyCatalog` / `build_enemy_fighter`（enemy_catalog.py） | `load` / `load_catalog` / `spawn_enemy(level, category)` / `profile_to_enemy` / `build_enemy_fighter` | 固定名册不可变 catalog（schema v2；28 敌 + 4 世界 Boss profile、(realm_segment, category) 索引、难度单点只乘伤害）；`build_enemy_fighter` 为 Enemy→FighterState **唯一 mapper**（level_index/触发技/大招/护甲映射；暴击按 per-enemy 正数 `/100` 优先，缺省/None 回退 `combat.base_crit_rate`，秘境兽与传承守护同走）；正式 sync 批准前 `load_catalog` 对旧 v1 config 返回 None（调用方保持动态路径）；2026-11-09 世界 Boss 域扩展 `WorldBossProfile`：补 `profile_version`、五文案键（spawn/phase2/phase3/kill/dissipate）与 `narrative_approved`，`from_dict` 对五文案缺键 KeyError=fail closed |
-| `PVECombatManager` | `trigger_pve_combat(player)` / `challenge_rift_beast(player, enemy_group_key=None)` / `challenge_legacy_guardian(player)` | PVE 触发主入口与秘境兽/传承守护者挑战；后两者共用 EnemyCatalog mapper，败/平经 HealthService 持久化至少 1% 动态上限气血，胜场使用引擎终值 |
-| `WorldBossService`（world_boss_service.py，2026-11-09 世界 Boss 域） | `ensure_spawn(profile_id=None)` / `challenge(player=…, challenge_id=…)` / `enabled` | 世界 Boss 领域唯一属主：固定实例生命周期（48h、击杀 12h/消散 24h 后再生，`next_spawn_at` 是再生资格唯一权威，`instance_id="wb_{profile_id}_{spawn_epoch}"` 确定性派生、同事务保证单 active）、出生快照冻结（选段 fact/难度倍率/五文案/narrative_approved）、北京日每人每日 3 次、事务外固定 RNG 战斗 + 单笔短事务（实例 CAS→扣次数→玩家气血 CAS→台账/贡献/阶段/末击事件，任一 False 立即 abort）、阶段 60%/20% 只升不降、GM 强制 profile 三分支；`catalog=None` 时整体 disabled。**已装配未切流**：poller 注册与 handler/旧 Boss 接线归 E2 |
-| `WorldBossEventDispatcher`（world_boss_events.py，2026-11-09 世界 Boss 域） | `expand(event_id)` / `dispatch_pending(now=…)` / 模块级 `render_event_text(event, instance)` | 提交后事件 outbox：spawn/stage/defeated/dissipated 唯一 business event → 逐 (event_id, platform, group_id) delivery；renderer 只读出生快照五文案 + `narrative_approved`（False/缺文案=禁播，无代码 fallback）；逐 delivery 条件 claim、网络 await 全在事务外、已知未发重试/超次或结果不确定落 `uncertain` 不自动重试、固定 600s 窗口恢复扫描补展开缺失 delivery；**未注册 poller**（E2） |
+| `EnemyManager` | `spawn_enemy(level_index)` / `spawn_enemy_from_group(group_key, player_level)` / `get_drop_items` | 旧动态派生与定向组入口；普通 PVE 仅在 `catalog=None` 的 v1 回落时命中默认动态派生，全局难度**只乘伤害** |
+| `EnemyCatalog` / `build_enemy_fighter`（enemy_catalog.py） | `load` / `load_catalog` / `spawn_enemy(level, category, difficulty_multiplier)` / `profile_to_enemy` / `build_enemy_fighter` | 固定名册不可变 catalog（schema v2；28 敌 + 4 世界 Boss profile、(realm_segment, category) 索引、难度单点只乘伤害）；`build_enemy_fighter` 为 Enemy→FighterState **唯一 mapper**（level_index/触发技/大招/护甲映射；暴击按 per-enemy 正数 `/100` 优先，缺省/None 回退 `combat.base_crit_rate`，秘境兽与传承守护同走）；旧 v1 config 返回 None，正式 v2 已激活；`WorldBossProfile` 含五文案与 `narrative_approved`，缺键 fail closed |
+| `PVECombatManager` | `prepare_encounter` / `challenge_rift_beast` / `challenge_legacy_guardian` | 默认出怪在 catalog 非 None 时走固定名册并显式传难度系数，None 时走 v1 回落；秘境定向组/传承守护不变；败/平经 HealthService 持久化至少 1% 动态上限气血 |
+| `WorldBossService`（world_boss_service.py） | `ensure_spawn(profile_id=None)` / `get_active()` / `challenge(player=…, challenge_id=…)` / `enabled` | 世界 Boss 领域唯一属主：48h、击杀 12h/消散 24h 后再生、单 active、出生快照、北京日 3 次、CAS 挑战与阶段/台账/贡献/末击事件；`get_active` 只结算到期不生成；GM 强制 profile 三分支；暴击显式读 `combat.base_crit_rate`；`catalog=None` 时 disabled |
+| `WorldBossEventDispatcher`（world_boss_events.py） | `expand(event_id)` / `dispatch_pending(now=…)` / `render_event_text` | 提交后 outbox → 逐目标 delivery；renderer 只读已批准出生快照，无代码或 narrative_config fallback；条件 claim、网络 await 在事务外、partial success 只重试未发目标、uncertain 人工处置；已由 `WorldBossPoller` 注册驱动 |
 
 ## 5. core/ 通用系统层
 
@@ -120,26 +120,26 @@
 | 位置 | 关键方法 | 作用 |
 |---|---|---|
 | `DataBase`（data_manager.py） | `connect/ensure_connection/reconnect` / `create_player` / `get_player_by_id` / `update_player` / `delete_player_cascade` / `get_shop_data` / `decrement_shop_item_stock` | 连接管理（定时任务前先 `ensure_connection`）；玩家 CRUD 字段从 `Player` dataclass 动态生成；商店库存**原子扣减/回滚** |
-| `DatabaseExtended`（database_extended.py，`db.ext`） | 按域分组：宗门 `*_sect*`、Boss `*_boss`、秘境 `*_rift`、状态 `create/get/update_user_cd`/`update_user_cd_fields`（窄写，只改指定列）+`set_user_busy/free`、技能 `learn_or_star_up`/`get_learned_skills`/`is_skill_learned`、悬赏 `*_bounty`、银行/贷款 `*_loan*`/`add_bank_transaction`、赠予 `*_pending_gift*`、系统配置 `get/set_system_config`（KV 表，悬赏放弃冷却等都用它） | 全部扩展表 SQL |
-| `AdventureRepository` / `WorldBossRepository` / `OutboxRepository`（pve_repository.py） | 历练：结算单据/效果 `claim`/疲劳；世界 Boss：`get/list_instances` / `insert_instance` / `cas_update_instance`（expected 必含 cas_version）/ `record_challenge` / `increment_daily_attempts`（单语句上限内自增、超限不扣）/ `record_ledger` / `accumulate_contribution` / `get_latest_terminal_instance`（spawn_epoch 源：终态按 `terminated_at DESC, rowid DESC`）；outbox：`append_event`（business_key 幂等）/ `add_delivery` / `claim_delivery`（只认 queued）/ `complete_delivery`（sent/queued/uncertain）/ `list_deliveries` / `list_deliveries_for_event` / `list_events_since`（固定窗口恢复）/ `list_stale_dispatching`；另有 `shanghai_date_key(now)`（北京自然日 YYYY-MM-DD） | CAS 前像由调用方传入；叶写按 `conn._txn_depth` 门控自动提交（事务内不自管 commit）；本 child 新增只读查询不改 schema |
-| `MigrationManager`（migration.py） | `migrate_or_reset()` | 版本化迁移：新装直接建最新 schema（v35）；旧库按版本升序逐个事务执行 `@migration(version)` 注册的任务；低于任务链下限的旧库整体重建为最新 schema（**重置前自动备份** `<db>.v<版本>.pre-reset.bak`）；版本高于 v35 时拒绝降级运行 |
+| `DatabaseExtended`（database_extended.py，`db.ext`） | 按域分组：宗门 `*_sect*`、秘境 `*_rift`、状态 `create/get/update_user_cd`/`update_user_cd_fields`（窄写，只改指定列）+`set_user_busy/free`、技能 `learn_or_star_up`/`get_learned_skills`/`is_skill_learned`、悬赏 `*_bounty`、银行/贷款 `*_loan*`/`add_bank_transaction`、赠予 `*_pending_gift*`、系统配置 `get/set_system_config`；旧 Boss CRUD 已删除 | 全部扩展表 SQL |
+| `AdventureRepository` / `WorldBossRepository` / `OutboxRepository`（pve_repository.py） | 历练：结算单据/效果 `claim`/疲劳；世界 Boss：`get/list_instances` / `insert_instance` / `cas_update_instance` / `record_challenge` / `increment_daily_attempts` / `record_ledger` / `accumulate_contribution` / `get_latest_terminal_instance`；outbox：`append_event` / `add_delivery` / `claim_delivery` / `complete_delivery` / 恢复扫描；另有 `shanghai_date_key(now)` | CAS 前像由调用方传入；叶写遵循事务所有权；北京自然日键供世界 Boss 每日次数使用 |
+| `MigrationManager`（migration.py） | `migrate_or_reset()` | 版本化迁移：新装直接建最新 schema（v40）；旧库按版本升序逐个事务执行 `@migration(version)`；v40 删除旧 `boss` 表与 `boss_next_spawn_time`，旧数据不迁移；重置前自动备份，拒绝高版本降级运行 |
 
-并发敏感操作惯例：`await db.conn.execute("BEGIN IMMEDIATE")` + try/commit/rollback（参照 `BountyManager.accept_bounty`）。
+并发敏感操作统一使用 `DataBase.transaction()` 与 `data/leaf_write.py` 所有权协议，不在业务块内自管 BEGIN/COMMIT。
 
 ## 7. 模型与配置
 
 | 文件 | 作用 |
 |---|---|
-| `models.py` | `Player` dataclass（主属性 damage/agility/speed + armor_value；气血三层 `base_hp`/`current_hp`/`health_recovered_at`，气血上限 `max_hp` 运行时聚合不入库；`get_total_attributes` 输出键为 `max_hp`）、`Item`/`StorageRing`（`atk` 等旧字段仅存于 `Boss` 模型） |
-| `models_extended.py` | `UserStatus` 枚举（IDLE/CULTIVATING/ADVENTURING/EXPLORING/SECT_TASK，忙碌状态真源之一）、`Sect/Boss/Rift` 等扩展模型 |
+| `models.py` | `Player` dataclass（主属性 damage/agility/speed + armor_value；气血三层 `base_hp`/`current_hp`/`health_recovered_at`，`max_hp` 运行时聚合）、`Item`/`StorageRing` |
+| `models_extended.py` | `UserStatus` 枚举、`Sect/Rift` 等扩展模型；旧 `Boss` 模型已删除 |
 | `config_manager.py` | 加载 `config/*.json`（缺失时从 `data/default_configs.py` 建默认）；静态配置改后需重启 |
-| `data/default_configs.py` | 全部 JSON 配置的默认值（平衡数值真源之一） |
+| `data/default_configs.py` | 全部 JSON 配置的默认值（平衡数值真源之一；旧 `BOSS_CONFIG` 已删除） |
 
 ## 8. 定时任务入口（main.py `initialize()` 启动）
 
 | 任务循环 | 调用 | 说明 |
 |---|---|---|
-| `_schedule_boss_spawn` | `BossManager.auto_spawn_boss` | 含指数退避重试范式，新定时任务照抄 |
+| `WorldBossPoller.run` | `WorldBossService.ensure_spawn(None)` + `WorldBossEventDispatcher.dispatch_pending()` | 唯一自动生成与 outbox 投递循环，含指数退避；开关只停生成 |
 | `_schedule_loan_check` | `BankManager.check_and_process_overdue_loans` | 逾期追杀 |
 | `_schedule_spirit_eye_spawn` | `SpiritEyeManager.spawn_spirit_eye` | 灵眼生成 |
 | `_schedule_bounty_check` | `BountyManager.check_and_expire_bounties` | 悬赏过期 |

@@ -1,13 +1,13 @@
 # data/database_extended.py
 """
-扩展数据库操作类，包含宗门、Boss、秘境等新系统的CRUD方法
+扩展数据库操作类，包含宗门、秘境等新系统的CRUD方法
 """
 
 import json
 
 import aiosqlite
 
-from ..models_extended import Boss, BuffInfo, LegacyInstance, Rift, Sect, UserCd
+from ..models_extended import BuffInfo, LegacyInstance, Rift, Sect, UserCd
 from .leaf_write import leaf_write_method
 
 # user_cd 允许窄写的列（update_user_cd_fields 的白名单；user_id 是主键，不参与 SET）。
@@ -247,85 +247,6 @@ class DatabaseExtended:
         """更新用户辅修功法"""
         await self.conn.execute(
             "UPDATE buff_info SET sec_buff = ? WHERE user_id = ?", (buff_id, user_id)
-        )
-
-    # ===== Boss 系统 CRUD =====
-
-    @leaf_write_method()
-    async def create_boss(self, boss: Boss) -> int:
-        """创建Boss"""
-        await self.conn.execute(
-            """
-            INSERT INTO boss (
-                boss_name, boss_level, hp, max_hp, atk, defense,
-                stone_reward, create_time, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                boss.boss_name,
-                boss.boss_level,
-                boss.hp,
-                boss.max_hp,
-                boss.atk,
-                boss.defense,
-                boss.stone_reward,
-                boss.create_time,
-                boss.status,
-            ),
-        )
-
-        async with self.conn.execute("SELECT last_insert_rowid()") as cursor:
-            row = await cursor.fetchone()
-            return row[0] if row else None
-
-    async def get_active_boss(self) -> Boss | None:
-        """获取当前存活的Boss"""
-        async with self.conn.execute(
-            "SELECT * FROM boss WHERE status = 1 ORDER BY create_time DESC LIMIT 1"
-        ) as cursor:
-            row = await cursor.fetchone()
-            if row:
-                return Boss(**dict(row))
-            return None
-
-    async def get_boss_by_id(self, boss_id: int) -> Boss | None:
-        """根据ID获取Boss信息"""
-        async with self.conn.execute(
-            "SELECT * FROM boss WHERE boss_id = ?", (boss_id,)
-        ) as cursor:
-            row = await cursor.fetchone()
-            if row:
-                return Boss(**dict(row))
-            return None
-
-    @leaf_write_method()
-    async def update_boss(self, boss: Boss):
-        """更新Boss信息"""
-        await self.conn.execute(
-            """
-            UPDATE boss SET
-                boss_name = ?, boss_level = ?, hp = ?, max_hp = ?, atk = ?,
-                defense = ?, stone_reward = ?, status = ?
-            WHERE boss_id = ?
-            """,
-            (
-                boss.boss_name,
-                boss.boss_level,
-                boss.hp,
-                boss.max_hp,
-                boss.atk,
-                boss.defense,
-                boss.stone_reward,
-                boss.status,
-                boss.boss_id,
-            ),
-        )
-
-    @leaf_write_method()
-    async def defeat_boss(self, boss_id: int):
-        """标记Boss为已击败"""
-        await self.conn.execute(
-            "UPDATE boss SET status = 0 WHERE boss_id = ?", (boss_id,)
         )
 
     # ===== 秘境系统 CRUD =====

@@ -570,11 +570,14 @@ class EnemyCatalog:
     ) -> Enemy:
         """Instantiate one roster enemy for the encounter request.
 
-        Same name/signature as the old ``EnemyManager.spawn_enemy`` to keep
-        the Batch 5 cutover mechanical; the difference is this child's reason
-        to exist: panels are the designed segment's absolute values — no
-        random level, no category multipliers, no ±10% jitter — and the
-        difficulty multiplier hits damage only (R2/AC5).
+        Named after the legacy ``EnemyManager.spawn_enemy`` so the cutover call
+        sites stay mechanical, but the caller **must pass
+        ``difficulty_multiplier`` explicitly** (read from
+        ``game_config["pve"]["difficulty_multiplier"]``) — the catalog never
+        reads global config itself, otherwise the knob would silently stop
+        affecting ordinary PVE. Panels are the designed segment's absolute
+        values: no random level, no category multipliers, no ±10% jitter; the
+        multiplier hits damage only (R2/AC5).
 
         Args:
             player_level: player level, selects the serving segment.

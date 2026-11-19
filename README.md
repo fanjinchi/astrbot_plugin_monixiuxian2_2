@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.21.6
+> **版本:** v3.22.0
 > **许可证:** AGPL-3.0
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -307,6 +307,14 @@ astrbot_plugin_monixiuxian2_2/
 ## 📝 更新日志
 
 ---
+
+### v3.22.0 - PVE 固定名册与世界 Boss 生命周期激活
+
+- **28+4 内容正式落地**：用户批准 28 个普通敌人与 4 个世界 Boss 的战斗数值和叙事文案，CSV 已升 `final / 定稿`，经 manifest/hash、数值预算与叙事 lint 双闸门同步为 `enemies.json` schema v2。
+- **普通 PVE 切流**：历练与秘境默认出怪改用固定名册，全局难度系数只乘伤害；`catalog=None` 时才保留旧动态派生回落，第一季移除 `top` 三兽组。
+- **世界 Boss 重做上线**：4 只有名天灾固定实例，48h 生命周期、60%/20% 三阶段、北京自然日每日 3 次、击杀后 12h/消散后 24h 再生；新 handler、单 poller 与 outbox 群广播已接管，五类文案只读已批准出生快照。
+- **旧 Boss 整删**：移除旧 manager/handler、配置、模型、固定 30% 会心及安慰奖；数据库 v40 删除旧 `boss` 表和 `boss_next_spawn_time`，旧数据不迁移。
+- **零奖励过渡**：当前世界 Boss 只记录挑战、伤害台账、贡献与末击事实，暂不发灵石、修为或物品；奖励经济留待 Step 7 单独设计。
 
 ### v3.21.6 - PVE 气血地板与暴击双侧收口
 

@@ -29,7 +29,7 @@
 - **装配**：catalog 装配归 D；E2 只在 D 归档时 `load_catalog` 仍位于 `PVECombatManager` 构造之后的情况下把该行上移，否则复用同一实例——**任何情况不得第二次 load**；构造参数注入、不用 setter；源路径 `Path(__file__).parent / "config" / "enemies.json"`（`_wire_core_services` 只收到 `plugin_data_dir`）。
 - 旧动态派生退役：`enemy_manager.spawn_enemy` 的 exp 派生路径不再被普通 PVE 命中，但**静态保留为 v1 回落**（不删除）；`enemy_catalog.spawn_enemy` docstring 改为「同名但需显式传 `difficulty_multiplier`」；把 `enemy_manager` 里的局部变量 `boss_config` 改名 `boss_mult`（否则 audit 判据永远命中）。
 - **Q6 清理**：删除 `config/enemies.json` 的 `enemy_groups` 中 `key=top` 的组；**`low/mid/high` 必须保留**为 `catalog=None` 的 v1 回落（消费者是旧派生 `_get_group_by_level`，删掉会落到无 `level_range` 的守护组，未同步态会刷出守护 NPC）；`legacy_guardian` 保留。顺序：**删 top → sync → 代码切流**（`enemy_groups` 是 sync 的手工透传段）。
-- **承接 D/E1 的延迟项**：若 D 落地时地板写回仍引用 `DEFEAT_HP_FLOOR_RATIO`，本 child 在激活检查点改调 `HealthService.defeat_hp_floor`（定义见 `10-10-pve-cross-system-integration/design.md` §2）；若 D 落地时 `build_enemy_fighter` 仍无 `base_crit_rate` 形参（D 先于 E1），本 child 补传（默认值见 `10-10-pve-cross-system-integration/design.md` §3、行为不变）并核世界 Boss 暴击随键变化。
+- **承接 D/E1 的当前接缝**：E1 已收口地板，`WorldBossService` 的玩家写回复用 `HealthService.defeat_hp_floor`，本 child 只复验、不再实现地板。E1 已为 `build_enemy_fighter` 提供 `base_crit_rate` 形参，但当前 `WorldBossService._build_instance_fighter` 仍未传；E2 必须从 `config_manager.game_config["combat"]["base_crit_rate"]` 读取并显式传给 `build_enemy_fighter`，补全局键变化、per-enemy 正数覆盖、missing/None 回退与显式 0 禁用回归。默认值与这些边界语义的唯一定义见 `.trellis/tasks/archive/2026-11/10-10-pve-cross-system-integration/design.md` §3，本 child 不另建数值定义。
 
 ### R3. 旧 Boss 整删（数据与结构直接放弃）
 
@@ -45,7 +45,7 @@
 ### R4. 新入口与 poller 接管
 
 - 复用 D 的 catalog 装配与领域服务，不重复装配；`boss.enabled` 保留为新玩法总开关（更新 comment 与默认配置文案）。
-- 注册 lifecycle poller（指数退避、`initialize()` 启动 / `terminate()` 取消），每轮顺序按 `design.md` §4 先过期再 ensure；新 handler 接管 `世界Boss`/`挑战Boss`/`生成Boss` 三个命令名；outbox dispatcher 运行，网络 await 在事务外。
+- 注册 lifecycle poller（指数退避、`initialize()` 启动 / `terminate()` 取消），每轮按 `design.md` §4 调用 `ensure_spawn(None)`（其事务内先消费到期 active，再判断/创建新实例），随后调用 `WorldBossEventDispatcher.dispatch_pending`；新 handler 接管 `世界Boss`/`挑战Boss`/`生成Boss` 三个命令名；outbox dispatcher 运行，网络 await 在事务外。
 - **零奖励过渡**：本轮只落台账事实，不发任何奖励；过渡态写入 `current-design-report §4.7` 与 `pve-enemy-design` Step 6 遗留①，广播文案不得承诺奖励。
 - 旧/new 不得同时运行；删除与启用必须同一提交/检查点。`boss.enabled=false` 时新 poller 不得生成实例，旧生成器已随同一检查点删除；`false→true` 后由下轮 poller 按 D 再生资格恢复，不补建一套补偿流程。
 
@@ -73,6 +73,6 @@
 - [ ] AC1：批准流程可执行——获批列范围 → 用户侧 `status→final` → 重算 hash/manifest → sync；draft/缺 manifest/hash 漂移/列越权 fail closed；占位放行须 manifest `["占位"]` 并回写设计。正向用例分别证明：combat-only 的占位产物 `narrative_approved=false` 且不广播；独立叙事批准后的 `定稿` 或显式 `豁免` 才产生 `true`。`design.md` §7 的合法完整/新增键缺失或类型错误/已批准空文案/旧 v1 配置契约测试通过。
 - [ ] AC2：普通 PVE 默认路径切到固定名册（28 可达、全局难度系数仍生效、v2 config 下 `catalog` 非 None）且 `key=top` 组删除；旧派生运行态不再命中（静态保留、仅回滚/未批准态可达）；`legacy_guardian` 与秘境组回归；`catalog=None` 回落用例通过。
 - [ ] AC3：旧 Boss 代码/配置三元组/表/键/测试/文档清零，`audit_pve_redesign.py --scope e2` 为 0；`boss` 表不存在（v40 专用 parity）；`system_config.boss_next_spawn_time` 无生产读写；`lint_narrative` 不再依赖已删配置；玩家文案不再承诺 Boss 掉落。
-- [ ] AC4：新入口与 poller 同一检查点启用，旧/new 不双跑；poller 指数退避与 terminate，固定先 `expire_active` 再 `ensure_spawn`，旧实例在轮询间到期且新随机 profile 不同时仍至多一个 active；`boss.enabled=false` 不生成，`false→true`、启用态重启与旧库 v40 升级后启动均符合 R4/R5；`生成Boss`/`GM 生成Boss` 按 D R1 三分支改接且 `BOSS_ADMINS` 沿用；catalog 装配复用 D 的注入。
+- [ ] AC4：新入口与 poller 同一检查点启用，旧/new 不双跑；poller 指数退避与 terminate，每轮 `ensure_spawn(None)` 内固定先 `_consume_expired_active` 再判断/创建，随后 `dispatch_pending`；旧实例在轮询间到期且新随机 profile 不同时仍至多一个 active；`boss.enabled=false` 不生成，`false→true`、启用态重启与旧库 v40 升级后启动均符合 R4/R5；`世界Boss`/`挑战Boss` 按 design §4 接入查询/挑战服务，`生成Boss`/`GM 生成Boss` 按 D R1 三分支改接且 `BOSS_ADMINS` 沿用；catalog 装配复用 D 的注入。
 - [ ] AC5：端到端链路、北京日 3 次、重启恢复、并发唯一末击、CAS 失败不扣次数、time-skip 矩阵、广播 partial success、D AC9 HP 锚复跑均有证据；真实 `EnemyCatalog` 加载正式产物可生成世界 Boss，四类事件使用已批准快照文案且无 `narrative_config.json`/代码 fallback；零奖励过渡已记录且广播不承诺奖励。
 - [ ] AC6：回滚材料齐备并演练；文档清单逐项完成；完整 pytest + 产品范围 ruff + `audit_pve_redesign.py --scope all` 为 0。

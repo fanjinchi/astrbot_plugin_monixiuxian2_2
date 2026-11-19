@@ -165,7 +165,6 @@ def test_drop_tables_use_skill_names():
         "config/enemies.json",
         "config/bounty_templates.json",
         "managers/rift_manager.py",
-        "managers/boss_manager.py",
     ):
         text = (PLUGIN_ROOT / rel).read_text(encoding="utf-8")
         assert not any(name in text for name in stale), f"{rel} still has stale names"

@@ -13,8 +13,8 @@
 - **形态**：AstrBot 插件（群聊文字修仙游戏），运行于宿主 `~/code/AstrBot/`（uv 环境，Python ≥3.12）
 - **入口**：`main.py` 的 `XiuXianPlugin`（`Star` 子类），AstrBot 插件加载器要求文件名必须是 main.py；core 服务（修炼/丹药/装备/储物戒/商店等）由 `__init__` 内 `_wire_core_services()` 装配段统一构造并按依赖序注入各 manager/handler，禁止在 handler/manager 内自构造核心服务
 - **依赖**：无额外依赖（历史 Pillow 依赖已随 image_generator 死代码移除）
-- **数据**：SQLite（aiosqlite）`xiuxian_data_lite.db`，位于 `data/plugin_data/astrbot_plugin_monixiuxian2_2_2/`（AstrBot 数据目录，禁止写插件自身目录）；当前数据库版本 v39
-- **配置**：静态 `config/*.json` ×22（`config_manager.py` 加载，改后重启生效）；动态 `_conf_schema.json`（WebUI 可调：白名单、GM/Boss 管理员、灵根、数值、数据库文件名）
+- **数据**：SQLite（aiosqlite）`xiuxian_data_lite.db`，位于 `data/plugin_data/astrbot_plugin_monixiuxian2_2/`（AstrBot 数据目录，禁止写插件自身目录）；当前数据库版本 v40
+- **配置**：静态 `config/*.json` ×21（`config_manager.py` 加载，改后重启生效）；动态 `_conf_schema.json`（WebUI 可调：白名单、GM/Boss 管理员、灵根、数值、数据库文件名）
 - **测试**：pytest，`tests/helpers.py` 的 `load_module()` 绕过 managers/`__init__.py` 相对导入链
 
 ## 2. 分层架构
@@ -26,21 +26,21 @@
   → managers/  业务逻辑层（17 管理器：战斗/宗门/Boss/银行/悬赏/秘境/历练/双修/传承/炼丹/洞天/灵田/灵眼…）
   → core/      通用系统层（9 模块：修炼/突破/丹药/装备/商店/储物戒/技能/GM/…）
   → data/      数据层（data_manager.py 玩家 CRUD、database_extended.py 扩展 CRUD、
-                      migration.py 版本化迁移（v39）、default_configs.py 内置默认配置）
-  → models.py / models_extended.py（Player、UserStatus、Sect、Boss、Rift…）
+                      migration.py 版本化迁移（v40）、default_configs.py 内置默认配置）
+  → models.py / models_extended.py（Player、UserStatus、Sect、Rift…）
 ```
 
 ```mermaid
 flowchart TD
     U["群聊用户指令（中文，如 闭关/突破/切磋）"] --> M["main.py · XiuXianPlugin（Star 子类）<br/>109 个 @filter.command · @require_whitelist"]
     M --> H["handlers/ 指令处理层（26 文件）<br/>utils.py @player_required 双层状态检查 + 忙碌白名单"]
-    H --> MG["managers/ 业务逻辑层（17 管理器）<br/>战斗 · 宗门 · Boss · 银行 · 悬赏 · 秘境 · 历练 · 双修 · 传承 · 炼丹 · 灵田/灵眼/洞天"]
+    H --> MG["managers/ 业务逻辑层（17 管理器）<br/>战斗 · 宗门 · 世界 Boss · 银行 · 悬赏 · 秘境 · 历练 · 双修 · 传承 · 炼丹 · 灵田/灵眼/洞天"]
     MG --> C["core/ 通用系统层（9 模块）<br/>修炼 · 突破 · 丹药 · 装备 · 商店 · 储物戒 · 技能 · GM"]
-    C --> D["data/ 数据层<br/>data_manager · database_extended · migration（v39）· default_configs"]
+    C --> D["data/ 数据层<br/>data_manager · database_extended · migration（v40）· default_configs"]
     D --> DB[("SQLite xiuxian_data_lite.db<br/>AstrBot data/plugin_data/ 下")]
-    CFG["config/*.json ×22<br/>config_manager.py（缺失自动建默认）"] -.-> C
-    MD["models.py / models_extended.py<br/>Player · UserStatus · Sect · Boss · Rift"] -.-> MG
-    T["定时任务 initialize()（指数退避重试）<br/>Boss 生成 · 贷款逾期 · 灵眼生成 · 悬赏过期"] -.-> MG
+    CFG["config/*.json ×21<br/>config_manager.py（缺失自动建默认）"] -.-> C
+    MD["models.py / models_extended.py<br/>Player · UserStatus · Sect · Rift"] -.-> MG
+    T["定时任务 initialize()（指数退避重试）<br/>世界 Boss 生命周期/outbox · 贷款逾期 · 灵眼生成 · 悬赏过期"] -.-> MG
     SPEC["openspec/specs/ 行为契约（11 篇）<br/>design_docs/ 设计基线"] -.-> MG
 ```
 
@@ -48,7 +48,7 @@ flowchart TD
 
 1. **状态双层维护**：`player.state`（字符串）与 `user_cd` 表 `type` 字段（`UserStatus` 枚举）必须同步；新增"进行中"状态要同时改 `models_extended.py`、`BUSY_STATE_ALLOWED_COMMANDS`（handlers/utils.py）、写入/清除 user_cd。
 2. **事务保护**：并发敏感操作使用 `DataBase.transaction()`；独立首写经 `data/leaf_write.py` 获取同一跨任务所有权（同任务 join、外任务等待、异常回滚），不得抢回连接或强制提交；定时任务先 `ensure_connection()`。
-3. **定时任务**（main.py `initialize()`，全部指数退避重试）：Boss 生成（boss.enabled）、贷款逾期检查、灵眼生成（7200s）、悬赏过期检查。
+3. **定时任务**（main.py `initialize()`，全部指数退避重试）：`WorldBossPoller` 负责世界 Boss 生命周期与 outbox 投递（boss.enabled 只停生成、不停投递）、贷款逾期检查、灵眼生成（7200s）、悬赏过期检查。
 4. **广播**：`self.context.send_message({platform}:GroupMessage:{group_id}, chain)`；aiocqhttp 会 strip plain 消息首尾空白（用零宽空格保留）。
 5. **消息发送**：普通 handler 用 `yield`，事件钩子（on_llm_request 等）用 `event.send()`。
 6. **静态配置加载**：config_manager 自动从 `data/default_configs.py` 创建缺失 JSON。
@@ -66,8 +66,8 @@ flowchart TD
 | 商店/储物戒 | 「商店/储物戒」 | 6h 刷新、折扣 0.8~1.2、权重加权不放回；储物戒 20 格、每物品占 1 格、丹药不可入 |
 | 战斗引擎 | 「切磋/决斗/传承PK/历练/秘境/Boss」 | CombatEngine 统一结算：出手权=迅捷加权，行动上限 200；判定链=出手权→闪避→格挡→暴击→触发技→大招→伤害；伤害=floor((base_damage+伤害×K)×倍率×U(0.95,1.05))；护甲**百分比**减伤 `armor/(armor+100+10×L)`，总减伤 ≤40%；caps：闪避 0.4/格挡 0.3/暴击率 0.5/暴击倍率 1.5；战报按合并条数输出（默认 10） |
 | 技能/领悟 | 「领悟/修习」 | 挂载制（无独立技能栏）；触发技引擎契约四键 `trigger_timing/effect_type/trigger_rate/effect_value`，EFFECT_HANDLERS 注册表分发 14 种效果键（13 个处理函数，combo 复用 damage_bonus 处理器；damage_bonus/combo/stun/counter/damage_reduction + heal/dot/buff/debuff/pierce/unavoidable/survive/reflect/fatigue），功法武器共用；持续状态机制：同名同源刷新、异源同型叠加上限默认 3 层（config 可调）、战斗结束全清（battle-status-effects spec）；大招**必放制**（注入 rate=1.0，config 不填概率）+ 解锁门槛（min_action_index + 血量阈值）；升星 3 星封顶、×(1.1)^(星级-1) 乘法、满星补偿 50% 修为；领悟池=配套池（系数加权）+修习目标+（仅突破）通用池 5%；**装备=已领悟表（player_skills）唯一依据**，储物戒秘籍仅作领悟凭据（物品名=技能名，商店 4011/4012 可购，掉落掉具体秘籍；旧 4001-4010 已 legacy 下架） |
-| PvE 敌人 | 历练/秘境遭遇 | 过渡方案：level_data shim 合成 exp_needed 派生属性（damage≈exp//10、hp≈exp//2）× 模板系数（0.85/1.0/1.2）× 难度系数 ±10%；**待重做**：独立境界基准表（bd 9u2） |
-| 世界 Boss | 「世界Boss」 | 8 档境界 hp_mult 1.0→6.0，数值同走 level_data 派生；Boss 会心 30%；败者安慰奖=经验×总伤害/max_hp；自动刷 base_exp=全服平均×1.2 |
+| PvE 敌人 | 历练/秘境遭遇 | `enemies.json` schema v2 固定 28 名册，`EnemyCatalog` 按境界段/档位生成；全局难度只乘伤害；`catalog=None` 才走旧动态派生回落；top 三兽组已移除 |
+| 世界 Boss | 「世界Boss/挑战Boss」 | 4 只有名天灾固定实例，48h 存活、60%/20% 三阶段、北京日 3 次、击杀 12h/消散 24h 再生；出生快照文案经 outbox 广播；当前零奖励，只记挑战/贡献/末击事实 |
 | 宗门 | 「宗门」 | 单入口 + 子命令（创建/加入/退出/信息/列表/捐献/任务/丹房/建设/镇派功法/晋升/宝库/师承/踢出/传位/职位/排行/贡献排行/悬赏/商店）；创建 1万灵石+L3；捐献 1灵石→+1贡献+`scale_ratio`(10)建设度；建设任务从 sect_tasks.json 抽（cost/reward/cooldown 按任务配置）；**默认宗门**（sect_factions.json，启动幂等播种，加入校验境界段）；建筑：洞天全员闭关加成/丹房每日领丹（签到日重置）；镇派功法位全员被动；职阶晋升双门槛（贡献+境界，读 positions.promotion）+ 福利（签到俸禄/商店折扣/宝库 unlocks）；师承任务链（默认宗门专属，进度存 players.sect_master_progress）；离宗三路径回收 treasure 宝物、sect_bound 功法保留可用、绑定物禁赠；宗门悬赏独立入口（「宗门 悬赏」）、宗门专属秘境仅本宗可见、历练宗门事件带 🏯 标记、领悟池注入宗门池；宗门商店贡献点结算（faction shop 池）；宗主死亡自动传位 |
 | 银行/贷款 | 「银行」 | 存款复利 0.1%/日、上限 1000 万；普通贷 0.5%/7d、突破贷 0.8%/3d；还款单利；**逾期删号** |
 | 悬赏 | 「悬赏」 | 难度解锁（hard L7/elite L12）；奖励=base×scale×(target/min)×(1+max(0,L-3)×0.06)；时限、70% 掉 1 件、放弃 1800s CD；宗门专属悬赏（sect_id）走「宗门 悬赏」入口，全局指令只处理公共悬赏 |
@@ -80,7 +80,7 @@ flowchart TD
 | 传承系统 | 「传承」 | 修炼出关累积传承值（15min/点，仅激活实例）；PK 夺取制（胜者夺最新非宗门实例+3日保护，败者扣1%修为+5天冷却）；宗门传承不可夺、离宗回收；等阶奖励自动发放 |
 | 炼丹 | 「炼丹」 | 成功率=min(95, 配方 50 + (L-要求)×2)；失败材料全损 |
 | GM 工具 | 「修仙GM/修仙GM帮助」 | GM_ADMINS 独立权限；属性修改/给装备物品/卸装/清除CD（需确认）/强制结算/生成Boss；JSON 审计日志 500MB 滚动 |
-| 内容同步管道 | scripts/sync_content_to_config.py | weapons/heart_methods/skills CSV→config（name 键控、契约校验、预算闸门） |
+| 内容同步管道 | scripts/sync_content_to_config.py | weapons/heart_methods/skills CSV→config（name 键控）；enemies/world_bosses CSV→schema v2（approval manifest/hash/整行表头、战斗与叙事独立批准、预算+叙事双闸门） |
 
 **排行榜**：战力 = 伤害 + 身法 + 迅捷 + 气血 + 护甲//2（含装备、不含临时丹；与玩家信息面板同公式，面板另含临时丹药）。
 
@@ -88,7 +88,7 @@ flowchart TD
 
 | spec | 内容要点 |
 |---|---|
-| `attribute-numerics` | 四主属性（伤害/身法/迅捷/气血）；防御非主属性；十进制境界（99 级封顶）；属性=创角随机+突破随机成长（不从 exp/境界配置派生）；新战力公式；PvE 基准待重做；数值全部 config 化；旧五维直接废弃不映射 |
+| `attribute-numerics` | 四主属性（伤害/身法/迅捷/气血）；防御非主属性；十进制境界（99 级封顶）；属性=创角随机+突破随机成长（不从 exp/境界配置派生）；新战力公式；普通 PvE 与世界 Boss 已使用独立固定名册基准，不再按 exp 派生；数值全部 config 化；旧五维直接废弃不映射 |
 | `combat-core` | 全自动回合制；迅捷加权出手权+行动上限 200；Muxxu 伤害公式+护甲减伤；统一判定链（大招解锁门槛）；胜负/战报合并/统一结算入口；Boss/PvE 功能开关；触发效果分发契约（EFFECT_HANDLERS，未知 effect_type 告警跳过） |
 | `skill-system` | 装备挂载制；引擎契约键名（无第二套同义键）；大招必放制+解锁门槛；功法槽位 4 本+升星 3 星乘法+满星补偿；领悟池三来源 |
 | `level-progression` | 境界配置结构（realms+公式参数，无逐級字段）；get_level_name 统一入口；分段幂律曲线；成功率按大境界+连败保底+level_up_rate；失败惩罚 E(L)×25%；死亡率 [0.005,0.03]；双修定额；level_index 1-based |
@@ -129,14 +129,14 @@ flowchart TD
 | 2026-08-20 | `unify-sect-commands` 落地 | 宗门功能收敛为「宗门」单入口+子命令（删 18 旧顶层指令）；宗门悬赏独立入口与全局悬赏分流；宗门商店（贡献点结算，faction shop 池）；宗门专属秘境仅本宗可见；历练宗门事件 🏯 标记；GM「清除悬赏」；v3.10.0 |
 | 2026-08-20 | `update-sect-functional-tests` / `adapt-pvp-effects-to-platform-v020` 归档 | sect 域用例全量迁移 `/宗门` 子命令并补新功能用例（商店/悬赏分流/事件标记/入口导航）；PvP 效果用例 deterministic/seed 化；平台 v0.2.0（expect_not/deterministic/combine/one-shot 编排） |
 
-**数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底 → v28 默认宗门+功法归属（sects.is_system/faction_id、player_skills.sect_bound）→ v29 宝库领取记录 → v30 师承任务链进度 → v31 rifts 播种青云剑冢（id 6，宗门专属秘境）→ v32 传承改版（legacy_instances/impart_pk_cooldown/impart_snatch_protection 三表，历史里程碑）→ v39 历练结算状态机增量列与索引（当前最新）。
+**数据库迁移里程碑**：v22 四主属性重构（旧五维废弃不映射）→ v25 技能领悟持久化（player_skills 表）→ v26 传承重做（impart_value 等阶制）→ v27 方案A 成长模型+突破连败保底 → v28 默认宗门+功法归属（sects.is_system/faction_id、player_skills.sect_bound）→ v29 宝库领取记录 → v30 师承任务链进度 → v31 rifts 播种青云剑冢（id 6，宗门专属秘境）→ v32 传承改版（legacy_instances/impart_pk_cooldown/impart_snatch_protection 三表，历史里程碑）→ v39 历练结算状态机增量列与索引 → v40 删除旧 `boss` 表与 `boss_next_spawn_time`（当前最新）。
 
 ## 6. 进行中的工作（bd open，设计相关）
 
 | bd | 内容 | 与 design_docs 的关系 |
 |---|---|---|
 | `hz7` | 武器/功法/心法内容设计（照搬 MB/QPet 适配） | 主战场：`content-design/` 工作区 |
-| `9u2` | Boss/PvE 模块重做（独立境界基准表落地 attribute-numerics PvE 需求） | 待玩家侧定稿后锚定 |
+| `9u2` | Boss/PvE 模块重做（独立境界基准表落地 attribute-numerics PvE 需求） | 28+4 固定名册与数值验收已完成；原 issue 的 fallback/shim 删除要求仍待与 E2「保留 v1 回滚路径」决策对齐，Step 7 奖励经济另行设计 |
 | `56y` | 固定收益类修为来源平衡（修为丹/商店/灵眼/福地/灵田/悬赏/秘境） | 依据 `level-exp-curve/balance-recommendations.md` |
 | `cqt` | 突破保命道具设计（占位） | — |
 | `cti` / `ehd` | 冻结平衡配置到 default_configs.py（两条同名，疑似重复建单，待去重） | 涉及 config 与 default_configs 的一致性 |

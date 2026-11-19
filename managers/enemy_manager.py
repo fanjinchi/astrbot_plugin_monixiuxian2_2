@@ -361,11 +361,11 @@ class EnemyManager:
             armor_value += elite_config.get("defense_bonus", 0)
             crit_rate += elite_config.get("crit_rate_bonus", 0)
         elif category == "boss":
-            boss_config = group.get("boss", {})
-            hp_mult *= boss_config.get("hp_mult", 1.2)
-            atk_mult *= boss_config.get("atk_mult", 1.2)
-            armor_value += boss_config.get("defense_bonus", 0)
-            crit_rate += boss_config.get("crit_rate_bonus", 0)
+            boss_mult = group.get("boss", {})
+            hp_mult *= boss_mult.get("hp_mult", 1.2)
+            atk_mult *= boss_mult.get("atk_mult", 1.2)
+            armor_value += boss_mult.get("defense_bonus", 0)
+            crit_rate += boss_mult.get("crit_rate_bonus", 0)
 
         level_range = group.get("level_range", [0, 0])
         enemy_level = self._choose_enemy_level(player_level, level_range)

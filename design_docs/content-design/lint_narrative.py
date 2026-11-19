@@ -313,12 +313,10 @@ def _load_name_maps() -> dict[str, dict[str, str]]:
         for tpl in group.get("templates", []):
             enemy_map[str(tpl.get("key", ""))] = tpl.get("name", "")
     maps["enemies"] = enemy_map
-    # boss_config.json world_bosses 名册（Step 6 重建后落地；当前 config 尚无该键 → 空表，
-    # 名字一致性对新增条目自动跳过）
-    boss_cfg = _load_json(CONFIG_DIR / "boss_config.json")
+    # enemies.json v2 world_bosses 名册（E2 起唯一来源；旧 boss_config.json 已删）。
+    # 不要删除该映射：world_bosses 在 desc_tables 中且按 name_maps[table] 直接索引。
     maps["world_bosses"] = {
-        str(b.get("id", "")): b.get("name", "")
-        for b in boss_cfg.get("world_bosses", [])
+        str(b.get("id", "")): b.get("name", "") for b in en.get("world_bosses", [])
     }
     # rift_config.json rifts（id 为 int，统一 str 比较）
     rift = _load_json(CONFIG_DIR / "rift_config.json")

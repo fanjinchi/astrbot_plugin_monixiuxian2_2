@@ -6,7 +6,6 @@ from astrbot.api import logger
 
 from .data.default_configs import (
     ALCHEMY_CONFIG,
-    BOSS_CONFIG,
     DEFAULT_NARRATIVE_CONFIG,
     GAME_CONFIG,
     IMPART_CONFIG,
@@ -57,7 +56,6 @@ class ConfigManager:
 
         # 新增系统配置
         self.sect_config: dict[str, Any] = {}
-        self.boss_config: dict[str, Any] = {}
         self.rift_config: dict[str, Any] = {}
         self.alchemy_config: dict[str, Any] = {}
         self.sect_factions: dict[str, Any] = {}  # 默认宗门定义
@@ -262,7 +260,7 @@ class ConfigManager:
         """Synthesize the legacy per-level list from the new-style config.
 
         This shim preserves compatibility with modules that still read
-        ``level_data`` directly (e.g. boss_manager). Generated entries contain
+        ``level_data`` directly (e.g. the world-boss service). Generated entries contain
         ``level``, ``level_name``, ``exp_needed`` and ``success_rate`` but no
         ``base_*`` attributes.
         """
@@ -414,9 +412,6 @@ class ConfigManager:
         # 加载新系统配置
         self.sect_config = self._load_config_with_default(
             config_dir / "sect_config.json", SECT_CONFIG
-        )
-        self.boss_config = self._load_config_with_default(
-            config_dir / "boss_config.json", BOSS_CONFIG
         )
         self.rift_config = self._load_config_with_default(
             config_dir / "rift_config.json", RIFT_CONFIG

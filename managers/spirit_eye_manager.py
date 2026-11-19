@@ -20,11 +20,10 @@ SPIRIT_EYE_TYPES = {
 
 # GM「时间快进」覆盖条目（openspec change: gm-time-skip-registry）：声明即覆盖，
 # 只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py 装配汇总。
-# 与 boss_manager 的条目共享标签「Boss/灵眼下次刷新时间」，按 D2a 拆条后
-# 聚合时 boss 在前、本条相邻在后。
+# E2 起与其他领域的条目共用注册表（同域拆条时按 provider 块连续聚合）。
 TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
     (
-        "Boss/灵眼下次刷新时间",
+        "灵眼下次刷新时间",
         "UPDATE system_config "
         "SET value = CAST(CAST(value AS INTEGER) - ? AS TEXT) "
         "WHERE key = 'spirit_eye_next_spawn_time' AND CAST(value AS INTEGER) > 0",

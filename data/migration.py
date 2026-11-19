@@ -25,11 +25,14 @@ if TYPE_CHECKING:
 # v38: 业务事件 outbox + 逐目标投递 claim（business_events / event_deliveries）
 # v39: 历练结算状态机增量列（adventure_settlements.state/route_key/snapshot，
 #      child C 授权；纯 ADD COLUMN + 索引，不改写 v36 已发布定义、不重建表）
+# v40: 旧 Boss 整删（2026-10-28 用户拍板：数据与结构直接放弃、不迁移不归档）
+#      DROP boss 表 + 删除 system_config.boss_next_spawn_time 键；本版本不拥有
+#      任何新表（VERSION_SCHEMA_TABLES[40] = ()）。
 # 每版 migration task 与 _create_all_tables 共用同一建表函数（单一真源，
 # 全新安装与逐版升级不可能漂移）；VERSION_SCHEMA_TABLES 声明每版拥有的表，
 # 供 schema parity 测试构造「升级前」库存档。只有 SQLite 约束要求时才允许
 # 继续拆连续 v39…，不得复用已发布版本做别的结构。
-LATEST_DB_VERSION = 39
+LATEST_DB_VERSION = 40
 
 # 增量任务链的适用下限：v32 是 _create_all_tables 冻结的完整 schema 基线，
 # 只有达到该版本的库才具备迁移任务依赖的全部表结构；更早的旧库必须走
@@ -67,6 +70,10 @@ VERSION_SCHEMA_TABLES: dict[int, tuple[str, ...]] = {
     # 「有一版升级无法构造升级前状态」。列增动的 parity 由
     # tests/test_pve_persistence_foundation.py 的 v39 专门用例负责。
     39: (),
+    # v40 只做旧 Boss 删除（DROP TABLE / DELETE key），不拥有新表。旧表在
+    # fresh 安装中已不存在，无法靠 DROP+重建构造升级前状态，故 v40 的删除
+    # parity 由 tests/test_pve_persistence_foundation.py 的手动旧库用例负责。
+    40: (),
 }
 
 
@@ -321,7 +328,7 @@ async def _create_world_boss_persistence_tables(conn: aiosqlite.Connection):
         )
     """)
     # expires_at（48h 寿命）与 next_spawn_at（终态后的再生资格时刻）都是
-    # 参与到期判定的绝对时间戳 → 登记 GM 时间快进（managers/boss_manager.py）。
+    # 参与到期判定的绝对时间戳 → 登记 GM 时间快进（managers/world_boss_service.py）。
     await conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_world_boss_instances_state "
         "ON world_boss_instances(state, expires_at)"
@@ -516,8 +523,31 @@ async def _adventure_settlement_state_machine_v39(
     )
 
 
+@migration(40)
+async def _remove_legacy_boss_v40(
+    conn: aiosqlite.Connection, config_manager: ConfigManager
+):
+    """Drop the retired legacy Boss table and its spawn-time key (v40).
+
+    2026-10-28 用户拍板旧 Boss 数据与结构直接放弃（不迁移、不归档）。
+    本任务对 fresh 安装是 no-op（表/键本就不存在），对旧库是一次性清理；
+    两条路径都幂等，重复执行不报错。``boss`` 表不得登记进
+    ``VERSION_SCHEMA_TABLES[40]``（v40 不拥有任何新表）。
+    """
+    await conn.execute("DROP TABLE IF EXISTS boss")
+    # v34/v35 之前的极简升级库可能尚未建 system_config（真实 v32 基线已有），
+    # 因此先确认表存在再删键，保证任务链在最小测试库上也可幂等执行。
+    async with conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='system_config'"
+    ) as cursor:
+        if await cursor.fetchone() is not None:
+            await conn.execute(
+                "DELETE FROM system_config WHERE key = 'boss_next_spawn_time'"
+            )
+
+
 async def _create_all_tables(conn: aiosqlite.Connection):
-    """Create the current (v39) schema for a fresh database.
+    """Create the current (v40) schema for a fresh database.
 
     唯一的建表入口：全新安装与旧库重建都走这里，保证两条路径 schema
     完全一致（不再存在多套历史建表函数漂移的问题）。v36 起新增的 PVE
@@ -645,24 +675,8 @@ async def _create_all_tables(conn: aiosqlite.Connection):
     """)
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_buff_user ON buff_info(user_id)")
 
-    # Boss表
-    await conn.execute("""
-        CREATE TABLE IF NOT EXISTS boss (
-            boss_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            boss_name TEXT NOT NULL,
-            boss_level TEXT NOT NULL,
-            hp INTEGER NOT NULL,
-            max_hp INTEGER NOT NULL,
-            atk INTEGER NOT NULL,
-            defense INTEGER NOT NULL DEFAULT 0,
-            stone_reward INTEGER NOT NULL DEFAULT 0,
-            create_time INTEGER NOT NULL DEFAULT 0,
-            status INTEGER NOT NULL DEFAULT 1
-        )
-    """)
-    await conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_boss_status ON boss(status, create_time DESC)"
-    )
+    # 旧 Boss 表已于 v40 整删（2026-10-28 用户拍板，数据与结构不迁移、不归档），
+    # fresh 安装不再创建；旧库由 _remove_legacy_boss_v40 DROP。
 
     # 秘境表
     await conn.execute("""

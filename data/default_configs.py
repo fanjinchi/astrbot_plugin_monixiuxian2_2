@@ -14,7 +14,6 @@ __all__ = [
     "SECT_CONFIG",
     "SECT_FACTIONS",
     "SECT_TASKS",
-    "BOSS_CONFIG",
     "RIFT_CONFIG",
     "ALCHEMY_CONFIG",
     "IMPART_CONFIG",
@@ -87,68 +86,6 @@ SECT_CONFIG = {
             "upgrade_cost": [200, 400, 800, 1600, 3200],
         },
     },
-}
-
-BOSS_CONFIG = {
-    "spawn_interval": 3600,
-    "levels": [
-        {
-            "name": "练气",
-            "level_index": 0,
-            "hp_mult": 1.0,
-            "atk_mult": 1.0,
-            "reward_mult": 1.0,
-        },
-        {
-            "name": "筑基",
-            "level_index": 3,
-            "hp_mult": 1.5,
-            "atk_mult": 1.2,
-            "reward_mult": 1.5,
-        },
-        {
-            "name": "金丹",
-            "level_index": 6,
-            "hp_mult": 2.0,
-            "atk_mult": 1.5,
-            "reward_mult": 2.0,
-        },
-        {
-            "name": "元婴",
-            "level_index": 9,
-            "hp_mult": 2.5,
-            "atk_mult": 1.8,
-            "reward_mult": 2.5,
-        },
-        {
-            "name": "化神",
-            "level_index": 12,
-            "hp_mult": 3.0,
-            "atk_mult": 2.0,
-            "reward_mult": 3.0,
-        },
-        {
-            "name": "炼虚",
-            "level_index": 15,
-            "hp_mult": 4.0,
-            "atk_mult": 2.5,
-            "reward_mult": 4.0,
-        },
-        {
-            "name": "合体",
-            "level_index": 18,
-            "hp_mult": 5.0,
-            "atk_mult": 3.0,
-            "reward_mult": 5.0,
-        },
-        {
-            "name": "大乘",
-            "level_index": 21,
-            "hp_mult": 6.0,
-            "atk_mult": 3.5,
-            "reward_mult": 6.0,
-        },
-    ],
 }
 
 RIFT_CONFIG = {
@@ -793,7 +730,7 @@ GAME_CONFIG = {
     },
     "boss": {
         "enabled": True,
-        "comment": "世界Boss系统总开关；关闭时停止Boss生成定时任务与相关指令",
+        "comment": "世界Boss生命周期玩法总开关；关闭时轮询不生成新实例，重启实例由领域状态机恢复",
     },
     "dual_cultivation": {
         "cooldown": 3600,

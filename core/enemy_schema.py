@@ -819,8 +819,8 @@ def check_approval(
     if require_final:
         for name, rows in sorted(rows_by_dataset.items()):
             spec = datasets.get(name) or {}
-            # 叙事决策由 manifest 显式列出获批值；缺省只放行 定稿/豁免。
-            approved_narr = spec.get("narrative_status") or ["定稿", "豁免"]
+            # 定稿按 CSV 行值匹配；豁免是 manifest 的显式决策，只放行实际占位行。
+            approved_narr = spec.get("narrative_status") or ["定稿"]
             approved_narr = set(approved_narr)
             for row in rows:
                 rid = (row.get("id") or "?").strip()
@@ -828,10 +828,12 @@ def check_approval(
                     errors.append(
                         f"{name}/{rid}: status 非 final（draft 内容只能 preview 渲染）"
                     )
-                if (row.get("narrative_status") or "").strip() not in approved_narr:
+                narrative = (row.get("narrative_status") or "").strip()
+                if narrative not in approved_narr and not (
+                    narrative == "占位" and "豁免" in approved_narr
+                ):
                     errors.append(
-                        f"{name}/{rid}: narrative_status "
-                        f"{(row.get('narrative_status') or '').strip()!r} 未在 manifest "
+                        f"{name}/{rid}: narrative_status {narrative!r} 未在 manifest "
                         "叙事决策中获批"
                     )
     return errors

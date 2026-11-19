@@ -26,13 +26,13 @@
 | `heart_methods.csv` | 心法设计表（每行一个心法） |
 | `armors.csv` | 防具设计表（每行一件防具：重甲/法袍 × 9 品级标杆件，2026-09-08 armor-content-design） |
 | `armors.md` | 防具设计说明（供给曲线/对称 EHP 推导、M 序列、占位防具删除留档） |
-| `pve-enemy-design.md` | PVE 怪物/Boss 分层状态设计（2026-10-01 建立）：Step 0–6 战斗机制与数值规划已封板，Step 7 奖励经济未定，Step 8 管实施/内容批准；CSV 正式战斗内容与叙事状态仍须独立 approval manifest/hash/列范围确认；含现状五坑、外部调研、五维类型学及 Q1–Q7 决策；关联 bd `9u2`/`6ow`/`lky` |
+| `pve-enemy-design.md` | PVE 怪物/Boss 分层状态设计（2026-10-01 建立）：Step 0–6 战斗机制与数值规划已封板，Step 7 奖励经济未定；28+4 战斗与叙事已于 2026-11-19 获批并经 approval manifest/hash/列范围正式同步，普通 PVE 与新世界 Boss 已切流；含现状五坑、外部调研、五维类型学及 Q1–Q7 决策；关联 bd `9u2`/`6ow`/`lky` |
 | `proto_pve_feel.py` | **一次性原型脚本（非生产代码）**：真实引擎跑标模玩家 vs 三档怪物，验证 Step 0 难度锚手感（结果与迭代记录见 pve-enemy-design.md 附录 A） |
 | `sim_pve_acceptance.py` | PvE 验收门（2026-10-08 Step 5，proto_pve_roster.py 转正）：enemies.csv × T2 标模 × 3000 场真实引擎，胜率/TTK 锚点带 + 天花板档对 Boss ≤70% 自动断言，非零退出码 |
 | `sim_world_boss_anchor.py` | 世界 Boss HP 锚验收门（2026-11-09 世界 Boss 域落地）：world_bosses.csv × T2 双路线标模 × 2000 场/阶段真实引擎，对附录 F 场均输出锚（228/393/1035/1123）±10% 自动断言，非零退出码；用法 `python design_docs/content-design/sim_world_boss_anchor.py [场次]` |
 | `events-canon.csv` | 历练事件叙事表（事件组 key/name + 叙事四列，无数值列） |
-| `enemies.csv` | PVE 怪物数值+叙事合一表（2026-10-08 Step 4 产出：28 roster+3 守护共 31 行，数值照 pve-enemy-design.md 附录 D.4；取代旧 enemies-canon.csv） |
-| `world_bosses.csv` | 世界 Boss（天灾）名册+数值表（2026-10-10 Step 6 产出：4 段 × 1 只，HP 锚实测照附录 F，含三阶段参数与全套可配置文案，占位待审） |
+| `enemies.csv` | PVE 怪物数值+叙事合一表（2026-10-08 Step 4 产出：28 roster+3 守护共 31 行，数值照 pve-enemy-design.md 附录 D.4；28 正式行已 final/定稿，3 守护仍 draft/占位；取代旧 enemies-canon.csv） |
+| `world_bosses.csv` | 世界 Boss（天灾）名册+数值表（2026-10-10 Step 6 产出：4 段 × 1 只，HP 锚实测照附录 F，含三阶段参数与全套可配置文案；4 行已 final/定稿并同步正式配置） |
 | `rifts-canon.csv` | 秘境叙事表（id/name + 叙事四列 + 文案待工程变更备注） |
 | `bounty-canon.csv` | 悬赏叙事表（模板 id/name + 叙事四列 + category/difficulty 备注） |
 | `validate_budget.py` | 数值预算验算脚本（§3 速查表的机器校验） |

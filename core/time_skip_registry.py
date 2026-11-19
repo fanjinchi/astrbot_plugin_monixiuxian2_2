@@ -34,13 +34,13 @@ from astrbot.api import logger
 # 新增等待类冷却域 = 在字段属主模块声明 `TIME_SKIP_ENTRIES` 常量 + 把模块点号名登记进
 # 本列表（AGENTS.md §2 人工义务的登记点）。列表顺序 = 时间快进回复的域明细顺序：
 # 按 provider 块连续聚合（忙碌 → 闭关 → 决斗/切磋 → 双修 → 悬赏任务 → 悬赏放弃 →
-# 贷款 → Boss → 灵眼 → 传承挑战 → 传承保护）。悬赏两条与 bank 跨模块交错，块连续
+# 贷款 → 世界Boss → 灵眼 → 传承挑战 → 传承保护）。悬赏两条与 bank 跨模块交错，块连续
 # 聚合后为 5,7,6（原 5,6,7 的 6↔7 单次相邻互换，设计取舍见 design Risks；
-# 回复明细行序非契约，spec 无顺序保证）。Boss/灵眼按 design D2a 拆为
-# 两条单键 UPDATE、共享同一域标签，展开后相邻（boss 在前）。
+# 回复明细行序非契约，spec 无顺序保证）。世界 Boss 两条由领域属主
+# `managers/world_boss_service.py` 声明，块连续聚合后相邻。
 # child P（pve-persistence-transaction-foundation design §5）：世界Boss 到期/
-# 再生两条落属主 boss_manager（聚合位不变）；「历练休整到期时间」新属主（v39 起休整为全局窗口）
-# adventure_manager 追加表尾，既有行序零位移。
+# 再生两条由世界 Boss 领域属主声明；「历练休整到期时间」新属主（v39 起休整
+# 为全局窗口）adventure_manager 追加表尾，既有行序零位移。
 _PROVIDER_MODULES: tuple[str, ...] = (
     "core.busy_state",
     "core.cultivation_manager",
@@ -48,7 +48,7 @@ _PROVIDER_MODULES: tuple[str, ...] = (
     "managers.dual_cultivation_manager",
     "managers.bounty_manager",
     "managers.bank_manager",
-    "managers.boss_manager",
+    "managers.world_boss_service",
     "managers.spirit_eye_manager",
     "managers.impart_manager",
     "managers.adventure_manager",

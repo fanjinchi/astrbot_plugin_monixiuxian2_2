@@ -147,7 +147,7 @@ async def test_fresh_schema_has_three_layer_health_columns():
         async with db_conn.execute("SELECT version FROM db_info") as cursor:
             row = await cursor.fetchone()
         # 钉住链条末端版本；新增迁移版本时同步更新（见 child P design §1）
-        assert row[0] == LATEST_DB_VERSION == 39
+        assert row[0] == LATEST_DB_VERSION == 40
     finally:
         await db_conn.close()
 

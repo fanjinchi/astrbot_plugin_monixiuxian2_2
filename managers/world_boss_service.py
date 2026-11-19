@@ -19,8 +19,9 @@ One service owns the whole world-boss domain state machine (design §3):
   dispatcher in managers/world_boss_events.py expands and sends them after
   commit.
 
-This child ships the service and its fixtures only: the poller is not
-registered and the legacy handler is not switched (that is child E2).
+E2 owns activation: the lifecycle poller, handlers, outbox dispatcher wiring and
+the dummy legacy-Boss removal live outside this service. ``get_active`` is the
+query seam used by the ``世界Boss`` command (expiry settles, no spawn).
 """
 
 from __future__ import annotations
@@ -94,6 +95,24 @@ except ImportError:
     spawn_business_key = _ev.spawn_business_key
     stage_business_key = _ev.stage_business_key
 
+# GM「时间快进」覆盖条目（openspec change: gm-time-skip-registry）：领域属主
+# 声明即覆盖，只前移参与到期/冷却判定的时间戳。由 core/time_skip_registry.py
+# 的 _PROVIDER_MODULES 汇总；E2 激活后世界 Boss 是这两个冷却域的唯一属主。
+TIME_SKIP_ENTRIES: tuple[tuple[str, str], ...] = (
+    (
+        "世界Boss实例到期时间",
+        "UPDATE world_boss_instances "
+        "SET expires_at = expires_at - ? "
+        "WHERE state = 'active' AND expires_at > 0",
+    ),
+    (
+        "世界Boss下次再生时间",
+        "UPDATE world_boss_instances "
+        "SET next_spawn_at = next_spawn_at - ? "
+        "WHERE next_spawn_at > 0",
+    ),
+)
+
 INSTANCE_STATE_ACTIVE = "active"
 INSTANCE_STATE_DEFEATED = "defeated"
 INSTANCE_STATE_DISSIPATED = "dissipated"
@@ -124,6 +143,61 @@ DEFAULT_MAX_CONFLICT_RETRIES = 3
 
 class WorldBossSpawnRejected(RuntimeError):
     """A spawn request was refused; the message is user-facing Chinese."""
+
+
+def _requested_profile_name(service: WorldBossService, profile_id: str) -> str:
+    """Resolve a requested profile id to its display name when possible.
+
+    Args:
+        service: World-boss service whose catalog owns the profiles.
+        profile_id: Requested catalog id (may be unknown).
+
+    Returns:
+        Catalog name when known, otherwise the raw id.
+    """
+    catalog = getattr(service, "catalog", None)
+    lookup = getattr(catalog, "world_boss_by_id", None)
+    if callable(lookup):
+        try:
+            return lookup(profile_id).name
+        except Exception:  # noqa: BLE001 - unknown id falls back to raw text
+            return profile_id
+    return profile_id
+
+
+async def spawn_with_message(
+    service: WorldBossService, profile_id: str | None = None
+) -> tuple[bool, str]:
+    """Run ``ensure_spawn`` and render the shared management-entry message.
+
+    Both management entry points (top-level ``生成Boss`` and ``GM 生成Boss``)
+    must render the same three D-R1 branches: created, reused existing active
+    instance, or a user-readable rejection. Only these entries may pass a
+    ``profile_id``; the poller always uses ``None``.
+
+    Args:
+        service: World-boss domain service.
+        profile_id: Optional forced profile id.
+
+    Returns:
+        (success, user-facing message). Failures are logged, never raised.
+    """
+    if service is None:
+        return False, "❌ 世界 Boss 服务未初始化！"
+    try:
+        instance, created, resolved_profile_id = await service.ensure_spawn(profile_id)
+    except WorldBossSpawnRejected as exc:
+        return False, str(exc)
+    except Exception:  # noqa: BLE001 - management entry must not crash
+        logger.exception("世界 Boss 生成失败")
+        return False, "❌ 生成Boss失败，请稍后重试。"
+    boss_name = str(instance.get("boss_name") or "")
+    if created:
+        return True, f"✅ 已生成世界Boss：{boss_name}"
+    if profile_id is None:
+        return True, f"已有活跃世界 Boss {boss_name}。"
+    requested = _requested_profile_name(service, profile_id)
+    return True, f"已有活跃世界 Boss {boss_name}，未生成 {requested}。"
 
 
 @dataclass(frozen=True)
@@ -164,8 +238,9 @@ class WorldBossService:
         busy_state: BusyState guard (assert_idle); None skips the busy gate.
         combat_manager: CombatManager (or a CombatEngine) exposing
             build_fighter_from_player / resolve_combat.
-        config_manager: Optional config source read only at spawn time for
-            pve.difficulty_multiplier.
+        config_manager: Optional config source read for
+            ``pve.difficulty_multiplier`` (frozen at spawn) and the shared
+            ``combat.base_crit_rate`` crit fallback.
         clock: Injectable business clock (unix seconds).
         rng: Injectable RNG used for profile selection (tests pin a seed).
         max_conflict_retries: Bounded recompute attempts on CAS conflict.
@@ -212,6 +287,27 @@ class WorldBossService:
     def enabled(self) -> bool:
         """Whether the domain has a loaded catalog with at least one profile."""
         return self.catalog is not None and bool(self.catalog.world_bosses)
+
+    async def get_active(self, *, now: int | None = None) -> dict | None:
+        """Return the current active instance after settling expiry (query only).
+
+        The query shares ``_consume_expired_active`` with ``ensure_spawn`` so an
+        expired row read by the handler is dissipated in the same short
+        transaction instead of lingering as "active". It never creates an
+        instance (E2 design §4).
+
+        Args:
+            now: Business timestamp override; defaults to the service clock.
+
+        Returns:
+            The surviving active instance row, or None when the domain is
+            disabled / no instance is active.
+        """
+        if not self.enabled:
+            return None
+        stamp = int(self.clock()) if now is None else int(now)
+        async with self.db.transaction():
+            return await self._consume_expired_active(stamp)
 
     def _profiles(self) -> tuple[WorldBossProfile, ...]:
         """Return the catalog world-boss profiles (empty when disabled)."""
@@ -677,6 +773,25 @@ class WorldBossService:
                 ),
             }
 
+    def _base_crit_rate(self) -> float | int:
+        """Read the shared monster crit fallback from ``game_config``.
+
+        E1 owns the contract (``combat.base_crit_rate``): a positive per-enemy
+        percentage still overrides it in :func:`build_enemy_fighter`; missing
+        key or ``None`` falls back to 0.15; an explicit ``0`` disables crit.
+
+        Returns:
+            Configured fallback rate, or 0.15 when unavailable.
+        """
+        config = getattr(self.config_manager, "game_config", None)
+        if isinstance(config, dict):
+            combat = config.get("combat", {})
+            if isinstance(combat, dict):
+                configured = combat.get("base_crit_rate")
+                if configured is not None:
+                    return configured
+        return 0.15
+
     def _build_instance_fighter(self, instance: dict) -> Any:
         """Build the boss FighterState from frozen facts and the persisted phase."""
         snapshot = self._snapshot(instance)
@@ -719,7 +834,7 @@ class WorldBossService:
             atk=damage,
             defense=armor,
         )
-        return build_enemy_fighter(enemy)
+        return build_enemy_fighter(enemy, base_crit_rate=self._base_crit_rate())
 
     async def _run_challenge_combat(self, snapshot: dict, seed: int) -> dict:
         """Run the deterministic fight outside any transaction (prd R4)."""

@@ -1,6 +1,6 @@
 # PVE 怪物与 Boss 设计：方法、外部调研与设计路径
 
-> 2026-10-01 建立。**分层状态**：Step 0–6 的战斗机制与数值规划已封板；Step 7 奖励经济未定，Step 8 为实施/内容批准流程；`enemies.csv` / `world_bosses.csv` 的正式战斗内容与 `narrative_status` 仍须按 approval manifest/hash/列范围另行获批后才能同步。
+> 2026-10-01 建立。**分层状态**：Step 0–6 的战斗机制与数值规划已封板；Step 7 奖励经济未定。2026-11-19 用户批准完整 28+4 战斗与叙事内容，32 行已升 `final / 定稿` 并经 approval manifest/hash/列范围正式同步；普通 PVE 固定名册、新世界 Boss 生命周期与文案广播已切流，3 个守护者行保持 `draft / 占位`。
 > 关联 bd：`9u2`（Boss/PvE 模块重做：落地 attribute-numerics 的 PvE 数值基准）、
 > `6ow`（秘境怪物生态配置立项）、`lky`（梯队2 敌人背景文案）。
 > 前置阅读：`route-identity.md`（路线身份与机制预算表）、`armors.md`（内容设计流程范本）、
@@ -56,17 +56,14 @@
 > 巴蛇=绞杀（trim×0.85）；纪律 = 禁用一切"回复/减免 Boss 血量"机制（回血/吸血/减伤/免死），
 > 招牌技变更必须连带重测 HP 锚。
 >
-> **实施状态（2026-10-12，Trellis child B `10-10-pve-enemy-catalog-runtime`）**：Step 3 定案三项中属本
-> child 的两项已落地——`difficulty_coefficients` 死配置删除（config/enemies.json + default_configs.py +
-> loader）、`pve.difficulty_multiplier` 收敛为只乘伤害（动态与定向组两条路径）、`crit_rate` 经唯一 mapper
-> `managers/enemy_catalog.py:build_enemy_fighter` 接线（>0 时 /100 覆盖，否则读取共享 `base_crit_rate`；随附补齐
-> `level_index` 护甲 K 常数与触发技/大招透传）。玩家侧暴击补完（base_crit_rate 物化）与 `exp_needed`
-> 修为派生退役不属本 child。固定名册管线：`core/enemy_schema.py`（schema v2 校验 + 词条/机制映射单一
-> 真相）→ `scripts/sync_content_to_config.py` 敌人域（draft 只读 preview / `--approval-manifest` 正式写
-> 闸门 fail closed；`status` 列 = 战斗数值机器闸门、与 `narrative_status` 独立）→ `managers/enemy_catalog.py`
-> （不可变 catalog、(realm_segment, category) 索引、难度单点施加）。**正式 sync 未执行**（内容仍 draft），
-> 28+4 四层一致性经真实 CSV preview 验收；正式 generated config 复验与调用方切流留父计划 Batch 5，
-> 世界 Boss 仅提供不可变 profile（生命周期归 child D）。
+> **实施状态（2026-11-19，Trellis E2 `10-28-pve-content-activation`）**：A/B/P/C/F/D/E1 已归档，E2 完成正式
+> 内容激活与切流。28+4  CSV 行均获用户战斗与叙事批准并升 `final / 定稿`，正式 manifest 绑定整行表头、
+> CSV SHA-256 与 `["定稿"]` 决策；`config/enemies.json` 已为 schema v2，4/4 世界 Boss
+> `narrative_approved=true`。普通 PVE 默认路径已切到不可变 `EnemyCatalog`，难度系数显式传入且只乘伤害，
+> `catalog=None` 才走旧动态派生回落；`enemy_groups.top` 已删除。旧 `BossManager/BossHandlers`、
+> `boss_config.json`、`Boss` 模型、旧表与旧 key 已整删，新 handler、单 lifecycle poller、outbox dispatcher
+> 和 `WorldBossService.get_active()` 已装配。世界 Boss 五类文案由已批准出生快照单一来源渲染，当前只记
+> 挑战/贡献/末击事实，Step 7 奖励仍未实施。
 
 ---
 
@@ -623,23 +620,20 @@ low=100% / mid=70/25/5 / high=40/40/20 / extreme=30/35/35），是继承不是�
 **Step 6 至此全部封板（2026-10-10）**。数值与名册已落表：`world_bosses.csv`
 （4 只天灾，招牌技定案 连咬/反震/灼烧/绞杀 各一，HP 锚 v2 实测见附录 F；
 巴蛇伤害 trim ×0.85 = 105 已随锚值复测一并落位，倒挂问题闭环）。
-遗留物：①奖励数值（Step 7 随丹药材料经济统一定）；
-②4 只天灾名册的叙事文案（已起草占位，待用户审阅升定稿）；③工程修复清单
-（坑 #5 护甲、boss 表 phase 字段、每日次数与伤害台账存储、广播接入）归 Step 8 Trellis 任务；
-④落地验收：sim 跑「单活跃玩家全勤 2 天磨死」场景 + 阶段混合场景收口 HP 锚。
-
-Boss 护甲/暴击工程修复（坑 #5：boss_config.json 缺 armor_value 键致护甲恒 0）随这一步走。
+2026-11-19 落地状态：4 只天灾的出场/阶段/击杀/消散文案已获用户批准并升 `定稿`，正式配置与出生快照均带
+`narrative_approved=true`；护甲、每日次数、伤害台账、贡献与广播 outbox 已接入。北京自然日每日 3 次，
+48h 存活，击杀后 12h/消散后 24h 再生；旧 Boss 经验派生、固定 30% 会心、旧 `boss_config.json` 与旧表已整删。
+唯一遗留是①奖励数值（Step 7 随丹药材料经济统一定）；当前只记战绩，不发奖励。HP 锚与阶段混合场景由
+`sim_world_boss_anchor.py` 及世界 Boss 域/激活回归共同验收。
 
 **Step 7｜掉落表重做**
-现 drop_tables 四档（low/mid/high/top）与炼丹/悬赏材料经济的挂钩重新梳理；
+现 drop_tables 档位与炼丹/悬赏材料经济的挂钩重新梳理；世界 Boss 奖励经济也归本步，未实施前不得恢复旧掉落承诺。
 掉落是「资源税」的对冲项，与 Step 0 的损血税一起算总账。
 
-**Step 8｜确认与落地**
-设计稿用户确认 → Trellis 任务立项（含工程修复清单：死配置接线、level_index 进引擎、
-怪物技能透传、坑 #5 护甲修复等；2026-10-09 起 OpenSpec 封存为只读历史契约，
-变更改走 Trellis 任务流程，见 AGENTS.md §14）→ 代码实施审批与内容批准分开：先完成只读 preview/运行时契约，
-待战斗数值与叙事状态分别绑定 approval manifest/hash/获批列范围并获用户确认后，才由 sync 管线导入正式配置
-→ 功能测试补 PVE 域用例。
+**Step 8｜确认与落地（已完成激活）**
+设计稿与用户战斗/叙事批准已分别绑定 approval manifest/hash/整行表头，正式 sync 双闸门通过；普通 PVE 固定名册、
+新世界 Boss handler/poller/outbox、暴击配置与 v40 旧表清理已切流。功能验证以 pytest 与静态审计为质量门，
+真实消息管线回归按项目约定由用户手动发起。
 
 ---
 
@@ -1244,5 +1238,5 @@ P3 伤害×0.9+护甲×0.5）下的场均输出，按阶段血量占比 40/40/20
 | 金丹 | 焚山朱厌 | 凶兽 | 燎原火毒（灼烧） | 朱厌现则大兵起（山海经兵戈之兆） |
 | 元婴 | 吞象巴蛇 | 凶兽 | 绞杀缠绕（眩晕） | 巴蛇吞象三岁出骨，腹中卡着旧骸骨 |
 
-全套出场/阶段/击杀/消散文案已入 CSV（占位状态，待用户审阅），走 config 可配置管线。
+全套出场/阶段/击杀/消散文案已入 CSV 并获用户批准定稿，经正式 config、出生快照与 outbox 管线消费。
 纪律遵守：不碰苍龙/墨玉麒麟/火凤三兽（Q6）；天灾科属取高智慧档贴 world-bible §2.3。

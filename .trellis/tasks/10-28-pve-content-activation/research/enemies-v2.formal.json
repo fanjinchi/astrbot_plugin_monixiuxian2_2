@@ -1,0 +1,1541 @@
+{
+  "schema_version": 2,
+  "profile_version": 1,
+  "generator": "scripts/sync_content_to_config.py",
+  "source": {
+    "mode": "formal",
+    "approval": {
+      "manifest_path": "/home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/.trellis/tasks/10-28-pve-content-activation/research/approval-manifest.json",
+      "manifest_sha256": "173a6b2fc5738bef0900685ffbd81ab15f938dfa7480f40e5f9a8fa108a2789f",
+      "datasets": {
+        "enemies.csv": {
+          "sha256": "c2cbb6c388bd8847056e3bbdb61328c71be7c7b1bbcf137a07c2ea690f359ff0",
+          "columns": [
+            "id",
+            "name",
+            "segment",
+            "tier",
+            "archetype",
+            "level",
+            "level_range",
+            "hp",
+            "damage",
+            "agility",
+            "speed",
+            "armor_value",
+            "affix",
+            "boss_skill",
+            "description",
+            "ref_source",
+            "design_note",
+            "status",
+            "canon_origin",
+            "tone_tier",
+            "story_hook",
+            "narrative_status"
+          ],
+          "narrative_status": [
+            "定稿"
+          ]
+        },
+        "world_bosses.csv": {
+          "sha256": "f442caa46848928898eb72924932f86f751fc14b3a6310985ffc001ee061f60e",
+          "columns": [
+            "id",
+            "name",
+            "segment",
+            "level",
+            "hp",
+            "damage",
+            "agility",
+            "speed",
+            "armor_value",
+            "signature_skill",
+            "skill_key",
+            "phase_thresholds",
+            "phase2_dmg_mult",
+            "phase3_dmg_mult",
+            "phase3_armor_mult",
+            "lifetime_h",
+            "daily_attempts",
+            "respawn_kill_h",
+            "respawn_dissipate_h",
+            "spawn_text",
+            "phase2_text",
+            "phase3_text",
+            "kill_text",
+            "dissipate_text",
+            "description",
+            "story_hook",
+            "design_note",
+            "ref_source",
+            "status",
+            "canon_origin",
+            "tone_tier",
+            "narrative_status"
+          ],
+          "narrative_status": [
+            "定稿"
+          ]
+        }
+      }
+    },
+    "enemies.csv": {
+      "path": "design_docs/content-design/enemies.csv",
+      "sha256": "c2cbb6c388bd8847056e3bbdb61328c71be7c7b1bbcf137a07c2ea690f359ff0",
+      "rows": 28
+    },
+    "world_bosses.csv": {
+      "path": "design_docs/content-design/world_bosses.csv",
+      "sha256": "f442caa46848928898eb72924932f86f751fc14b3a6310985ffc001ee061f60e",
+      "rows": 4
+    }
+  },
+  "enemies": [
+    {
+      "id": "mon_jd_e",
+      "profile_version": 1,
+      "name": "玄水鳄",
+      "segment": "金丹",
+      "category": "normal",
+      "archetype": "均衡",
+      "level_index": 20,
+      "level_range": [
+        20,
+        29
+      ],
+      "hp": 257,
+      "damage": 33,
+      "agility": 32,
+      "speed": 33,
+      "armor_value": 0,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_jd_jiao",
+      "profile_version": 1,
+      "name": "玄水蛟·螭渊",
+      "segment": "金丹",
+      "category": "boss",
+      "archetype": "坚壳",
+      "level_index": 20,
+      "level_range": [
+        20,
+        29
+      ],
+      "hp": 994,
+      "damage": 57,
+      "agility": 31,
+      "speed": 32,
+      "armor_value": 31,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "鳞甲反震",
+      "trigger_skills": [
+        {
+          "name": "鳞甲反震",
+          "trigger_timing": "on_defense",
+          "trigger_rate": 0.2,
+          "effect_type": "counter",
+          "effect_value": 0.3
+        }
+      ],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_jd_ya",
+      "profile_version": 1,
+      "name": "赤焰火鸦",
+      "segment": "金丹",
+      "category": "normal",
+      "archetype": "猛击",
+      "level_index": 20,
+      "level_range": [
+        20,
+        29
+      ],
+      "hp": 206,
+      "damage": 41,
+      "agility": 32,
+      "speed": 33,
+      "armor_value": 0,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_jd_ya_e",
+      "profile_version": 1,
+      "name": "狂暴的赤焰火鸦",
+      "segment": "金丹",
+      "category": "elite",
+      "archetype": "猛击",
+      "level_index": 20,
+      "level_range": [
+        20,
+        29
+      ],
+      "hp": 518,
+      "damage": 98,
+      "agility": 33,
+      "speed": 35,
+      "armor_value": 4,
+      "crit_rate": 0,
+      "affix": "狂暴",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_jd_yao",
+      "profile_version": 1,
+      "name": "穿云鹞",
+      "segment": "金丹",
+      "category": "normal",
+      "archetype": "迅捷",
+      "level_index": 20,
+      "level_range": [
+        20,
+        29
+      ],
+      "hp": 232,
+      "damage": 31,
+      "agility": 35,
+      "speed": 37,
+      "armor_value": 0,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_jd_yuan",
+      "profile_version": 1,
+      "name": "玄甲鼋",
+      "segment": "金丹",
+      "category": "normal",
+      "archetype": "坚壳",
+      "level_index": 20,
+      "level_range": [
+        20,
+        29
+      ],
+      "hp": 322,
+      "damage": 28,
+      "agility": 30,
+      "speed": 31,
+      "armor_value": 12,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_jd_yuan_e",
+      "profile_version": 1,
+      "name": "坚甲的玄甲鼋",
+      "segment": "金丹",
+      "category": "elite",
+      "archetype": "坚壳",
+      "level_index": 20,
+      "level_range": [
+        20,
+        29
+      ],
+      "hp": 607,
+      "damage": 76,
+      "agility": 32,
+      "speed": 32,
+      "armor_value": 37,
+      "crit_rate": 0,
+      "affix": "坚甲",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_lq_bao",
+      "profile_version": 1,
+      "name": "山豹",
+      "segment": "练气",
+      "category": "normal",
+      "archetype": "猛击",
+      "level_index": 1,
+      "level_range": [
+        1,
+        9
+      ],
+      "hp": 61,
+      "damage": 4,
+      "agility": 8,
+      "speed": 11,
+      "armor_value": 0,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_lq_bao_e",
+      "profile_version": 1,
+      "name": "狂暴的山豹",
+      "segment": "练气",
+      "category": "elite",
+      "archetype": "猛击",
+      "level_index": 1,
+      "level_range": [
+        1,
+        9
+      ],
+      "hp": 156,
+      "damage": 22,
+      "agility": 9,
+      "speed": 11,
+      "armor_value": 1,
+      "crit_rate": 0,
+      "affix": "狂暴",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_lq_gui",
+      "profile_version": 1,
+      "name": "石壳龟",
+      "segment": "练气",
+      "category": "normal",
+      "archetype": "坚壳",
+      "level_index": 1,
+      "level_range": [
+        1,
+        9
+      ],
+      "hp": 96,
+      "damage": 3,
+      "agility": 8,
+      "speed": 10,
+      "armor_value": 4,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_lq_gui_e",
+      "profile_version": 1,
+      "name": "坚甲的石壳龟",
+      "segment": "练气",
+      "category": "elite",
+      "archetype": "坚壳",
+      "level_index": 1,
+      "level_range": [
+        1,
+        9
+      ],
+      "hp": 183,
+      "damage": 17,
+      "agility": 8,
+      "speed": 10,
+      "armor_value": 13,
+      "crit_rate": 0,
+      "affix": "坚甲",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_lq_she",
+      "profile_version": 1,
+      "name": "青竹蛇",
+      "segment": "练气",
+      "category": "normal",
+      "archetype": "迅捷",
+      "level_index": 1,
+      "level_range": [
+        1,
+        9
+      ],
+      "hp": 69,
+      "damage": 3,
+      "agility": 9,
+      "speed": 12,
+      "armor_value": 0,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_lq_zhu",
+      "profile_version": 1,
+      "name": "獠牙野猪",
+      "segment": "练气",
+      "category": "normal",
+      "archetype": "均衡",
+      "level_index": 1,
+      "level_range": [
+        1,
+        9
+      ],
+      "hp": 77,
+      "damage": 3,
+      "agility": 8,
+      "speed": 11,
+      "armor_value": 0,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_lq_zhu_wang",
+      "profile_version": 1,
+      "name": "老林猪王·古力",
+      "segment": "练气",
+      "category": "boss",
+      "archetype": "均衡",
+      "level_index": 1,
+      "level_range": [
+        1,
+        9
+      ],
+      "hp": 228,
+      "damage": 18,
+      "agility": 8,
+      "speed": 11,
+      "armor_value": 7,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "拱土疗伤",
+      "trigger_skills": [
+        {
+          "name": "拱土疗伤",
+          "trigger_timing": "on_defense",
+          "trigger_rate": 0.12,
+          "effect_type": "heal",
+          "heal_percent": 0.07
+        }
+      ],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_yy_hu",
+      "profile_version": 1,
+      "name": "玉面狐",
+      "segment": "元婴",
+      "category": "normal",
+      "archetype": "均衡",
+      "level_index": 30,
+      "level_range": [
+        30,
+        40
+      ],
+      "hp": 352,
+      "damage": 57,
+      "agility": 45,
+      "speed": 45,
+      "armor_value": 0,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_yy_hu_e",
+      "profile_version": 1,
+      "name": "狂暴的玉面狐",
+      "segment": "元婴",
+      "category": "elite",
+      "archetype": "均衡",
+      "level_index": 30,
+      "level_range": [
+        30,
+        40
+      ],
+      "hp": 881,
+      "damage": 127,
+      "agility": 47,
+      "speed": 48,
+      "armor_value": 6,
+      "crit_rate": 0,
+      "affix": "狂暴",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_yy_hujun",
+      "profile_version": 1,
+      "name": "千面狐君",
+      "segment": "元婴",
+      "category": "boss",
+      "archetype": "均衡",
+      "level_index": 30,
+      "level_range": [
+        30,
+        40
+      ],
+      "hp": 1083,
+      "damage": 124,
+      "agility": 45,
+      "speed": 47,
+      "armor_value": 25,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "九尾现形",
+      "trigger_skills": [],
+      "ultimates": [
+        {
+          "id": "boss_rage",
+          "name": "九尾现形",
+          "trigger_self_hp_below": 0.3,
+          "trigger_rate": 1.0,
+          "effect_type": "buff",
+          "stat": "damage",
+          "effect_value": 0.1,
+          "duration": 3
+        }
+      ],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_yy_juren",
+      "profile_version": 1,
+      "name": "石魄巨人",
+      "segment": "元婴",
+      "category": "normal",
+      "archetype": "坚壳",
+      "level_index": 30,
+      "level_range": [
+        30,
+        40
+      ],
+      "hp": 440,
+      "damage": 48,
+      "agility": 42,
+      "speed": 42,
+      "armor_value": 16,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_yy_sun",
+      "profile_version": 1,
+      "name": "九霄雷隼",
+      "segment": "元婴",
+      "category": "normal",
+      "archetype": "迅捷",
+      "level_index": 30,
+      "level_range": [
+        30,
+        40
+      ],
+      "hp": 317,
+      "damage": 54,
+      "agility": 49,
+      "speed": 51,
+      "armor_value": 0,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_yy_tanglang",
+      "profile_version": 1,
+      "name": "血刀螳螂",
+      "segment": "元婴",
+      "category": "normal",
+      "archetype": "猛击",
+      "level_index": 30,
+      "level_range": [
+        30,
+        40
+      ],
+      "hp": 282,
+      "damage": 71,
+      "agility": 45,
+      "speed": 45,
+      "armor_value": 0,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_yy_tanglang_e",
+      "profile_version": 1,
+      "name": "嗜血的血刀螳螂",
+      "segment": "元婴",
+      "category": "elite",
+      "archetype": "猛击",
+      "level_index": 30,
+      "level_range": [
+        30,
+        40
+      ],
+      "hp": 705,
+      "damage": 144,
+      "agility": 47,
+      "speed": 48,
+      "armor_value": 12,
+      "crit_rate": 0,
+      "affix": "嗜血",
+      "boss_skill": "",
+      "trigger_skills": [
+        {
+          "name": "嗜血",
+          "trigger_timing": "on_attack",
+          "trigger_rate": 0.2,
+          "effect_type": "heal",
+          "effect_value": 0.2,
+          "vampire": true
+        }
+      ],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_zj_hu",
+      "profile_version": 1,
+      "name": "赤瞳虎",
+      "segment": "筑基",
+      "category": "normal",
+      "archetype": "猛击",
+      "level_index": 10,
+      "level_range": [
+        10,
+        19
+      ],
+      "hp": 103,
+      "damage": 20,
+      "agility": 19,
+      "speed": 21,
+      "armor_value": 0,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_zj_hu_e",
+      "profile_version": 1,
+      "name": "嗜血的赤瞳虎",
+      "segment": "筑基",
+      "category": "elite",
+      "archetype": "猛击",
+      "level_index": 10,
+      "level_range": [
+        10,
+        19
+      ],
+      "hp": 260,
+      "damage": 49,
+      "agility": 20,
+      "speed": 22,
+      "armor_value": 6,
+      "crit_rate": 0,
+      "affix": "嗜血",
+      "boss_skill": "",
+      "trigger_skills": [
+        {
+          "name": "嗜血",
+          "trigger_timing": "on_attack",
+          "trigger_rate": 0.2,
+          "effect_type": "heal",
+          "effect_value": 0.2,
+          "vampire": true
+        }
+      ],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_zj_lang",
+      "profile_version": 1,
+      "name": "疾风狼",
+      "segment": "筑基",
+      "category": "normal",
+      "archetype": "迅捷",
+      "level_index": 10,
+      "level_range": [
+        10,
+        19
+      ],
+      "hp": 116,
+      "damage": 15,
+      "agility": 21,
+      "speed": 24,
+      "armor_value": 0,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_zj_lang_wang",
+      "profile_version": 1,
+      "name": "苍月狼王",
+      "segment": "筑基",
+      "category": "boss",
+      "archetype": "迅捷",
+      "level_index": 10,
+      "level_range": [
+        10,
+        19
+      ],
+      "hp": 410,
+      "damage": 34,
+      "agility": 22,
+      "speed": 24,
+      "armor_value": 12,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "狼王连咬",
+      "trigger_skills": [
+        {
+          "name": "狼王连咬",
+          "trigger_timing": "on_attack",
+          "trigger_rate": 0.15,
+          "effect_type": "combo",
+          "effect_value": 0.5
+        }
+      ],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_zj_niu",
+      "profile_version": 1,
+      "name": "板角蛮牛",
+      "segment": "筑基",
+      "category": "normal",
+      "archetype": "均衡",
+      "level_index": 10,
+      "level_range": [
+        10,
+        19
+      ],
+      "hp": 129,
+      "damage": 16,
+      "agility": 19,
+      "speed": 21,
+      "armor_value": 0,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_zj_xiong",
+      "profile_version": 1,
+      "name": "铁背熊",
+      "segment": "筑基",
+      "category": "normal",
+      "archetype": "坚壳",
+      "level_index": 10,
+      "level_range": [
+        10,
+        19
+      ],
+      "hp": 161,
+      "damage": 13,
+      "agility": 18,
+      "speed": 19,
+      "armor_value": 8,
+      "crit_rate": 0,
+      "affix": "",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    },
+    {
+      "id": "mon_zj_xiong_e",
+      "profile_version": 1,
+      "name": "坚甲的铁背熊",
+      "segment": "筑基",
+      "category": "elite",
+      "archetype": "坚壳",
+      "level_index": 10,
+      "level_range": [
+        10,
+        19
+      ],
+      "hp": 305,
+      "damage": 42,
+      "agility": 19,
+      "speed": 20,
+      "armor_value": 25,
+      "crit_rate": 0,
+      "affix": "坚甲",
+      "boss_skill": "",
+      "trigger_skills": [],
+      "ultimates": [],
+      "exp": 0,
+      "status": "final",
+      "narrative_status": "定稿"
+    }
+  ],
+  "world_bosses": [
+    {
+      "id": "wb_jd_zhu",
+      "profile_version": 1,
+      "name": "焚山朱厌",
+      "segment": "金丹",
+      "level_index": 20,
+      "hp": 4600,
+      "damage": 57,
+      "agility": 31,
+      "speed": 32,
+      "armor_value": 31,
+      "crit_rate": 0,
+      "signature_skill": "燎原火毒",
+      "skill_key": "灼烧",
+      "trigger_skills": [
+        {
+          "name": "灼烧",
+          "trigger_timing": "on_attack",
+          "trigger_rate": 0.2,
+          "effect_type": "dot",
+          "effect_value": 0.15,
+          "duration": 3
+        }
+      ],
+      "ultimates": [],
+      "phase_thresholds": [
+        0.6,
+        0.2
+      ],
+      "phase2_damage_multiplier": 1.1,
+      "phase3_damage_multiplier": 0.9,
+      "phase3_armor_multiplier": 0.5,
+      "lifetime_h": 48,
+      "daily_attempts": 3,
+      "respawn_after_kill_h": 12,
+      "respawn_after_dissipate_h": 24,
+      "status": "final",
+      "narrative_status": "定稿",
+      "spawn_text": "西边山火三日不熄——朱厌现世，兵戈之兆！",
+      "phase2_text": "朱厌捶胸长啸，火随拳势暴涨！",
+      "phase3_text": "朱厌毛发焦落白首低垂，拳势却更急了。",
+      "kill_text": "朱厌倒在它亲手点燃的山火里。",
+      "dissipate_text": "朱厌长啸一声跃入火海，不知所终。",
+      "narrative_approved": true
+    },
+    {
+      "id": "wb_lq_ba",
+      "profile_version": 1,
+      "name": "裂峡罴王",
+      "segment": "练气",
+      "level_index": 1,
+      "hp": 1000,
+      "damage": 18,
+      "agility": 8,
+      "speed": 11,
+      "armor_value": 7,
+      "crit_rate": 0,
+      "signature_skill": "裂峡连掌",
+      "skill_key": "连咬",
+      "trigger_skills": [
+        {
+          "name": "连咬",
+          "trigger_timing": "on_attack",
+          "trigger_rate": 0.15,
+          "effect_type": "combo",
+          "effect_value": 0.5
+        }
+      ],
+      "ultimates": [],
+      "phase_thresholds": [
+        0.6,
+        0.2
+      ],
+      "phase2_damage_multiplier": 1.1,
+      "phase3_damage_multiplier": 0.9,
+      "phase3_armor_multiplier": 0.5,
+      "lifetime_h": 48,
+      "daily_attempts": 3,
+      "respawn_after_kill_h": 12,
+      "respawn_after_dissipate_h": 24,
+      "status": "final",
+      "narrative_status": "定稿",
+      "spawn_text": "黑风峡方向煞气冲天——裂峡罴王出峡了！",
+      "phase2_text": "罴王吃痛狂性大发，掌势更猛了！",
+      "phase3_text": "罴王遍体鳞伤步履踉跄，甲皮都松动了。",
+      "kill_text": "罴王轰然倒地，峡谷回音久久不散。",
+      "dissipate_text": "罴王拖着伤躯退回黑风峡深处，只留下满地狼藉。",
+      "narrative_approved": true
+    },
+    {
+      "id": "wb_yy_ba",
+      "profile_version": 1,
+      "name": "吞象巴蛇",
+      "segment": "元婴",
+      "level_index": 30,
+      "hp": 5000,
+      "damage": 105,
+      "agility": 45,
+      "speed": 47,
+      "armor_value": 25,
+      "crit_rate": 0,
+      "signature_skill": "绞杀缠绕",
+      "skill_key": "绞杀",
+      "trigger_skills": [
+        {
+          "name": "绞杀",
+          "trigger_timing": "on_attack",
+          "trigger_rate": 0.15,
+          "effect_type": "stun"
+        }
+      ],
+      "ultimates": [],
+      "phase_thresholds": [
+        0.6,
+        0.2
+      ],
+      "phase2_damage_multiplier": 1.1,
+      "phase3_damage_multiplier": 0.9,
+      "phase3_armor_multiplier": 0.5,
+      "lifetime_h": 48,
+      "daily_attempts": 3,
+      "respawn_after_kill_h": 12,
+      "respawn_after_dissipate_h": 24,
+      "status": "final",
+      "narrative_status": "定稿",
+      "spawn_text": "云梦大泽雾气蔽日，有巨物游走其间——巴蛇出矣。",
+      "phase2_text": "巴蛇昂首吞吸如虹，百里鸟兽惊散！",
+      "phase3_text": "巴蛇腹部旧伤迸裂鳞甲大片脱落，绞杀却愈发疯狂。",
+      "kill_text": "巴蛇庞大的身躯轰然砸落泽中，雾气久久不散。",
+      "dissipate_text": "巴蛇负伤遁入泽底深渊，吞下最后一片云影。",
+      "narrative_approved": true
+    },
+    {
+      "id": "wb_zj_tuo",
+      "profile_version": 1,
+      "name": "泽底鼍龙",
+      "segment": "筑基",
+      "level_index": 10,
+      "hp": 1800,
+      "damage": 34,
+      "agility": 22,
+      "speed": 24,
+      "armor_value": 12,
+      "crit_rate": 0,
+      "signature_skill": "铁脊反震",
+      "skill_key": "反震",
+      "trigger_skills": [
+        {
+          "name": "反震",
+          "trigger_timing": "on_defense",
+          "trigger_rate": 0.2,
+          "effect_type": "counter",
+          "effect_value": 0.3
+        }
+      ],
+      "ultimates": [],
+      "phase_thresholds": [
+        0.6,
+        0.2
+      ],
+      "phase2_damage_multiplier": 1.1,
+      "phase3_damage_multiplier": 0.9,
+      "phase3_armor_multiplier": 0.5,
+      "lifetime_h": 48,
+      "daily_attempts": 3,
+      "respawn_after_kill_h": 12,
+      "respawn_after_dissipate_h": 24,
+      "status": "final",
+      "narrative_status": "定稿",
+      "spawn_text": "大泽水翻如沸，背负断碑的鼍龙浮出水面。",
+      "phase2_text": "鼍龙摆尾激浪，暴怒翻腾！",
+      "phase3_text": "鼍龙鳞甲剥落，铁脊裂纹遍布。",
+      "kill_text": "鼍龙沉入泽底，背上的断碑终于倾倒。",
+      "dissipate_text": "鼍龙潜入深泽不知所踪，只留下一泽浊水。",
+      "narrative_approved": true
+    }
+  ],
+  "enemy_groups": [
+    {
+      "key": "low",
+      "name": "低阶妖域",
+      "description": "炼气-筑基期妖兽出没的荒野林地",
+      "level_range": [
+        0,
+        12
+      ],
+      "templates": [
+        {
+          "key": "wolf",
+          "name": "疾风狼",
+          "description": "速度迅捷，利爪如风的低阶妖兽",
+          "elite_prefixes": [
+            "历战的",
+            "强壮的",
+            "变异的",
+            "狂暴的"
+          ],
+          "boss_names": [
+            "苍月狼王",
+            "疾风狼王",
+            "啸月狼尊"
+          ],
+          "hp_mult": 0.6,
+          "atk_mult": 0.85,
+          "defense": 3,
+          "crit_rate": 10
+        },
+        {
+          "key": "snake",
+          "name": "赤炼蛇",
+          "description": "身蕴火毒，噬人于无形",
+          "elite_prefixes": [
+            "历战的",
+            "强壮的",
+            "变异的",
+            "狂暴的"
+          ],
+          "boss_names": [
+            "赤炼蛇王",
+            "噬心蛇尊",
+            "九节毒龙"
+          ],
+          "hp_mult": 0.65,
+          "atk_mult": 0.8,
+          "defense": 5,
+          "crit_rate": 8
+        },
+        {
+          "key": "spider",
+          "name": "鬼面蛛",
+          "description": "背生鬼脸，毒丝缠魂",
+          "elite_prefixes": [
+            "历战的",
+            "强壮的",
+            "变异的",
+            "狂暴的"
+          ],
+          "boss_names": [
+            "千面蛛后",
+            "幽冥鬼蛛",
+            "噬魂蛛王"
+          ],
+          "hp_mult": 0.7,
+          "atk_mult": 0.7,
+          "defense": 10,
+          "crit_rate": 5
+        }
+      ],
+      "elite": {
+        "hp_mult": 0.9,
+        "atk_mult": 1.0,
+        "defense_bonus": 5,
+        "crit_rate_bonus": 5
+      },
+      "boss": {
+        "hp_mult": 1.2,
+        "atk_mult": 1.2,
+        "defense_bonus": 15,
+        "crit_rate_bonus": 10
+      },
+      "drop_tier": "low"
+    },
+    {
+      "key": "mid",
+      "name": "中阶妖域",
+      "description": "金丹-元婴期妖兽盘踞的山脉深谷",
+      "level_range": [
+        13,
+        18
+      ],
+      "templates": [
+        {
+          "key": "tiger",
+          "name": "裂地虎",
+          "description": "虎啸裂地，凶煞逼人",
+          "elite_prefixes": [
+            "强大的",
+            "铁甲的",
+            "血瞳的",
+            "吞噬的"
+          ],
+          "boss_names": [
+            "裂地虎尊",
+            "血瞳虎王",
+            "噬天虎妖"
+          ],
+          "hp_mult": 0.7,
+          "atk_mult": 1.0,
+          "defense": 10,
+          "crit_rate": 15
+        },
+        {
+          "key": "bear",
+          "name": "撼山熊",
+          "description": "力能撼山，妖躯如铁",
+          "elite_prefixes": [
+            "强大的",
+            "铁甲的",
+            "血瞳的",
+            "吞噬的"
+          ],
+          "boss_names": [
+            "撼山熊君",
+            "铁背妖熊",
+            "吞山巨罴"
+          ],
+          "hp_mult": 0.9,
+          "atk_mult": 0.85,
+          "defense": 25,
+          "crit_rate": 8
+        },
+        {
+          "key": "eagle",
+          "name": "铁羽鹰",
+          "description": "铁翼横空，喙爪如刃",
+          "elite_prefixes": [
+            "强大的",
+            "铁甲的",
+            "血瞳的",
+            "吞噬的"
+          ],
+          "boss_names": [
+            "铁羽鹰皇",
+            "裂空妖鹏",
+            "噬魂鹫王"
+          ],
+          "hp_mult": 0.75,
+          "atk_mult": 0.95,
+          "defense": 12,
+          "crit_rate": 12
+        }
+      ],
+      "elite": {
+        "hp_mult": 1.1,
+        "atk_mult": 1.1,
+        "defense_bonus": 8,
+        "crit_rate_bonus": 5
+      },
+      "boss": {
+        "hp_mult": 1.2,
+        "atk_mult": 1.4,
+        "defense_bonus": 20,
+        "crit_rate_bonus": 8
+      },
+      "drop_tier": "mid"
+    },
+    {
+      "key": "high",
+      "name": "高阶妖域",
+      "description": "化神-合体期凶兽蛰伏的远古禁地",
+      "level_range": [
+        19,
+        27
+      ],
+      "templates": [
+        {
+          "key": "jiao",
+          "name": "玄水蛟",
+          "description": "潜渊游雾，龙威初显",
+          "elite_prefixes": [
+            "天灾级的",
+            "上古的",
+            "深渊的",
+            "混沌的"
+          ],
+          "boss_names": [
+            "覆海蛟魔",
+            "深渊龙君",
+            "玄冥蛟皇"
+          ],
+          "hp_mult": 0.8,
+          "atk_mult": 1.1,
+          "defense": 20,
+          "crit_rate": 15
+        },
+        {
+          "key": "turtle",
+          "name": "镇海玄龟",
+          "description": "背负玄甲，万法不侵",
+          "elite_prefixes": [
+            "天灾级的",
+            "上古的",
+            "深渊的",
+            "混沌的"
+          ],
+          "boss_names": [
+            "北海玄龟",
+            "镇海龙龟",
+            "玄武后裔"
+          ],
+          "hp_mult": 1.1,
+          "atk_mult": 0.85,
+          "defense": 45,
+          "crit_rate": 5
+        },
+        {
+          "key": "golden_eagle",
+          "name": "裂空金雕",
+          "description": "金翼裂空，喙啄金石",
+          "elite_prefixes": [
+            "天灾级的",
+            "上古的",
+            "深渊的",
+            "混沌的"
+          ],
+          "boss_names": [
+            "金翅大鹏",
+            "裂天雕皇",
+            "九霄鹏魔"
+          ],
+          "hp_mult": 0.85,
+          "atk_mult": 1.05,
+          "defense": 18,
+          "crit_rate": 20
+        }
+      ],
+      "elite": {
+        "hp_mult": 1.1,
+        "atk_mult": 1.3,
+        "defense_bonus": 12,
+        "crit_rate_bonus": 5
+      },
+      "boss": {
+        "hp_mult": 1.3,
+        "atk_mult": 1.6,
+        "defense_bonus": 30,
+        "crit_rate_bonus": 5
+      },
+      "drop_tier": "high"
+    },
+    {
+      "key": "top",
+      "name": "顶级妖域",
+      "description": "大乘-渡劫期神兽栖息的洪荒秘境",
+      "level_range": [
+        28,
+        31
+      ],
+      "templates": [
+        {
+          "key": "dragon",
+          "name": "苍龙",
+          "description": "龙吟九霄，吐息焚海",
+          "elite_prefixes": [
+            "天灾级的",
+            "太古的",
+            "洪荒的",
+            "混沌的"
+          ],
+          "boss_names": [
+            "五爪金龙",
+            "太古苍龙",
+            "混沌龙祖"
+          ],
+          "hp_mult": 0.9,
+          "atk_mult": 1.2,
+          "defense": 35,
+          "crit_rate": 20
+        },
+        {
+          "key": "qilin",
+          "name": "墨玉麒麟",
+          "description": "瑞兽后裔，踏火御风",
+          "elite_prefixes": [
+            "天灾级的",
+            "太古的",
+            "洪荒的",
+            "混沌的"
+          ],
+          "boss_names": [
+            "麒麟圣皇",
+            "洪荒玉麒麟",
+            "祥瑞古兽"
+          ],
+          "hp_mult": 1.2,
+          "atk_mult": 1.0,
+          "defense": 60,
+          "crit_rate": 10
+        },
+        {
+          "key": "phoenix",
+          "name": "火凤",
+          "description": "浴火而生，涅槃不灭",
+          "elite_prefixes": [
+            "天灾级的",
+            "太古的",
+            "洪荒的",
+            "混沌的"
+          ],
+          "boss_names": [
+            "九天凤皇",
+            "太古火凤",
+            "不死凤凰"
+          ],
+          "hp_mult": 1.0,
+          "atk_mult": 1.1,
+          "defense": 30,
+          "crit_rate": 25
+        }
+      ],
+      "elite": {
+        "hp_mult": 1.1,
+        "atk_mult": 1.5,
+        "defense_bonus": 15,
+        "crit_rate_bonus": 5
+      },
+      "boss": {
+        "hp_mult": 1.3,
+        "atk_mult": 1.8,
+        "defense_bonus": 40,
+        "crit_rate_bonus": 5
+      },
+      "drop_tier": "top"
+    },
+    {
+      "key": "legacy_guardian",
+      "name": "传承之地守护",
+      "description": "守护传承之地的神秘存在，强度与来访者境界匹配",
+      "templates": [
+        {
+          "key": "guardian_low",
+          "name": "守碑灵",
+          "description": "守护低阶传承之地的石灵",
+          "max_level_index": 10,
+          "hp_mult": 1.1,
+          "atk_mult": 1.0,
+          "defense": 8,
+          "crit_rate": 8
+        },
+        {
+          "key": "guardian_mid",
+          "name": "镇殿战偶",
+          "description": "守护中阶传承之地的青铜战偶",
+          "max_level_index": 30,
+          "hp_mult": 1.2,
+          "atk_mult": 1.1,
+          "defense": 15,
+          "crit_rate": 10
+        },
+        {
+          "key": "guardian_high",
+          "name": "传承剑侍",
+          "description": "守护高阶传承之地的无名剑侍",
+          "max_level_index": 999,
+          "hp_mult": 1.3,
+          "atk_mult": 1.2,
+          "defense": 22,
+          "crit_rate": 12
+        }
+      ]
+    }
+  ],
+  "drop_tables": {
+    "low": [
+      {
+        "name": "妖兽精血",
+        "weight": 40,
+        "min": 1,
+        "max": 2
+      },
+      {
+        "name": "灵兽毛皮",
+        "weight": 35,
+        "min": 1,
+        "max": 2
+      },
+      {
+        "name": "灵草",
+        "weight": 25,
+        "min": 1,
+        "max": 3
+      }
+    ],
+    "mid": [
+      {
+        "name": "灵兽内丹",
+        "weight": 30,
+        "min": 1,
+        "max": 1
+      },
+      {
+        "name": "妖兽精血",
+        "weight": 30,
+        "min": 1,
+        "max": 2
+      },
+      {
+        "name": "星辰石",
+        "weight": 25,
+        "min": 1,
+        "max": 2
+      },
+      {
+        "name": "基础吐纳",
+        "weight": 15,
+        "min": 1,
+        "max": 1
+      }
+    ],
+    "high": [
+      {
+        "name": "天材地宝",
+        "weight": 25,
+        "min": 1,
+        "max": 1
+      },
+      {
+        "name": "混沌精华",
+        "weight": 25,
+        "min": 1,
+        "max": 1
+      },
+      {
+        "name": "铁布衫",
+        "weight": 25,
+        "min": 1,
+        "max": 1
+      },
+      {
+        "name": "仙器碎片",
+        "weight": 25,
+        "min": 1,
+        "max": 1
+      }
+    ],
+    "top": [
+      {
+        "name": "天材地宝",
+        "weight": 20,
+        "min": 1,
+        "max": 2
+      },
+      {
+        "name": "混沌精华",
+        "weight": 20,
+        "min": 1,
+        "max": 1
+      },
+      {
+        "name": "铁布衫",
+        "weight": 20,
+        "min": 1,
+        "max": 1
+      },
+      {
+        "name": "仙器碎片",
+        "weight": 20,
+        "min": 1,
+        "max": 1
+      },
+      {
+        "name": "神兽之骨",
+        "weight": 20,
+        "min": 1,
+        "max": 1
+      }
+    ]
+  },
+  "naming": {
+    "normal": "{name}",
+    "elite": "{prefix}{name}",
+    "boss": "{boss_name}"
+  }
+}

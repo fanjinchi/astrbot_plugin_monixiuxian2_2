@@ -1,3 +1,4 @@
 {"file":".trellis/spec/backend/database-guidelines.md","reason":"复核 v40 DROP 与 fresh/升级一致、旧表无残留读"}
 {"file":".trellis/spec/backend/quality-guidelines.md","reason":"复核激活后完整 pytest/ruff 与故障恢复材料"}
 {"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"复核内容批准→sync→激活→广播的跨层闭环"}
+{"file":".trellis/tasks/10-28-pve-content-activation/research/content-approval.md","reason":"复核 28+4 审批材料、hash、三种用户决策与未批准边界"}

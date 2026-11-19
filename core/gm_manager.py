@@ -83,10 +83,9 @@ class GMManager:
         equipment_manager: "EquipmentManager",
         adventure_manager=None,
         rift_manager=None,
-        boss_manager=None,
+        world_boss_service=None,
         bounty_manager=None,
         plugin_data_path: Path = None,
-        broadcast_callback=None,
         sect_manager=None,
         impart_manager=None,
         *,
@@ -99,7 +98,7 @@ class GMManager:
         self.equipment_manager = equipment_manager
         self.adventure_manager = adventure_manager
         self.rift_manager = rift_manager
-        self.boss_manager = boss_manager
+        self.world_boss_service = world_boss_service
         self.bounty_manager = bounty_manager
         self.sect_manager = sect_manager
         self.impart_manager = impart_manager
@@ -108,7 +107,6 @@ class GMManager:
         # 测试夹具可不接线，其余 GM 命令不依赖它。
         self.health_service = health_service
         self.plugin_data_path = plugin_data_path
-        self.broadcast_callback = broadcast_callback
 
         # 时间快进覆盖清单注册表（openspec change: gm-time-skip-registry）：
         # 从各字段属主模块的 TIME_SKIP_ENTRIES 常量装配汇总（provider 列表与
@@ -388,11 +386,11 @@ class GMManager:
             "  触发秘境传承 [@玩家/ID] （挂起传承之地遭遇，玩家以「探索秘境 传承」应邀）\n"
             "\n"
             "👹 系统\n"
-            "  生成Boss\n"
+            "  生成Boss [profile_id]\n"
             "\n"
             "🧪 测试工具（⚠️ 仅限测试实例）\n"
             "  时间快进 <秒> 确认 （全库到期类时间戳前移，不可逆；不唤醒睡眠中的定时任务，\n"
-            "    Boss/灵眼下轮醒来即触发，需要立即生成请用「生成Boss」；前移贷款到期会真实触发逾期追杀）\n"
+            "    世界 Boss/灵眼下轮醒来即触发，需要立即生成请用「生成Boss」；前移贷款到期会真实触发逾期追杀）\n"
             f"    覆盖域：{covered}\n"
             "  清除全部冷却 [@玩家/ID] 确认 （忙碌/决斗切磋/双修/悬赏/传承/历练路线休整一键清零）\n"
             "  随机种子 <整数> / 随机种子 重置 （进程级固定全局随机序列，同进程其他插件亦受影响；\n"
@@ -1294,21 +1292,24 @@ class GMManager:
     async def cmd_spawn_boss(
         self, event: "AstrMessageEvent", args: str
     ) -> tuple[bool, str]:
-        """生成世界 Boss。"""
-        if not self.boss_manager:
-            return False, "❌ Boss管理器未初始化！"
+        """生成世界 Boss（GM 管理入口，可传 profile_id 强制指定档案）。
 
-        success, msg, boss = await self.boss_manager.auto_spawn_boss()
-        if not success:
-            return False, f"❌ 生成Boss失败：{msg.removeprefix('❌ ')}"
+        Args:
+            event: 消息事件（管理员校验由 main.py 的 GM 入口负责）。
+            args: 可选 profile_id（如 ``wb_lq_ba``）；省略走常规随机/再生资格。
 
-        if self.broadcast_callback:
-            try:
-                await self.broadcast_callback(boss)
-            except Exception as e:
-                logger.warning(f"【GM管理器】广播Boss生成消息失败: {e}")
+        Returns:
+            (success, user-facing message)。三分支渲染复用领域统一消息。
+        """
+        try:
+            from ..managers.world_boss_service import spawn_with_message
+        except ImportError:
+            # 独立测试环境（本模块按文件路径加载）走同款降级装载。
+            _wbs = _load_module("world_boss_service", "managers/world_boss_service.py")
+            spawn_with_message = _wbs.spawn_with_message
 
-        return True, f"✅ 已生成世界Boss：{boss.boss_name}"
+        profile_id = args.strip() or None
+        return await spawn_with_message(self.world_boss_service, profile_id)
 
     # ========== 测试工具子命令（仅限测试实例，见 design D1/D4/D5/D6） ==========
 
@@ -1323,8 +1324,8 @@ class GMManager:
         已前移的刷新时间即触发）。前移不可逆，故沿用「确认」约定。
         覆盖清单来自 time_skip_registry 注册表（openspec change:
         gm-time-skip-registry），同一 label 的多条条目按聚合计数。回复明细
-        10 行（label 聚合）vs 共前移 11 条（Boss/灵眼为两条单键行）是有意
-        设计：前者是面向玩家的域粒度可读行，后者是实际行数。
+        行按 label 去重动态生成，总条数按注册表实际条目（含同域拆条）动态
+        累加，不再写死行数/条数。
         """
         confirmed, remaining = self._pop_confirmation(args)
         if not confirmed:
@@ -1359,7 +1360,7 @@ class GMManager:
         return True, (
             f"✅ 时间已快进 {seconds} 秒（共前移 {total} 条记录）：\n"
             f"{detail}\n"
-            "⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（Boss/灵眼）不会被唤醒，"
+            "⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，"
             "将在下次醒来时立即触发，需要立即生成请用「生成Boss」。"
         )
 

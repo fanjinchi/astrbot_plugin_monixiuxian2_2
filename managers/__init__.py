@@ -6,7 +6,6 @@ from .bank_manager import BankManager
 
 # Phase 4
 from .blessed_land_manager import BlessedLandManager
-from .boss_manager import BossManager
 from .bounty_manager import BountyManager
 from .combat_manager import CombatManager, CombatStats
 from .dual_cultivation_manager import DualCultivationManager
@@ -26,7 +25,6 @@ __all__ = [
     "EnemyManager",
     "PVECombatManager",
     "SectManager",
-    "BossManager",
     "RiftManager",
     "RankingManager",
     "AdventureManager",

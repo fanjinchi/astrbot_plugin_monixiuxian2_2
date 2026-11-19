@@ -944,8 +944,8 @@ async def test_time_skip_registry_covers_world_boss_cooldowns():
     registry_source = (PLUGIN_ROOT / "core" / "time_skip_registry.py").read_text(
         encoding="utf-8"
     )
-    assert "managers.boss_manager" in registry_source
-    manager_source = (PLUGIN_ROOT / "managers" / "boss_manager.py").read_text(
+    assert "managers.world_boss_service" in registry_source
+    manager_source = (PLUGIN_ROOT / "managers" / "world_boss_service.py").read_text(
         encoding="utf-8"
     )
     assert "world_boss_instances" in manager_source

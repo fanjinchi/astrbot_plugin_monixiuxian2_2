@@ -15,7 +15,7 @@
   -> 普通 PVE 切流（catalog.spawn_enemy + 显式 difficulty_multiplier）；旧派生退役
   -> 停旧：删旧 Boss 实现/配置三元组/表（v40 DROP）/键/测试 + lint_narrative 改读 + GM 改接
   -> 启新：复用 D 的 catalog 装配、注册 poller、切 handler、outbox dispatcher
-  -> 承接延迟项（地板 API 改调 / 暴击形参补传）+ HP 锚复跑 + smoke + 完整回归 + 文档同步
+  -> 世界 Boss 暴击显式传参（地板已由 E1 收口，只复验）+ HP 锚复跑 + smoke + 完整回归 + 文档同步
 ```
 
 ## 2. 普通 PVE 切流
@@ -46,8 +46,10 @@
 ## 4. 新入口装配
 
 - 复用 D 的 `_wire_core_services` 注入（E2 不重复 load）；v2 config 自动启用，v1 → disabled + 维护文案。
-- lifecycle poller：指数退避（`min(60 * 2**n, 3600)`），`initialize()` 启动、`terminate()` cancel；每轮固定 `expire_active → ensure_spawn → dispatch_events`，先提交到期终态再做生成资格判断。D 的 ensure 仍须在自己的事务内幂等处理到期 active，防止 GM 等其他调用方绕过 poller 顺序。
-- outbox dispatcher：读已提交事件 → 展开 per-destination delivery → 逐条 claim 发送；网络 await 在事务外；`uncertain` 人工处置。
+- **lifecycle poller**：指数退避（`min(60 * 2**n, 3600)`），`initialize()` 启动、`terminate()` cancel。每轮先检查 `_is_boss_enabled()`：false 时跳过生成，true 时调用 `WorldBossService.ensure_spawn(None)`；随后无论开关状态都调用 `WorldBossEventDispatcher.dispatch_pending()`，避免停用生成后卡住已提交事件。**不新增公开 `expire_active`**。D 的 `ensure_spawn` 已在同一事务内先 `_consume_expired_active(now)` 写入到期终态，再做 active 复用/生成资格判断；轮询间到期、GM 与定时入口因此共用同一状态机。`dispatch_pending` 失败不反滚已提交的领域事实，按既有指数退避进入下轮。
+- **查询与挑战接缝**：E2 在 `WorldBossService` 增加公开 `get_active()`，在短事务中调用 `_consume_expired_active(now)` 后返回当前 active 或 `None`，只查询/结算到期，不生成实例。新 handler 的 `世界Boss` 调 `get_active()` 并渲染实例状态，无 active 时返回当前无 Boss；`挑战Boss` 加载玩家后调 `challenge(player=..., challenge_id=...)`，直接渲染 `ChallengeResult.message`，忙态仍由 D 的 `BusyState.assert_idle` 承接，handler 不另写战斗或次数规则。`challenge_id` 由 handler 为一次用户命令生成，重放测试固定该键。
+- **管理入口**：顶层 `生成Boss [profile_id]` 与 `GM 生成Boss [profile_id]` 都调 `ensure_spawn(profile_id)`；只有这两个管理入口允许传 id，poller 永远传 `None`。按 D R1 的 `(instance, created, resolved_profile_id)` 三分支渲染：新建成功、复用既有 active（含请求 id 不同仍返回实际 id）、`WorldBossSpawnRejected` 的用户可读拒绝；异常只记日志并返回通用失败，不绕过领域服务直接写库。
+- **outbox dispatcher 装配**：在 `_wire_core_services` 复用同一 `db` 构造一个 `WorldBossEventDispatcher`，注入异步 `sender(platform, group_id, text)` 与动态 `targets()`。sender 仅构造 `{platform}:GroupMessage:{group_id}` 并调用 `context.send_message` 发送纯文本消息链；targets 每轮动态读取 `context.platform_manager.get_insts()` 与 `self.whitelist_groups`，平台名沿用 `platform.meta().name`，生成“平台实例 × 白名单群”的 `(platform, group_id)` 笛卡尔积快照，不从群 ID 解包平台，也不缓存平台或群列表。dispatcher 读已提交事件 → 展开 per-destination delivery → 逐条 claim 发送；网络 await 在事务外；partial success 只重试未发送目标，`uncertain` 记录并人工处置。
 - 零奖励过渡：只落台账事实，不新增保底/分档/彩蛋数值，广播不承诺奖励。
 
 ## 5. 验证矩阵
@@ -55,7 +57,7 @@
 - 内容：draft/缺 manifest/hash 漂移/列越权 → 正式 config 零修改；批准后 count 28+4、id 唯一、profile hash 一致；combat-only 占位产物 `narrative_approved=false` 且不广播，只有独立叙事批准的 `定稿` 或显式 `豁免` 才为 true；共享 Schema、真实加载与叙事快照链路按 §7 验收。
 - 切流：28 名册在历练/秘境可达；改 `pve.difficulty_multiplier` 伤害变化；旧派生不再命中；无 `key=top`；`low/mid/high` 在 `catalog=None` 回落可用；`legacy_guardian` 可用。
 - 旧删：`audit_pve_redesign.py --scope e2` 为 0；`boss` 表不存在（v40 专用用例）；`lint_narrative` 不读已删文件；玩家文案无 Boss 掉落承诺。
-- 新启：poller 起停与固定调用顺序、到期后换不同 profile 仍单 active、三个命令可达、生命周期、北京日 3 次、并发唯一末击、CAS 失败不扣次数、outbox partial success、重启恢复。
+- 新启：poller 起停与 `ensure_spawn(None)` 内部到期→生成、`dispatch_pending` 后续投递的固定顺序；`get_active()` 到期查询不生成；到期后换不同 profile 仍单 active、三个命令可达、生命周期、北京日 3 次、并发唯一末击、CAS 失败不扣次数、outbox partial success、重启恢复。
 - HP 锚：正式 config 的 4 只 profile 复跑 D AC9。
 - time-skip：Boss 到期/再生生效；anchor/pending/date_key 不受影响。
 - 回滚演练：备份恢复后旧版本可读（不允许混合 schema）。

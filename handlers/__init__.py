@@ -6,7 +6,6 @@ from .bank_handlers import BankHandlers
 
 # Phase 4
 from .blessed_land_handlers import BlessedLandHandlers
-from .boss_handlers import BossHandlers
 from .bounty_handlers import BountyHandlers
 from .breakthrough_handler import BreakthroughHandler
 from .combat_handlers import CombatHandlers
@@ -27,6 +26,7 @@ from .spirit_eye_handlers import SpiritEyeHandlers
 from .spirit_farm_handlers import SpiritFarmHandlers
 from .storage_ring_handler import StorageRingHandler
 from .technique_handler import TechniqueHandler
+from .world_boss_handlers import WorldBossHandlers
 
 __all__ = [
     "PlayerHandler",
@@ -38,7 +38,7 @@ __all__ = [
     "StorageRingHandler",
     "TechniqueHandler",
     "SectHandlers",
-    "BossHandlers",
+    "WorldBossHandlers",
     "CombatHandlers",
     "RankingHandlers",
     "RiftHandlers",

@@ -77,7 +77,7 @@
   },
   "boss": {
     "enabled": true,
-    "comment": "世界Boss系统总开关；关闭时停止Boss生成定时任务与相关指令"
+    "comment": "世界Boss生命周期玩法总开关；关闭时轮询不生成新实例，重启实例由领域状态机恢复"
   },
   "dual_cultivation": {
     "cooldown": 3600,

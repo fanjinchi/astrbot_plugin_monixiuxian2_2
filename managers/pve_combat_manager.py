@@ -111,6 +111,7 @@ class PVECombatManager:
         enemy_mgr: EnemyManager,
         config_manager=None,
         health_service=None,
+        catalog=None,
     ):
         """
         初始化PVE战斗管理器
@@ -120,12 +121,62 @@ class PVECombatManager:
             enemy_mgr: 敌人管理器，用于生成敌人
             config_manager: 配置管理器，可选，用于读取装备与战斗配置。
             health_service: Health Domain，负责败场地板与战斗气血持久化。
+            catalog: 固定名册 ``EnemyCatalog``（D 装配、E2 注入）。非 ``None``
+                时普通 PVE 默认出怪走固定名册；``None``（未 sync / 回滚）保持
+                旧动态派生，不半切。
         """
         # 兼容直接传入 CombatEngine 或 Legacy CombatManager
         self.combat_engine = getattr(combat_mgr, "engine", combat_mgr)
         self.enemy_mgr = enemy_mgr
         self.config_manager = config_manager
         self.health_service = health_service
+        self.catalog = catalog
+
+    def _difficulty_multiplier(self) -> float:
+        """Read ``game_config["pve"]["difficulty_multiplier"]`` once per spawn.
+
+        The global knob was previously read inside ``EnemyManager.spawn_enemy``;
+        the fixed-roster path needs it passed explicitly so the knob keeps
+        affecting every normal PVE encounter. Missing config / ``None`` falls
+        back to 1.0 (same contract as the legacy manager).
+
+        Returns:
+            The configured multiplier, or 1.0 when absent/unreadable.
+        """
+        config_manager = getattr(self, "config_manager", None)
+        game_config = getattr(config_manager, "game_config", None)
+        if isinstance(game_config, dict):
+            pve = game_config.get("pve", {})
+            if isinstance(pve, dict):
+                value = pve.get("difficulty_multiplier", 1.0)
+                if value is not None:
+                    try:
+                        return float(value)
+                    except (TypeError, ValueError):
+                        return 1.0
+        return 1.0
+
+    def _spawn_default_enemy(self, player_level: int, category: str):
+        """Spawn a normal PVE enemy from the fixed roster or the legacy path.
+
+        This is the single cutover seam for ordinary encounters: ``catalog``
+        present means the 28-entry roster; absent means the legacy dynamic
+        derivation stays authoritative (v1 fallback, no half cutover).
+
+        Args:
+            player_level: Player's ``level_index`` (1-based).
+            category: ``normal`` / ``elite`` / ``boss``.
+
+        Returns:
+            An ``Enemy`` carrier ready for the combat engine.
+        """
+        if self.catalog is not None:
+            return self.catalog.spawn_enemy(
+                player_level,
+                category,
+                difficulty_multiplier=self._difficulty_multiplier(),
+            )
+        return self.enemy_mgr.spawn_enemy(player_level, category)
 
     def _should_trigger_combat(self, scene: str, difficulty: str) -> bool:
         """
@@ -390,6 +441,10 @@ class PVECombatManager:
 
         Returns:
             :class:`PreparedEncounter`；未触发战斗或敌人生成失败时 ``None``。
+
+        The default spawn goes through :meth:`_spawn_default_enemy`: a loaded
+        catalog serves the fixed 28-entry roster (difficulty multiplier passed
+        explicitly), otherwise the legacy dynamic path is kept intact.
         """
         from astrbot.api import logger
 
@@ -397,7 +452,7 @@ class PVECombatManager:
             return None
         category = self._select_enemy_category(scene, difficulty)
         try:
-            enemy = self.enemy_mgr.spawn_enemy(player.level_index, category)
+            enemy = self._spawn_default_enemy(player.level_index, category)
         except Exception as exc:
             logger.error(f"生成敌人失败: {exc}")
             return None
@@ -542,7 +597,7 @@ class PVECombatManager:
                 )
             else:
                 category = self._select_enemy_category("rift", "low")
-                enemy = self.enemy_mgr.spawn_enemy(player.level_index, category)
+                enemy = self._spawn_default_enemy(player.level_index, category)
         except Exception as e:
             logger.error(f"生成秘境妖兽失败: {e}")
             return None
