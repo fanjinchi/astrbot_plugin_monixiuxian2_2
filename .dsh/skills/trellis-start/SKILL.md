@@ -57,7 +57,7 @@ From Step 1 you know the current task and status. Check the task directory:
 |---|---|
 | New feature / unclear requirements | `grill-with-docs` |
 | About to write code | `trellis-before-dev` |
-| Done coding / quality check | `trellis-check` |
+| Done coding / quality check | `code-review` |
 | Stuck / fixed same bug multiple times | `trellis-break-loop` |
 | Learned something worth capturing | `trellis-update-spec` |
 
