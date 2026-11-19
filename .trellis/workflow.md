@@ -43,7 +43,7 @@ Every task has its own directory under `.trellis/tasks/{MM-DD-name}/` holding `t
 
 ```bash
 # Task lifecycle
-python3 ./.trellis/scripts/task.py create "<title>" [--slug <name>] [--parent <dir>]
+python3 ./.trellis/scripts/task.py create "<title>" --description "<what it delivers>" [--slug <name>] [--parent <dir>]
 python3 ./.trellis/scripts/task.py start <name>          # set active task (session-scoped when available)
 python3 ./.trellis/scripts/task.py current --source      # show active task and source
 python3 ./.trellis/scripts/task.py finish                # clear active task (triggers after_finish hooks)
@@ -76,7 +76,7 @@ python3 ./.trellis/scripts/task.py create-pr [name] [--dry-run]
 
 > Run `python3 ./.trellis/scripts/task.py --help` to see the authoritative, up-to-date list.
 
-**Current-task mechanism**: `task.py create` creates the task directory and (when session identity is available) auto-sets the per-session active-task pointer so the planning breadcrumb fires immediately. `task.py start` writes the same pointer (idempotent if already set) and flips `task.json.status` from `planning` to `in_progress`. State is stored under `.trellis/.runtime/sessions/`. If no context key is available from hook input, `TRELLIS_CONTEXT_ID`, or a platform-native session environment variable, there is no active task and `task.py start` fails with a session identity hint. `task.py finish` deletes the current session file (status unchanged). `task.py archive <task>` writes `status=completed`, moves the directory to `archive/`, and deletes any runtime session files that still point at the archived task.
+**Current-task mechanism**: `task.py create` creates the task directory and (when session identity is available) auto-sets the per-session active-task pointer so the planning breadcrumb fires immediately. `task.py start` writes the same pointer (idempotent if already set) and flips `task.json.status` from `planning` to `in_progress`. State is stored under `.trellis/.runtime/sessions/`. If no context key is available from hook input, `TRELLIS_CONTEXT_ID`, or a platform-native session environment variable, there is no active task; `task.py start` then runs in degraded mode (status flips, pointer is not persisted). Kimi Code exports no session id to Bash, so prefix every `task.py` call with `TRELLIS_CONTEXT_ID=<id>` there (the optional Kimi UserPromptSubmit hook prints the id). `task.py finish` deletes the current session file (status unchanged). `task.py archive <task>` writes `status=completed`, moves the directory to `archive/`, and deletes any runtime session files that still point at the archived task.
 
 ### Workspace System
 
@@ -184,14 +184,14 @@ Use a parent task when one user request contains several independently verifiabl
 
 Use child tasks for deliverables that can be planned, implemented, checked, and archived independently. Parent/child structure is not a dependency system: if one child must wait for another, write that ordering in the child `prd.md` / `implement.md` and keep each child's acceptance criteria testable.
 
-Create new children with `task.py create "<title>" --slug <name> --parent <parent-dir>`. Link existing tasks with `task.py add-subtask <parent> <child>`, and unlink mistakes with `task.py remove-subtask <parent> <child>`.
+Create new children with `task.py create "<title>" --description "<ticket body>" --slug <name> --parent <parent-dir>`. Link existing tasks with `task.py add-subtask <parent> <child>`, and unlink mistakes with `task.py remove-subtask <parent> <child>`.
 
 <!-- Per-turn breadcrumb: shown when there is no active task (before Phase 1) -->
 
 [workflow-state:no_task]
 No active task. First classify the current turn and ask for task-creation consent before creating any Trellis task.
 Simple conversation / small task: ask only whether this turn should create a Trellis task. If the user says no, skip Trellis for this session.
-Complex task: ask the user if you can create a Trellis task and enter the planning phase. If the user says no, explain, clarify scope, or suggest a smaller split.
+Complex task: ask the user if you can create a Trellis task and enter the planning phase. If the user says no, explain, clarify scope, or suggest a smaller split. Once consent is yes, grill until requirements, scope, and key decisions are agreed (1.1), then create the task in 1.0.
 [/workflow-state:no_task]
 
 <!-- Per-turn breadcrumb: shown when the active task record cannot be read. -->
@@ -203,7 +203,7 @@ Preserve existing task fields and artifacts. If the correct status cannot be det
 [/workflow-state:task_error]
 
 ### Phase 1: Plan
-- 1.0 Create task `[required · once]` (only after task-creation consent)
+- 1.0 Create task `[required · once]` (only after task-creation consent *and* the 1.1 grill agreement)
 - 1.1 Requirement exploration `[required · repeatable]` (Matt-owned: `grill-with-docs` → `to-spec` → `to-tickets`; `prd.md`; complex tasks also need `design.md` + `implement.md`)
 - 1.2 Research `[optional · repeatable]`
 - 1.3 Configure context `[required · once]` — Claude Code, Cursor, OpenCode, Codex, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, Oh My Pi, ZCode, Snow, Reasonix, Grok, Kimi Code (sub-agent-dispatch platforms only; inline platforms skip)
@@ -243,11 +243,11 @@ Inline mode: skip jsonl curation; `to-spec` / `to-tickets` still run and child t
      therefore must cover every required step from implementation through
      commit, including Phase 3.3 spec update and Phase 3.4 commit. -->
 
-Sub-agent dispatch protocol applies to all platforms and all sub-agents, including native Codex `SubagentStart` context injection with child-side pull fallback, class-2 Gemini/Qoder/Copilot/Reasonix/Trae/Grok/Kimi Code, hook-backed ZCode/Snow, and `trellis-research`: every dispatch prompt starts with `Active task: <task path from task.py current>` before role-specific instructions. On Grok Build, use `spawn_subagent` with `subagent_type` set to the Trellis agent name (e.g. `trellis-implement`). On Kimi Code, dispatch the built-in `coder` / `explore` sub-agent with the matching `.kimi-code/skills/trellis-<role>/SKILL.md` instructions; `AgentSwarm` may run frontier-ready tickets concurrently. On Pi / Oh My Pi there is no concurrent sub-agent: `trellis_subagent` queues tasks that execute **one at a time** in FIFO order, so a dispatch is a serial turn, not a parallel worker.
+Sub-agent dispatch protocol applies to all platforms and all Trellis-dispatched sub-agents (`trellis-implement` / `trellis-check` / `trellis-research`), including native Codex `SubagentStart` context injection with child-side pull fallback, class-2 Gemini/Qoder/Copilot/Reasonix/Trae/Grok/Kimi Code, and hook-backed ZCode/Snow: every dispatch prompt starts with `Active task: <task path from task.py current>` before role-specific instructions. Matt skills that dispatch their own internal sub-agents (e.g. `implement-spec`) are out of scope — they use context pointers, not `Active task:`. On Grok Build, use `spawn_subagent` with `subagent_type` set to the Trellis agent name (e.g. `trellis-implement`). On Kimi Code, dispatch the project custom agents `trellis-implement` / `trellis-check` / `trellis-research` (installed by `trellis init --kimi` under `.kimi-code/agents/`); the built-in `coder` / `explore` are fallbacks only, and `explore` is read-only so it cannot persist research. `AgentSwarm` runs only after the user enables swarm mode and shares the working tree — no worktree isolation — so serialize implementers unless the tickets touch disjoint files. On Pi / Oh My Pi there is no concurrent sub-agent: `trellis_subagent` queues tasks that execute **one at a time** in FIFO order, so a dispatch is a serial turn, not a parallel worker.
 
 [workflow-state:in_progress]
-Tools: `trellis-research` is a sub-agent type; `trellis-update-spec` is a skill. Implementation and review are Matt skills (`implement` / `implement-spec` + `tdd` / `code-review`) loaded from the skill catalog.
-Flow: Matt implement (`implement` / `implement-spec` on the ticket frontier) + `tdd` -> `code-review` -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
+Tools: `trellis-research` is a sub-agent type; `trellis-update-spec` is a skill. Implementation and review are Matt skills (`implement` / `implement-spec` + `tdd` / `code-review`) loaded from the skill catalog, or Trellis agents (`trellis-implement` / `trellis-check`) on platforms that dispatch them.
+Flow: implement (`implement` / `implement-spec` + `tdd`, or `trellis-implement`) -> review (`code-review`, or `trellis-check`) -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
 Parallel dispatch is allowed (the host rule exempts `implement-spec`); pick frontier-ready tickets and dispatch implementers concurrently. Sub-agent self-exemption: a spawned implementer must not spawn further implement/review agents — dispatch is main-session only.
 Dispatch prompt starts with `Active task: <task path from task.py current>`. Read context: jsonl pointer entries -> `prd.md` -> `design.md if present` -> `implement.md if present` -> the parent task's `design.md` / `prd.md` when `task.json` declares a `parent` (shared contracts are stated there once).
 [/workflow-state:in_progress]
@@ -327,7 +327,7 @@ When a user request matches one of these intents inside an active task, route fi
 [Pi, Oh My Pi]
 
 - Planning or unclear requirements -> Matt `grill-with-docs` → `to-spec` → `to-tickets` (same flow; the skills are pi-local copies under `~/.pi/agent/skills/`).
-- `in_progress` implementation/check -> Matt `implement` / `implement-spec` + `tdd`, executed through the pi task queue: **one task at a time**, mainline gates each result.
+- `in_progress` implementation/check -> Trellis `trellis-implement` with Matt `tdd` discipline, executed through the pi task queue: **one task at a time**, mainline gates each result.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
 - Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; pi-local copies at `~/.pi/agent/skills/`).
 
@@ -335,10 +335,12 @@ When a user request matches one of these intents inside an active task, route fi
 
 [Kimi Code]
 
-- Planning or unclear requirements -> Matt `grill-with-docs` → `to-spec` → `to-tickets` (skills under `~/.kimi-code/skills/`).
-- `in_progress` implementation/check -> Matt `implement` / `implement-spec` + `tdd`; review via `code-review`.
+- Planning or unclear requirements -> Matt `grill-with-docs` → `to-spec` → `to-tickets` (Kimi-local copies under `~/.kimi-code/skills/`; shared install under `~/.agents/skills/`).
+- `in_progress` implementation/check -> dispatch the project custom agents `trellis-implement` (with Matt `tdd` discipline) and `trellis-check` from `.kimi-code/agents/`; the stock agents read `implement.jsonl` / `check.jsonl` themselves. Subagents must not commit; the mainline commits at Phase 3.4. If `.kimi-code/agents/` is missing (a project initialized only with `--dsh`), run `trellis init --kimi` in the project root to add the Kimi entry points.
+- Research -> `trellis-research` custom agent (writes to `{TASK_DIR}/research/`). The built-in `explore` agent is read-only and cannot persist a report; use it only for throwaway lookups.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
-- Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; installed at `~/.kimi-code/skills/`).
+- Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; available at `~/.agents/skills/` (shared) or `~/.kimi-code/skills/` (Kimi-local copies)).
+- Session identity -> Kimi exports no session id to Bash. Prefix `task.py` with `TRELLIS_CONTEXT_ID=<id>` (the optional UserPromptSubmit hook prints one); otherwise `task.py start` runs degraded and `task.py current` returns nothing.
 
 [/Kimi Code]
 
@@ -348,7 +350,7 @@ When a user request matches one of these intents inside an active task, route fi
 - Planning or unclear requirements -> Matt `grill-with-docs` → `to-spec` → `to-tickets` (grill until the plan's details, scope, and key decisions are agreed before any task is created).
 - Before editing -> `trellis-before-dev`; implement via Matt (`implement` / `implement-spec` + `tdd`); after editing -> `code-review`.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
-- Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; shipped on DeepSeek Harness at `~/.agents/skills/`).
+- Engineering execution details -> mattpocock skills as needed (`tdd`, `diagnosing-bugs`, `code-review`, `prototype`, `research`, `grilling`, ...; available to DeepSeek Harness at `~/.agents/skills/`).
 - Host task board: cards with host-managed lifecycle (prompt/description/resume/archive) stay under host control; a Trellis task provides the engineering method for the same work. Do not duplicate card bookkeeping into `.trellis/tasks/` and do not fight the host card state.
 
 [/codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
@@ -378,17 +380,19 @@ Goal: classify the request, get task-creation consent when a task is needed, and
 
 #### 1.0 Create task `[required · once]`
 
-Create the task directory only after task-creation consent. The command sets status to `planning`, writes `task.json`, creates a default `prd.md`, and auto-targets the new task when session identity is available:
+**Prerequisite — grill first.** The host global plan gate (`~/.dsh/AGENTS.md` on DSH, `~/.kimi-code/AGENTS.md` on Kimi Code) forbids creating a task or writing a plan document before `grill-with-docs` (or the `grilling` / `grill-me` primitive it drives) has settled requirements, scope, and key decisions with the user. So the order is: task-creation consent → 1.1 grill → agreement → this step. If requirements are not agreed yet, run 1.1's Grill step now and come back here; the task directory is bookkeeping for the agreed plan, not the place where planning starts.
+
+Create the task directory only after task-creation consent *and* that agreement. The command sets status to `planning`, writes `task.json`, creates a default `prd.md`, and auto-targets the new task when session identity is available:
 
 ```bash
-python3 ./.trellis/scripts/task.py create "<task title>" --slug <name>
+python3 ./.trellis/scripts/task.py create "<task title>" --description "<what this task delivers>" --slug <name>
 ```
 
-`--slug` is the human-readable name only. Do **not** include the `MM-DD-` date prefix; `task.py create` adds that prefix automatically.
+`--description` is required (a task with an empty description is refused at archive). `--slug` is the human-readable name only. Do **not** include the `MM-DD-` date prefix; `task.py create` adds that prefix automatically.
 
-For task trees, create the parent task first and then create each child with `--parent <parent-dir>`. Do not start the parent just because children exist; start the child that owns the next independently verifiable deliverable.
+For task trees, create the parent task first and then create each child with `--parent <parent-dir>` and its own `--description`. Do not start the parent just because children exist; start the child that owns the next independently verifiable deliverable.
 
-After this command succeeds, the per-turn breadcrumb auto-switches to `[workflow-state:planning]`, telling the AI to stay in planning.
+After this command succeeds, the per-turn breadcrumb auto-switches to `[workflow-state:planning]`, telling the AI to stay in planning. On Kimi Code there is no per-turn hook and no session id in Bash: pass `TRELLIS_CONTEXT_ID=<id>` on the command (or accept degraded mode) and keep the planning state in the conversation yourself.
 
 Run only `create` here — do not also run `start`. `start` flips status to `in_progress`, which switches the breadcrumb to the implementation phase before planning artifacts are reviewed. Save `start` for step 1.4.
 
@@ -398,10 +402,10 @@ Skip when `python3 ./.trellis/scripts/task.py current --source` already points t
 
 Planning is **Matt-owned**; Trellis owns the task lifecycle and the artifact paths. Run the Matt flow in this order and persist its output into the artifacts:
 
-1. **Grill** — load `grill-with-docs` (installed at `~/.agents/skills/`). It runs the `grilling` interview primitive in rounds — every question whose prerequisites are settled, numbered, each with a recommended answer — and keeps a paper trail (`GLOSSARY.md`, ADRs), which is why it beats the stateless `grill-me` inside a repo. Never persist `prd.md` from assumptions; update the artifacts after each confirmed answer.
+1. **Grill** — load `grill-with-docs` (installed at `~/.agents/skills/`). It runs the `grilling` interview primitive in rounds — every question whose prerequisites are settled, numbered, each with a recommended answer — and keeps a paper trail (`GLOSSARY.md`, ADRs), which is why it beats the stateless `grill-me` inside a repo. Never persist `prd.md` from assumptions; update the artifacts after each confirmed answer. If the task does not exist yet, run this grill *before* 1.0 creates it — 1.0 is blocked on the agreement, not the other way round — and re-run it whenever requirements change.
 2. **Research** — step 1.2. Prefer reading the codebase over asking the user.
 3. **Spec** — load `to-spec`; it synthesizes the agreed conversation without re-interviewing. **Tracker override:** the Trellis task directory is the tracker — persist the spec as `{TASK_DIR}/prd.md`, and for complex tasks turn the spec's Implementation Decisions / Testing Decisions / contract sections into `{TASK_DIR}/design.md`. Do not publish a second copy elsewhere. Keep `to-spec`'s section skeleton and add the **Acceptance Criteria** section it lacks.
-4. **Tickets** — load `to-tickets`; it splits the spec into tracer-bullet tickets with declared blocking edges. **Materialize each ticket as a child task** (`task.py create --parent`) instead of `.scratch/` files: the child's `prd.md` carries the ticket body plus its blocking edges. Tickets are the task graph — implement in frontier order; a ticket whose blockers are all done is ready. Apply the single-source rule from "Planning Artifacts": a child that shares a fact with a sibling points at the owner instead of restating it.
+4. **Tickets** — load `to-tickets`; it splits the spec into tracer-bullet tickets with declared blocking edges. **Materialize each ticket as a child task** (`task.py create --description "<ticket body>" --parent`) instead of `.scratch/` files: the child's `prd.md` carries the ticket body plus its blocking edges. Tickets are the task graph — implement in frontier order; a ticket whose blockers are all done is ready. Apply the single-source rule from "Planning Artifacts": a child that shares a fact with a sibling points at the owner instead of restating it.
 5. **Design depth (optional)** — `codebase-design` for interface/module-shape questions (module, interface, depth, seam); `domain-modeling` for domain vocabulary and irreversible decisions (ADR).
 6. **Router** — when the right skill is not obvious, load `ask-matt` and route from its map; map any skill it names that is not installed to an installed fallback.
 
@@ -434,20 +438,20 @@ Spawn the research sub-agent:
 [/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, ZCode, Snow, Reasonix, Trae, Grok]
 [Pi, Oh My Pi]
 
-Queue a research task with `trellis_subagent` (single mode, self-contained prompt — a fresh task does not see this conversation). It runs **serially**, one task at a time, and its report arrives as a result message next turn. Cheap lookups (read/grep/fetch) are faster inline; queue only the reading legwork that would otherwise flood the context.
+Queue a research task with `trellis_subagent` (agent `trellis-research`, single mode, self-contained prompt — a fresh task does not see this conversation). It runs **serially**, one task at a time, persists findings to `{TASK_DIR}/research/`, and reports the file paths next turn. Cheap lookups (read/grep/fetch) are faster inline; queue only the reading legwork that would otherwise flood the context.
 
 [/Pi, Oh My Pi]
 
 [Kimi Code]
 
-Dispatch the built-in `explore` sub-agent with the `.kimi-code/skills/trellis-research/SKILL.md` instructions, or load the Matt `research` skill and let it drive the same sub-agent. Persist the report to `{TASK_DIR}/research/`.
+Dispatch the project custom agent `trellis-research` (`subagent_type: trellis-research`, installed by `trellis init --kimi`); its prompt starts with `Active task: <task path>` and it persists the report to `{TASK_DIR}/research/`. Do not use the built-in `explore` agent for this — it is read-only and cannot write the report. The Matt `research` skill is the fallback when you want its cited-Markdown format.
 
 [/Kimi Code]
 
 
 [codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
-Do the research in the main session directly and write findings into `{TASK_DIR}/research/`. `codex-inline` is the explicit mode that keeps work in the main session.
+Override the general Method: do the research in the main session directly and write findings into `{TASK_DIR}/research/`. (The Matt `research` skill delegates to a background agent; on this pull-based platform, keep the work in the main session.)
 
 [/codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
@@ -517,7 +521,7 @@ Curate `implement.jsonl` and `check.jsonl` exactly as above — a queued pi task
 
 [Kimi Code]
 
-Curate `implement.jsonl` and `check.jsonl` exactly as above — the dispatched sub-agent reads them from disk.
+Curate `implement.jsonl` and `check.jsonl` exactly as above — the stock `trellis-implement` / `trellis-check` custom agents read them from disk. The dispatch prompt still starts with `Active task: <path>`; the jsonl is context, not a substitute for that line.
 
 [/Kimi Code]
 
@@ -546,7 +550,7 @@ For lightweight tasks, `prd.md` can be enough. For complex tasks, `prd.md`, `des
 
 After this command succeeds, the breadcrumb auto-switches to `[workflow-state:in_progress]`, and the rest of Phase 2 / 3 follows.
 
-If `task.py start` errors with a session-identity message (no context key from hook input, `TRELLIS_CONTEXT_ID`, or platform-native session env), follow the hint in the error to set up session identity, then retry.
+If `task.py start` reports "Session identity not available" and runs in degraded mode (no context key from hook input, `TRELLIS_CONTEXT_ID`, or a platform-native session env), set `TRELLIS_CONTEXT_ID` before retrying if the platform supports an explicit id. On Kimi Code the optional UserPromptSubmit hook prints the per-session id; DSH and Claude Code export their own session variables.
 
 #### 1.5 Completion criteria
 
@@ -604,21 +608,22 @@ The platform hook/plugin auto-handles:
 
 The main session orchestrates; the pi extension queues the work.
 
-- **Method**: Matt `implement` per ticket, driven through `trellis_subagent` (agent `trellis-implement`, prompt starts with `Active task: <task path>`). **One task at a time**: queue it, wait for the result, verify it, then queue the next. `implement-spec`'s frontier-parallelism does not exist here — N tickets cost N serial turns, so choose the frontier order deliberately and never queue several implement tasks in one reply expecting concurrent work.
-- **Shared-tree hazard**: queued tasks work in the same working tree. A task that leaves the branch or the tree dirty blocks the next one, so every implement prompt must say "commit or revert before you finish".
-- **Task description**: implement the reviewed artifacts, consult `{TASK_DIR}/research/`, run project lint and type-check, report files touched and verification results.
+- **Method**: Trellis `trellis-implement` agent with Matt `tdd` discipline (red-green per slice), driven through `trellis_subagent` (prompt starts with `Active task: <task path>`). **One task at a time**: queue it, wait for the result, verify it, then queue the next — do not commit between tasks; Phase 3.4 owns the commit gate. `implement-spec`'s frontier-parallelism does not exist here — N tickets cost N serial turns, so choose the frontier order deliberately and never queue several implement tasks in one reply expecting concurrent work.
+- **Shared-tree hazard**: queued tasks share the working tree, and the previous task's changes stay in it. The agent cannot commit (`trellis-implement` forbids it), so every implement prompt must say "leave the tree dirty; do not commit, do not revert". The mainline verifies each result and queues the next task on the same dirty tree; Phase 3.4 commits the accumulated work in one batched plan.
+- **Task description**: implement the reviewed artifacts, drive `tdd` red-green per slice, consult `{TASK_DIR}/research/`, run project lint and type-check, report files touched and verification results.
 - **Recursion guard**: a queued task must not queue further tasks — dispatch is mainline-only.
 
 [/Pi, Oh My Pi]
 
 [Kimi Code]
 
-Spawn the implement sub-agent:
+Dispatch the project custom agent (installed by `trellis init --kimi`):
 
-- **Method**: Matt `implement` per ticket, or `implement-spec` for the whole graph — Kimi's `AgentSwarm` can run frontier-ready tickets concurrently.
-- **Agent type**: `coder` with the `.kimi-code/skills/trellis-implement/SKILL.md` instructions (or the `trellis-implement` agent profile).
-- **Dispatch prompt guard**: the prompt MUST start with `Active task: <task path>`, then say the agent is already the implementer and must not spawn another implement/review agent.
-- **Task description**: implement the reviewed artifacts, consult `{TASK_DIR}/research/`, finish by running project lint and type-check.
+- **Method**: `trellis-implement` with Matt `tdd` discipline (red-green per slice). For a whole ticket graph, `implement-spec` is a main-session skill — load it in the main session instead of dispatching this agent.
+- **Agent type**: `trellis-implement` (`subagent_type: trellis-implement`, definition at `.kimi-code/agents/trellis-implement.md`). The built-in `coder` is a fallback only when the project has no custom agent; if used, pass the `.kimi-code/skills/trellis-implement/SKILL.md` instructions and the same guards.
+- **Dispatch prompt guard**: the prompt MUST start with `Active task: <task path>` and state: implement directly, do not spawn another implement/review agent, do not `git commit` / `git push`, leave the tree dirty.
+- **Task description**: implement the reviewed artifacts, drive `tdd` red-green per slice, consult `{TASK_DIR}/research/`, finish by running project lint and type-check.
+- **Concurrency**: `Agent` / `AgentSwarm` share the session's working tree; Kimi exposes no worktree option (only `prompt` / `description` / `subagent_type` / `model`), and `AgentSwarm` requires the user to enable swarm mode. Serialize implementers by default. Only swarm tickets that touch disjoint files, and still let the mainline verify each result. Do not let a coder commit — Phase 3.4 owns the commit gate. `Tower` is a separate experimental mode with mission worktrees; do not mix it into this flow.
 
 [/Kimi Code]
 
@@ -660,6 +665,7 @@ The platform prelude auto-handles the context load requirement:
 3. Read `{TASK_DIR}/prd.md`, then `design.md` if present, then `implement.md` if present, plus materials under `{TASK_DIR}/research/`; if `task.json` declares a `parent`, read the parent's `design.md` first — shared contracts are stated there once and only pointed at here
 4. Parallel implementers are allowed: the host global rule treats choosing `implement-spec` as explicit opt-in for sub-agents — no extra confirmation needed
 5. Implement the code per reviewed artifacts, then run project lint and type-check
+6. Do not commit in this step — 3.4 owns the commit gate. If the Matt skill's final step says to commit, skip it and leave the tree dirty. Exception: `implement-spec` commits on its integration branch by design; if you use it, treat those commits as the work commits and skip 3.4's plan (go to 3.5 after verifying the tree is clean).
 
 [/codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
@@ -684,25 +690,25 @@ The check agent's job:
 [/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, ZCode, Snow, Reasonix, Trae, Grok]
 [Pi, Oh My Pi]
 
-Queue one review task (`trellis_subagent`, agent `trellis-check`) after the implement result lands, or run `code-review` inline. Two queued review tasks would serialize anyway, so put both axes in one brief.
+Queue one review task (`trellis_subagent`, agent `trellis-check`) after the implement result lands. Phase 2.1 leaves the tree dirty, so the agent reviews the working-tree diff itself (`git add -N .` first so new files appear, then `git diff HEAD`); give it the base commit if it needs a range. The agent reads `check.jsonl`, reviews against specs and task artifacts, fixes findings directly, and runs lint/type-check; re-check until green. Commit only at Phase 3.4 — do not commit just to give the reviewer a range. (`code-review` is the main-session alternative when you want a report without fixes.)
 
 [/Pi, Oh My Pi]
 
 [Kimi Code]
 
-Spawn the review sub-agent (`trellis-check` profile / `.kimi-code/skills/trellis-check/SKILL.md`), or load `code-review` and run both axes. Fix findings, then re-check until green.
+Spawn the project custom agent `trellis-check` (`subagent_type: trellis-check`, definition at `.kimi-code/agents/trellis-check.md`). Phase 2.1 leaves the tree dirty, so pass the working-tree diff (`git add -N .` first so new files appear, then `git diff HEAD`); if the work was already committed, use `git diff <base>...HEAD` instead. The agent reads `check.jsonl`, reviews against specs and task artifacts, fixes findings directly, and runs lint/type-check; re-check until green. The mainline commits only at Phase 3.4 — do not commit just to give the reviewer a diff. (`code-review` is the main-session alternative when you want a report without fixes.)
 
 [/Kimi Code]
 
 
 [codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
-Load the `code-review` skill and review the diff on both axes (Standards + Spec):
+Load the `code-review` skill and review the diff on both axes (Standards + Spec). The fixed point is the branch point before 2.1: if 2.1 left the tree dirty (the default), pass `git diff HEAD` (working tree; run `git add -N .` first so new files appear); if 2.1 committed (`implement-spec`), use `git diff <branch-point>...HEAD`.
 - Spec compliance (`prd.md` / `design.md` / tickets, plus the parent task's contracts when `task.json` declares a `parent`)
 - lint / type-check / tests
 - Cross-layer consistency (when changes span layers)
 
-If issues are found → fix → re-check, until green. `trellis-check` is retired; legacy references may be treated as an alias for `code-review`.
+If issues are found → fix → re-check, until green. On this platform `trellis-check` is retired; legacy references may be treated as an alias for `code-review`. (Kimi Code is different: there `trellis-check` is a live custom agent.)
 
 [/codex-inline, Kilo, Antigravity, Devin, DeepSeek Harness]
 
