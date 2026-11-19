@@ -332,3 +332,25 @@ child D 落地：WorldBossService 生命周期/原子挑战（事务内 CAS、�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 11: PVE 固定名册与世界 Boss 激活
+<!-- trellis-session: v=2 fp=78aa4739cfd8f04e -->
+
+**Date**: 2026-11-20
+**Task**: PVE 固定名册与世界 Boss 激活
+**Branch**: `main`
+
+### Summary
+
+28+4 战斗与叙事获批并同步 schema v2；普通 PVE 固定名册切流，旧 Boss 整删，新世界 Boss handler/poller/outbox 与 v40 上线；两轮复核无阻塞，1282 pytest、数值锚、审计与真实备份迁移均通过。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d6da49b` | feat(pve): 激活固定名册与世界 Boss 生命周期 |
+
+### Status
+
+[OK] **Completed**
