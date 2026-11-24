@@ -1,0 +1,509 @@
+{
+  "id": 1014,
+  "case_name": "world-boss-lq-kill",
+  "run_index": 3,
+  "status": "passed",
+  "conversation_id": 1034,
+  "steps_result": [
+    {
+      "index": -1,
+      "type": "pre_run_hook",
+      "note": "",
+      "ok": true,
+      "detail": "hook 退出码 0：已备份现有固定 ID 数据 -> /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/functional_tests/.fixture-backup.json\nfixture pve 完成：3 个固定测试玩家已重置",
+      "actual": [],
+      "duration": 0.06
+    },
+    {
+      "index": 0,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14345）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14346：✅ 已生成世界Boss：裂峡罴王）",
+      "actual": [
+        "✅ 已生成世界Boss：裂峡罴王"
+      ],
+      "expected": "✅ 已生成世界Boss：裂峡罴王",
+      "matched": {
+        "id": 14346,
+        "window_index": 0,
+        "text": "✅ 已生成世界Boss：裂峡罴王"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14347）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 3,
+      "type": "expect",
+      "note": "同时等查询与 spawn outbox 广播；文案再改需同步此处（world_bosses.csv:wb_lq_ba.spawn_text）",
+      "ok": true,
+      "detail": "合并窗口匹配（消息 #14346-#14349）",
+      "actual": [
+        "✅ 已生成世界Boss：裂峡罴王",
+        "👹 当前世界 Boss：裂峡罴王\n境界等级：1\n气血：1000/1000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:23\n发送「挑战Boss」参与讨伐。",
+        "黑风峡方向煞气冲天——裂峡罴王出峡了！"
+      ],
+      "expected": "re:(?=[\\s\\S]*👹 当前世界 Boss：裂峡罴王)(?=[\\s\\S]*气血：1000/1000)(?=[\\s\\S]*阶段：第 1 阶段)(?=[\\s\\S]*黑风峡方向煞气冲天——裂峡罴王出峡了！)",
+      "matched": {
+        "combined": true,
+        "first_id": 14346,
+        "last_id": 14349,
+        "text": "✅ 已生成世界Boss：裂峡罴王\n👹 当前世界 Boss：裂峡罴王\n境界等级：1\n气血：1000/1000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:23\n发送「挑战Boss」参与讨伐。\n黑风峡方向煞气冲天——裂峡罴王出峡了"
+      },
+      "duration": 58.1
+    },
+    {
+      "index": 4,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14350）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 5,
+      "type": "expect",
+      "note": "阶段 2/3 与击杀广播；文案再改需同步此处（world_bosses.csv:wb_lq_ba.phase2_text/phase3_text/kill_text）",
+      "ok": true,
+      "detail": "合并窗口匹配（消息 #14346-#14354）",
+      "actual": [
+        "✅ 已生成世界Boss：裂峡罴王",
+        "👹 当前世界 Boss：裂峡罴王\n境界等级：1\n气血：1000/1000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:23\n发送「挑战Boss」参与讨伐。",
+        "黑风峡方向煞气冲天——裂峡罴王出峡了！",
+        "⚔️ 你对「裂峡罴王」造成 1000 点伤害（剩余 0/1000）。「裂峡罴王」进入第 3 阶段！🎯 你给予了「裂峡罴王」最后一击！",
+        "罴王轰然倒地，峡谷回音久久不散。",
+        "罴王吃痛狂性大发，掌势更猛了！",
+        "罴王遍体鳞伤步履踉跄，甲皮都松动了。"
+      ],
+      "expected": "re:(?=[\\s\\S]*⚔️ 你对「裂峡罴王」造成 \\d+ 点伤害（剩余 0/1000）。)(?=[\\s\\S]*「裂峡罴王」进入第 3 阶段！)(?=[\\s\\S]*🎯 你给予了「裂峡罴王」最后一击！)(?=[\\s\\S]*罴王吃痛狂性大发，掌势更猛了！)(?=[\\s\\S]*罴王遍体鳞伤步履踉跄，甲皮都松动了。)(?=[\\s\\S]*罴王轰然倒地，峡谷回音久久不散。)",
+      "matched": {
+        "combined": true,
+        "first_id": 14346,
+        "last_id": 14354,
+        "text": "✅ 已生成世界Boss：裂峡罴王\n👹 当前世界 Boss：裂峡罴王\n境界等级：1\n气血：1000/1000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:23\n发送「挑战Boss」参与讨伐。\n黑风峡方向煞气冲天——裂峡罴王出峡了"
+      },
+      "duration": 60.52
+    },
+    {
+      "index": 6,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14355）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 7,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14356：❌ 当前没有可挑战的世界 Boss。）",
+      "actual": [
+        "✅ 已生成世界Boss：裂峡罴王",
+        "👹 当前世界 Boss：裂峡罴王\n境界等级：1\n气血：1000/1000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:23\n发送「挑战Boss」参与讨伐。",
+        "黑风峡方向煞气冲天——裂峡罴王出峡了！",
+        "⚔️ 你对「裂峡罴王」造成 1000 点伤害（剩余 0/1000）。「裂峡罴王」进入第 3 阶段！🎯 你给予了「裂峡罴王」最后一击！",
+        "罴王轰然倒地，峡谷回音久久不散。",
+        "罴王吃痛狂性大发，掌势更猛了！",
+        "罴王遍体鳞伤步履踉跄，甲皮都松动了。",
+        "❌ 当前没有可挑战的世界 Boss。"
+      ],
+      "expected": "❌ 当前没有可挑战的世界 Boss。",
+      "matched": {
+        "id": 14356,
+        "window_index": 7,
+        "text": "❌ 当前没有可挑战的世界 Boss。"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 8,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14357）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 9,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14358：❌ 世界 Boss 尚未到再生时间。）",
+      "actual": [
+        "✅ 已生成世界Boss：裂峡罴王",
+        "👹 当前世界 Boss：裂峡罴王\n境界等级：1\n气血：1000/1000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:23\n发送「挑战Boss」参与讨伐。",
+        "黑风峡方向煞气冲天——裂峡罴王出峡了！",
+        "⚔️ 你对「裂峡罴王」造成 1000 点伤害（剩余 0/1000）。「裂峡罴王」进入第 3 阶段！🎯 你给予了「裂峡罴王」最后一击！",
+        "罴王轰然倒地，峡谷回音久久不散。",
+        "罴王吃痛狂性大发，掌势更猛了！",
+        "罴王遍体鳞伤步履踉跄，甲皮都松动了。",
+        "❌ 当前没有可挑战的世界 Boss。",
+        "❌ 世界 Boss 尚未到再生时间。"
+      ],
+      "expected": "❌ 世界 Boss 尚未到再生时间。",
+      "matched": {
+        "id": 14358,
+        "window_index": 8,
+        "text": "❌ 世界 Boss 尚未到再生时间。"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 10,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14359）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 11,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14360：✅ 时间已快进 43200 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：）",
+      "actual": [
+        "✅ 已生成世界Boss：裂峡罴王",
+        "👹 当前世界 Boss：裂峡罴王\n境界等级：1\n气血：1000/1000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:23\n发送「挑战Boss」参与讨伐。",
+        "黑风峡方向煞气冲天——裂峡罴王出峡了！",
+        "⚔️ 你对「裂峡罴王」造成 1000 点伤害（剩余 0/1000）。「裂峡罴王」进入第 3 阶段！🎯 你给予了「裂峡罴王」最后一击！",
+        "罴王轰然倒地，峡谷回音久久不散。",
+        "罴王吃痛狂性大发，掌势更猛了！",
+        "罴王遍体鳞伤步履踉跄，甲皮都松动了。",
+        "❌ 当前没有可挑战的世界 Boss。",
+        "❌ 世界 Boss 尚未到再生时间。",
+        "✅ 时间已快进 43200 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：0 条\n  世界Boss下次再生时间：2 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。"
+      ],
+      "expected": "re:✅ 时间已快进 43200 秒[\\s\\S]*世界Boss下次再生时间：[1-9]\\d* 条",
+      "matched": {
+        "id": 14360,
+        "window_index": 9,
+        "text": "✅ 时间已快进 43200 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  "
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 12,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14361）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 13,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14362：✅ 已生成世界Boss：裂峡罴王）",
+      "actual": [
+        "✅ 已生成世界Boss：裂峡罴王",
+        "👹 当前世界 Boss：裂峡罴王\n境界等级：1\n气血：1000/1000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:23\n发送「挑战Boss」参与讨伐。",
+        "黑风峡方向煞气冲天——裂峡罴王出峡了！",
+        "⚔️ 你对「裂峡罴王」造成 1000 点伤害（剩余 0/1000）。「裂峡罴王」进入第 3 阶段！🎯 你给予了「裂峡罴王」最后一击！",
+        "罴王轰然倒地，峡谷回音久久不散。",
+        "罴王吃痛狂性大发，掌势更猛了！",
+        "罴王遍体鳞伤步履踉跄，甲皮都松动了。",
+        "❌ 当前没有可挑战的世界 Boss。",
+        "❌ 世界 Boss 尚未到再生时间。",
+        "✅ 时间已快进 43200 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：0 条\n  世界Boss下次再生时间：2 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+        "✅ 已生成世界Boss：裂峡罴王"
+      ],
+      "expected": "✅ 已生成世界Boss：",
+      "matched": {
+        "id": 14362,
+        "window_index": 10,
+        "text": "✅ 已生成世界Boss：裂峡罴王"
+      },
+      "duration": 0.3
+    }
+  ],
+  "case_snapshot": {
+    "name": "world-boss-lq-kill",
+    "description": "裂峡罴王生成、查询、三阶段击杀、定稿广播及击杀后 12 小时再生窗真实回归。",
+    "scenario": "pve fixture 以未来终态门挡住随机轮询；GM 指定 wb_lq_ba，玩家高属性一次挑战跨至第三阶段并末击。combine 断言同时覆盖 handler 回执和 poller/outbox 主动群广播。",
+    "tags": [
+      "pve",
+      "pve-e2",
+      "world-boss"
+    ],
+    "pre_run_hook": {
+      "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pve --yes",
+      "timeout": 60
+    },
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_pvp_001",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000002"
+      }
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 生成Boss wb_lq_ba"
+      },
+      {
+        "type": "expect",
+        "match": "✅ 已生成世界Boss：裂峡罴王",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#世界Boss"
+      },
+      {
+        "type": "expect",
+        "match": "re:(?=[\\s\\S]*👹 当前世界 Boss：裂峡罴王)(?=[\\s\\S]*气血：1000/1000)(?=[\\s\\S]*阶段：第 1 阶段)(?=[\\s\\S]*黑风峡方向煞气冲天——裂峡罴王出峡了！)",
+        "combine": true,
+        "timeout": 90,
+        "note": "同时等查询与 spawn outbox 广播；文案再改需同步此处（world_bosses.csv:wb_lq_ba.spawn_text）"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#挑战Boss"
+      },
+      {
+        "type": "expect",
+        "match": "re:(?=[\\s\\S]*⚔️ 你对「裂峡罴王」造成 \\d+ 点伤害（剩余 0/1000）。)(?=[\\s\\S]*「裂峡罴王」进入第 3 阶段！)(?=[\\s\\S]*🎯 你给予了「裂峡罴王」最后一击！)(?=[\\s\\S]*罴王吃痛狂性大发，掌势更猛了！)(?=[\\s\\S]*罴王遍体鳞伤步履踉跄，甲皮都松动了。)(?=[\\s\\S]*罴王轰然倒地，峡谷回音久久不散。)",
+        "combine": true,
+        "timeout": 90,
+        "note": "阶段 2/3 与击杀广播；文案再改需同步此处（world_bosses.csv:wb_lq_ba.phase2_text/phase3_text/kill_text）"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#挑战Boss"
+      },
+      {
+        "type": "expect",
+        "match": "❌ 当前没有可挑战的世界 Boss。",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 生成Boss"
+      },
+      {
+        "type": "expect",
+        "match": "❌ 世界 Boss 尚未到再生时间。",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 时间快进 43200 确认"
+      },
+      {
+        "type": "expect",
+        "match": "re:✅ 时间已快进 43200 秒[\\s\\S]*世界Boss下次再生时间：[1-9]\\d* 条",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 生成Boss"
+      },
+      {
+        "type": "expect",
+        "match": "✅ 已生成世界Boss：",
+        "timeout": 30
+      }
+    ],
+    "owner": "astrbot_plugin_monixiuxian2_2"
+  },
+  "run_messages": [
+    {
+      "id": 14345,
+      "conversation_id": 1034,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 生成Boss wb_lq_ba",
+      "rich": null,
+      "created_at": 1795166630.9435217
+    },
+    {
+      "id": 14346,
+      "conversation_id": 1034,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已生成世界Boss：裂峡罴王",
+      "rich": [],
+      "created_at": 1795166630.9717221
+    },
+    {
+      "id": 14347,
+      "conversation_id": 1034,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#世界Boss",
+      "rich": null,
+      "created_at": 1795166631.2563863
+    },
+    {
+      "id": 14348,
+      "conversation_id": 1034,
+      "direction": "out",
+      "sender": "bot",
+      "text": "👹 当前世界 Boss：裂峡罴王\n境界等级：1\n气血：1000/1000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:23\n发送「挑战Boss」参与讨伐。",
+      "rich": [],
+      "created_at": 1795166631.274865
+    },
+    {
+      "id": 14349,
+      "conversation_id": 1034,
+      "direction": "out",
+      "sender": "bot",
+      "text": "黑风峡方向煞气冲天——裂峡罴王出峡了！",
+      "rich": [],
+      "created_at": 1795166689.2802818
+    },
+    {
+      "id": 14350,
+      "conversation_id": 1034,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#挑战Boss",
+      "rich": null,
+      "created_at": 1795166689.3727748
+    },
+    {
+      "id": 14351,
+      "conversation_id": 1034,
+      "direction": "out",
+      "sender": "bot",
+      "text": "⚔️ 你对「裂峡罴王」造成 1000 点伤害（剩余 0/1000）。「裂峡罴王」进入第 3 阶段！🎯 你给予了「裂峡罴王」最后一击！",
+      "rich": [],
+      "created_at": 1795166689.4125302
+    },
+    {
+      "id": 14352,
+      "conversation_id": 1034,
+      "direction": "out",
+      "sender": "bot",
+      "text": "罴王轰然倒地，峡谷回音久久不散。",
+      "rich": [],
+      "created_at": 1795166749.5701704
+    },
+    {
+      "id": 14353,
+      "conversation_id": 1034,
+      "direction": "out",
+      "sender": "bot",
+      "text": "罴王吃痛狂性大发，掌势更猛了！",
+      "rich": [],
+      "created_at": 1795166749.6820467
+    },
+    {
+      "id": 14354,
+      "conversation_id": 1034,
+      "direction": "out",
+      "sender": "bot",
+      "text": "罴王遍体鳞伤步履踉跄，甲皮都松动了。",
+      "rich": [],
+      "created_at": 1795166749.7922816
+    },
+    {
+      "id": 14355,
+      "conversation_id": 1034,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#挑战Boss",
+      "rich": null,
+      "created_at": 1795166749.9072874
+    },
+    {
+      "id": 14356,
+      "conversation_id": 1034,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 当前没有可挑战的世界 Boss。",
+      "rich": [],
+      "created_at": 1795166749.9356415
+    },
+    {
+      "id": 14357,
+      "conversation_id": 1034,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 生成Boss",
+      "rich": null,
+      "created_at": 1795166750.2211452
+    },
+    {
+      "id": 14358,
+      "conversation_id": 1034,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 世界 Boss 尚未到再生时间。",
+      "rich": [],
+      "created_at": 1795166750.2423978
+    },
+    {
+      "id": 14359,
+      "conversation_id": 1034,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 时间快进 43200 确认",
+      "rich": null,
+      "created_at": 1795166750.5396068
+    },
+    {
+      "id": 14360,
+      "conversation_id": 1034,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 时间已快进 43200 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：0 条\n  世界Boss下次再生时间：2 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+      "rich": [],
+      "created_at": 1795166750.5728345
+    },
+    {
+      "id": 14361,
+      "conversation_id": 1034,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 生成Boss",
+      "rich": null,
+      "created_at": 1795166750.8584924
+    },
+    {
+      "id": 14362,
+      "conversation_id": 1034,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已生成世界Boss：裂峡罴王",
+      "rich": [],
+      "created_at": 1795166750.8911133
+    }
+  ],
+  "started_at": 1795166630.8311899,
+  "finished_at": 1795166751.17673
+}

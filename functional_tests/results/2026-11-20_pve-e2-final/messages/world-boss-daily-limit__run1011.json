@@ -1,0 +1,146 @@
+[
+  {
+    "id": 14295,
+    "conversation_id": 1031,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置攻击 900000002 1",
+    "rich": null,
+    "created_at": 1795166398.687866
+  },
+  {
+    "id": 14296,
+    "conversation_id": 1031,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的攻击设置为 1",
+    "rich": [],
+    "created_at": 1795166398.7110124
+  },
+  {
+    "id": 14297,
+    "conversation_id": 1031,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置战斗气血 900000002 1",
+    "rich": null,
+    "created_at": 1795166398.999412
+  },
+  {
+    "id": 14298,
+    "conversation_id": 1031,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的气血底数与当前气血设置为 1",
+    "rich": [],
+    "created_at": 1795166399.039984
+  },
+  {
+    "id": 14299,
+    "conversation_id": 1031,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss wb_yy_ba",
+    "rich": null,
+    "created_at": 1795166399.3157387
+  },
+  {
+    "id": 14300,
+    "conversation_id": 1031,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已生成世界Boss：吞象巴蛇",
+    "rich": [],
+    "created_at": 1795166399.3558648
+  },
+  {
+    "id": 14301,
+    "conversation_id": 1031,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#挑战Boss",
+    "rich": null,
+    "created_at": 1795166399.6452193
+  },
+  {
+    "id": 14302,
+    "conversation_id": 1031,
+    "direction": "out",
+    "sender": "bot",
+    "text": "⚔️ 你对「吞象巴蛇」造成 180 点伤害（剩余 4820/5000）。",
+    "rich": [],
+    "created_at": 1795166399.6868796
+  },
+  {
+    "id": 14303,
+    "conversation_id": 1031,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#挑战Boss",
+    "rich": null,
+    "created_at": 1795166399.973423
+  },
+  {
+    "id": 14304,
+    "conversation_id": 1031,
+    "direction": "out",
+    "sender": "bot",
+    "text": "⚔️ 你对「吞象巴蛇」造成 299 点伤害（剩余 4521/5000）。",
+    "rich": [],
+    "created_at": 1795166400.0188317
+  },
+  {
+    "id": 14305,
+    "conversation_id": 1031,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#挑战Boss",
+    "rich": null,
+    "created_at": 1795166400.305253
+  },
+  {
+    "id": 14306,
+    "conversation_id": 1031,
+    "direction": "out",
+    "sender": "bot",
+    "text": "⚔️ 你对「吞象巴蛇」造成 52 点伤害（剩余 4469/5000）。",
+    "rich": [],
+    "created_at": 1795166400.4282744
+  },
+  {
+    "id": 14307,
+    "conversation_id": 1031,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#挑战Boss",
+    "rich": null,
+    "created_at": 1795166400.672568
+  },
+  {
+    "id": 14308,
+    "conversation_id": 1031,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 今日世界 Boss 挑战次数已用完（每日 3 次）。",
+    "rich": [],
+    "created_at": 1795166400.708175
+  },
+  {
+    "id": 14309,
+    "conversation_id": 1031,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#世界Boss",
+    "rich": null,
+    "created_at": 1795166401.0052257
+  },
+  {
+    "id": 14310,
+    "conversation_id": 1031,
+    "direction": "out",
+    "sender": "bot",
+    "text": "👹 当前世界 Boss：吞象巴蛇\n境界等级：30\n气血：4469/5000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:19\n发送「挑战Boss」参与讨伐。",
+    "rich": [],
+    "created_at": 1795166401.0349488
+  }
+]

@@ -1,0 +1,164 @@
+[
+  {
+    "id": 14381,
+    "conversation_id": 1036,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss wb_zj_tuo",
+    "rich": null,
+    "created_at": 1795166872.1777973
+  },
+  {
+    "id": 14382,
+    "conversation_id": 1036,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已生成世界Boss：泽底鼍龙",
+    "rich": [],
+    "created_at": 1795166872.2070956
+  },
+  {
+    "id": 14383,
+    "conversation_id": 1036,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#世界Boss",
+    "rich": null,
+    "created_at": 1795166872.4912548
+  },
+  {
+    "id": 14384,
+    "conversation_id": 1036,
+    "direction": "out",
+    "sender": "bot",
+    "text": "👹 当前世界 Boss：泽底鼍龙\n境界等级：10\n气血：1800/1800\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:27\n发送「挑战Boss」参与讨伐。",
+    "rich": [],
+    "created_at": 1795166872.5132499
+  },
+  {
+    "id": 14385,
+    "conversation_id": 1036,
+    "direction": "out",
+    "sender": "bot",
+    "text": "大泽水翻如沸，背负断碑的鼍龙浮出水面。",
+    "rich": [],
+    "created_at": 1795166930.6797733
+  },
+  {
+    "id": 14386,
+    "conversation_id": 1036,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#挑战Boss",
+    "rich": null,
+    "created_at": 1795166930.9267101
+  },
+  {
+    "id": 14387,
+    "conversation_id": 1036,
+    "direction": "out",
+    "sender": "bot",
+    "text": "⚔️ 你对「泽底鼍龙」造成 1800 点伤害（剩余 0/1800）。「泽底鼍龙」进入第 3 阶段！🎯 你给予了「泽底鼍龙」最后一击！",
+    "rich": [],
+    "created_at": 1795166930.9710987
+  },
+  {
+    "id": 14388,
+    "conversation_id": 1036,
+    "direction": "out",
+    "sender": "bot",
+    "text": "鼍龙沉入泽底，背上的断碑终于倾倒。",
+    "rich": [],
+    "created_at": 1795166990.9672697
+  },
+  {
+    "id": 14389,
+    "conversation_id": 1036,
+    "direction": "out",
+    "sender": "bot",
+    "text": "鼍龙摆尾激浪，暴怒翻腾！",
+    "rich": [],
+    "created_at": 1795166991.0793283
+  },
+  {
+    "id": 14390,
+    "conversation_id": 1036,
+    "direction": "out",
+    "sender": "bot",
+    "text": "鼍龙鳞甲剥落，铁脊裂纹遍布。",
+    "rich": [],
+    "created_at": 1795166991.1893172
+  },
+  {
+    "id": 14391,
+    "conversation_id": 1036,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#挑战Boss",
+    "rich": null,
+    "created_at": 1795166991.4671667
+  },
+  {
+    "id": 14392,
+    "conversation_id": 1036,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 当前没有可挑战的世界 Boss。",
+    "rich": [],
+    "created_at": 1795166991.497581
+  },
+  {
+    "id": 14393,
+    "conversation_id": 1036,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss",
+    "rich": null,
+    "created_at": 1795166991.7850285
+  },
+  {
+    "id": 14394,
+    "conversation_id": 1036,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 世界 Boss 尚未到再生时间。",
+    "rich": [],
+    "created_at": 1795166991.8060923
+  },
+  {
+    "id": 14395,
+    "conversation_id": 1036,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 时间快进 43200 确认",
+    "rich": null,
+    "created_at": 1795166992.1032953
+  },
+  {
+    "id": 14396,
+    "conversation_id": 1036,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 时间已快进 43200 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：0 条\n  世界Boss下次再生时间：2 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+    "rich": [],
+    "created_at": 1795166992.135843
+  },
+  {
+    "id": 14397,
+    "conversation_id": 1036,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss",
+    "rich": null,
+    "created_at": 1795166992.4219544
+  },
+  {
+    "id": 14398,
+    "conversation_id": 1036,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已生成世界Boss：吞象巴蛇",
+    "rich": [],
+    "created_at": 1795166992.4538536
+  }
+]

@@ -1,0 +1,28 @@
+{
+  "name": "world-boss-dissipate",
+  "description": "泽底鼍龙 48 小时到期消散、定稿广播及消散后 24 小时再生窗真实回归。",
+  "scenario": "pve fixture 挡住随机轮询；GM 指定 wb_zj_tuo，时间快进 48 小时后由玩家查询触发领域消散，outbox 广播 dissipate_text；未到 24 小时拒绝再生，快进后可常规随机生成。",
+  "tags": ["pve", "pve-e2", "world-boss"],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pve --yes",
+    "timeout": 60
+  },
+  "conversation": {"kind": "group", "group_id": "webtest_pvp_001", "pin_players": {"gm": "900000001", "p1": "900000002"}},
+  "steps": [
+    {"type": "send", "player": "gm", "text": "#修仙GM 生成Boss wb_zj_tuo"},
+    {"type": "expect", "match": "✅ 已生成世界Boss：泽底鼍龙", "timeout": 30},
+    {"type": "send", "player": "p1", "text": "#世界Boss"},
+    {"type": "expect", "match": "re:(?=[\\s\\S]*👹 当前世界 Boss：泽底鼍龙)(?=[\\s\\S]*大泽水翻如沸，背负断碑的鼍龙浮出水面。)", "combine": true, "timeout": 90, "note": "文案再改需同步此处（world_bosses.csv:wb_zj_tuo.spawn_text）"},
+    {"type": "send", "player": "gm", "text": "#修仙GM 时间快进 172800 确认"},
+    {"type": "expect", "match": "re:✅ 时间已快进 172800 秒[\\s\\S]*世界Boss实例到期时间：[1-9]\\d* 条", "timeout": 30},
+    {"type": "send", "player": "p1", "text": "#世界Boss", "note": "查询只结算到期，不自动生成下一只"},
+    {"type": "expect", "match": "re:(?=[\\s\\S]*👹 当前没有活跃的世界 Boss。)(?=[\\s\\S]*鼍龙潜入深泽不知所踪，只留下一泽浊水。)", "combine": true, "timeout": 90, "note": "同时等无活跃回执与 dissipate outbox 广播；文案再改需同步此处（world_bosses.csv:wb_zj_tuo.dissipate_text）"},
+    {"type": "send", "player": "gm", "text": "#修仙GM 生成Boss"},
+    {"type": "expect", "match": "❌ 世界 Boss 尚未到再生时间。", "timeout": 30},
+    {"type": "send", "player": "gm", "text": "#修仙GM 时间快进 86400 确认"},
+    {"type": "expect", "match": "re:✅ 时间已快进 86400 秒[\\s\\S]*世界Boss下次再生时间：[1-9]\\d* 条", "timeout": 30},
+    {"type": "send", "player": "gm", "text": "#修仙GM 生成Boss"},
+    {"type": "expect", "match": "✅ 已生成世界Boss：", "timeout": 30}
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
+}

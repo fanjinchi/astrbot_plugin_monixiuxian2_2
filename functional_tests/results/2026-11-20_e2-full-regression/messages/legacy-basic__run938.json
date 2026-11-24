@@ -1,0 +1,380 @@
+[
+  {
+    "id": 13275,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1795109453.7220995
+  },
+  {
+    "id": 13276,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1795109453.7398624
+  },
+  {
+    "id": 13277,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000003",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1795109454.0355227
+  },
+  {
+    "id": 13278,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1795109454.0575354
+  },
+  {
+    "id": 13279,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除传承状态 900000002 all",
+    "rich": null,
+    "created_at": 1795109454.355381
+  },
+  {
+    "id": 13280,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已清除 测试玩家1 的传承状态：挑战冷却 0 条、保护期 0 条",
+    "rich": [],
+    "created_at": 1795109454.3788776
+  },
+  {
+    "id": 13281,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除传承状态 900000003 all",
+    "rich": null,
+    "created_at": 1795109454.675107
+  },
+  {
+    "id": 13282,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已清除 测试玩家2 的传承状态：挑战冷却 1 条、保护期 1 条",
+    "rich": [],
+    "created_at": 1795109454.7018266
+  },
+  {
+    "id": 13283,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除传承 900000002 全部",
+    "rich": null,
+    "created_at": 1795109454.988269
+  },
+  {
+    "id": 13284,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 测试玩家1 未持有任何传承！",
+    "rich": [],
+    "created_at": 1795109455.0113215
+  },
+  {
+    "id": 13285,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除传承 900000003 全部",
+    "rich": null,
+    "created_at": 1795109455.3077147
+  },
+  {
+    "id": 13286,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已删除 测试玩家2 的全部传承（共 1 条）",
+    "rich": [],
+    "created_at": 1795109455.3395903
+  },
+  {
+    "id": 13287,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 给予传承 900000003 common",
+    "rich": null,
+    "created_at": 1795109455.6257968
+  },
+  {
+    "id": 13288,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已为 测试玩家2 创建【通用传承】传承 #41\n（未激活，传承值 0；发送「激活传承 41」开始累积）",
+    "rich": [],
+    "created_at": 1795109455.6595037
+  },
+  {
+    "id": 13289,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 给予传承 900000003 adventure",
+    "rich": null,
+    "created_at": 1795109455.94596
+  },
+  {
+    "id": 13290,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已为 测试玩家2 创建【历练传承】传承 #42\n（未激活，传承值 0；发送「激活传承 42」开始累积）",
+    "rich": [],
+    "created_at": 1795109455.978355
+  },
+  {
+    "id": 13291,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000003",
+    "text": "#传承信息",
+    "rich": null,
+    "created_at": 1795109456.264679
+  },
+  {
+    "id": 13292,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 传承信息\n━━━━━━━━━━━━━━━\n【历练传承】#42（未激活）\n  传承值：0｜当前等阶：第0阶\n  下一阶：第1阶（需20，进度0%）｜已领取：无\n【通用传承】#41（未激活）\n  传承值：0｜当前等阶：第0阶\n  下一阶：第1阶（需20，进度0%）｜已领取：无\n━━━━━━━━━━━━━━━\n⚠ 未激活传承，出关不会累积传承值。发送「激活传承」选择一条。",
+    "rich": [],
+    "created_at": 1795109456.286513
+  },
+  {
+    "id": 13293,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置攻击 900000002 99999",
+    "rich": null,
+    "created_at": 1795109456.583856
+  },
+  {
+    "id": 13294,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的攻击设置为 99,999",
+    "rich": [],
+    "created_at": 1795109456.611416
+  },
+  {
+    "id": 13295,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置战斗气血 900000002 8000",
+    "rich": null,
+    "created_at": 1795109456.8977365
+  },
+  {
+    "id": 13296,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的气血底数与当前气血设置为 8,000",
+    "rich": [],
+    "created_at": 1795109456.949953
+  },
+  {
+    "id": 13297,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置攻击 900000003 100",
+    "rich": null,
+    "created_at": 1795109457.2162278
+  },
+  {
+    "id": 13298,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家2】的攻击设置为 100",
+    "rich": [],
+    "created_at": 1795109457.241425
+  },
+  {
+    "id": 13299,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#传承挑战 900000003",
+    "rich": null,
+    "created_at": 1795109457.529148
+  },
+  {
+    "id": 13300,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🎉 传承挑战胜利！\n━━━━━━━━━━━━━━━\n对手：测试玩家2\n你夺走了对方的【历练传承】！\n传承进度已清零，需重新修炼解锁等阶奖励。\n发送「激活传承」可将其设为当前修炼目标。",
+    "rich": [],
+    "created_at": 1795109457.5700517
+  },
+  {
+    "id": 13301,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#传承信息",
+    "rich": null,
+    "created_at": 1795109457.8416262
+  },
+  {
+    "id": 13302,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 传承信息\n━━━━━━━━━━━━━━━\n【历练传承】#42（未激活）\n  传承值：0｜当前等阶：第0阶\n  下一阶：第1阶（需20，进度0%）｜已领取：无\n━━━━━━━━━━━━━━━\n⚠ 未激活传承，出关不会累积传承值。发送「激活传承」选择一条。",
+    "rich": [],
+    "created_at": 1795109457.858928
+  },
+  {
+    "id": 13303,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#激活传承",
+    "rich": null,
+    "created_at": 1795109458.1568592
+  },
+  {
+    "id": 13304,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 选择要激活的传承\n━━━━━━━━━━━━━━━\n#42【历练传承】传承值0\n━━━━━━━━━━━━━━━\n💡 用法：/激活传承 <编号>（如：/激活传承 3）\n出关时仅激活中的传承累积传承值。",
+    "rich": [],
+    "created_at": 1795109458.1767004
+  },
+  {
+    "id": 13305,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#传承挑战 900000003",
+    "rich": null,
+    "created_at": 1795109458.4729915
+  },
+  {
+    "id": 13306,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 无法发起传承挑战：对方刚被夺取传承，尚在保护期内（剩余 2天23小时），暂不可挑战。",
+    "rich": [],
+    "created_at": 1795109458.4931796
+  },
+  {
+    "id": 13307,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000003",
+    "text": "#传承挑战 900000002",
+    "rich": null,
+    "created_at": 1795109458.7885044
+  },
+  {
+    "id": 13308,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "💀 传承挑战失败...\n━━━━━━━━━━━━━━━\n对手：测试玩家1\n损失修为：-0\n且5天内不得再次向该玩家发起传承挑战。",
+    "rich": [],
+    "created_at": 1795109458.8241827
+  },
+  {
+    "id": 13309,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000003",
+    "text": "#传承挑战 900000002",
+    "rich": null,
+    "created_at": 1795109459.1048033
+  },
+  {
+    "id": 13310,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 无法发起传承挑战：你 5 天内曾挑战对方失败，仍需冷却（剩余 4天23小时）。",
+    "rich": [],
+    "created_at": 1795109459.1248784
+  },
+  {
+    "id": 13311,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 清除传承 900000002 全部",
+    "rich": null,
+    "created_at": 1795109459.4211996
+  },
+  {
+    "id": 13312,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已删除 测试玩家1 的全部传承（共 1 条）",
+    "rich": [],
+    "created_at": 1795109459.44779
+  },
+  {
+    "id": 13313,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#传承信息",
+    "rich": null,
+    "created_at": 1795109459.7378573
+  },
+  {
+    "id": 13314,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 传承信息\n━━━━━━━━━━━━━━━\n你尚未持有任何传承。\n获取途径：宗门宝库领取 / 历练与秘境机缘触发\n（均需先战胜传承之地的守护者）",
+    "rich": [],
+    "created_at": 1795109459.752405
+  },
+  {
+    "id": 13315,
+    "conversation_id": 957,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我的信息",
+    "rich": null,
+    "created_at": 1795109460.0486128
+  },
+  {
+    "id": 13316,
+    "conversation_id": 957,
+    "direction": "out",
+    "sender": "bot",
+    "text": "📋 道友 测试玩家1 的信息\n━━━━━━━━━━━━━━━\n\n【基本信息】\n  道号：测试玩家1\n  境界：练气一阶\n  修为：0/1,800\n  灵石：100,000\n  战力：108,099\n  灵根：天灵根\n\n【四主属性】\n  伤害：99999\n  身法：50\n  迅捷：50\n  气血：8000/8000\n  护甲：0\n\n【装备信息】\n  主修功法：无\n  法器：无\n  防具：无\n\n【功法修习】\n  已领悟功法：19\n  修习目标：无\n  战报合并条数：10\n\n【宗门信息】\n  所在宗门：无宗门\n  宗门职位：散修\n━━━━━━━━━━━━━━━",
+    "rich": [],
+    "created_at": 1795109460.0690937
+  }
+]

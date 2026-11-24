@@ -12,9 +12,10 @@ Commands:
   export              Export recent runs into functional_tests/results/<date>_<target>/.
                       On the .last-run.json manifest branch <date> is taken from the runs'
                       actual day (``--date`` only names the folder there, it never filters).
-  fixture --profile pvp|sect  Write fixed test player baseline rows into the plugin test DB.
+  fixture --profile pvp|sect|breakthrough|economy|pve
+                            Write fixed test player baseline rows into the plugin test DB.
                             (Legacy: platform v0.3.0 supports case-level pre_run_hook —
-                            sect cases declare it calling fixture --profile sect --yes;
+                            sect/PVE cases declare their profile in pre_run_hook;
                             CLI mode and run --fixture kept for compatibility.)
 
 This script intentionally uses only the Python standard library (urllib/sqlite3)
@@ -1225,8 +1226,9 @@ def cmd_fixture(args: argparse.Namespace) -> int:
     """Implement ``fixture``: write a deterministic baseline to the test DB.
 
     ``pvp`` writes the PvP verification baseline; ``sect`` writes the sect
-    domain baseline (member preset, sect rows, shop seed, idle cds). May be
-    invoked from the CLI or as a case-level ``pre_run_hook`` command
+    domain baseline (member preset, sect rows, shop seed, idle cds); ``pve``
+    additionally resets the world-boss lifecycle and blocks unforced polling.
+    May be invoked from the CLI or as a case-level ``pre_run_hook`` command
     (platform v0.3.0); the CLI form is kept for compatibility.
     """
     db_path = _resolve_db_path(args)
@@ -1236,8 +1238,8 @@ def cmd_fixture(args: argparse.Namespace) -> int:
         ids = list(SECT_TEST_IDS)
     elif args.profile == "breakthrough":
         ids = list(BREAKTHROUGH_TEST_IDS)
-    elif args.profile == "economy":
-        # 经济域沿用 3 个固定 ID 基线（GM + 两名玩家），只是额外清掉拥有型状态。
+    elif args.profile in {"economy", "pve"}:
+        # 经济/PVE 域沿用 3 个固定 ID 基线（GM + 两名玩家）。
         ids = list(PVP_TEST_IDS)
     else:
         raise CtlError(f"不支持的 fixture profile: {args.profile}")
@@ -1310,6 +1312,48 @@ def cmd_fixture(args: argparse.Namespace) -> int:
             conn.execute("DELETE FROM blessed_lands WHERE user_id IN (?,?,?)", ids)
             conn.execute("DELETE FROM spirit_farms WHERE user_id IN (?,?,?)", ids)
             conn.execute("DELETE FROM combat_cooldowns WHERE user_id IN (?,?,?)", ids)
+        elif args.profile == "pve":
+            for user_id in ids:
+                _upsert_player(conn, user_id, names[user_id])
+                conn.execute("DELETE FROM player_skills WHERE user_id = ?", (user_id,))
+                _ensure_idle_cd(conn, user_id)
+            conn.execute(
+                "UPDATE players SET base_hp = 999999, current_hp = 999999, "
+                "health_recovered_at = 0, damage = 999999, agility = 999, speed = 999 "
+                "WHERE user_id IN (?,?,?)",
+                ids,
+            )
+            conn.execute("DELETE FROM combat_cooldowns WHERE user_id IN (?,?,?)", ids)
+            conn.execute("DELETE FROM adventure_fatigue WHERE user_id IN (?,?,?)", ids)
+            conn.execute(
+                "DELETE FROM adventure_effects WHERE settlement_id IN "
+                "(SELECT settlement_id FROM adventure_settlements "
+                "WHERE user_id IN (?,?,?))",
+                ids,
+            )
+            conn.execute(
+                "DELETE FROM adventure_settlements WHERE user_id IN (?,?,?)", ids
+            )
+            for table in (
+                "event_deliveries",
+                "business_events",
+                "world_boss_contributions",
+                "world_boss_ledger",
+                "world_boss_challenges",
+                "world_boss_daily_attempts",
+                "world_boss_instances",
+            ):
+                conn.execute(f"DELETE FROM {table}")
+            # A future terminal gate prevents the background poller from winning
+            # the race against the explicit profile spawn in the first GM step.
+            conn.execute(
+                "INSERT INTO world_boss_instances "
+                "(instance_id, profile_id, boss_name, max_hp, current_hp, state, "
+                "birth_snapshot, terminated_at, next_spawn_at) "
+                "VALUES ('wb_fixture_respawn_gate', 'fixture_gate', '测试再生门', "
+                "1, 0, 'dissipated', '{}', ?, ?)",
+                (int(time.time()), int(time.time()) + 7 * 86400),
+            )
         else:  # sect
             sect_row_id = _resolve_sect_row(conn)
             for user_id in ids:
@@ -1394,7 +1438,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument(
         "--fixture-profile",
-        choices=["pvp", "sect", "breakthrough", "economy"],
+        choices=["pvp", "sect", "breakthrough", "economy", "pve"],
         default="pvp",
         help="--fixture 使用的 profile（默认 pvp）",
     )
@@ -1426,7 +1470,7 @@ def build_parser() -> argparse.ArgumentParser:
     fixture = sub.add_parser("fixture", help="准备测试基线数据")
     fixture.add_argument(
         "--profile",
-        choices=["pvp", "sect", "breakthrough", "economy"],
+        choices=["pvp", "sect", "breakthrough", "economy", "pve"],
         default="pvp",
     )
     fixture.add_argument(

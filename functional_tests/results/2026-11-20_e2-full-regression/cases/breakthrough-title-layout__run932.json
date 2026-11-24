@@ -1,0 +1,115 @@
+{
+  "id": 932,
+  "case_name": "breakthrough-title-layout",
+  "run_index": 9,
+  "status": "passed",
+  "conversation_id": 951,
+  "steps_result": [
+    {
+      "index": -1,
+      "type": "pre_run_hook",
+      "note": "",
+      "ok": true,
+      "detail": "hook 退出码 0：已备份现有固定 ID 数据 -> /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/functional_tests/.fixture-backup.json\nfixture breakthrough 完成：2 个固定测试玩家已重置",
+      "actual": [],
+      "duration": 0.05
+    },
+    {
+      "index": 0,
+      "type": "send",
+      "note": "保底必成突破（复现同一条成功面板）",
+      "ok": true,
+      "detail": "已注入（消息 #13202）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "标题行以 ✨ 结尾且其后另起一行非分隔符内容 ⇒ 连败彩蛋确实独占一行。（fixture 预置 level_index=9 练气九阶，突破后 level_index=10 → 筑基初期，success 双槽的 flavor 取筑基段，故标题前必有一行引子；pity 参数见 game_config.skill_system.breakthrough_pity_step / _pity_guarantee，不在 level_config。）bd -ju1 修复的验收锚点：只断 `✨\\n` 证不了 bug 是否复现，故要求后随非 ━ 字符。",
+      "ok": true,
+      "detail": "合并窗口匹配（消息 #13203-#13204）",
+      "actual": [
+        "开始尝试突破...",
+        "丹田里第一滴灵液落下，如春水破冰。河开的那一刻，整条灵脉都活了，汩汩地往丹田里汇。你守着这一泓春水，知道根基落成了——往后的路，是奔流，不再是漫流。\n✨ 突破成功！✨\n闭关处的墙角，你踢到一枚石子——不是普通石子，是温养石，摸着暖融融的，不知是哪位前辈随手落的。你揣进怀里，心想：败了这么多回，总该捡点什么。这石头后来一直跟着你，比许多法宝都贴心。\n━━━━━━━━━━━━━━━\n基础成功率：80.0%\n永久加成：-100.0%\n连败保底：19次失败，天道酬勤，本次必成！\n最终成功率：100.0%\n━━━━━━━━━━━━━━━\n恭喜你从【练气九阶】突破至【筑基初期】！\n\n【属性增长】\n气血 +15\n伤害 +4\n身法 +0\n迅捷 +1\n\n【当前属性】\n伤害：104\n身法：50\n迅捷：51\n气血：1015\n护甲：0\n\n山道旁滚着一只旧药袋，你捡起来，袋底沉着些受潮的丹药——【小法盾丹】x1、【小灵爆丹】x1——卖相不佳，药香却正。你把药袋系在腰上，走了三里路，药香一路跟着你，像一只不认生的小狗。你决定先留着，万一下回闭关缺个由头呢。"
+      ],
+      "expected": "re:✨ 突破成功！✨\n[^━\n]",
+      "matched": {
+        "combined": true,
+        "first_id": 13203,
+        "last_id": 13204,
+        "text": "开始尝试突破...\n丹田里第一滴灵液落下，如春水破冰。河开的那一刻，整条灵脉都活了，汩汩地往丹田里汇。你守着这一泓春水，知道根基落成了——往后的路，是奔流，不再是漫流。\n✨ 突破成功！✨\n闭关处的墙角，你踢到一枚石子——不是普通石子，是温养"
+      },
+      "duration": 0.3
+    }
+  ],
+  "case_snapshot": {
+    "name": "breakthrough-title-layout",
+    "description": "换行契约：高连败突破成功时，lose_streak_reward 彩蛋必须与「✨ 突破成功！✨」标题分行（bd -ju1 的防回归钉，修复后转常规用例）。",
+    "scenario": "前置与 breakthrough-guarantee 完全相同（fixture --profile breakthrough --breakthrough-streak 19 → 突破必然成功且必然带彩蛋段）。唯一断言要求标题行以换行收尾、彩蛋另起一行。换行责任在代码调用侧（core/breakthrough_manager.py 渲染 streak_bonus_msg 时补 \\n 并 strip 变体首尾空白，导入器同样 strip），因为文案自带的前导换行穿不过内容导入。空彩蛋分支（连败 <3 不插换行、不留空行）由 tests/test_breakthrough_manager.py::TestSuccessPanelStreakBonusLineBreak 覆盖。",
+    "tags": [
+      "player",
+      "narrative",
+      "narrative-flavor"
+    ],
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_flavor_002",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000002"
+      }
+    },
+    "pre_run_hook": {
+      "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile breakthrough --breakthrough-streak 19 --yes",
+      "timeout": 90
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#突破",
+        "note": "保底必成突破（复现同一条成功面板）"
+      },
+      {
+        "type": "expect",
+        "match": "re:✨ 突破成功！✨\n[^━\n]",
+        "combine": true,
+        "timeout": 60,
+        "note": "标题行以 ✨ 结尾且其后另起一行非分隔符内容 ⇒ 连败彩蛋确实独占一行。（fixture 预置 level_index=9 练气九阶，突破后 level_index=10 → 筑基初期，success 双槽的 flavor 取筑基段，故标题前必有一行引子；pity 参数见 game_config.skill_system.breakthrough_pity_step / _pity_guarantee，不在 level_config。）bd -ju1 修复的验收锚点：只断 `✨\\n` 证不了 bug 是否复现，故要求后随非 ━ 字符。"
+      }
+    ],
+    "owner": "astrbot_plugin_monixiuxian2_2"
+  },
+  "run_messages": [
+    {
+      "id": 13202,
+      "conversation_id": 951,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#突破",
+      "rich": null,
+      "created_at": 1795109381.3438988
+    },
+    {
+      "id": 13203,
+      "conversation_id": 951,
+      "direction": "out",
+      "sender": "bot",
+      "text": "开始尝试突破...",
+      "rich": [],
+      "created_at": 1795109381.3596575
+    },
+    {
+      "id": 13204,
+      "conversation_id": 951,
+      "direction": "out",
+      "sender": "bot",
+      "text": "丹田里第一滴灵液落下，如春水破冰。河开的那一刻，整条灵脉都活了，汩汩地往丹田里汇。你守着这一泓春水，知道根基落成了——往后的路，是奔流，不再是漫流。\n✨ 突破成功！✨\n闭关处的墙角，你踢到一枚石子——不是普通石子，是温养石，摸着暖融融的，不知是哪位前辈随手落的。你揣进怀里，心想：败了这么多回，总该捡点什么。这石头后来一直跟着你，比许多法宝都贴心。\n━━━━━━━━━━━━━━━\n基础成功率：80.0%\n永久加成：-100.0%\n连败保底：19次失败，天道酬勤，本次必成！\n最终成功率：100.0%\n━━━━━━━━━━━━━━━\n恭喜你从【练气九阶】突破至【筑基初期】！\n\n【属性增长】\n气血 +15\n伤害 +4\n身法 +0\n迅捷 +1\n\n【当前属性】\n伤害：104\n身法：50\n迅捷：51\n气血：1015\n护甲：0\n\n山道旁滚着一只旧药袋，你捡起来，袋底沉着些受潮的丹药——【小法盾丹】x1、【小灵爆丹】x1——卖相不佳，药香却正。你把药袋系在腰上，走了三里路，药香一路跟着你，像一只不认生的小狗。你决定先留着，万一下回闭关缺个由头呢。",
+      "rich": [],
+      "created_at": 1795109381.4077458
+    }
+  ],
+  "started_at": 1795109381.2350876,
+  "finished_at": 1795109381.656968
+}

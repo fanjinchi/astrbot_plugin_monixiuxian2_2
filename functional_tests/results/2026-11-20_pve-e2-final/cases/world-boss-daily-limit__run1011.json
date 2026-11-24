@@ -1,0 +1,511 @@
+{
+  "id": 1011,
+  "case_name": "world-boss-daily-limit",
+  "run_index": 4,
+  "status": "passed",
+  "conversation_id": 1031,
+  "steps_result": [
+    {
+      "index": -1,
+      "type": "pre_run_hook",
+      "note": "",
+      "ok": true,
+      "detail": "hook 退出码 0：已备份现有固定 ID 数据 -> /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/functional_tests/.fixture-backup.json\nfixture pve 完成：3 个固定测试玩家已重置",
+      "actual": [],
+      "duration": 0.05
+    },
+    {
+      "index": 0,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14295）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14296：✅ 已将【测试玩家1】的攻击设置为 1）",
+      "actual": [
+        "✅ 已将【测试玩家1】的攻击设置为 1"
+      ],
+      "expected": "攻击设置为 1",
+      "matched": {
+        "id": 14296,
+        "window_index": 0,
+        "text": "✅ 已将【测试玩家1】的攻击设置为 1"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14297）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 3,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14298：✅ 已将【测试玩家1】的气血底数与当前气血设置为 1）",
+      "actual": [
+        "✅ 已将【测试玩家1】的攻击设置为 1",
+        "✅ 已将【测试玩家1】的气血底数与当前气血设置为 1"
+      ],
+      "expected": "气血底数与当前气血设置为 1",
+      "matched": {
+        "id": 14298,
+        "window_index": 1,
+        "text": "✅ 已将【测试玩家1】的气血底数与当前气血设置为 1"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 4,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14299）",
+      "actual": [],
+      "duration": 0.03
+    },
+    {
+      "index": 5,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14300：✅ 已生成世界Boss：吞象巴蛇）",
+      "actual": [
+        "✅ 已将【测试玩家1】的攻击设置为 1",
+        "✅ 已将【测试玩家1】的气血底数与当前气血设置为 1",
+        "✅ 已生成世界Boss：吞象巴蛇"
+      ],
+      "expected": "✅ 已生成世界Boss：吞象巴蛇",
+      "matched": {
+        "id": 14300,
+        "window_index": 2,
+        "text": "✅ 已生成世界Boss：吞象巴蛇"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 6,
+      "type": "send",
+      "note": "第 1 次",
+      "ok": true,
+      "detail": "已注入（消息 #14301）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 7,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14302：⚔️ 你对「吞象巴蛇」造成 180 点伤害（剩余 4820/5000）。）",
+      "actual": [
+        "✅ 已将【测试玩家1】的攻击设置为 1",
+        "✅ 已将【测试玩家1】的气血底数与当前气血设置为 1",
+        "✅ 已生成世界Boss：吞象巴蛇",
+        "⚔️ 你对「吞象巴蛇」造成 180 点伤害（剩余 4820/5000）。"
+      ],
+      "expected": "re:⚔️ 你对「吞象巴蛇」造成 \\d+ 点伤害（剩余 [1-9]\\d*/5000）。",
+      "matched": {
+        "id": 14302,
+        "window_index": 3,
+        "text": "⚔️ 你对「吞象巴蛇」造成 180 点伤害（剩余 4820/5000）。"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 8,
+      "type": "send",
+      "note": "第 2 次",
+      "ok": true,
+      "detail": "已注入（消息 #14303）",
+      "actual": [],
+      "duration": 0.03
+    },
+    {
+      "index": 9,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14304：⚔️ 你对「吞象巴蛇」造成 299 点伤害（剩余 4521/5000）。）",
+      "actual": [
+        "✅ 已将【测试玩家1】的攻击设置为 1",
+        "✅ 已将【测试玩家1】的气血底数与当前气血设置为 1",
+        "✅ 已生成世界Boss：吞象巴蛇",
+        "⚔️ 你对「吞象巴蛇」造成 180 点伤害（剩余 4820/5000）。",
+        "⚔️ 你对「吞象巴蛇」造成 299 点伤害（剩余 4521/5000）。"
+      ],
+      "expected": "re:⚔️ 你对「吞象巴蛇」造成 \\d+ 点伤害（剩余 [1-9]\\d*/5000）。",
+      "matched": {
+        "id": 14304,
+        "window_index": 4,
+        "text": "⚔️ 你对「吞象巴蛇」造成 299 点伤害（剩余 4521/5000）。"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 10,
+      "type": "send",
+      "note": "第 3 次",
+      "ok": true,
+      "detail": "已注入（消息 #14305）",
+      "actual": [],
+      "duration": 0.06
+    },
+    {
+      "index": 11,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14306：⚔️ 你对「吞象巴蛇」造成 52 点伤害（剩余 4469/5000）。）",
+      "actual": [
+        "✅ 已将【测试玩家1】的攻击设置为 1",
+        "✅ 已将【测试玩家1】的气血底数与当前气血设置为 1",
+        "✅ 已生成世界Boss：吞象巴蛇",
+        "⚔️ 你对「吞象巴蛇」造成 180 点伤害（剩余 4820/5000）。",
+        "⚔️ 你对「吞象巴蛇」造成 299 点伤害（剩余 4521/5000）。",
+        "⚔️ 你对「吞象巴蛇」造成 52 点伤害（剩余 4469/5000）。"
+      ],
+      "expected": "re:⚔️ 你对「吞象巴蛇」造成 \\d+ 点伤害（剩余 [1-9]\\d*/5000）。",
+      "matched": {
+        "id": 14306,
+        "window_index": 5,
+        "text": "⚔️ 你对「吞象巴蛇」造成 52 点伤害（剩余 4469/5000）。"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 12,
+      "type": "send",
+      "note": "第 4 次应被北京日次数闸门拒绝",
+      "ok": true,
+      "detail": "已注入（消息 #14307）",
+      "actual": [],
+      "duration": 0.03
+    },
+    {
+      "index": 13,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14308：❌ 今日世界 Boss 挑战次数已用完（每日 3 次）。）",
+      "actual": [
+        "✅ 已将【测试玩家1】的攻击设置为 1",
+        "✅ 已将【测试玩家1】的气血底数与当前气血设置为 1",
+        "✅ 已生成世界Boss：吞象巴蛇",
+        "⚔️ 你对「吞象巴蛇」造成 180 点伤害（剩余 4820/5000）。",
+        "⚔️ 你对「吞象巴蛇」造成 299 点伤害（剩余 4521/5000）。",
+        "⚔️ 你对「吞象巴蛇」造成 52 点伤害（剩余 4469/5000）。",
+        "❌ 今日世界 Boss 挑战次数已用完（每日 3 次）。"
+      ],
+      "expected": "❌ 今日世界 Boss 挑战次数已用完（每日 3 次）。",
+      "matched": {
+        "id": 14308,
+        "window_index": 6,
+        "text": "❌ 今日世界 Boss 挑战次数已用完（每日 3 次）。"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 14,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14309）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 15,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14310：👹 当前世界 Boss：吞象巴蛇\n境界等级：30\n气血：4469/5000\n阶段：第 1 阶段\n消散时刻：2026-11）",
+      "actual": [
+        "✅ 已将【测试玩家1】的攻击设置为 1",
+        "✅ 已将【测试玩家1】的气血底数与当前气血设置为 1",
+        "✅ 已生成世界Boss：吞象巴蛇",
+        "⚔️ 你对「吞象巴蛇」造成 180 点伤害（剩余 4820/5000）。",
+        "⚔️ 你对「吞象巴蛇」造成 299 点伤害（剩余 4521/5000）。",
+        "⚔️ 你对「吞象巴蛇」造成 52 点伤害（剩余 4469/5000）。",
+        "❌ 今日世界 Boss 挑战次数已用完（每日 3 次）。",
+        "👹 当前世界 Boss：吞象巴蛇\n境界等级：30\n气血：4469/5000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:19\n发送「挑战Boss」参与讨伐。"
+      ],
+      "expected": "re:👹 当前世界 Boss：吞象巴蛇[\\s\\S]*气血：[1-9]\\d*/5000",
+      "matched": {
+        "id": 14310,
+        "window_index": 7,
+        "text": "👹 当前世界 Boss：吞象巴蛇\n境界等级：30\n气血：4469/5000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:19\n发送「挑战Boss」参与讨伐。"
+      },
+      "duration": 0.3
+    }
+  ],
+  "case_snapshot": {
+    "name": "world-boss-daily-limit",
+    "description": "世界 Boss 北京自然日三次挑战上限：前三次真实结算，第四次拒绝且 Boss 保持活跃。",
+    "scenario": "pve fixture 复位玩家，GM 指定 5000 HP 的吞象巴蛇；攻击与当前气血均设为 1 以缩短单场并降低累计伤害，确保三次挑战不会末击，第四次必定进入日限分支。",
+    "tags": [
+      "pve",
+      "pve-e2",
+      "world-boss"
+    ],
+    "pre_run_hook": {
+      "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pve --yes",
+      "timeout": 60
+    },
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_pvp_001",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000002"
+      }
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置攻击 900000002 1"
+      },
+      {
+        "type": "expect",
+        "match": "攻击设置为 1",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置战斗气血 900000002 1"
+      },
+      {
+        "type": "expect",
+        "match": "气血底数与当前气血设置为 1",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 生成Boss wb_yy_ba"
+      },
+      {
+        "type": "expect",
+        "match": "✅ 已生成世界Boss：吞象巴蛇",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#挑战Boss",
+        "note": "第 1 次"
+      },
+      {
+        "type": "expect",
+        "match": "re:⚔️ 你对「吞象巴蛇」造成 \\d+ 点伤害（剩余 [1-9]\\d*/5000）。",
+        "timeout": 60
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#挑战Boss",
+        "note": "第 2 次"
+      },
+      {
+        "type": "expect",
+        "match": "re:⚔️ 你对「吞象巴蛇」造成 \\d+ 点伤害（剩余 [1-9]\\d*/5000）。",
+        "timeout": 60
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#挑战Boss",
+        "note": "第 3 次"
+      },
+      {
+        "type": "expect",
+        "match": "re:⚔️ 你对「吞象巴蛇」造成 \\d+ 点伤害（剩余 [1-9]\\d*/5000）。",
+        "timeout": 60
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#挑战Boss",
+        "note": "第 4 次应被北京日次数闸门拒绝"
+      },
+      {
+        "type": "expect",
+        "match": "❌ 今日世界 Boss 挑战次数已用完（每日 3 次）。",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#世界Boss"
+      },
+      {
+        "type": "expect",
+        "match": "re:👹 当前世界 Boss：吞象巴蛇[\\s\\S]*气血：[1-9]\\d*/5000",
+        "timeout": 30
+      }
+    ],
+    "owner": "astrbot_plugin_monixiuxian2_2"
+  },
+  "run_messages": [
+    {
+      "id": 14295,
+      "conversation_id": 1031,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置攻击 900000002 1",
+      "rich": null,
+      "created_at": 1795166398.687866
+    },
+    {
+      "id": 14296,
+      "conversation_id": 1031,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家1】的攻击设置为 1",
+      "rich": [],
+      "created_at": 1795166398.7110124
+    },
+    {
+      "id": 14297,
+      "conversation_id": 1031,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置战斗气血 900000002 1",
+      "rich": null,
+      "created_at": 1795166398.999412
+    },
+    {
+      "id": 14298,
+      "conversation_id": 1031,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家1】的气血底数与当前气血设置为 1",
+      "rich": [],
+      "created_at": 1795166399.039984
+    },
+    {
+      "id": 14299,
+      "conversation_id": 1031,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 生成Boss wb_yy_ba",
+      "rich": null,
+      "created_at": 1795166399.3157387
+    },
+    {
+      "id": 14300,
+      "conversation_id": 1031,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已生成世界Boss：吞象巴蛇",
+      "rich": [],
+      "created_at": 1795166399.3558648
+    },
+    {
+      "id": 14301,
+      "conversation_id": 1031,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#挑战Boss",
+      "rich": null,
+      "created_at": 1795166399.6452193
+    },
+    {
+      "id": 14302,
+      "conversation_id": 1031,
+      "direction": "out",
+      "sender": "bot",
+      "text": "⚔️ 你对「吞象巴蛇」造成 180 点伤害（剩余 4820/5000）。",
+      "rich": [],
+      "created_at": 1795166399.6868796
+    },
+    {
+      "id": 14303,
+      "conversation_id": 1031,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#挑战Boss",
+      "rich": null,
+      "created_at": 1795166399.973423
+    },
+    {
+      "id": 14304,
+      "conversation_id": 1031,
+      "direction": "out",
+      "sender": "bot",
+      "text": "⚔️ 你对「吞象巴蛇」造成 299 点伤害（剩余 4521/5000）。",
+      "rich": [],
+      "created_at": 1795166400.0188317
+    },
+    {
+      "id": 14305,
+      "conversation_id": 1031,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#挑战Boss",
+      "rich": null,
+      "created_at": 1795166400.305253
+    },
+    {
+      "id": 14306,
+      "conversation_id": 1031,
+      "direction": "out",
+      "sender": "bot",
+      "text": "⚔️ 你对「吞象巴蛇」造成 52 点伤害（剩余 4469/5000）。",
+      "rich": [],
+      "created_at": 1795166400.4282744
+    },
+    {
+      "id": 14307,
+      "conversation_id": 1031,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#挑战Boss",
+      "rich": null,
+      "created_at": 1795166400.672568
+    },
+    {
+      "id": 14308,
+      "conversation_id": 1031,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 今日世界 Boss 挑战次数已用完（每日 3 次）。",
+      "rich": [],
+      "created_at": 1795166400.708175
+    },
+    {
+      "id": 14309,
+      "conversation_id": 1031,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#世界Boss",
+      "rich": null,
+      "created_at": 1795166401.0052257
+    },
+    {
+      "id": 14310,
+      "conversation_id": 1031,
+      "direction": "out",
+      "sender": "bot",
+      "text": "👹 当前世界 Boss：吞象巴蛇\n境界等级：30\n气血：4469/5000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:19\n发送「挑战Boss」参与讨伐。",
+      "rich": [],
+      "created_at": 1795166401.0349488
+    }
+  ],
+  "started_at": 1795166398.5757778,
+  "finished_at": 1795166401.331538
+}

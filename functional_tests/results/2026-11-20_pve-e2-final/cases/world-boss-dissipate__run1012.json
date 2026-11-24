@@ -1,0 +1,481 @@
+{
+  "id": 1012,
+  "case_name": "world-boss-dissipate",
+  "run_index": 3,
+  "status": "passed",
+  "conversation_id": 1032,
+  "steps_result": [
+    {
+      "index": -1,
+      "type": "pre_run_hook",
+      "note": "",
+      "ok": true,
+      "detail": "hook 退出码 0：已备份现有固定 ID 数据 -> /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/functional_tests/.fixture-backup.json\nfixture pve 完成：3 个固定测试玩家已重置",
+      "actual": [],
+      "duration": 0.05
+    },
+    {
+      "index": 0,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14311）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14312：✅ 已生成世界Boss：泽底鼍龙）",
+      "actual": [
+        "✅ 已生成世界Boss：泽底鼍龙"
+      ],
+      "expected": "✅ 已生成世界Boss：泽底鼍龙",
+      "matched": {
+        "id": 14312,
+        "window_index": 0,
+        "text": "✅ 已生成世界Boss：泽底鼍龙"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14313）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 3,
+      "type": "expect",
+      "note": "文案再改需同步此处（world_bosses.csv:wb_zj_tuo.spawn_text）",
+      "ok": true,
+      "detail": "合并窗口匹配（消息 #14312-#14315）",
+      "actual": [
+        "✅ 已生成世界Boss：泽底鼍龙",
+        "👹 当前世界 Boss：泽底鼍龙\n境界等级：10\n气血：1800/1800\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:20\n发送「挑战Boss」参与讨伐。",
+        "大泽水翻如沸，背负断碑的鼍龙浮出水面。"
+      ],
+      "expected": "re:(?=[\\s\\S]*👹 当前世界 Boss：泽底鼍龙)(?=[\\s\\S]*大泽水翻如沸，背负断碑的鼍龙浮出水面。)",
+      "matched": {
+        "combined": true,
+        "first_id": 14312,
+        "last_id": 14315,
+        "text": "✅ 已生成世界Boss：泽底鼍龙\n👹 当前世界 Boss：泽底鼍龙\n境界等级：10\n气血：1800/1800\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:20\n发送「挑战Boss」参与讨伐。\n大泽水翻如沸，背负断碑的鼍龙浮出水"
+      },
+      "duration": 46.38
+    },
+    {
+      "index": 4,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14316）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 5,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14317：✅ 时间已快进 172800 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间）",
+      "actual": [
+        "✅ 已生成世界Boss：泽底鼍龙",
+        "👹 当前世界 Boss：泽底鼍龙\n境界等级：10\n气血：1800/1800\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:20\n发送「挑战Boss」参与讨伐。",
+        "大泽水翻如沸，背负断碑的鼍龙浮出水面。",
+        "✅ 时间已快进 172800 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：1 条\n  世界Boss下次再生时间：1 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。"
+      ],
+      "expected": "re:✅ 时间已快进 172800 秒[\\s\\S]*世界Boss实例到期时间：[1-9]\\d* 条",
+      "matched": {
+        "id": 14317,
+        "window_index": 3,
+        "text": "✅ 时间已快进 172800 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n "
+      },
+      "duration": 2.41
+    },
+    {
+      "index": 6,
+      "type": "send",
+      "note": "查询只结算到期，不自动生成下一只",
+      "ok": true,
+      "detail": "已注入（消息 #14318）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 7,
+      "type": "expect",
+      "note": "同时等无活跃回执与 dissipate outbox 广播；文案再改需同步此处（world_bosses.csv:wb_zj_tuo.dissipate_text）",
+      "ok": true,
+      "detail": "合并窗口匹配（消息 #14312-#14320）",
+      "actual": [
+        "✅ 已生成世界Boss：泽底鼍龙",
+        "👹 当前世界 Boss：泽底鼍龙\n境界等级：10\n气血：1800/1800\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:20\n发送「挑战Boss」参与讨伐。",
+        "大泽水翻如沸，背负断碑的鼍龙浮出水面。",
+        "✅ 时间已快进 172800 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：1 条\n  世界Boss下次再生时间：1 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+        "👹 当前没有活跃的世界 Boss。",
+        "鼍龙潜入深泽不知所踪，只留下一泽浊水。"
+      ],
+      "expected": "re:(?=[\\s\\S]*👹 当前没有活跃的世界 Boss。)(?=[\\s\\S]*鼍龙潜入深泽不知所踪，只留下一泽浊水。)",
+      "matched": {
+        "combined": true,
+        "first_id": 14312,
+        "last_id": 14320,
+        "text": "✅ 已生成世界Boss：泽底鼍龙\n👹 当前世界 Boss：泽底鼍龙\n境界等级：10\n气血：1800/1800\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:20\n发送「挑战Boss」参与讨伐。\n大泽水翻如沸，背负断碑的鼍龙浮出水"
+      },
+      "duration": 57.82
+    },
+    {
+      "index": 8,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14321）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 9,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14322：❌ 世界 Boss 尚未到再生时间。）",
+      "actual": [
+        "✅ 已生成世界Boss：泽底鼍龙",
+        "👹 当前世界 Boss：泽底鼍龙\n境界等级：10\n气血：1800/1800\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:20\n发送「挑战Boss」参与讨伐。",
+        "大泽水翻如沸，背负断碑的鼍龙浮出水面。",
+        "✅ 时间已快进 172800 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：1 条\n  世界Boss下次再生时间：1 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+        "👹 当前没有活跃的世界 Boss。",
+        "鼍龙潜入深泽不知所踪，只留下一泽浊水。",
+        "❌ 世界 Boss 尚未到再生时间。"
+      ],
+      "expected": "❌ 世界 Boss 尚未到再生时间。",
+      "matched": {
+        "id": 14322,
+        "window_index": 6,
+        "text": "❌ 世界 Boss 尚未到再生时间。"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 10,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14323）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 11,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14324：✅ 时间已快进 86400 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：）",
+      "actual": [
+        "✅ 已生成世界Boss：泽底鼍龙",
+        "👹 当前世界 Boss：泽底鼍龙\n境界等级：10\n气血：1800/1800\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:20\n发送「挑战Boss」参与讨伐。",
+        "大泽水翻如沸，背负断碑的鼍龙浮出水面。",
+        "✅ 时间已快进 172800 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：1 条\n  世界Boss下次再生时间：1 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+        "👹 当前没有活跃的世界 Boss。",
+        "鼍龙潜入深泽不知所踪，只留下一泽浊水。",
+        "❌ 世界 Boss 尚未到再生时间。",
+        "✅ 时间已快进 86400 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：0 条\n  世界Boss下次再生时间：2 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。"
+      ],
+      "expected": "re:✅ 时间已快进 86400 秒[\\s\\S]*世界Boss下次再生时间：[1-9]\\d* 条",
+      "matched": {
+        "id": 14324,
+        "window_index": 7,
+        "text": "✅ 时间已快进 86400 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  "
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 12,
+      "type": "send",
+      "note": "",
+      "ok": true,
+      "detail": "已注入（消息 #14325）",
+      "actual": [],
+      "duration": 0.02
+    },
+    {
+      "index": 13,
+      "type": "expect",
+      "note": "",
+      "ok": true,
+      "detail": "匹配（消息 #14326：✅ 已生成世界Boss：裂峡罴王）",
+      "actual": [
+        "✅ 已生成世界Boss：泽底鼍龙",
+        "👹 当前世界 Boss：泽底鼍龙\n境界等级：10\n气血：1800/1800\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:20\n发送「挑战Boss」参与讨伐。",
+        "大泽水翻如沸，背负断碑的鼍龙浮出水面。",
+        "✅ 时间已快进 172800 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：1 条\n  世界Boss下次再生时间：1 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+        "👹 当前没有活跃的世界 Boss。",
+        "鼍龙潜入深泽不知所踪，只留下一泽浊水。",
+        "❌ 世界 Boss 尚未到再生时间。",
+        "✅ 时间已快进 86400 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：0 条\n  世界Boss下次再生时间：2 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+        "✅ 已生成世界Boss：裂峡罴王"
+      ],
+      "expected": "✅ 已生成世界Boss：",
+      "matched": {
+        "id": 14326,
+        "window_index": 8,
+        "text": "✅ 已生成世界Boss：裂峡罴王"
+      },
+      "duration": 0.3
+    }
+  ],
+  "case_snapshot": {
+    "name": "world-boss-dissipate",
+    "description": "泽底鼍龙 48 小时到期消散、定稿广播及消散后 24 小时再生窗真实回归。",
+    "scenario": "pve fixture 挡住随机轮询；GM 指定 wb_zj_tuo，时间快进 48 小时后由玩家查询触发领域消散，outbox 广播 dissipate_text；未到 24 小时拒绝再生，快进后可常规随机生成。",
+    "tags": [
+      "pve",
+      "pve-e2",
+      "world-boss"
+    ],
+    "pre_run_hook": {
+      "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pve --yes",
+      "timeout": 60
+    },
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_pvp_001",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000002"
+      }
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 生成Boss wb_zj_tuo"
+      },
+      {
+        "type": "expect",
+        "match": "✅ 已生成世界Boss：泽底鼍龙",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#世界Boss"
+      },
+      {
+        "type": "expect",
+        "match": "re:(?=[\\s\\S]*👹 当前世界 Boss：泽底鼍龙)(?=[\\s\\S]*大泽水翻如沸，背负断碑的鼍龙浮出水面。)",
+        "combine": true,
+        "timeout": 90,
+        "note": "文案再改需同步此处（world_bosses.csv:wb_zj_tuo.spawn_text）"
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 时间快进 172800 确认"
+      },
+      {
+        "type": "expect",
+        "match": "re:✅ 时间已快进 172800 秒[\\s\\S]*世界Boss实例到期时间：[1-9]\\d* 条",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#世界Boss",
+        "note": "查询只结算到期，不自动生成下一只"
+      },
+      {
+        "type": "expect",
+        "match": "re:(?=[\\s\\S]*👹 当前没有活跃的世界 Boss。)(?=[\\s\\S]*鼍龙潜入深泽不知所踪，只留下一泽浊水。)",
+        "combine": true,
+        "timeout": 90,
+        "note": "同时等无活跃回执与 dissipate outbox 广播；文案再改需同步此处（world_bosses.csv:wb_zj_tuo.dissipate_text）"
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 生成Boss"
+      },
+      {
+        "type": "expect",
+        "match": "❌ 世界 Boss 尚未到再生时间。",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 时间快进 86400 确认"
+      },
+      {
+        "type": "expect",
+        "match": "re:✅ 时间已快进 86400 秒[\\s\\S]*世界Boss下次再生时间：[1-9]\\d* 条",
+        "timeout": 30
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 生成Boss"
+      },
+      {
+        "type": "expect",
+        "match": "✅ 已生成世界Boss：",
+        "timeout": 30
+      }
+    ],
+    "owner": "astrbot_plugin_monixiuxian2_2"
+  },
+  "run_messages": [
+    {
+      "id": 14311,
+      "conversation_id": 1032,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 生成Boss wb_zj_tuo",
+      "rich": null,
+      "created_at": 1795166401.739279
+    },
+    {
+      "id": 14312,
+      "conversation_id": 1032,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已生成世界Boss：泽底鼍龙",
+      "rich": [],
+      "created_at": 1795166401.761516
+    },
+    {
+      "id": 14313,
+      "conversation_id": 1032,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#世界Boss",
+      "rich": null,
+      "created_at": 1795166402.0500891
+    },
+    {
+      "id": 14314,
+      "conversation_id": 1032,
+      "direction": "out",
+      "sender": "bot",
+      "text": "👹 当前世界 Boss：泽底鼍龙\n境界等级：10\n气血：1800/1800\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:20\n发送「挑战Boss」参与讨伐。",
+      "rich": [],
+      "created_at": 1795166402.066387
+    },
+    {
+      "id": 14315,
+      "conversation_id": 1032,
+      "direction": "out",
+      "sender": "bot",
+      "text": "大泽水翻如沸，背负断碑的鼍龙浮出水面。",
+      "rich": [],
+      "created_at": 1795166448.207547
+    },
+    {
+      "id": 14316,
+      "conversation_id": 1032,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 时间快进 172800 确认",
+      "rich": null,
+      "created_at": 1795166448.4349778
+    },
+    {
+      "id": 14317,
+      "conversation_id": 1032,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 时间已快进 172800 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：1 条\n  世界Boss下次再生时间：1 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+      "rich": [],
+      "created_at": 1795166450.845075
+    },
+    {
+      "id": 14318,
+      "conversation_id": 1032,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#世界Boss",
+      "rich": null,
+      "created_at": 1795166450.8616152
+    },
+    {
+      "id": 14319,
+      "conversation_id": 1032,
+      "direction": "out",
+      "sender": "bot",
+      "text": "👹 当前没有活跃的世界 Boss。",
+      "rich": [],
+      "created_at": 1795166451.2421105
+    },
+    {
+      "id": 14320,
+      "conversation_id": 1032,
+      "direction": "out",
+      "sender": "bot",
+      "text": "鼍龙潜入深泽不知所踪，只留下一泽浊水。",
+      "rich": [],
+      "created_at": 1795166508.3998854
+    },
+    {
+      "id": 14321,
+      "conversation_id": 1032,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 生成Boss",
+      "rich": null,
+      "created_at": 1795166508.6879325
+    },
+    {
+      "id": 14322,
+      "conversation_id": 1032,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 世界 Boss 尚未到再生时间。",
+      "rich": [],
+      "created_at": 1795166508.710248
+    },
+    {
+      "id": 14323,
+      "conversation_id": 1032,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 时间快进 86400 确认",
+      "rich": null,
+      "created_at": 1795166509.0078154
+    },
+    {
+      "id": 14324,
+      "conversation_id": 1032,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 时间已快进 86400 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：0 条\n  世界Boss下次再生时间：2 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+      "rich": [],
+      "created_at": 1795166509.035145
+    },
+    {
+      "id": 14325,
+      "conversation_id": 1032,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 生成Boss",
+      "rich": null,
+      "created_at": 1795166509.3223875
+    },
+    {
+      "id": 14326,
+      "conversation_id": 1032,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已生成世界Boss：裂峡罴王",
+      "rich": [],
+      "created_at": 1795166509.3627992
+    }
+  ],
+  "started_at": 1795166401.6285782,
+  "finished_at": 1795166509.6471255
+}

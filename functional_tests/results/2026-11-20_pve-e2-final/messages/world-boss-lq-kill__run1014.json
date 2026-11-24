@@ -1,0 +1,164 @@
+[
+  {
+    "id": 14345,
+    "conversation_id": 1034,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss wb_lq_ba",
+    "rich": null,
+    "created_at": 1795166630.9435217
+  },
+  {
+    "id": 14346,
+    "conversation_id": 1034,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已生成世界Boss：裂峡罴王",
+    "rich": [],
+    "created_at": 1795166630.9717221
+  },
+  {
+    "id": 14347,
+    "conversation_id": 1034,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#世界Boss",
+    "rich": null,
+    "created_at": 1795166631.2563863
+  },
+  {
+    "id": 14348,
+    "conversation_id": 1034,
+    "direction": "out",
+    "sender": "bot",
+    "text": "👹 当前世界 Boss：裂峡罴王\n境界等级：1\n气血：1000/1000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:23\n发送「挑战Boss」参与讨伐。",
+    "rich": [],
+    "created_at": 1795166631.274865
+  },
+  {
+    "id": 14349,
+    "conversation_id": 1034,
+    "direction": "out",
+    "sender": "bot",
+    "text": "黑风峡方向煞气冲天——裂峡罴王出峡了！",
+    "rich": [],
+    "created_at": 1795166689.2802818
+  },
+  {
+    "id": 14350,
+    "conversation_id": 1034,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#挑战Boss",
+    "rich": null,
+    "created_at": 1795166689.3727748
+  },
+  {
+    "id": 14351,
+    "conversation_id": 1034,
+    "direction": "out",
+    "sender": "bot",
+    "text": "⚔️ 你对「裂峡罴王」造成 1000 点伤害（剩余 0/1000）。「裂峡罴王」进入第 3 阶段！🎯 你给予了「裂峡罴王」最后一击！",
+    "rich": [],
+    "created_at": 1795166689.4125302
+  },
+  {
+    "id": 14352,
+    "conversation_id": 1034,
+    "direction": "out",
+    "sender": "bot",
+    "text": "罴王轰然倒地，峡谷回音久久不散。",
+    "rich": [],
+    "created_at": 1795166749.5701704
+  },
+  {
+    "id": 14353,
+    "conversation_id": 1034,
+    "direction": "out",
+    "sender": "bot",
+    "text": "罴王吃痛狂性大发，掌势更猛了！",
+    "rich": [],
+    "created_at": 1795166749.6820467
+  },
+  {
+    "id": 14354,
+    "conversation_id": 1034,
+    "direction": "out",
+    "sender": "bot",
+    "text": "罴王遍体鳞伤步履踉跄，甲皮都松动了。",
+    "rich": [],
+    "created_at": 1795166749.7922816
+  },
+  {
+    "id": 14355,
+    "conversation_id": 1034,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#挑战Boss",
+    "rich": null,
+    "created_at": 1795166749.9072874
+  },
+  {
+    "id": 14356,
+    "conversation_id": 1034,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 当前没有可挑战的世界 Boss。",
+    "rich": [],
+    "created_at": 1795166749.9356415
+  },
+  {
+    "id": 14357,
+    "conversation_id": 1034,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss",
+    "rich": null,
+    "created_at": 1795166750.2211452
+  },
+  {
+    "id": 14358,
+    "conversation_id": 1034,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 世界 Boss 尚未到再生时间。",
+    "rich": [],
+    "created_at": 1795166750.2423978
+  },
+  {
+    "id": 14359,
+    "conversation_id": 1034,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 时间快进 43200 确认",
+    "rich": null,
+    "created_at": 1795166750.5396068
+  },
+  {
+    "id": 14360,
+    "conversation_id": 1034,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 时间已快进 43200 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：0 条\n  世界Boss下次再生时间：2 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+    "rich": [],
+    "created_at": 1795166750.5728345
+  },
+  {
+    "id": 14361,
+    "conversation_id": 1034,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss",
+    "rich": null,
+    "created_at": 1795166750.8584924
+  },
+  {
+    "id": 14362,
+    "conversation_id": 1034,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已生成世界Boss：裂峡罴王",
+    "rich": [],
+    "created_at": 1795166750.8911133
+  }
+]

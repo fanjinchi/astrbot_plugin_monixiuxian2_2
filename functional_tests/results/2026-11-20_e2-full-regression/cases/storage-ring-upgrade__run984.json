@@ -1,0 +1,336 @@
+{
+  "id": 984,
+  "case_name": "storage-ring-upgrade",
+  "run_index": 6,
+  "status": "passed",
+  "conversation_id": 1003,
+  "steps_result": [
+    {
+      "index": -1,
+      "type": "pre_run_hook",
+      "note": "",
+      "ok": true,
+      "detail": "hook 退出码 0：已备份现有固定 ID 数据 -> /home/guigui/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/functional_tests/.fixture-backup.json\nfixture economy 完成：3 个固定测试玩家已重置",
+      "actual": [],
+      "duration": 0.06
+    },
+    {
+      "index": 0,
+      "type": "send",
+      "note": "建角色（fixture 已建则提示已踏入）",
+      "ok": true,
+      "detail": "已注入（消息 #14093）",
+      "actual": [],
+      "duration": 0.01
+    },
+    {
+      "index": 1,
+      "type": "expect",
+      "note": "p1 可用",
+      "ok": true,
+      "detail": "匹配（消息 #14094：道友，你已踏入仙途，无需重复此举。）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。"
+      ],
+      "expected": "re:恭喜道友|已踏入仙途",
+      "matched": {
+        "id": 14094,
+        "window_index": 0,
+        "text": "道友，你已踏入仙途，无需重复此举。"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 2,
+      "type": "send",
+      "note": "20 格 < 当前 120 格且需求 0 级：容量复核早退（不先撞境界闸门）",
+      "ok": true,
+      "detail": "已注入（消息 #14095）",
+      "actual": [],
+      "duration": 0.03
+    },
+    {
+      "index": 3,
+      "type": "expect",
+      "note": "写锁内重读后的容量校验",
+      "ok": true,
+      "detail": "匹配（消息 #14096：❌ 【基础储物戒】容量（20格）不高于当前储物戒（120格），无法替换）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "❌ 【基础储物戒】容量（20格）不高于当前储物戒（120格），无法替换"
+      ],
+      "expected": "无法替换",
+      "matched": {
+        "id": 14096,
+        "window_index": 1,
+        "text": "❌ 【基础储物戒】容量（20格）不高于当前储物戒（120格），无法替换"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 4,
+      "type": "send",
+      "note": "抬到 20 级（须弥要求）",
+      "ok": true,
+      "detail": "已注入（消息 #14097）",
+      "actual": [],
+      "duration": 0.03
+    },
+    {
+      "index": 5,
+      "type": "expect",
+      "note": "GM 设置境界",
+      "ok": true,
+      "detail": "匹配（消息 #14098：✅ 已将【测试玩家1】的境界设置为「金丹初期」）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "❌ 【基础储物戒】容量（20格）不高于当前储物戒（120格），无法替换",
+        "✅ 已将【测试玩家1】的境界设置为「金丹初期」"
+      ],
+      "expected": "境界设置为",
+      "matched": {
+        "id": 14098,
+        "window_index": 2,
+        "text": "✅ 已将【测试玩家1】的境界设置为「金丹初期」"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 6,
+      "type": "send",
+      "note": "灵石恰好够须弥价格",
+      "ok": true,
+      "detail": "已注入（消息 #14099）",
+      "actual": [],
+      "duration": 0.03
+    },
+    {
+      "index": 7,
+      "type": "expect",
+      "note": "GM 设置灵石",
+      "ok": true,
+      "detail": "匹配（消息 #14100：✅ 已将【测试玩家1】的灵石设置为 200,000）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "❌ 【基础储物戒】容量（20格）不高于当前储物戒（120格），无法替换",
+        "✅ 已将【测试玩家1】的境界设置为「金丹初期」",
+        "✅ 已将【测试玩家1】的灵石设置为 200,000"
+      ],
+      "expected": "灵石设置为",
+      "matched": {
+        "id": 14100,
+        "window_index": 3,
+        "text": "✅ 已将【测试玩家1】的灵石设置为 200,000"
+      },
+      "duration": 0.3
+    },
+    {
+      "index": 8,
+      "type": "send",
+      "note": "升级成功路径",
+      "ok": true,
+      "detail": "已注入（消息 #14101）",
+      "actual": [],
+      "duration": 0.03
+    },
+    {
+      "index": 9,
+      "type": "expect",
+      "note": "重读→校验→扣费→写回",
+      "ok": true,
+      "detail": "匹配（消息 #14102：✅ 储物戒升级成功！\n【乾坤储物戒】(120格) → 【须弥储物戒】(200格)\n品级：圣品\n消耗灵石：200,000）",
+      "actual": [
+        "道友，你已踏入仙途，无需重复此举。",
+        "❌ 【基础储物戒】容量（20格）不高于当前储物戒（120格），无法替换",
+        "✅ 已将【测试玩家1】的境界设置为「金丹初期」",
+        "✅ 已将【测试玩家1】的灵石设置为 200,000",
+        "✅ 储物戒升级成功！\n【乾坤储物戒】(120格) → 【须弥储物戒】(200格)\n品级：圣品\n消耗灵石：200,000"
+      ],
+      "expected": "储物戒升级成功",
+      "matched": {
+        "id": 14102,
+        "window_index": 4,
+        "text": "✅ 储物戒升级成功！\n【乾坤储物戒】(120格) → 【须弥储物戒】(200格)\n品级：圣品\n消耗灵石：200,000"
+      },
+      "duration": 0.3
+    }
+  ],
+  "case_snapshot": {
+    "name": "storage-ring-upgrade",
+    "owner": "astrbot_plugin_monixiuxian2_2",
+    "description": "储物戒升级：容量不足被拒 → GM 抬境界与灵石 → 升级须弥储物戒成功。",
+    "scenario": "前置：economy fixture 复位固定 ID（默认乾坤储物戒 120 格 / 1 级 / 10 万灵石）。覆盖 upgrade_ring 的写锁内重读 + 容量复核早退 + 扣费升级成功。",
+    "tags": [
+      "economy",
+      "gm"
+    ],
+    "pre_run_hook": {
+      "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile economy --yes",
+      "timeout": 60
+    },
+    "conversation": {
+      "kind": "group",
+      "group_id": "webtest_pvp_001",
+      "pin_players": {
+        "gm": "900000001",
+        "p1": "900000002"
+      }
+    },
+    "steps": [
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#我要修仙 灵修",
+        "note": "建角色（fixture 已建则提示已踏入）"
+      },
+      {
+        "type": "expect",
+        "match": "re:恭喜道友|已踏入仙途",
+        "timeout": 30,
+        "note": "p1 可用"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#更换储物戒 基础储物戒",
+        "note": "20 格 < 当前 120 格且需求 0 级：容量复核早退（不先撞境界闸门）"
+      },
+      {
+        "type": "expect",
+        "match": "无法替换",
+        "timeout": 30,
+        "note": "写锁内重读后的容量校验"
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置境界 900000002 金丹初期",
+        "note": "抬到 20 级（须弥要求）"
+      },
+      {
+        "type": "expect",
+        "match": "境界设置为",
+        "timeout": 30,
+        "note": "GM 设置境界"
+      },
+      {
+        "type": "send",
+        "player": "gm",
+        "text": "#修仙GM 设置灵石 900000002 200000",
+        "note": "灵石恰好够须弥价格"
+      },
+      {
+        "type": "expect",
+        "match": "灵石设置为",
+        "timeout": 30,
+        "note": "GM 设置灵石"
+      },
+      {
+        "type": "send",
+        "player": "p1",
+        "text": "#更换储物戒 须弥储物戒",
+        "note": "升级成功路径"
+      },
+      {
+        "type": "expect",
+        "match": "储物戒升级成功",
+        "timeout": 30,
+        "note": "重读→校验→扣费→写回"
+      }
+    ]
+  },
+  "run_messages": [
+    {
+      "id": 14093,
+      "conversation_id": 1003,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#我要修仙 灵修",
+      "rich": null,
+      "created_at": 1795111173.062785
+    },
+    {
+      "id": 14094,
+      "conversation_id": 1003,
+      "direction": "out",
+      "sender": "bot",
+      "text": "道友，你已踏入仙途，无需重复此举。",
+      "rich": [],
+      "created_at": 1795111173.07646
+    },
+    {
+      "id": 14095,
+      "conversation_id": 1003,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#更换储物戒 基础储物戒",
+      "rich": null,
+      "created_at": 1795111173.37341
+    },
+    {
+      "id": 14096,
+      "conversation_id": 1003,
+      "direction": "out",
+      "sender": "bot",
+      "text": "❌ 【基础储物戒】容量（20格）不高于当前储物戒（120格），无法替换",
+      "rich": [],
+      "created_at": 1795111173.4080203
+    },
+    {
+      "id": 14097,
+      "conversation_id": 1003,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置境界 900000002 金丹初期",
+      "rich": null,
+      "created_at": 1795111173.7042115
+    },
+    {
+      "id": 14098,
+      "conversation_id": 1003,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家1】的境界设置为「金丹初期」",
+      "rich": [],
+      "created_at": 1795111173.7528226
+    },
+    {
+      "id": 14099,
+      "conversation_id": 1003,
+      "direction": "in",
+      "sender": "900000001",
+      "text": "#修仙GM 设置灵石 900000002 200000",
+      "rich": null,
+      "created_at": 1795111174.0425477
+    },
+    {
+      "id": 14100,
+      "conversation_id": 1003,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 已将【测试玩家1】的灵石设置为 200,000",
+      "rich": [],
+      "created_at": 1795111174.0895958
+    },
+    {
+      "id": 14101,
+      "conversation_id": 1003,
+      "direction": "in",
+      "sender": "900000002",
+      "text": "#更换储物戒 须弥储物戒",
+      "rich": null,
+      "created_at": 1795111174.3786652
+    },
+    {
+      "id": 14102,
+      "conversation_id": 1003,
+      "direction": "out",
+      "sender": "bot",
+      "text": "✅ 储物戒升级成功！\n【乾坤储物戒】(120格) → 【须弥储物戒】(200格)\n品级：圣品\n消耗灵石：200,000",
+      "rich": [],
+      "created_at": 1795111174.4163003
+    }
+  ],
+  "started_at": 1795111172.9474156,
+  "finished_at": 1795111174.7079995
+}

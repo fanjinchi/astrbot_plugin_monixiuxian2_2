@@ -1,0 +1,92 @@
+[
+  {
+    "id": 13165,
+    "conversation_id": 947,
+    "direction": "in",
+    "sender": "case_bank-sect-smoke_18_player1",
+    "text": "我要修仙 灵修",
+    "rich": null,
+    "created_at": 1795109254.1693945
+  },
+  {
+    "id": 13166,
+    "conversation_id": 947,
+    "direction": "out",
+    "sender": "bot",
+    "text": "恭喜道友 player1 踏上仙途！\n━━━━━━━━━━━━━━━\n修炼方式：【灵修】\n灵根：【暗灵根】\n评价：【稀有】幽暗深邃，诡异莫测\n启动资金：100 灵石\n━━━━━━━━━━━━━━━\n修仙路上多凶险：突破失败或生命值归零，会身死道消，一切归于尘土。修行之前，先把这条路看清。\n━━━━━━━━━━━━━━━\n💡 发送「我的信息」查看状态",
+    "rich": [],
+    "created_at": 1795109254.2055728
+  },
+  {
+    "id": 13167,
+    "conversation_id": 947,
+    "direction": "in",
+    "sender": "case_bank-sect-smoke_18_player1",
+    "text": "银行",
+    "rich": null,
+    "created_at": 1795109254.485625
+  },
+  {
+    "id": 13168,
+    "conversation_id": 947,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏦 灵石银行\n━━━━━━━━━━━━━━━\n💰 存款余额：0 灵石\n📈 待领利息：0 灵石\n📊 日利率：0.1%（复利）\n━━━━━━━━━━━━━━━\n💎 持有灵石：100\n━━━━━━━━━━━━━━━\n💡 指令：\n  /存灵石 <数量>\n  /取灵石 <数量>\n  /领取利息\n  /贷款 <数量>\n  /还款\n  /银行流水",
+    "rich": [],
+    "created_at": 1795109254.50311
+  },
+  {
+    "id": 13169,
+    "conversation_id": 947,
+    "direction": "in",
+    "sender": "case_bank-sect-smoke_18_player1",
+    "text": "存灵石 100",
+    "rich": null,
+    "created_at": 1795109254.7993412
+  },
+  {
+    "id": 13170,
+    "conversation_id": 947,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 成功存入 100 灵石！\n当前余额：100 灵石",
+    "rich": [],
+    "created_at": 1795109254.8452935
+  },
+  {
+    "id": 13171,
+    "conversation_id": 947,
+    "direction": "in",
+    "sender": "case_bank-sect-smoke_18_player1",
+    "text": "宗门 信息",
+    "rich": null,
+    "created_at": 1795109255.131395
+  },
+  {
+    "id": 13172,
+    "conversation_id": 947,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 你还未加入宗门！",
+    "rich": [],
+    "created_at": 1795109255.1484008
+  },
+  {
+    "id": 13173,
+    "conversation_id": 947,
+    "direction": "in",
+    "sender": "case_bank-sect-smoke_18_player1",
+    "text": "宗门 列表",
+    "rich": null,
+    "created_at": 1795109255.4447458
+  },
+  {
+    "id": 13174,
+    "conversation_id": 947,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏛️ 宗门列表\n━━━━━━━━━━━━━━━\n1. 【青云门】\n   宗主：未知\n   建设度：100 | 成员：1人\n\n2. 【合欢宗】\n   宗主：未知\n   建设度：100 | 成员：0人\n\n",
+    "rich": [],
+    "created_at": 1795109255.4846725
+  }
+]

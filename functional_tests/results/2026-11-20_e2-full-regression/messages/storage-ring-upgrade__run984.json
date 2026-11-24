@@ -1,0 +1,92 @@
+[
+  {
+    "id": 14093,
+    "conversation_id": 1003,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1795111173.062785
+  },
+  {
+    "id": 14094,
+    "conversation_id": 1003,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1795111173.07646
+  },
+  {
+    "id": 14095,
+    "conversation_id": 1003,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#更换储物戒 基础储物戒",
+    "rich": null,
+    "created_at": 1795111173.37341
+  },
+  {
+    "id": 14096,
+    "conversation_id": 1003,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 【基础储物戒】容量（20格）不高于当前储物戒（120格），无法替换",
+    "rich": [],
+    "created_at": 1795111173.4080203
+  },
+  {
+    "id": 14097,
+    "conversation_id": 1003,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置境界 900000002 金丹初期",
+    "rich": null,
+    "created_at": 1795111173.7042115
+  },
+  {
+    "id": 14098,
+    "conversation_id": 1003,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的境界设置为「金丹初期」",
+    "rich": [],
+    "created_at": 1795111173.7528226
+  },
+  {
+    "id": 14099,
+    "conversation_id": 1003,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 设置灵石 900000002 200000",
+    "rich": null,
+    "created_at": 1795111174.0425477
+  },
+  {
+    "id": 14100,
+    "conversation_id": 1003,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已将【测试玩家1】的灵石设置为 200,000",
+    "rich": [],
+    "created_at": 1795111174.0895958
+  },
+  {
+    "id": 14101,
+    "conversation_id": 1003,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#更换储物戒 须弥储物戒",
+    "rich": null,
+    "created_at": 1795111174.3786652
+  },
+  {
+    "id": 14102,
+    "conversation_id": 1003,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 储物戒升级成功！\n【乾坤储物戒】(120格) → 【须弥储物戒】(200格)\n品级：圣品\n消耗灵石：200,000",
+    "rich": [],
+    "created_at": 1795111174.4163003
+  }
+]

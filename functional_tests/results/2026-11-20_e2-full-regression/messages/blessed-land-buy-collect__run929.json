@@ -1,0 +1,74 @@
+[
+  {
+    "id": 13175,
+    "conversation_id": 948,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我要修仙 灵修",
+    "rich": null,
+    "created_at": 1795109256.2817214
+  },
+  {
+    "id": 13176,
+    "conversation_id": 948,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友，你已踏入仙途，无需重复此举。",
+    "rich": [],
+    "created_at": 1795109256.2989511
+  },
+  {
+    "id": 13177,
+    "conversation_id": 948,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#我的洞天",
+    "rich": null,
+    "created_at": 1795109256.5955398
+  },
+  {
+    "id": 13178,
+    "conversation_id": 948,
+    "direction": "out",
+    "sender": "bot",
+    "text": "🏔️ 洞天福地\n━━━━━━━━━━━━━━━\n你还没有洞天！\n\n可购买的洞天：\n  1. 小洞天 - 10,000灵石\n  2. 中洞天 - 50,000灵石\n  3. 大洞天 - 200,000灵石\n  4. 福地 - 500,000灵石\n  5. 洞天福地 - 1,000,000灵石\n\n💡 使用 /购买洞天 <编号>",
+    "rich": [],
+    "created_at": 1795109256.6347675
+  },
+  {
+    "id": 13179,
+    "conversation_id": 948,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#购买洞天 1",
+    "rich": null,
+    "created_at": 1795109256.932218
+  },
+  {
+    "id": 13180,
+    "conversation_id": 948,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✨ 恭喜获得【小洞天】！\n━━━━━━━━━━━━━━━\n修炼加成：+5%\n每小时产出：100 灵石\n━━━━━━━━━━━━━━━\n使用 /洞天收取 领取产出",
+    "rich": [],
+    "created_at": 1795109256.981252
+  },
+  {
+    "id": 13181,
+    "conversation_id": 948,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#洞天收取",
+    "rich": null,
+    "created_at": 1795109257.2670186
+  },
+  {
+    "id": 13182,
+    "conversation_id": 948,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 收取冷却中，还需 59 分钟。",
+    "rich": [],
+    "created_at": 1795109257.3641574
+  }
+]

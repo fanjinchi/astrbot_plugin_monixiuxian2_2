@@ -1,0 +1,28 @@
+{
+  "name": "world-boss-jd-kill",
+  "description": "焚山朱厌生成、查询、三阶段击杀、定稿广播及击杀后 12 小时再生窗真实回归。",
+  "scenario": "pve fixture 以未来终态门挡住随机轮询；GM 指定 wb_jd_zhu，玩家高属性一次挑战跨至第三阶段并末击。combine 断言同时覆盖 handler 回执和 poller/outbox 主动群广播。",
+  "tags": ["pve", "pve-e2", "world-boss"],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pve --yes",
+    "timeout": 60
+  },
+  "conversation": {"kind": "group", "group_id": "webtest_pvp_001", "pin_players": {"gm": "900000001", "p1": "900000002"}},
+  "steps": [
+    {"type": "send", "player": "gm", "text": "#修仙GM 生成Boss wb_jd_zhu"},
+    {"type": "expect", "match": "✅ 已生成世界Boss：焚山朱厌", "timeout": 30},
+    {"type": "send", "player": "p1", "text": "#世界Boss"},
+    {"type": "expect", "match": "re:(?=[\\s\\S]*👹 当前世界 Boss：焚山朱厌)(?=[\\s\\S]*气血：4600/4600)(?=[\\s\\S]*阶段：第 1 阶段)(?=[\\s\\S]*西边山火三日不熄——朱厌现世，兵戈之兆！)", "combine": true, "timeout": 90, "note": "文案再改需同步此处（world_bosses.csv:wb_jd_zhu.spawn_text）"},
+    {"type": "send", "player": "p1", "text": "#挑战Boss"},
+    {"type": "expect", "match": "re:(?=[\\s\\S]*⚔️ 你对「焚山朱厌」造成 \\d+ 点伤害（剩余 0/4600）。)(?=[\\s\\S]*「焚山朱厌」进入第 3 阶段！)(?=[\\s\\S]*🎯 你给予了「焚山朱厌」最后一击！)(?=[\\s\\S]*朱厌捶胸长啸，火随拳势暴涨！)(?=[\\s\\S]*朱厌毛发焦落白首低垂，拳势却更急了。)(?=[\\s\\S]*朱厌倒在它亲手点燃的山火里。)", "combine": true, "timeout": 90, "note": "文案再改需同步此处（world_bosses.csv:wb_jd_zhu.phase2_text/phase3_text/kill_text）"},
+    {"type": "send", "player": "p1", "text": "#挑战Boss"},
+    {"type": "expect", "match": "❌ 当前没有可挑战的世界 Boss。", "timeout": 30},
+    {"type": "send", "player": "gm", "text": "#修仙GM 生成Boss"},
+    {"type": "expect", "match": "❌ 世界 Boss 尚未到再生时间。", "timeout": 30},
+    {"type": "send", "player": "gm", "text": "#修仙GM 时间快进 43200 确认"},
+    {"type": "expect", "match": "re:✅ 时间已快进 43200 秒[\\s\\S]*世界Boss下次再生时间：[1-9]\\d* 条", "timeout": 30},
+    {"type": "send", "player": "gm", "text": "#修仙GM 生成Boss"},
+    {"type": "expect", "match": "✅ 已生成世界Boss：", "timeout": 30}
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "id": 13205,
+    "conversation_id": 952,
+    "direction": "in",
+    "sender": "case_daily-checkin-basic_7_p1",
+    "text": "签到",
+    "rich": null,
+    "created_at": 1795109381.8029907
+  },
+  {
+    "id": 13206,
+    "conversation_id": 952,
+    "direction": "out",
+    "sender": "bot",
+    "text": "道友尚未踏入仙途，请发送「我要修仙」开启你的旅程。",
+    "rich": [],
+    "created_at": 1795109381.8171604
+  },
+  {
+    "id": 13207,
+    "conversation_id": 952,
+    "direction": "in",
+    "sender": "case_daily-checkin-basic_7_p1",
+    "text": "我要修仙 灵修",
+    "rich": null,
+    "created_at": 1795109382.1146674
+  },
+  {
+    "id": 13208,
+    "conversation_id": 952,
+    "direction": "out",
+    "sender": "bot",
+    "text": "恭喜道友 p1 踏上仙途！\n━━━━━━━━━━━━━━━\n修炼方式：【灵修】\n灵根：【金灵根】\n评价：【上品】金之精华，锋锐无双\n启动资金：100 灵石\n━━━━━━━━━━━━━━━\n修仙路上多凶险：突破失败或生命值归零，会身死道消，一切归于尘土。修行之前，先把这条路看清。\n━━━━━━━━━━━━━━━\n💡 发送「我的信息」查看状态",
+    "rich": [],
+    "created_at": 1795109382.1436298
+  },
+  {
+    "id": 13209,
+    "conversation_id": 952,
+    "direction": "in",
+    "sender": "case_daily-checkin-basic_7_p1",
+    "text": "签到",
+    "rich": null,
+    "created_at": 1795109382.4321356
+  },
+  {
+    "id": 13210,
+    "conversation_id": 952,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 签到成功！\n━━━━━━━━━━━━━━━\n💰 获得灵石：73\n💎 当前灵石：173\n━━━━━━━━━━━━━━━\n明日再来，莫要忘记哦~",
+    "rich": [],
+    "created_at": 1795109382.4657323
+  },
+  {
+    "id": 13211,
+    "conversation_id": 952,
+    "direction": "in",
+    "sender": "case_daily-checkin-basic_7_p1",
+    "text": "签到",
+    "rich": null,
+    "created_at": 1795109382.745281
+  },
+  {
+    "id": 13212,
+    "conversation_id": 952,
+    "direction": "out",
+    "sender": "bot",
+    "text": "📅 道友今日已经签到过了\n请明日再来。",
+    "rich": [],
+    "created_at": 1795109382.7650898
+  }
+]

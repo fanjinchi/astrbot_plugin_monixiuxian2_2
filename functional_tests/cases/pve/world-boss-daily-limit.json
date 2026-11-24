@@ -1,0 +1,30 @@
+{
+  "name": "world-boss-daily-limit",
+  "description": "世界 Boss 北京自然日三次挑战上限：前三次真实结算，第四次拒绝且 Boss 保持活跃。",
+  "scenario": "pve fixture 复位玩家，GM 指定 5000 HP 的吞象巴蛇；攻击与当前气血均设为 1 以缩短单场并降低累计伤害，确保三次挑战不会末击，第四次必定进入日限分支。",
+  "tags": ["pve", "pve-e2", "world-boss"],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pve --yes",
+    "timeout": 60
+  },
+  "conversation": {"kind": "group", "group_id": "webtest_pvp_001", "pin_players": {"gm": "900000001", "p1": "900000002"}},
+  "steps": [
+    {"type": "send", "player": "gm", "text": "#修仙GM 设置攻击 900000002 1"},
+    {"type": "expect", "match": "攻击设置为 1", "timeout": 30},
+    {"type": "send", "player": "gm", "text": "#修仙GM 设置战斗气血 900000002 1"},
+    {"type": "expect", "match": "气血底数与当前气血设置为 1", "timeout": 30},
+    {"type": "send", "player": "gm", "text": "#修仙GM 生成Boss wb_yy_ba"},
+    {"type": "expect", "match": "✅ 已生成世界Boss：吞象巴蛇", "timeout": 30},
+    {"type": "send", "player": "p1", "text": "#挑战Boss", "note": "第 1 次"},
+    {"type": "expect", "match": "re:⚔️ 你对「吞象巴蛇」造成 \\d+ 点伤害（剩余 [1-9]\\d*/5000）。", "timeout": 60},
+    {"type": "send", "player": "p1", "text": "#挑战Boss", "note": "第 2 次"},
+    {"type": "expect", "match": "re:⚔️ 你对「吞象巴蛇」造成 \\d+ 点伤害（剩余 [1-9]\\d*/5000）。", "timeout": 60},
+    {"type": "send", "player": "p1", "text": "#挑战Boss", "note": "第 3 次"},
+    {"type": "expect", "match": "re:⚔️ 你对「吞象巴蛇」造成 \\d+ 点伤害（剩余 [1-9]\\d*/5000）。", "timeout": 60},
+    {"type": "send", "player": "p1", "text": "#挑战Boss", "note": "第 4 次应被北京日次数闸门拒绝"},
+    {"type": "expect", "match": "❌ 今日世界 Boss 挑战次数已用完（每日 3 次）。", "timeout": 30},
+    {"type": "send", "player": "p1", "text": "#世界Boss"},
+    {"type": "expect", "match": "re:👹 当前世界 Boss：吞象巴蛇[\\s\\S]*气血：[1-9]\\d*/5000", "timeout": 30}
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
+}

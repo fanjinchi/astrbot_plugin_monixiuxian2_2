@@ -1,0 +1,28 @@
+{
+  "name": "world-boss-lq-kill",
+  "description": "裂峡罴王生成、查询、三阶段击杀、定稿广播及击杀后 12 小时再生窗真实回归。",
+  "scenario": "pve fixture 以未来终态门挡住随机轮询；GM 指定 wb_lq_ba，玩家高属性一次挑战跨至第三阶段并末击。combine 断言同时覆盖 handler 回执和 poller/outbox 主动群广播。",
+  "tags": ["pve", "pve-e2", "world-boss"],
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pve --yes",
+    "timeout": 60
+  },
+  "conversation": {"kind": "group", "group_id": "webtest_pvp_001", "pin_players": {"gm": "900000001", "p1": "900000002"}},
+  "steps": [
+    {"type": "send", "player": "gm", "text": "#修仙GM 生成Boss wb_lq_ba"},
+    {"type": "expect", "match": "✅ 已生成世界Boss：裂峡罴王", "timeout": 30},
+    {"type": "send", "player": "p1", "text": "#世界Boss"},
+    {"type": "expect", "match": "re:(?=[\\s\\S]*👹 当前世界 Boss：裂峡罴王)(?=[\\s\\S]*气血：1000/1000)(?=[\\s\\S]*阶段：第 1 阶段)(?=[\\s\\S]*黑风峡方向煞气冲天——裂峡罴王出峡了！)", "combine": true, "timeout": 90, "note": "同时等查询与 spawn outbox 广播；文案再改需同步此处（world_bosses.csv:wb_lq_ba.spawn_text）"},
+    {"type": "send", "player": "p1", "text": "#挑战Boss"},
+    {"type": "expect", "match": "re:(?=[\\s\\S]*⚔️ 你对「裂峡罴王」造成 \\d+ 点伤害（剩余 0/1000）。)(?=[\\s\\S]*「裂峡罴王」进入第 3 阶段！)(?=[\\s\\S]*🎯 你给予了「裂峡罴王」最后一击！)(?=[\\s\\S]*罴王吃痛狂性大发，掌势更猛了！)(?=[\\s\\S]*罴王遍体鳞伤步履踉跄，甲皮都松动了。)(?=[\\s\\S]*罴王轰然倒地，峡谷回音久久不散。)", "combine": true, "timeout": 90, "note": "阶段 2/3 与击杀广播；文案再改需同步此处（world_bosses.csv:wb_lq_ba.phase2_text/phase3_text/kill_text）"},
+    {"type": "send", "player": "p1", "text": "#挑战Boss"},
+    {"type": "expect", "match": "❌ 当前没有可挑战的世界 Boss。", "timeout": 30},
+    {"type": "send", "player": "gm", "text": "#修仙GM 生成Boss"},
+    {"type": "expect", "match": "❌ 世界 Boss 尚未到再生时间。", "timeout": 30},
+    {"type": "send", "player": "gm", "text": "#修仙GM 时间快进 43200 确认"},
+    {"type": "expect", "match": "re:✅ 时间已快进 43200 秒[\\s\\S]*世界Boss下次再生时间：[1-9]\\d* 条", "timeout": 30},
+    {"type": "send", "player": "gm", "text": "#修仙GM 生成Boss"},
+    {"type": "expect", "match": "✅ 已生成世界Boss：", "timeout": 30}
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
+}

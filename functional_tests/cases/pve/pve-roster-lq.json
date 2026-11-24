@@ -1,0 +1,30 @@
+{
+  "name": "pve-roster-lq",
+  "description": "练气段固定名册真实历练：云游结算锁定老林猪王，并核对首领固定面板。",
+  "scenario": "pve fixture 复位固定玩家与历练状态；deterministic seed=0 在中风险云游结算稳定触发首领。完整 28 条名册、top 组移除和守护者回退由 tests/test_pve_cutover.py 等单测覆盖，本条验证真实消息管线的练气段首领路径。",
+  "tags": ["pve", "pve-e2"],
+  "deterministic": true,
+  "seed": 0,
+  "pre_run_hook": {
+    "command": "python3 \"$HOME/code/AstrBot/data/plugins/astrbot_plugin_monixiuxian2_2/scripts/test_suite_ctl.py\" fixture --profile pve --yes",
+    "timeout": 60
+  },
+  "conversation": {
+    "kind": "group",
+    "group_id": "webtest_pvp_001",
+    "pin_players": {"gm": "900000001", "p1": "900000002"}
+  },
+  "steps": [
+    {"type": "send", "player": "gm", "text": "#修仙GM 设置境界 900000002 练气三阶", "note": "进入练气段且达到云游门槛"},
+    {"type": "expect", "match": "境界设置为「练气三阶」", "timeout": 30},
+    {"type": "send", "player": "p1", "text": "#开始历练 云游", "note": "中风险路线可触发首领"},
+    {"type": "expect", "match": "云游四方", "timeout": 30},
+    {"type": "send", "player": "gm", "text": "#修仙GM 时间快进 3600 确认", "note": "使云游到达正常完成时刻"},
+    {"type": "expect", "match": "✅ 时间已快进 3600 秒", "timeout": 30},
+    {"type": "send", "player": "p1", "text": "#完成历练", "note": "玩家正常路径展示战前面板，seed=0 锁定老林猪王·古力"},
+    {"type": "expect", "match": "re:⚔️ 历练遭遇劲敌！[\\s\\S]*敌方：老林猪王·古力[\\s\\S]*此次遭遇已经锁定", "combine": true, "timeout": 30},
+    {"type": "send", "player": "p1", "text": "#迎战", "note": "同一锁定敌人进入真实战斗"},
+    {"type": "expect", "match": "re:🚶 历练归来[\\s\\S]*老林猪王·古力：气血 \\d+/228，伤害 18，身法 \\d+，迅捷 \\d+[\\s\\S]*🏆 战斗结果：胜利", "combine": true, "timeout": 60, "note": "固定 HP=228、伤害=18×难度系数 1.0"}
+  ],
+  "owner": "astrbot_plugin_monixiuxian2_2"
+}

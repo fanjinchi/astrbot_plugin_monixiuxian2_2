@@ -1,0 +1,164 @@
+[
+  {
+    "id": 14363,
+    "conversation_id": 1035,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss wb_yy_ba",
+    "rich": null,
+    "created_at": 1795166751.3070889
+  },
+  {
+    "id": 14364,
+    "conversation_id": 1035,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已生成世界Boss：吞象巴蛇",
+    "rich": [],
+    "created_at": 1795166751.335539
+  },
+  {
+    "id": 14365,
+    "conversation_id": 1035,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#世界Boss",
+    "rich": null,
+    "created_at": 1795166751.6206236
+  },
+  {
+    "id": 14366,
+    "conversation_id": 1035,
+    "direction": "out",
+    "sender": "bot",
+    "text": "👹 当前世界 Boss：吞象巴蛇\n境界等级：30\n气血：5000/5000\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:25\n发送「挑战Boss」参与讨伐。",
+    "rich": [],
+    "created_at": 1795166751.6428962
+  },
+  {
+    "id": 14367,
+    "conversation_id": 1035,
+    "direction": "out",
+    "sender": "bot",
+    "text": "云梦大泽雾气蔽日，有巨物游走其间——巴蛇出矣。",
+    "rich": [],
+    "created_at": 1795166809.966235
+  },
+  {
+    "id": 14368,
+    "conversation_id": 1035,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#挑战Boss",
+    "rich": null,
+    "created_at": 1795166810.0572648
+  },
+  {
+    "id": 14369,
+    "conversation_id": 1035,
+    "direction": "out",
+    "sender": "bot",
+    "text": "⚔️ 你对「吞象巴蛇」造成 5000 点伤害（剩余 0/5000）。「吞象巴蛇」进入第 3 阶段！🎯 你给予了「吞象巴蛇」最后一击！",
+    "rich": [],
+    "created_at": 1795166810.1090088
+  },
+  {
+    "id": 14370,
+    "conversation_id": 1035,
+    "direction": "out",
+    "sender": "bot",
+    "text": "巴蛇庞大的身躯轰然砸落泽中，雾气久久不散。",
+    "rich": [],
+    "created_at": 1795166870.264368
+  },
+  {
+    "id": 14371,
+    "conversation_id": 1035,
+    "direction": "out",
+    "sender": "bot",
+    "text": "巴蛇昂首吞吸如虹，百里鸟兽惊散！",
+    "rich": [],
+    "created_at": 1795166870.3812017
+  },
+  {
+    "id": 14372,
+    "conversation_id": 1035,
+    "direction": "out",
+    "sender": "bot",
+    "text": "巴蛇腹部旧伤迸裂鳞甲大片脱落，绞杀却愈发疯狂。",
+    "rich": [],
+    "created_at": 1795166870.4963236
+  },
+  {
+    "id": 14373,
+    "conversation_id": 1035,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#挑战Boss",
+    "rich": null,
+    "created_at": 1795166870.6075947
+  },
+  {
+    "id": 14374,
+    "conversation_id": 1035,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 当前没有可挑战的世界 Boss。",
+    "rich": [],
+    "created_at": 1795166870.6367545
+  },
+  {
+    "id": 14375,
+    "conversation_id": 1035,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss",
+    "rich": null,
+    "created_at": 1795166870.9215195
+  },
+  {
+    "id": 14376,
+    "conversation_id": 1035,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 世界 Boss 尚未到再生时间。",
+    "rich": [],
+    "created_at": 1795166870.944052
+  },
+  {
+    "id": 14377,
+    "conversation_id": 1035,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 时间快进 43200 确认",
+    "rich": null,
+    "created_at": 1795166871.240043
+  },
+  {
+    "id": 14378,
+    "conversation_id": 1035,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 时间已快进 43200 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：0 条\n  世界Boss下次再生时间：2 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+    "rich": [],
+    "created_at": 1795166871.2721052
+  },
+  {
+    "id": 14379,
+    "conversation_id": 1035,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss",
+    "rich": null,
+    "created_at": 1795166871.5584326
+  },
+  {
+    "id": 14380,
+    "conversation_id": 1035,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已生成世界Boss：焚山朱厌",
+    "rich": [],
+    "created_at": 1795166871.590366
+  }
+]

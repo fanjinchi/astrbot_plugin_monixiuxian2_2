@@ -1,0 +1,146 @@
+[
+  {
+    "id": 14311,
+    "conversation_id": 1032,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss wb_zj_tuo",
+    "rich": null,
+    "created_at": 1795166401.739279
+  },
+  {
+    "id": 14312,
+    "conversation_id": 1032,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已生成世界Boss：泽底鼍龙",
+    "rich": [],
+    "created_at": 1795166401.761516
+  },
+  {
+    "id": 14313,
+    "conversation_id": 1032,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#世界Boss",
+    "rich": null,
+    "created_at": 1795166402.0500891
+  },
+  {
+    "id": 14314,
+    "conversation_id": 1032,
+    "direction": "out",
+    "sender": "bot",
+    "text": "👹 当前世界 Boss：泽底鼍龙\n境界等级：10\n气血：1800/1800\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:20\n发送「挑战Boss」参与讨伐。",
+    "rich": [],
+    "created_at": 1795166402.066387
+  },
+  {
+    "id": 14315,
+    "conversation_id": 1032,
+    "direction": "out",
+    "sender": "bot",
+    "text": "大泽水翻如沸，背负断碑的鼍龙浮出水面。",
+    "rich": [],
+    "created_at": 1795166448.207547
+  },
+  {
+    "id": 14316,
+    "conversation_id": 1032,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 时间快进 172800 确认",
+    "rich": null,
+    "created_at": 1795166448.4349778
+  },
+  {
+    "id": 14317,
+    "conversation_id": 1032,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 时间已快进 172800 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：1 条\n  世界Boss下次再生时间：1 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+    "rich": [],
+    "created_at": 1795166450.845075
+  },
+  {
+    "id": 14318,
+    "conversation_id": 1032,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#世界Boss",
+    "rich": null,
+    "created_at": 1795166450.8616152
+  },
+  {
+    "id": 14319,
+    "conversation_id": 1032,
+    "direction": "out",
+    "sender": "bot",
+    "text": "👹 当前没有活跃的世界 Boss。",
+    "rich": [],
+    "created_at": 1795166451.2421105
+  },
+  {
+    "id": 14320,
+    "conversation_id": 1032,
+    "direction": "out",
+    "sender": "bot",
+    "text": "鼍龙潜入深泽不知所踪，只留下一泽浊水。",
+    "rich": [],
+    "created_at": 1795166508.3998854
+  },
+  {
+    "id": 14321,
+    "conversation_id": 1032,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss",
+    "rich": null,
+    "created_at": 1795166508.6879325
+  },
+  {
+    "id": 14322,
+    "conversation_id": 1032,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 世界 Boss 尚未到再生时间。",
+    "rich": [],
+    "created_at": 1795166508.710248
+  },
+  {
+    "id": 14323,
+    "conversation_id": 1032,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 时间快进 86400 确认",
+    "rich": null,
+    "created_at": 1795166509.0078154
+  },
+  {
+    "id": 14324,
+    "conversation_id": 1032,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 时间已快进 86400 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：0 条\n  世界Boss下次再生时间：2 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+    "rich": [],
+    "created_at": 1795166509.035145
+  },
+  {
+    "id": 14325,
+    "conversation_id": 1032,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss",
+    "rich": null,
+    "created_at": 1795166509.3223875
+  },
+  {
+    "id": 14326,
+    "conversation_id": 1032,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已生成世界Boss：裂峡罴王",
+    "rich": [],
+    "created_at": 1795166509.3627992
+  }
+]

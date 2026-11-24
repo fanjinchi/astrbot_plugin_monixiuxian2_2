@@ -1,0 +1,164 @@
+[
+  {
+    "id": 14327,
+    "conversation_id": 1033,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss wb_jd_zhu",
+    "rich": null,
+    "created_at": 1795166510.0713582
+  },
+  {
+    "id": 14328,
+    "conversation_id": 1033,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已生成世界Boss：焚山朱厌",
+    "rich": [],
+    "created_at": 1795166510.0999184
+  },
+  {
+    "id": 14329,
+    "conversation_id": 1033,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#世界Boss",
+    "rich": null,
+    "created_at": 1795166510.384878
+  },
+  {
+    "id": 14330,
+    "conversation_id": 1033,
+    "direction": "out",
+    "sender": "bot",
+    "text": "👹 当前世界 Boss：焚山朱厌\n境界等级：20\n气血：4600/4600\n阶段：第 1 阶段\n消散时刻：2026-11-22 17:21\n发送「挑战Boss」参与讨伐。",
+    "rich": [],
+    "created_at": 1795166510.4072251
+  },
+  {
+    "id": 14331,
+    "conversation_id": 1033,
+    "direction": "out",
+    "sender": "bot",
+    "text": "西边山火三日不熄——朱厌现世，兵戈之兆！",
+    "rich": [],
+    "created_at": 1795166568.578641
+  },
+  {
+    "id": 14332,
+    "conversation_id": 1033,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#挑战Boss",
+    "rich": null,
+    "created_at": 1795166568.8059285
+  },
+  {
+    "id": 14333,
+    "conversation_id": 1033,
+    "direction": "out",
+    "sender": "bot",
+    "text": "⚔️ 你对「焚山朱厌」造成 4600 点伤害（剩余 0/4600）。「焚山朱厌」进入第 3 阶段！🎯 你给予了「焚山朱厌」最后一击！",
+    "rich": [],
+    "created_at": 1795166568.8512337
+  },
+  {
+    "id": 14334,
+    "conversation_id": 1033,
+    "direction": "out",
+    "sender": "bot",
+    "text": "朱厌倒在它亲手点燃的山火里。",
+    "rich": [],
+    "created_at": 1795166628.8768544
+  },
+  {
+    "id": 14335,
+    "conversation_id": 1033,
+    "direction": "out",
+    "sender": "bot",
+    "text": "朱厌捶胸长啸，火随拳势暴涨！",
+    "rich": [],
+    "created_at": 1795166628.9860108
+  },
+  {
+    "id": 14336,
+    "conversation_id": 1033,
+    "direction": "out",
+    "sender": "bot",
+    "text": "朱厌毛发焦落白首低垂，拳势却更急了。",
+    "rich": [],
+    "created_at": 1795166629.0958169
+  },
+  {
+    "id": 14337,
+    "conversation_id": 1033,
+    "direction": "in",
+    "sender": "900000002",
+    "text": "#挑战Boss",
+    "rich": null,
+    "created_at": 1795166629.3404195
+  },
+  {
+    "id": 14338,
+    "conversation_id": 1033,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 当前没有可挑战的世界 Boss。",
+    "rich": [],
+    "created_at": 1795166629.374327
+  },
+  {
+    "id": 14339,
+    "conversation_id": 1033,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss",
+    "rich": null,
+    "created_at": 1795166629.6601958
+  },
+  {
+    "id": 14340,
+    "conversation_id": 1033,
+    "direction": "out",
+    "sender": "bot",
+    "text": "❌ 世界 Boss 尚未到再生时间。",
+    "rich": [],
+    "created_at": 1795166629.6823585
+  },
+  {
+    "id": 14341,
+    "conversation_id": 1033,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 时间快进 43200 确认",
+    "rich": null,
+    "created_at": 1795166629.980188
+  },
+  {
+    "id": 14342,
+    "conversation_id": 1033,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 时间已快进 43200 秒（共前移 7 条记录）：\n  历练/秘境/宗门任务计划完成时间：0 条\n  闭关开始时间：0 条\n  决斗/切磋冷却：0 条\n  双修冷却：0 条\n  进行中悬赏过期时间：0 条\n  悬赏放弃冷却：2 条\n  贷款到期时间：0 条\n  世界Boss实例到期时间：0 条\n  世界Boss下次再生时间：2 条\n  灵眼下次刷新时间：1 条\n  传承挑战冷却：1 条\n  传承被夺保护期：1 条\n  历练休整到期时间：0 条\n⚠️ 仅限测试实例：前移不可逆；睡眠中的定时任务（世界 Boss/灵眼）不会被唤醒，将在下次醒来时立即触发，需要立即生成请用「生成Boss」。",
+    "rich": [],
+    "created_at": 1795166630.0122764
+  },
+  {
+    "id": 14343,
+    "conversation_id": 1033,
+    "direction": "in",
+    "sender": "900000001",
+    "text": "#修仙GM 生成Boss",
+    "rich": null,
+    "created_at": 1795166630.2991586
+  },
+  {
+    "id": 14344,
+    "conversation_id": 1033,
+    "direction": "out",
+    "sender": "bot",
+    "text": "✅ 已生成世界Boss：焚山朱厌",
+    "rich": [],
+    "created_at": 1795166630.3320138
+  }
+]
